@@ -11,7 +11,7 @@ const dateTimeFormat = new Intl.DateTimeFormat("de-DE", {
 });
 
 const inputClasses =
-  "mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
+  "mt-1 min-h-11 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
 
 export default async function ContactDetailPage({
   params,
@@ -47,7 +47,7 @@ export default async function ContactDetailPage({
         </div>
         <Link
           href={`/contacts/${contact.id}/edit`}
-          className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+          className="inline-flex min-h-11 items-center rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
         >
           Bearbeiten
         </Link>
@@ -150,7 +150,7 @@ export default async function ContactDetailPage({
           <div className="flex justify-end">
             <button
               type="submit"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
               Aktivität speichern
             </button>

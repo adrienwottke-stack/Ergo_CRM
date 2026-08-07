@@ -36,7 +36,7 @@ export default async function ContactsPage({
         <h1 className="text-2xl font-semibold">Kontakte</h1>
         <Link
           href="/contacts/new"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="inline-flex min-h-11 items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           + Neuer Kontakt
         </Link>

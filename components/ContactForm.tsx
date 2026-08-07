@@ -2,7 +2,7 @@ import type { Contact } from "@/lib/generated/prisma/client";
 import { allContactStatuses, contactStatusLabels } from "@/lib/labels";
 
 const inputClasses =
-  "mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
+  "mt-1 min-h-11 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
 
 export default function ContactForm({
   action,
@@ -126,7 +126,7 @@ export default function ContactForm({
       <div className="flex justify-end">
         <button
           type="submit"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           {submitLabel}
         </button>
