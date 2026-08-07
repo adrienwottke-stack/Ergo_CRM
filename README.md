@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ergo CRM
 
-## Getting Started
+Kleine CRM-Web-App zum Tracken von Ergo-Netzwerk-Kontakten: Kontakte anlegen,
+Status pflegen (Neu → Kontaktiert → Termin → Abgeschlossen/Abgelehnt) und
+Aktivitäten (Anruf, Meeting, E-Mail) protokollieren. Kein Vertragsabschluss-Tool.
 
-First, run the development server:
+**Stack:** Next.js 15 (App Router, Server Components/Actions), TypeScript,
+Tailwind CSS 4, Prisma 7 (pg-Adapter), Postgres via Supabase.
+
+## Lokales Setup
+
+```bash
+npm install
+```
+
+`.env` anlegen (Vorlage: `.env.example`) und ausfüllen, dann Migration einspielen:
+
+```bash
+npx prisma migrate deploy
+```
+
+Dev-Server starten:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Login unter `http://localhost:3000` mit dem Passwort aus `APP_PASSWORD`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment-Variablen (auch in Vercel setzen)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable       | Zweck                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| `DATABASE_URL` | Supabase **Transaction Pooler** (Port 6543, `?pgbouncer=true`) – wird von der App genutzt |
+| `DIRECT_URL`   | Supabase **Session Pooler** (Port 5432) – nur für `prisma migrate`                        |
+| `APP_PASSWORD` | Passwort für den Login der App                                                            |
 
-## Learn More
+Beide URLs stehen im Supabase-Dashboard unter **Connect → ORMs → Prisma**.
 
-To learn more about Next.js, take a look at the following resources:
+## Deployment (Vercel)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Repo pushen und in Vercel importieren.
+2. Die drei Env-Variablen oben setzen (Production + Preview).
+3. Deploy – `postinstall` führt `prisma generate` automatisch aus.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Migrationen laufen nicht automatisch beim Deploy; bei Schemaänderungen einmal
+lokal `npx prisma migrate deploy` gegen die Supabase-DB ausführen.
 
-## Deploy on Vercel
+## Seiten
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `/dashboard` – Kontakte je Status als Kacheln
+- `/contacts` – Liste mit Status-Filter
+- `/contacts/new` – Kontakt anlegen
+- `/contacts/[id]` – Detailseite mit Aktivitäten-Log
+- `/contacts/[id]/edit` – Kontakt bearbeiten
+- `/login` – Passwortschutz (Single-User)
