@@ -1,6 +1,7 @@
 export const authCookieName = "ergo_crm_auth";
 export const teamCookieName = "ergo_crm_team_auth";
 export const personCookieName = "ergo_crm_person_id";
+export const reportCookieName = "ergo_crm_report_auth";
 
 // Edge-kompatibel (Web Crypto), damit es auch in der Middleware läuft.
 async function sha256Hex(input: string): Promise<string> {
@@ -19,4 +20,9 @@ export async function authTokenValue(): Promise<string> {
 // Team-Zugang: nur Aktivitäten loggen + Rangliste ansehen, keine Kontaktdaten.
 export async function teamTokenValue(): Promise<string> {
   return sha256Hex(`ergo-crm-team:${process.env.TEAM_PASSWORD ?? ""}`);
+}
+
+// Berichts-Zugang (Vorgesetzte): nur aggregierter Tätigkeitsbericht, keine Kundendaten.
+export async function reportTokenValue(): Promise<string> {
+  return sha256Hex(`ergo-crm-report:${process.env.REPORT_PASSWORD ?? ""}`);
 }

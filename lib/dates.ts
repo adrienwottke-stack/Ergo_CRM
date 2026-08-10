@@ -9,6 +9,22 @@ export function berlinToday(): string {
   return berlinDayFormat.format(new Date());
 }
 
+// Berliner Kalendertag eines beliebigen Zeitstempels (z. B. Activity.date).
+export function berlinDayOf(date: Date): string {
+  return berlinDayFormat.format(date);
+}
+
+export function shiftDay(day: string, days: number): string {
+  const date = dayToUtcDate(day);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+// Montag der Woche, in der `day` liegt – als Tag-String.
+export function mondayOf(day: string): string {
+  return startOfWeek(day).toISOString().slice(0, 10);
+}
+
 export function dayToUtcDate(day: string): Date {
   return new Date(`${day}T00:00:00Z`);
 }

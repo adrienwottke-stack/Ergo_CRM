@@ -19,6 +19,7 @@ export default function AppLayout({
                   { href: "/dashboard", label: "Dashboard" },
                   { href: "/contacts", label: "Kontakte" },
                   { href: "/leaderboard", label: "Wettbewerb" },
+                  { href: "/report", label: "Bericht" },
                 ]}
               />
             </div>

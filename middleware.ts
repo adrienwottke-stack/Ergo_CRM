@@ -2,12 +2,22 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   authCookieName,
   authTokenValue,
+  reportCookieName,
+  reportTokenValue,
   teamCookieName,
   teamTokenValue,
 } from "@/lib/auth";
 
 // Nur diese Pfade sind mit dem Team-Zugang erreichbar (keine Kundendaten).
 const teamPathPrefixes = ["/log", "/leaderboard"];
+// Nur dieser Pfad ist mit dem Berichts-Zugang erreichbar (nur Aggregate).
+const reportPathPrefixes = ["/report"];
+
+function matchesPrefix(pathname: string, prefixes: string[]): boolean {
+  return prefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
 
 export async function middleware(request: NextRequest) {
   const fullToken = request.cookies.get(authCookieName)?.value;
@@ -16,12 +26,17 @@ export async function middleware(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl;
-  const isTeamPath = teamPathPrefixes.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
-  if (isTeamPath) {
+
+  if (matchesPrefix(pathname, teamPathPrefixes)) {
     const teamToken = request.cookies.get(teamCookieName)?.value;
     if (teamToken && teamToken === (await teamTokenValue())) {
+      return NextResponse.next();
+    }
+  }
+
+  if (matchesPrefix(pathname, reportPathPrefixes)) {
+    const reportToken = request.cookies.get(reportCookieName)?.value;
+    if (reportToken && reportToken === (await reportTokenValue())) {
       return NextResponse.next();
     }
   }

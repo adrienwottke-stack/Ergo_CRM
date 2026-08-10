@@ -6,6 +6,8 @@ import {
   authCookieName,
   authTokenValue,
   personCookieName,
+  reportCookieName,
+  reportTokenValue,
   teamCookieName,
   teamTokenValue,
 } from "@/lib/auth";
@@ -36,6 +38,11 @@ export async function login(formData: FormData) {
     redirect("/log");
   }
 
+  if (process.env.REPORT_PASSWORD && password === process.env.REPORT_PASSWORD) {
+    cookieStore.set(reportCookieName, await reportTokenValue(), cookieOptions);
+    redirect("/report");
+  }
+
   redirect("/login?error=1");
 }
 
@@ -43,6 +50,7 @@ export async function logout() {
   const cookieStore = await cookies();
   cookieStore.delete(authCookieName);
   cookieStore.delete(teamCookieName);
+  cookieStore.delete(reportCookieName);
   cookieStore.delete(personCookieName);
   redirect("/login");
 }

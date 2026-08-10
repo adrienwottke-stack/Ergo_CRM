@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "storno-mockup",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:\\Users\\adrie\\AppData\\Local\\Temp\\claude\\C--Users-adrie-Desktop-Business-Ergo-CRM\\a667ca1a-0fe0-410d-a647-499a2107f56a\\scratchpad\\serve.js"],
+      "port": 4173
     }
   ]
 }

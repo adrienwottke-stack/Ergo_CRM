@@ -33,8 +33,9 @@ Login unter `http://localhost:3000` mit dem Passwort aus `APP_PASSWORD`.
 | --------------- | ----------------------------------------------------------------------------------------- |
 | `DATABASE_URL`  | Supabase **Transaction Pooler** (Port 6543, `?pgbouncer=true`) – wird von der App genutzt |
 | `DIRECT_URL`    | Supabase **Session Pooler** (Port 5432) – nur für `prisma migrate`                        |
-| `APP_PASSWORD`  | Passwort mit vollem Zugriff (Kontakte + Wettbewerb)                                       |
+| `APP_PASSWORD`  | Passwort mit vollem Zugriff (Kontakte + Wettbewerb + Bericht)                             |
 | `TEAM_PASSWORD` | Team-Passwort für den Wettbewerb – nur `/log` + `/leaderboard`, keine Kontaktdaten        |
+| `REPORT_PASSWORD` | Berichts-Passwort für Vorgesetzte – nur `/report`, aggregierte Zahlen ohne Kundendaten  |
 
 Beide URLs stehen im Supabase-Dashboard unter **Connect → ORMs → Prisma**.
 
@@ -67,3 +68,11 @@ Netzwerkweit teilbarer Bereich, getrennt vom privaten Kontakt-CRM:
 Wer sich mit `TEAM_PASSWORD` anmeldet, sieht **nur** diese beiden Seiten –
 Kontaktdaten (Namen, Telefonnummern, Notizen) bleiben privat hinter
 `APP_PASSWORD`. Zum Verteilen im Netzwerk: URL + Team-Passwort weitergeben.
+
+## Tätigkeitsbericht für Vorgesetzte
+
+- `/report` – aggregierte Übersicht: Aktivitäten (Woche/Monat/gesamt),
+  Pipeline nach Status, Wochen-Verlauf der letzten 8 Wochen, Quellen-Verteilung
+- Zugang über `REPORT_PASSWORD` – sieht ausschließlich diese Seite
+- Datenschutz: nur Zahlen und Typen (Anruf/Meeting/E-Mail), niemals
+  Kundennamen, Kontaktdaten oder Gesprächsnotizen
