@@ -5,7 +5,36 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  /* Marken-Navy: Struktur, Buttons, Links */
+  --color-navy-50: #f2f6fb;
+  --color-navy-100: #e0eaf6;
+  --color-navy-200: #bed3ea;
+  --color-navy-300: #93b4d9;
+  --color-navy-400: #5f8dc0;
+  --color-navy-500: #3a6ba4;
+  --color-navy-600: #2b5387;
+  --color-navy-700: #22426c;
+  --color-navy-800: #1a3253;
+  --color-navy-900: #12233c;
+  --color-navy-950: #0a1628;
+
+  /* Gold: Auszeichnung, Platz 1, dezente Akzente */
+  --color-gold-100: #f7ecd4;
+  --color-gold-400: #d4a942;
+  --color-gold-600: #a97f24;
+}
+
 body {
-  background: #f5f5f4;
-  color: #1c1917;
+  background: #f4f6f9;
+  color: #0f172a;
+}
+
+::selection {
+  background: var(--color-navy-100);
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
 }

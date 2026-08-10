@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import ContactForm from "@/components/ContactForm";
+import { pageTitle } from "@/components/ui";
 import { updateContact } from "../../actions";
 
 export default async function EditContactPage({
@@ -20,14 +21,14 @@ export default async function EditContactPage({
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Kontakt bearbeiten</h1>
+      <div>
         <Link
           href={`/contacts/${contact.id}`}
-          className="text-sm text-stone-500 hover:text-stone-900"
+          className="text-sm font-medium text-slate-500 transition hover:text-slate-900"
         >
-          Zurück zum Kontakt
+          ← Zurück zu {contact.name}
         </Link>
+        <h1 className={`${pageTitle} mt-2`}>Kontakt bearbeiten</h1>
       </div>
       <ContactForm
         action={updateContactWithId}

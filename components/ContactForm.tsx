@@ -1,8 +1,6 @@
 import type { Contact } from "@/lib/generated/prisma/client";
 import { allContactStatuses, contactStatusLabels } from "@/lib/labels";
-
-const inputClasses =
-  "mt-1 min-h-11 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
+import { btnPrimary, card, input, label } from "@/components/ui";
 
 export default function ContactForm({
   action,
@@ -14,15 +12,9 @@ export default function ContactForm({
   submitLabel: string;
 }) {
   return (
-    <form
-      action={action}
-      className="space-y-4 rounded-xl border border-stone-200 bg-white p-6 shadow-sm"
-    >
+    <form action={action} className={`${card} space-y-5 p-6 sm:p-8`}>
       <div>
-        <label
-          htmlFor="name"
-          className="block text-sm font-medium text-stone-700"
-        >
+        <label htmlFor="name" className={label}>
           Name *
         </label>
         <input
@@ -30,50 +22,44 @@ export default function ContactForm({
           name="name"
           type="text"
           required
+          placeholder="Vor- und Nachname"
           defaultValue={contact?.name ?? ""}
-          className={inputClasses}
+          className={input}
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <div>
-          <label
-            htmlFor="phone"
-            className="block text-sm font-medium text-stone-700"
-          >
+          <label htmlFor="phone" className={label}>
             Telefon
           </label>
           <input
             id="phone"
             name="phone"
             type="tel"
+            placeholder="+49 …"
             defaultValue={contact?.phone ?? ""}
-            className={inputClasses}
+            className={input}
           />
         </div>
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-stone-700"
-          >
+          <label htmlFor="email" className={label}>
             E-Mail
           </label>
           <input
             id="email"
             name="email"
             type="email"
+            placeholder="name@beispiel.de"
             defaultValue={contact?.email ?? ""}
-            className={inputClasses}
+            className={input}
           />
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <div>
-          <label
-            htmlFor="source"
-            className="block text-sm font-medium text-stone-700"
-          >
+          <label htmlFor="source" className={label}>
             Quelle
           </label>
           <input
@@ -82,21 +68,18 @@ export default function ContactForm({
             type="text"
             placeholder="z. B. Empfehlung, Messe, Bestandskunde"
             defaultValue={contact?.source ?? ""}
-            className={inputClasses}
+            className={input}
           />
         </div>
         <div>
-          <label
-            htmlFor="status"
-            className="block text-sm font-medium text-stone-700"
-          >
+          <label htmlFor="status" className={label}>
             Status
           </label>
           <select
             id="status"
             name="status"
             defaultValue={contact?.status ?? "NEW"}
-            className={inputClasses}
+            className={input}
           >
             {allContactStatuses.map((status) => (
               <option key={status} value={status}>
@@ -108,26 +91,21 @@ export default function ContactForm({
       </div>
 
       <div>
-        <label
-          htmlFor="note"
-          className="block text-sm font-medium text-stone-700"
-        >
+        <label htmlFor="note" className={label}>
           Notiz
         </label>
         <textarea
           id="note"
           name="note"
           rows={4}
+          placeholder="Gesprächsnotizen, Besonderheiten, nächste Schritte …"
           defaultValue={contact?.note ?? ""}
-          className={inputClasses}
+          className={input}
         />
       </div>
 
-      <div className="flex justify-end">
-        <button
-          type="submit"
-          className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
+      <div className="flex justify-end border-t border-slate-100 pt-5">
+        <button type="submit" className={btnPrimary}>
           {submitLabel}
         </button>
       </div>
