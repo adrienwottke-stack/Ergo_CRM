@@ -45,3 +45,30 @@ model Activity {
 
   @@index([contactId])
 }
+
+// --- Team-Wettbewerb: taegliche Aktivitaets-Zaehler, getrennt vom privaten Kontakt-CRM ---
+
+enum QuotaType {
+  CALL
+  NUMBERS_PULLED
+  APPOINTMENT_SET
+}
+
+model Person {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  dailyLogs DailyLog[]
+}
+
+model DailyLog {
+  id        String    @id @default(cuid())
+  personId  String
+  person    Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  type      QuotaType
+  count     Int
+  date      DateTime  @default(now())
+  createdAt DateTime  @default(now())
+
+  @@index([personId, date])
+}

@@ -29,11 +29,12 @@ Login unter `http://localhost:3000` mit dem Passwort aus `APP_PASSWORD`.
 
 ## Environment-Variablen (auch in Vercel setzen)
 
-| Variable       | Zweck                                                                                     |
-| -------------- | ----------------------------------------------------------------------------------------- |
-| `DATABASE_URL` | Supabase **Transaction Pooler** (Port 6543, `?pgbouncer=true`) – wird von der App genutzt |
-| `DIRECT_URL`   | Supabase **Session Pooler** (Port 5432) – nur für `prisma migrate`                        |
-| `APP_PASSWORD` | Passwort für den Login der App                                                            |
+| Variable        | Zweck                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| `DATABASE_URL`  | Supabase **Transaction Pooler** (Port 6543, `?pgbouncer=true`) – wird von der App genutzt |
+| `DIRECT_URL`    | Supabase **Session Pooler** (Port 5432) – nur für `prisma migrate`                        |
+| `APP_PASSWORD`  | Passwort mit vollem Zugriff (Kontakte + Wettbewerb)                                       |
+| `TEAM_PASSWORD` | Team-Passwort für den Wettbewerb – nur `/log` + `/leaderboard`, keine Kontaktdaten        |
 
 Beide URLs stehen im Supabase-Dashboard unter **Connect → ORMs → Prisma**.
 
@@ -53,4 +54,16 @@ lokal `npx prisma migrate deploy` gegen die Supabase-DB ausführen.
 - `/contacts/new` – Kontakt anlegen
 - `/contacts/[id]` – Detailseite mit Aktivitäten-Log
 - `/contacts/[id]/edit` – Kontakt bearbeiten
-- `/login` – Passwortschutz (Single-User)
+- `/login` – Passwortschutz
+
+## Team-Wettbewerb
+
+Netzwerkweit teilbarer Bereich, getrennt vom privaten Kontakt-CRM:
+
+- `/log` – tägliche Zähler loggen (Anrufe, Nummern gezogen, Termine vereinbart),
+  Name wird beim ersten Mal frei gewählt (kein eigener Account nötig)
+- `/leaderboard` – Rangliste Heute / Woche / Monat, sortiert nach Gesamtzahl
+
+Wer sich mit `TEAM_PASSWORD` anmeldet, sieht **nur** diese beiden Seiten –
+Kontaktdaten (Namen, Telefonnummern, Notizen) bleiben privat hinter
+`APP_PASSWORD`. Zum Verteilen im Netzwerk: URL + Team-Passwort weitergeben.

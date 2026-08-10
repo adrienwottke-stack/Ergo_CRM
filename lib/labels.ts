@@ -1,4 +1,8 @@
-import { ActivityType, ContactStatus } from "@/lib/generated/prisma/enums";
+import {
+  ActivityType,
+  ContactStatus,
+  QuotaType,
+} from "@/lib/generated/prisma/enums";
 
 export const contactStatusLabels: Record<ContactStatus, string> = {
   NEW: "Neu",
@@ -34,4 +38,16 @@ export function isContactStatus(value: string): value is ContactStatus {
 
 export function isActivityType(value: string): value is ActivityType {
   return (allActivityTypes as string[]).includes(value);
+}
+
+export const quotaTypeLabels: Record<QuotaType, string> = {
+  CALL: "Anrufe",
+  NUMBERS_PULLED: "Nummern gezogen",
+  APPOINTMENT_SET: "Termine vereinbart",
+};
+
+export const allQuotaTypes = Object.values(QuotaType) as QuotaType[];
+
+export function isQuotaType(value: string): value is QuotaType {
+  return (allQuotaTypes as string[]).includes(value);
 }
