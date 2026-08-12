@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+// Relativer Import statt "@/lib/auth": Vercels Edge-Bundler löst den
+// tsconfig-Alias in der Middleware nicht auf ("referencing unsupported modules").
 import {
   authCookieName,
   authTokenValue,
@@ -6,7 +8,7 @@ import {
   reportTokenValue,
   teamCookieName,
   teamTokenValue,
-} from "@/lib/auth";
+} from "./lib/auth";
 
 // Nur diese Pfade sind mit dem Team-Zugang erreichbar (keine Kundendaten).
 const teamPathPrefixes = ["/log", "/leaderboard"];

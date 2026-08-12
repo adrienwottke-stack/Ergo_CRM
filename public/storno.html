@@ -1161,7 +1161,7 @@
   }
 
   /* ---------- State ---------- */
-  var bars, deck, days, idx, day, firstRun = true, busy = false, deadKey = null;
+  var bars, deck, days, idx, day, busy = false, deadKey = null;
   var vermerkt, rallyShown;
 
   /* ---------- DOM ---------- */
@@ -1283,15 +1283,8 @@
     var RUN = 24;
     var pool = CARDS.filter(function (c) { return c.id !== FINALE_ID; });
     var finale = CARDS.filter(function (c) { return c.id === FINALE_ID; })[0];
-    var chosen, pinKrause = false;
-    if (firstRun) {
-      var rest = pool.filter(function (c) { return c.id !== "krause"; });
-      chosen = [CARDS[0]].concat(shuffle(rest.slice()).slice(0, RUN - 2));
-      pinKrause = true;
-      firstRun = false;
-    } else {
-      chosen = shuffle(pool.slice()).slice(0, RUN - 1);
-    }
+    /* Jede Runde ein frisch gemischtes Deck – kein Pinning, keine Wiederholung. */
+    var chosen = shuffle(pool.slice()).slice(0, RUN - 1);
 
     /* Terminplan: Karten über das Jahr verteilen, Finale am 24. Dezember. */
     var n = chosen.length;
@@ -1307,16 +1300,25 @@
     /* Saison-Karten in passende Slots legen */
     var slots = new Array(n).fill(null);
     var used = new Array(n).fill(false);
-    if (pinKrause) { slots[0] = chosen[0]; used[0] = true; }
     var seasonal = chosen.filter(function (c) { return c.season && slots.indexOf(c) === -1; });
     seasonal.forEach(function (c) {
-      var bestSlot = -1, bestDist = 99;
+      /* Alle freien Slots im Umkreis von einem Monat sammeln und zufällig wählen,
+         damit Saison-Karten nicht jede Runde an derselben Position liegen. */
+      var bestDist = 99;
       for (var s = 0; s < n; s++) {
         if (used[s]) continue;
         var dist = Math.abs(monthOf(days[s]) - c.season);
-        if (dist < bestDist) { bestDist = dist; bestSlot = s; }
+        if (dist < bestDist) bestDist = dist;
       }
-      if (bestSlot >= 0) { slots[bestSlot] = c; used[bestSlot] = true; }
+      var candidates = [];
+      for (var s2 = 0; s2 < n; s2++) {
+        if (used[s2]) continue;
+        if (Math.abs(monthOf(days[s2]) - c.season) <= Math.max(bestDist, 1)) candidates.push(s2);
+      }
+      if (candidates.length) {
+        var pick = candidates[Math.floor(Math.random() * candidates.length)];
+        slots[pick] = c; used[pick] = true;
+      }
     });
     var others = shuffle(chosen.filter(function (c) { return slots.indexOf(c) === -1; }));
     for (var s2 = 0; s2 < n; s2++) {
