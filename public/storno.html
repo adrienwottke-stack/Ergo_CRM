@@ -296,27 +296,32 @@
     transform: rotate(-24deg); white-space: nowrap;
   }
   .card .eilt {
-    position: absolute; top: 58px; right: 12px;
+    position: absolute; top: 40px; right: 12px;
     font-family: var(--font-stamp); text-transform: uppercase;
     font-size: 14px; letter-spacing: .08em;
     color: var(--red); border: 3px solid var(--red); border-radius: 6px;
     padding: 0 8px 2px; transform: rotate(7deg); opacity: .9;
     -webkit-mask-image: radial-gradient(circle at 60% 40%, #000 94%, transparent 100%);
   }
-  /* Kontext-Block: WER spricht, WO bin ich – auf einen Blick */
-  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  .ctx { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
+  /* Kontext-Block: WER spricht, WO bin ich – direkt über der Pointe */
+  .card-top { display: flex; justify-content: flex-end; }
+  .ctx {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+    align-self: stretch;
+    border-bottom: 2px dashed rgba(21,24,29,.25);
+    padding-bottom: 12px;
+  }
   .who {
     display: inline-block;
     background: var(--yellow);
-    font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    font-size: 14px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
     padding: 6px 12px; border-radius: 5px;
-    transform: rotate(-1.6deg);
+    transform: rotate(-1.2deg);
     box-shadow: 2px 2px 0 rgba(0,0,0,.2);
   }
   .scene {
-    font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase;
-    color: var(--ink-soft); padding-left: 3px;
+    font-size: 10.5px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink); opacity: .65; padding-left: 2px;
   }
   .vorgang-tab {
     font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
@@ -1329,12 +1334,12 @@
     el.innerHTML =
       '<div class="watermark"><i>' + (card.wm || "Vertraulich") + "</i></div>" +
       (card.urgent ? '<span class="eilt">Eilt</span>' : "") +
-      '<div class="card-top"><div class="ctx">' +
+      '<div class="card-top"><span class="vorgang-tab">Blatt ' + String(idx + 1).padStart(2, "0") + "/" + deck.length + "</span></div>" +
+      '<div class="body"><div class="ctx">' +
         '<span class="who">' + whoMain + "</span>" +
         (scene ? '<span class="scene">' + scene + "</span>" : "") +
       "</div>" +
-      '<span class="vorgang-tab">Blatt ' + String(idx + 1).padStart(2, "0") + "/" + deck.length + "</span></div>" +
-      '<div class="body"><p class="quote">' + card.txt + "</p>" +
+      '<p class="quote">' + card.txt + "</p>" +
       (card.sub ? '<p class="note">' + card.sub + "</p>" : "") +
       "</div>" +
       '<div class="perfo"><span>K-2026</span><span>bitte wenden</span></div>' +
