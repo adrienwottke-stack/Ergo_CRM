@@ -6,8 +6,9 @@ import {
   isContactStatus,
 } from "@/lib/labels";
 import StatusBadge from "@/components/StatusBadge";
-import { PlusIcon, UsersIcon } from "@/components/icons";
+import { BellIcon, PlusIcon, UsersIcon } from "@/components/icons";
 import { btnPrimary, card, filterPill, pageTitle, td, th } from "@/components/ui";
+import { berlinToday, dayToUtcDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ export default async function ContactsPage({
     orderBy: { updatedAt: "desc" },
     include: { _count: { select: { activities: true } } },
   });
+  const todayDate = dayToUtcDate(berlinToday());
 
   return (
     <div className="space-y-6">
@@ -117,13 +119,25 @@ export default async function ContactsPage({
                       <span className="font-medium text-slate-900 group-hover:text-navy-700">
                         {contact.name}
                       </span>
+                      {contact.nextFollowUp &&
+                        contact.nextFollowUp <= todayDate &&
+                        contact.status !== "CLOSED" &&
+                        contact.status !== "REJECTED" && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+                            title="Wiedervorlage fällig"
+                          >
+                            <BellIcon className="h-3 w-3" />
+                            fällig
+                          </span>
+                        )}
                     </Link>
                   </td>
                   <td className={`${td} text-slate-600`}>
                     <div className="space-y-0.5">
                       {contact.phone && <p>{contact.phone}</p>}
                       {contact.email && (
-                        <p className="text-xs text-slate-400">{contact.email}</p>
+                        <p className="text-xs text-slate-500">{contact.email}</p>
                       )}
                       {!contact.phone && !contact.email && "–"}
                     </div>
@@ -140,7 +154,7 @@ export default async function ContactsPage({
                   <td className={`${td} text-right`}>
                     <Link
                       href={`/contacts/${contact.id}/edit`}
-                      className="text-sm font-medium text-navy-600 opacity-0 transition group-hover:opacity-100 hover:underline focus-visible:opacity-100"
+                      className="text-sm font-medium text-navy-600 hover:underline"
                     >
                       Bearbeiten
                     </Link>

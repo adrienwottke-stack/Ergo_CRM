@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { personCookieName } from "@/lib/auth";
-import { isQuotaType } from "@/lib/labels";
 import { berlinToday, dayToUtcDate, isValidDay } from "@/lib/dates";
 import { QuotaType } from "@/lib/generated/prisma/enums";
 
@@ -83,10 +82,11 @@ export async function logDaily(formData: FormData) {
   redirect("/log");
 }
 
-export async function deleteLog(logId: string) {
+export async function deleteLog(formData: FormData) {
+  const logId = (formData.get("logId") as string | null)?.trim();
   const cookieStore = await cookies();
   const personId = cookieStore.get(personCookieName)?.value;
-  if (!personId) {
+  if (!personId || !logId) {
     redirect("/log");
   }
 
@@ -95,32 +95,6 @@ export async function deleteLog(logId: string) {
     where: {
       id: logId,
       personId,
-      date: dayToUtcDate(berlinToday()),
-    },
-  });
-
-  revalidatePath("/log");
-  revalidatePath("/leaderboard");
-}
-
-export async function quickLog(type: string, count: number) {
-  const cookieStore = await cookies();
-  const personId = cookieStore.get(personCookieName)?.value;
-  if (!personId || !isQuotaType(type) || !Number.isFinite(count)) {
-    redirect("/log");
-  }
-
-  const person = await prisma.person.findUnique({ where: { id: personId } });
-  if (!person) {
-    cookieStore.delete(personCookieName);
-    redirect("/log");
-  }
-
-  await prisma.dailyLog.create({
-    data: {
-      personId: person.id,
-      type,
-      count: Math.min(Math.max(Math.trunc(count), 1), 999),
       date: dayToUtcDate(berlinToday()),
     },
   });

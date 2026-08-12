@@ -2,14 +2,25 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { allQuotaTypes, quotaTypeLabels } from "@/lib/labels";
 import {
+  berlinDayOf,
   berlinToday,
   dayToUtcDate,
+  shiftDay,
   startOfMonth,
   startOfWeek,
 } from "@/lib/dates";
+import { streakDays } from "@/lib/stats";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
-import { PlusIcon, TrophyIcon } from "@/components/icons";
-import { btnPrimary, card, filterPill, pageTitle, td, th } from "@/components/ui";
+import { FlameIcon, PlusIcon, TrophyIcon } from "@/components/icons";
+import {
+  btnPrimary,
+  card,
+  filterPill,
+  kicker,
+  pageTitle,
+  td,
+  th,
+} from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -21,30 +32,37 @@ const ranges = {
 
 type RangeKey = keyof typeof ranges;
 
+const podiumStyles = [
+  {
+    chip: "bg-gold-100 text-gold-600 ring-gold-600/25",
+    card: "border-gold-400/40 bg-gold-100/40",
+    label: "Führung",
+  },
+  {
+    chip: "bg-slate-200 text-slate-600 ring-slate-500/20",
+    card: "border-slate-200/80 bg-white",
+    label: "Platz 2",
+  },
+  {
+    chip: "bg-orange-100 text-orange-700 ring-orange-600/20",
+    card: "border-slate-200/80 bg-white",
+    label: "Platz 3",
+  },
+];
+
 function RankChip({ rank }: { rank: number }) {
-  if (rank === 1) {
+  const style = podiumStyles[rank - 1];
+  if (style) {
     return (
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gold-100 text-[13px] font-bold text-gold-600 ring-1 ring-inset ring-gold-600/25">
-        1
-      </span>
-    );
-  }
-  if (rank === 2) {
-    return (
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-[13px] font-bold text-slate-600 ring-1 ring-inset ring-slate-500/20">
-        2
-      </span>
-    );
-  }
-  if (rank === 3) {
-    return (
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-[13px] font-bold text-orange-700 ring-1 ring-inset ring-orange-600/20">
-        3
+      <span
+        className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-bold ring-1 ring-inset ${style.chip}`}
+      >
+        {rank}
       </span>
     );
   }
   return (
-    <span className="inline-flex h-7 w-7 items-center justify-center text-[13px] font-medium tabular-nums text-slate-400">
+    <span className="inline-flex h-7 w-7 items-center justify-center text-[13px] font-medium tabular-nums text-slate-500">
       {rank}
     </span>
   );
@@ -67,20 +85,39 @@ export default async function LeaderboardPage({
         ? startOfWeek(today)
         : startOfMonth(today);
 
-  const [sums, persons] = await Promise.all([
+  const [sums, persons, streakLogs] = await Promise.all([
     prisma.dailyLog.groupBy({
       by: ["personId", "type"],
       where: { date: { gte: start } },
       _sum: { count: true },
     }),
     prisma.person.findMany(),
+    prisma.dailyLog.findMany({
+      where: { date: { gte: dayToUtcDate(shiftDay(today, -60)) } },
+      select: { personId: true, date: true },
+    }),
   ]);
 
   const nameById = new Map(persons.map((p) => [p.id, p.name]));
 
+  const daysByPerson = new Map<string, Set<string>>();
+  for (const log of streakLogs) {
+    let days = daysByPerson.get(log.personId);
+    if (!days) {
+      days = new Set();
+      daysByPerson.set(log.personId, days);
+    }
+    days.add(berlinDayOf(log.date));
+  }
+
   const rows = new Map<
     string,
-    { name: string; byType: Record<QuotaType, number>; total: number }
+    {
+      personId: string;
+      name: string;
+      byType: Record<QuotaType, number>;
+      total: number;
+    }
   >();
   for (const entry of sums) {
     const count = entry._sum.count ?? 0;
@@ -88,6 +125,7 @@ export default async function LeaderboardPage({
     let row = rows.get(entry.personId);
     if (!row) {
       row = {
+        personId: entry.personId,
         name: nameById.get(entry.personId) ?? "Unbekannt",
         byType: { CALL: 0, NUMBERS_PULLED: 0, APPOINTMENT_SET: 0 },
         total: 0,
@@ -99,7 +137,8 @@ export default async function LeaderboardPage({
   }
 
   const ranking = [...rows.values()].sort((a, b) => b.total - a.total);
-  const maxTotal = ranking[0]?.total ?? 0;
+  const leaderTotal = ranking[0]?.total ?? 0;
+  const podium = ranking.slice(0, 3);
 
   return (
     <div className="space-y-6">
@@ -131,7 +170,9 @@ export default async function LeaderboardPage({
       </div>
 
       {ranking.length === 0 ? (
-        <div className={`${card} flex flex-col items-center px-6 py-16 text-center`}>
+        <div
+          className={`${card} flex flex-col items-center px-6 py-16 text-center`}
+        >
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gold-100 text-gold-600">
             <TrophyIcon className="h-6 w-6" />
           </span>
@@ -147,70 +188,131 @@ export default async function LeaderboardPage({
           </Link>
         </div>
       ) : (
-        <div className={`${card} overflow-x-auto`}>
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-slate-200/80 bg-slate-50/60">
-              <tr>
-                <th className={th}>Platz</th>
-                <th className={th}>Name</th>
-                {allQuotaTypes.map((type) => (
-                  <th key={type} className={`${th} text-right`}>
-                    {quotaTypeLabels[type]}
-                  </th>
-                ))}
-                <th className={`${th} w-56 text-right`}>Gesamt</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {ranking.map((row, index) => (
-                <tr
-                  key={row.name}
-                  className={
-                    index === 0
-                      ? "bg-gold-100/30"
-                      : "transition hover:bg-navy-50/40"
-                  }
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {podium.map((row, index) => {
+              const style = podiumStyles[index]!;
+              const gap = leaderTotal - row.total;
+              const streak = streakDays(
+                daysByPerson.get(row.personId) ?? new Set(),
+                today
+              );
+              return (
+                <div
+                  key={row.personId}
+                  className={`${card} animate-rise p-5 ${style.card}`}
+                  style={{ animationDelay: `${index * 90}ms` }}
                 >
-                  <td className={td}>
+                  <div className="flex items-center justify-between">
                     <RankChip rank={index + 1} />
-                  </td>
-                  <td className={`${td} font-medium text-slate-900`}>
+                    <span className={kicker}>{style.label}</span>
+                  </div>
+                  <p className="mt-4 truncate text-base font-semibold text-slate-900">
                     {row.name}
-                  </td>
+                  </p>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <p className="text-4xl font-semibold tracking-tight text-slate-900">
+                      {row.total}
+                    </p>
+                    <span className="text-xs text-slate-500">
+                      {index === 0
+                        ? "Aktivitäten"
+                        : `−${gap} auf Platz 1`}
+                    </span>
+                  </div>
+                  {streak >= 2 && (
+                    <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold text-gold-600 ring-1 ring-inset ring-gold-600/25">
+                      <FlameIcon className="h-3.5 w-3.5" />
+                      {streak} Tage Serie
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className={`${card} overflow-x-auto`}>
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="border-b border-slate-200/80 bg-slate-50/60">
+                <tr>
+                  <th className={th}>Platz</th>
+                  <th className={th}>Name</th>
                   {allQuotaTypes.map((type) => (
-                    <td
-                      key={type}
-                      className={`${td} text-right tabular-nums text-slate-600`}
-                    >
-                      {row.byType[type]}
-                    </td>
+                    <th key={type} className={`${th} text-right`}>
+                      {quotaTypeLabels[type]}
+                    </th>
                   ))}
-                  <td className={td}>
-                    <div className="flex items-center justify-end gap-3">
-                      <span className="w-8 text-right text-sm font-semibold tabular-nums text-slate-900">
-                        {row.total}
-                      </span>
-                      <span
-                        aria-hidden
-                        className="h-1 w-24 shrink-0 overflow-hidden rounded-full bg-navy-100"
-                      >
-                        <span
-                          className="block h-full rounded-full bg-navy-600"
-                          style={{
-                            width: `${maxTotal > 0 ? Math.max((row.total / maxTotal) * 100, 4) : 0}%`,
-                          }}
-                        />
-                      </span>
-                    </div>
-                  </td>
+                  <th className={`${th} w-56 text-right`}>Gesamt</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {ranking.map((row, index) => {
+                  const streak = streakDays(
+                    daysByPerson.get(row.personId) ?? new Set(),
+                    today
+                  );
+                  return (
+                    <tr
+                      key={row.personId}
+                      className={
+                        index === 0
+                          ? "bg-gold-100/30"
+                          : "transition hover:bg-navy-50/40"
+                      }
+                    >
+                      <td className={td}>
+                        <RankChip rank={index + 1} />
+                      </td>
+                      <td className={`${td} font-medium text-slate-900`}>
+                        <span className="flex items-center gap-2">
+                          {row.name}
+                          {streak >= 2 && (
+                            <span
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-gold-600"
+                              title={`${streak} Tage in Folge geloggt`}
+                            >
+                              <FlameIcon className="h-3.5 w-3.5" />
+                              {streak}
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      {allQuotaTypes.map((type) => (
+                        <td
+                          key={type}
+                          className={`${td} text-right tabular-nums text-slate-600`}
+                        >
+                          {row.byType[type]}
+                        </td>
+                      ))}
+                      <td className={td}>
+                        <div className="flex items-center justify-end gap-3">
+                          <span className="w-8 text-right text-sm font-semibold tabular-nums text-slate-900">
+                            {row.total}
+                          </span>
+                          <span
+                            aria-hidden
+                            className="h-1 w-24 shrink-0 overflow-hidden rounded-full bg-navy-100"
+                          >
+                            <span
+                              className="block h-full rounded-full bg-navy-600"
+                              style={{
+                                width: `${leaderTotal > 0 ? Math.max((row.total / leaderTotal) * 100, 4) : 0}%`,
+                              }}
+                            />
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-slate-500">
         Woche = ab Montag, Zeitzone Europe/Berlin. Sichtbar sind nur Namen und
         Zahlen – keine Kontaktdaten.
       </p>

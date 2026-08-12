@@ -17,8 +17,6 @@ export default async function EditContactPage({
     notFound();
   }
 
-  const updateContactWithId = updateContact.bind(null, contact.id);
-
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
@@ -31,7 +29,7 @@ export default async function EditContactPage({
         <h1 className={`${pageTitle} mt-2`}>Kontakt bearbeiten</h1>
       </div>
       <ContactForm
-        action={updateContactWithId}
+        action={updateContact}
         contact={contact}
         submitLabel="Änderungen speichern"
       />

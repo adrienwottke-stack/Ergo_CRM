@@ -81,6 +81,39 @@ export function ClipboardIcon({ className }: { className?: string }) {
   );
 }
 
+export function FlameIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M12 21c3.6 0 6-2.4 6-5.6 0-2.5-1.5-4.4-2.9-6C13.9 8 13 6.5 13 4.5c0 0-5.5 2.6-5.5 7.5 0 1.2.3 2.1.8 2.9.3-.9.9-1.7 1.7-2.4.4 2.6 2 3.4 2 5.5 0 1.2-.5 2.2-1.4 2.8" />
+    </svg>
+  );
+}
+
+export function PrinterIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M7 8V3.5h10V8M7 17H4.5a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1H17M7 14.5h10v6H7v-6Z" />
+    </svg>
+  );
+}
+
+export function BellIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M18 10a6 6 0 1 0-12 0c0 4-1.5 5.5-2.5 6.5h17c-1-1-2.5-2.5-2.5-6.5M10 20a2.2 2.2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+export function ClockIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </svg>
+  );
+}
+
 export function LockIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>

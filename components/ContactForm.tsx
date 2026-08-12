@@ -13,6 +13,9 @@ export default function ContactForm({
 }) {
   return (
     <form action={action} className={`${card} space-y-5 p-6 sm:p-8`}>
+      {contact && (
+        <input type="hidden" name="contactId" value={contact.id} />
+      )}
       <div>
         <label htmlFor="name" className={label}>
           Name *
@@ -87,6 +90,28 @@ export default function ContactForm({
               </option>
             ))}
           </select>
+        </div>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label htmlFor="nextFollowUp" className={label}>
+            Wiedervorlage
+          </label>
+          <input
+            id="nextFollowUp"
+            name="nextFollowUp"
+            type="date"
+            defaultValue={
+              contact?.nextFollowUp
+                ? contact.nextFollowUp.toISOString().slice(0, 10)
+                : ""
+            }
+            className={input}
+          />
+          <p className="mt-1.5 text-xs text-slate-500">
+            {"Ab diesem Tag erscheint der Kontakt im Dashboard unter „Heute dran“."}
+          </p>
         </div>
       </div>
 

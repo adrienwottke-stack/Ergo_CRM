@@ -16,6 +16,7 @@ import {
   shiftDay,
 } from "@/lib/dates";
 import StatusBadge from "@/components/StatusBadge";
+import PrintButton from "@/components/PrintButton";
 import { LockIcon } from "@/components/icons";
 import { card, pageTitle, sectionTitle } from "@/components/ui";
 
@@ -125,15 +126,44 @@ export default async function ReportPage() {
     },
   ];
 
+  const thisWeekEntry = byWeek.get(thisMonday);
+  const lastWeekEntry = byWeek.get(shiftDay(thisMonday, -7));
+  const weekDelta =
+    (thisWeekEntry?.total ?? 0) - (lastWeekEntry?.total ?? 0);
+  const activePipeline =
+    (countsByStatus.get("NEW") ?? 0) +
+    (countsByStatus.get("CONTACTED") ?? 0) +
+    (countsByStatus.get("APPOINTMENT") ?? 0);
+  const closedTotal = countsByStatus.get("CLOSED") ?? 0;
+
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className={pageTitle}>Tätigkeitsbericht</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Aggregierte Übersicht · Stand{" "}
-          {new Intl.DateTimeFormat("de-DE", { dateStyle: "long" }).format(
-            dayToUtcDate(today)
-          )}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className={pageTitle}>Tätigkeitsbericht</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Aggregierte Übersicht · Stand{" "}
+            {new Intl.DateTimeFormat("de-DE", { dateStyle: "long" }).format(
+              dayToUtcDate(today)
+            )}
+          </p>
+        </div>
+        <PrintButton />
+      </div>
+
+      <div className={`${card} border-navy-200/60 bg-navy-50/50 px-6 py-5`}>
+        <p className="text-sm leading-relaxed text-navy-900">
+          <span className="font-semibold">Kurzfassung:</span> Diese Woche{" "}
+          <span className="font-semibold">
+            {thisWeekEntry?.total ?? 0} Aktivitäten
+          </span>{" "}
+          ({weekDelta >= 0 ? `+${weekDelta}` : weekDelta} gegenüber der
+          Vorwoche). Aktuell{" "}
+          <span className="font-semibold">
+            {activePipeline} Kontakte im aktiven Prozess
+          </span>{" "}
+          und {closedTotal}{" "}
+          {closedTotal === 1 ? "Abschluss" : "Abschlüsse"} insgesamt.
         </p>
       </div>
 
@@ -147,7 +177,7 @@ export default async function ReportPage() {
               {kpi.value}
             </p>
             {kpi.sub && (
-              <p className="mt-1 text-xs text-slate-400">{kpi.sub}</p>
+              <p className="mt-1 text-xs text-slate-500">{kpi.sub}</p>
             )}
           </div>
         ))}
@@ -233,7 +263,7 @@ export default async function ReportPage() {
           </p>
         </div>
         <table className="mt-4 w-full min-w-[560px] text-left text-sm">
-          <thead className="border-b border-slate-200/80 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          <thead className="border-b border-slate-200/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             <tr>
               <th className="px-6 py-3 sm:px-8">Woche</th>
               {allActivityTypes.map((type) => (

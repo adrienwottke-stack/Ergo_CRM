@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { isActivityType, isContactStatus } from "@/lib/labels";
+import { dayToUtcDate, isValidDay } from "@/lib/dates";
 import type { ContactStatus } from "@/lib/generated/prisma/enums";
 
 function contactDataFromForm(formData: FormData) {
@@ -20,6 +21,10 @@ function contactDataFromForm(formData: FormData) {
     return value ? value : null;
   };
 
+  const followUpRaw = (formData.get("nextFollowUp") as string | null)?.trim();
+  const nextFollowUp =
+    followUpRaw && isValidDay(followUpRaw) ? dayToUtcDate(followUpRaw) : null;
+
   return {
     name,
     status,
@@ -27,6 +32,7 @@ function contactDataFromForm(formData: FormData) {
     email: optional("email"),
     source: optional("source"),
     note: optional("note"),
+    nextFollowUp,
   };
 }
 
@@ -40,7 +46,12 @@ export async function createContact(formData: FormData) {
   redirect(`/contacts/${contact.id}`);
 }
 
-export async function updateContact(contactId: string, formData: FormData) {
+export async function updateContact(formData: FormData) {
+  const contactId = (formData.get("contactId") as string | null)?.trim();
+  if (!contactId) {
+    throw new Error("Kontakt-ID fehlt.");
+  }
+
   await prisma.contact.update({
     where: { id: contactId },
     data: contactDataFromForm(formData),
@@ -52,7 +63,12 @@ export async function updateContact(contactId: string, formData: FormData) {
   redirect(`/contacts/${contactId}`);
 }
 
-export async function createActivity(contactId: string, formData: FormData) {
+export async function createActivity(formData: FormData) {
+  const contactId = (formData.get("contactId") as string | null)?.trim();
+  if (!contactId) {
+    throw new Error("Kontakt-ID fehlt.");
+  }
+
   const text = (formData.get("text") as string | null)?.trim();
   if (!text) {
     throw new Error("Beschreibung ist ein Pflichtfeld.");

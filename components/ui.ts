@@ -23,7 +23,11 @@ export const pageTitle =
 export const sectionTitle = "text-base font-semibold text-slate-900";
 
 export const th =
-  "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 first:pl-5 last:pr-5";
+  "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 first:pl-5 last:pr-5";
+
+// Kleines Überschriften-Label über Kennzahlen ("Zahlen-DNA")
+export const kicker =
+  "text-[11px] font-semibold uppercase tracking-wider text-slate-500";
 
 export const td = "px-4 py-3.5 first:pl-5 last:pr-5";
 

@@ -22,16 +22,17 @@ enum ActivityType {
 }
 
 model Contact {
-  id         String        @id @default(cuid())
-  name       String
-  phone      String?
-  email      String?
-  source     String?
-  status     ContactStatus @default(NEW)
-  note       String?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  activities Activity[]
+  id           String        @id @default(cuid())
+  name         String
+  phone        String?
+  email        String?
+  source       String?
+  status       ContactStatus @default(NEW)
+  note         String?
+  nextFollowUp DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  activities   Activity[]
 }
 
 model Activity {

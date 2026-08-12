@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import type { ActivityType } from "@/lib/generated/prisma/enums";
 import StatusBadge from "@/components/StatusBadge";
 import { activityTypeLabels, allActivityTypes } from "@/lib/labels";
@@ -63,7 +64,7 @@ export default async function ContactDetailPage({
     notFound();
   }
 
-  const createActivityForContact = createActivity.bind(null, contact.id);
+  const todayDate = dayToUtcDate(berlinToday());
 
   return (
     <div className="space-y-8">
@@ -98,7 +99,7 @@ export default async function ContactDetailPage({
 
       <div className={`${card} grid gap-x-8 gap-y-5 p-6 sm:grid-cols-2 sm:p-8`}>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             Telefon
           </p>
           <p className="mt-1 text-sm text-slate-900">
@@ -115,7 +116,7 @@ export default async function ContactDetailPage({
           </p>
         </div>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             E-Mail
           </p>
           <p className="mt-1 text-sm text-slate-900">
@@ -132,22 +133,43 @@ export default async function ContactDetailPage({
           </p>
         </div>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             Quelle
           </p>
           <p className="mt-1 text-sm text-slate-900">{contact.source ?? "–"}</p>
         </div>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             Zuletzt aktualisiert
           </p>
           <p className="mt-1 text-sm text-slate-900">
             {dateTimeFormat.format(contact.updatedAt)}
           </p>
         </div>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Wiedervorlage
+          </p>
+          <p className="mt-1 text-sm text-slate-900">
+            {contact.nextFollowUp ? (
+              <>
+                {dateFormat.format(contact.nextFollowUp)}
+                {contact.nextFollowUp <= todayDate &&
+                  contact.status !== "CLOSED" &&
+                  contact.status !== "REJECTED" && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20">
+                      fällig
+                    </span>
+                  )}
+              </>
+            ) : (
+              "–"
+            )}
+          </p>
+        </div>
         {contact.note && (
           <div className="sm:col-span-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               Notiz
             </p>
             <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
@@ -166,9 +188,10 @@ export default async function ContactDetailPage({
         </h2>
 
         <form
-          action={createActivityForContact}
+          action={createActivity}
           className={`${card} space-y-5 p-6 sm:p-8`}
         >
+          <input type="hidden" name="contactId" value={contact.id} />
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
               <label htmlFor="type" className={label}>

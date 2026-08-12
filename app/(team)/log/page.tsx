@@ -4,14 +4,21 @@ import { prisma } from "@/lib/prisma";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
 import { personCookieName } from "@/lib/auth";
 import { allQuotaTypes, quotaTypeLabels } from "@/lib/labels";
-import { berlinToday, dayDisplayFormat, dayToUtcDate } from "@/lib/dates";
+import {
+  berlinDayOf,
+  berlinToday,
+  dayDisplayFormat,
+  dayToUtcDate,
+} from "@/lib/dates";
+import { streakDays } from "@/lib/stats";
 import { LogoMark } from "@/components/Logo";
+import QuickCounter from "@/components/QuickCounter";
 import {
   CalendarCheckIcon,
   ChevronRightIcon,
+  FlameIcon,
   HashIcon,
   PhoneIcon,
-  PlusIcon,
 } from "@/components/icons";
 import {
   btnPrimary,
@@ -21,13 +28,8 @@ import {
   pageTitle,
   sectionTitle,
 } from "@/components/ui";
-import {
-  deleteLog,
-  logDaily,
-  quickLog,
-  selectPerson,
-  switchPerson,
-} from "./actions";
+import { deleteLog, logDaily, selectPerson, switchPerson } from "./actions";
+import { quickLog } from "./quickLogAction";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +104,7 @@ export default async function LogPage() {
   const today = berlinToday();
   const todayDate = dayToUtcDate(today);
 
-  const [todaySums, recentLogs] = await Promise.all([
+  const [todaySums, recentLogs, loggedDates] = await Promise.all([
     prisma.dailyLog.groupBy({
       by: ["type"],
       where: { personId: person.id, date: todayDate },
@@ -113,17 +115,34 @@ export default async function LogPage() {
       orderBy: { createdAt: "desc" },
       take: 10,
     }),
+    prisma.dailyLog.findMany({
+      where: { personId: person.id },
+      select: { date: true },
+      distinct: ["date"],
+    }),
   ]);
 
   const todayByType = new Map(
     todaySums.map((entry) => [entry.type, entry._sum.count ?? 0])
+  );
+  const streak = streakDays(
+    new Set(loggedDates.map((entry) => berlinDayOf(entry.date))),
+    today
   );
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className={pageTitle}>Aktivität loggen</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className={pageTitle}>Aktivität loggen</h1>
+            {streak >= 2 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2.5 py-1 text-xs font-semibold text-gold-600 ring-1 ring-inset ring-gold-600/25">
+                <FlameIcon className="h-3.5 w-3.5" />
+                {streak} Tage Serie
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-slate-500">
             Du loggst als{" "}
             <span className="font-medium text-slate-900">{person.name}</span>
@@ -141,32 +160,13 @@ export default async function LogPage() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         {allQuotaTypes.map((type) => (
-          <div key={type} className={`${card} p-5`}>
-            <div className="flex items-center justify-between">
-              <span
-                className={`flex h-9 w-9 items-center justify-center rounded-full ${quotaIconStyles[type]}`}
-              >
-                <QuotaIcon type={type} className="h-4.5 w-4.5" />
-              </span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Heute
-              </span>
-            </div>
-            <p className="mt-4 text-4xl font-semibold tracking-tight text-slate-900">
-              {todayByType.get(type) ?? 0}
-            </p>
-            <p className="mt-1 text-[13px] font-medium text-slate-500">
-              {quotaTypeLabels[type]}
-            </p>
-            <form action={quickLog.bind(null, type, 1)} className="mt-4">
-              <button
-                type="submit"
-                className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 transition hover:border-navy-300 hover:bg-navy-50 hover:text-navy-700 active:scale-[0.98]"
-              >
-                <PlusIcon className="h-4 w-4" />1
-              </button>
-            </form>
-          </div>
+          <QuickCounter
+            key={type}
+            type={type}
+            label={quotaTypeLabels[type]}
+            count={todayByType.get(type) ?? 0}
+            action={quickLog}
+          />
         ))}
       </div>
 
@@ -255,14 +255,15 @@ export default async function LogPage() {
                     </span>
                   </span>
                   <span className="flex items-center gap-4">
-                    <span className="text-xs tabular-nums text-slate-400">
+                    <span className="text-xs tabular-nums text-slate-500">
                       {dayDisplayFormat.format(log.date)}
                     </span>
                     {isToday && (
-                      <form action={deleteLog.bind(null, log.id)}>
+                      <form action={deleteLog}>
+                        <input type="hidden" name="logId" value={log.id} />
                         <button
                           type="submit"
-                          className="text-xs font-medium text-slate-400 transition hover:text-red-600"
+                          className="text-xs font-medium text-slate-500 transition hover:text-red-600"
                         >
                           Löschen
                         </button>
