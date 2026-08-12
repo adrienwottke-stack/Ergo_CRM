@@ -45,6 +45,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Alles schützen außer Login, Next-Assets und statischen Dateien
-  matcher: ["/((?!login|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)"],
+  // Alles schützen außer Login, Storno-Spiel (bewusst öffentlich, keine Kundendaten),
+  // Next-Assets und statischen Dateien
+  matcher: ["/((?!login|storno|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)"],
 };
