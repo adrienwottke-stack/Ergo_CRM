@@ -43,5 +43,8 @@ next-env.d.ts
 # prisma (generierter Client)
 /lib/generated/prisma
 
+# IDE files
+.vs/
+
 # .env.example darf committet werden
 !.env.example

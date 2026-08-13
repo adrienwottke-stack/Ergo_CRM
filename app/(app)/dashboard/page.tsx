@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth";
 import type { ContactStatus } from "@/lib/generated/prisma/enums";
 import { allContactStatuses, contactStatusLabels } from "@/lib/labels";
 import { berlinToday, dayToUtcDate, mondayOf, shiftDay } from "@/lib/dates";
@@ -25,21 +26,34 @@ const dateFormat = new Intl.DateTimeFormat("de-DE", {
   timeZone: "UTC",
 });
 
+import DailyTargetCard from "@/components/DailyTargetCard";
+
 export default async function DashboardPage() {
+  const user = await requireUser();
   const today = berlinToday();
   const thisMonday = mondayOf(today);
   const oldestMonday = shiftDay(thisMonday, -7 * (WEEKS_SHOWN - 1));
   const staleBefore = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000);
 
-  const [grouped, recentActivities, dueFollowUps, staleContacts] =
+  const todayStart = dayToUtcDate(today);
+
+  const [grouped, recentActivities, dueFollowUps, staleContacts, todayCallsCount, todayAppointmentsCount] =
     await Promise.all([
-      prisma.contact.groupBy({ by: ["status"], _count: { _all: true } }),
+      prisma.contact.groupBy({
+        by: ["status"],
+        where: { ownerId: user.id },
+        _count: { _all: true },
+      }),
       prisma.activity.findMany({
-        where: { date: { gte: dayToUtcDate(oldestMonday) } },
+        where: {
+          date: { gte: dayToUtcDate(oldestMonday) },
+          contact: { is: { ownerId: user.id } },
+        },
         select: { date: true },
       }),
       prisma.contact.findMany({
         where: {
+          ownerId: user.id,
           nextFollowUp: { lte: dayToUtcDate(today) },
           status: { notIn: ["CLOSED", "REJECTED"] },
         },
@@ -49,12 +63,26 @@ export default async function DashboardPage() {
       }),
       prisma.contact.findMany({
         where: {
+          ownerId: user.id,
           updatedAt: { lt: staleBefore },
           status: { in: ["NEW", "CONTACTED", "APPOINTMENT"] },
         },
         orderBy: { updatedAt: "asc" },
         take: 5,
         select: { id: true, name: true, updatedAt: true, status: true },
+      }),
+      prisma.activity.count({
+        where: {
+          type: "CALL",
+          date: { gte: todayStart },
+          contact: { is: { ownerId: user.id } },
+        },
+      }),
+      prisma.contact.count({
+        where: {
+          ownerId: user.id,
+          appointmentLoggedAt: { gte: todayStart },
+        },
       }),
     ]);
 
@@ -85,6 +113,11 @@ export default async function DashboardPage() {
           Dein Netzwerk auf einen Blick.
         </p>
       </div>
+
+      <DailyTargetCard
+        todayCallsCount={todayCallsCount}
+        todayAppointmentsCount={todayAppointmentsCount}
+      />
 
       <section className={`${card} p-6 sm:p-7`}>
         <div className="flex items-center gap-2">
@@ -180,10 +213,7 @@ export default async function DashboardPage() {
         </Link>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2 lg:grid-cols-3">
-          <Link
-            href="/report"
-            className={`${card} group p-5 transition hover:border-navy-300 sm:col-span-2`}
-          >
+          <div className={`${card} p-5 sm:col-span-2`}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[13px] font-medium text-slate-600">
@@ -204,12 +234,12 @@ export default async function DashboardPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
-                  Letzte {WEEKS_SHOWN} Wochen · Details im Bericht
+                  Letzte {WEEKS_SHOWN} Wochen
                 </p>
               </div>
               <SparkBars values={weekly} className="mt-1 h-12 w-24 shrink-0" />
             </div>
-          </Link>
+          </div>
 
           <Link
             href="/leaderboard"

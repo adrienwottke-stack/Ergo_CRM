@@ -1,12 +1,16 @@
 import { prisma } from "@/lib/prisma";
+import { requireReportAccess } from "@/lib/auth";
 import type {
   ActivityType,
   ContactStatus,
+  QuotaType,
 } from "@/lib/generated/prisma/enums";
 import {
   activityTypeLabels,
   allActivityTypes,
   allContactStatuses,
+  allQuotaTypes,
+  quotaTypeLabels,
 } from "@/lib/labels";
 import {
   berlinDayOf,
@@ -45,6 +49,7 @@ function weekLabel(monday: string): string {
 }
 
 export default async function ReportPage() {
+  await requireReportAccess();
   const today = berlinToday();
   const thisMonday = mondayOf(today);
   const monthStartDay = `${today.slice(0, 7)}-01`;
@@ -57,6 +62,8 @@ export default async function ReportPage() {
     sourceGroups,
     totalActivities,
     recentActivities,
+    totalTeamActivities,
+    recentTeamLogs,
   ] = await Promise.all([
     prisma.contact.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.contact.count(),
@@ -68,6 +75,11 @@ export default async function ReportPage() {
     prisma.activity.findMany({
       where: { date: { gte: dayToUtcDate(oldestMonday) } },
       select: { type: true, date: true },
+    }),
+    prisma.dailyLog.aggregate({ _sum: { count: true } }),
+    prisma.dailyLog.findMany({
+      where: { date: { gte: dayToUtcDate(oldestMonday) } },
+      select: { type: true, count: true, date: true },
     }),
   ]);
 
@@ -98,6 +110,35 @@ export default async function ReportPage() {
       bucket.total += 1;
     }
   }
+
+  // Team-Logging ist vom privaten Kontakt-Log getrennt. Hier werden nur
+  // Summen ausgewertet, damit der Bericht keine Personen- oder Kundendaten zeigt.
+  const teamCounts = (): Record<QuotaType, number> => ({
+    CALL: 0,
+    NUMBERS_PULLED: 0,
+    APPOINTMENT_SET: 0,
+  });
+  const teamToday = teamCounts();
+  const teamThisWeek = teamCounts();
+  const teamThisMonth = teamCounts();
+  for (const log of recentTeamLogs) {
+    const day = berlinDayOf(log.date);
+    if (day === today) teamToday[log.type] += log.count;
+    if (mondayOf(day) === thisMonday) teamThisWeek[log.type] += log.count;
+    if (day >= monthStartDay) teamThisMonth[log.type] += log.count;
+  }
+  const teamTodayTotal = Object.values(teamToday).reduce(
+    (sum, count) => sum + count,
+    0
+  );
+  const teamWeekTotal = Object.values(teamThisWeek).reduce(
+    (sum, count) => sum + count,
+    0
+  );
+  const teamMonthTotal = Object.values(teamThisMonth).reduce(
+    (sum, count) => sum + count,
+    0
+  );
   const maxWeekTotal = Math.max(
     1,
     ...[...byWeek.values()].map((entry) => entry.total)
@@ -182,6 +223,60 @@ export default async function ReportPage() {
           </div>
         ))}
       </div>
+
+      <section className={`${card} overflow-x-auto`}>
+        <div className="p-6 pb-0 sm:p-8 sm:pb-0">
+          <h2 className={sectionTitle}>Team-Aktivitäten</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Aggregierte Zähler aus dem Team-Logging. Heute: {teamTodayTotal},
+            diese Woche: {teamWeekTotal}, diesen Monat: {teamMonthTotal},
+            insgesamt: {totalTeamActivities._sum.count ?? 0}.
+          </p>
+        </div>
+        <table className="mt-4 w-full min-w-[560px] text-left text-sm">
+          <thead className="border-y border-slate-200/80 bg-slate-50/60 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <tr>
+              <th className="px-6 py-3 sm:px-8">Zeitraum</th>
+              {allQuotaTypes.map((type) => (
+                <th key={type} className="px-4 py-3 text-right">
+                  {quotaTypeLabels[type]}
+                </th>
+              ))}
+              <th className="px-6 py-3 text-right sm:px-8">Gesamt</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {[
+              { label: "Heute", counts: teamToday },
+              { label: "Diese Woche", counts: teamThisWeek },
+              { label: "Diesen Monat", counts: teamThisMonth },
+            ].map((row) => {
+              const total = Object.values(row.counts).reduce(
+                (sum, count) => sum + count,
+                0
+              );
+              return (
+                <tr key={row.label}>
+                  <td className="px-6 py-3.5 font-medium text-slate-700 sm:px-8">
+                    {row.label}
+                  </td>
+                  {allQuotaTypes.map((type) => (
+                    <td
+                      key={type}
+                      className="px-4 py-3.5 text-right tabular-nums text-slate-600"
+                    >
+                      {row.counts[type]}
+                    </td>
+                  ))}
+                  <td className="px-6 py-3.5 text-right font-semibold tabular-nums text-slate-900 sm:px-8">
+                    {total}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className={`${card} p-6 sm:p-8`}>

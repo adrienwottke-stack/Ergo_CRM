@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth";
 import {
   allContactStatuses,
   contactStatusLabels,
   isContactStatus,
 } from "@/lib/labels";
 import StatusBadge from "@/components/StatusBadge";
+import KanbanBoard from "@/components/KanbanBoard";
 import { BellIcon, PlusIcon, UsersIcon } from "@/components/icons";
-import { btnPrimary, card, filterPill, pageTitle, td, th } from "@/components/ui";
+import { btnPrimary, btnSecondary, card, filterPill, pageTitle, td, th } from "@/components/ui";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
@@ -24,13 +26,15 @@ function initials(name: string): string {
 export default async function ContactsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; view?: string }>;
 }) {
-  const { status } = await searchParams;
+  const user = await requireUser();
+  const { status, view } = await searchParams;
   const statusFilter = status && isContactStatus(status) ? status : undefined;
+  const isKanban = view === "kanban";
 
   const contacts = await prisma.contact.findMany({
-    where: statusFilter ? { status: statusFilter } : undefined,
+    where: { ownerId: user.id, ...(statusFilter ? { status: statusFilter } : {}) },
     orderBy: { updatedAt: "desc" },
     include: { _count: { select: { activities: true } } },
   });
@@ -49,25 +53,51 @@ export default async function ContactsPage({
               : " insgesamt"}
           </p>
         </div>
-        <Link href="/contacts/new" className={btnPrimary}>
-          <PlusIcon className="h-4 w-4" />
-          Neuer Kontakt
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/contacts/import" className={btnSecondary}>
+            📥 CSV Import
+          </Link>
+          <Link href="/contacts/new" className={btnPrimary}>
+            <PlusIcon className="h-4 w-4" />
+            Neuer Kontakt
+          </Link>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Link href="/contacts" className={filterPill(!statusFilter)}>
-          Alle
-        </Link>
-        {allContactStatuses.map((s) => (
-          <Link
-            key={s}
-            href={`/contacts?status=${s}`}
-            className={filterPill(statusFilter === s)}
-          >
-            {contactStatusLabels[s]}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/contacts${isKanban ? "?view=kanban" : ""}`} className={filterPill(!statusFilter)}>
+            Alle
           </Link>
-        ))}
+          {allContactStatuses.map((s) => (
+            <Link
+              key={s}
+              href={`/contacts?status=${s}${isKanban ? "&view=kanban" : ""}`}
+              className={filterPill(statusFilter === s)}
+            >
+              {contactStatusLabels[s]}
+            </Link>
+          ))}
+        </div>
+
+        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+          <Link
+            href={`/contacts${statusFilter ? `?status=${statusFilter}` : ""}`}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              !isKanban ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            📋 Liste
+          </Link>
+          <Link
+            href={`/contacts?view=kanban${statusFilter ? `&status=${statusFilter}` : ""}`}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              isKanban ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            📊 Pipeline (Kanban)
+          </Link>
+        </div>
       </div>
 
       {contacts.length === 0 ? (
@@ -90,6 +120,8 @@ export default async function ContactsPage({
             Kontakt anlegen
           </Link>
         </div>
+      ) : isKanban ? (
+        <KanbanBoard contacts={contacts} />
       ) : (
         <div className={`${card} overflow-x-auto`}>
           <table className="w-full min-w-[640px] text-left text-sm">

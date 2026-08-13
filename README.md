@@ -1,78 +1,71 @@
 # Ergo CRM
 
-Kleine CRM-Web-App zum Tracken von Ergo-Netzwerk-Kontakten: Kontakte anlegen,
-Status pflegen (Neu → Kontaktiert → Termin → Abgeschlossen/Abgelehnt) und
-Aktivitäten (Anruf, Meeting, E-Mail) protokollieren. Kein Vertragsabschluss-Tool.
+Persönliches Kontakt-CRM für ein Ergo-Team: Jedes Teammitglied hat ein eigenes
+Konto und sieht ausschließlich die eigenen Kontakte. Die Rangliste ist
+teamweit, enthält aber nur Namen und aggregierte Aktivitätszahlen.
 
-**Stack:** Next.js 15 (App Router, Server Components/Actions), TypeScript,
-Tailwind CSS 4, Prisma 7 (pg-Adapter), Postgres via Supabase.
+## Funktionen
 
-## Lokales Setup
+- Private Kontakte mit Status, Wiedervorlagen und Aktivitäten
+- Admin-verwaltete persönliche Benutzerkonten
+- Automatische Rangliste: neuer Kontakt = Nummer gezogen, Anruf-Aktivität =
+  Anruf, erster Statuswechsel auf `Termin` = Termin vereinbart
+- Manuelles Nachloggen für Aktivitäten außerhalb eines CRM-Kontakts
+- Aggregierter Bericht für Admins bzw. den separaten Berichtszugang – ohne
+  Kunden-, Kontakt- oder Notizdaten
 
-```bash
-npm install
-```
+## Stack
 
-`.env` anlegen (Vorlage: `.env.example`) und ausfüllen, dann Migration einspielen:
+Next.js 15 (App Router, Server Components/Actions), TypeScript, Tailwind CSS,
+Prisma 7 und PostgreSQL via Supabase.
 
-```bash
-npx prisma migrate deploy
-```
+## Ersteinrichtung und Migration
 
-Dev-Server starten:
+1. `npm install`
+2. `.env` aus `.env.example` erstellen und die Werte setzen.
+3. Migration gegen die Ziel-Datenbank ausführen:
 
-```bash
-npm run dev
-```
+   ```bash
+   npx prisma migrate deploy
+   ```
 
-Login unter `http://localhost:3000` mit dem Passwort aus `APP_PASSWORD`.
+4. App lokal starten:
 
-## Environment-Variablen (auch in Vercel setzen)
+   ```bash
+   npm run dev
+   ```
 
-| Variable        | Zweck                                                                                     |
-| --------------- | ----------------------------------------------------------------------------------------- |
-| `DATABASE_URL`  | Supabase **Transaction Pooler** (Port 6543, `?pgbouncer=true`) – wird von der App genutzt |
-| `DIRECT_URL`    | Supabase **Session Pooler** (Port 5432) – nur für `prisma migrate`                        |
-| `APP_PASSWORD`  | Passwort mit vollem Zugriff (Kontakte + Wettbewerb + Bericht)                             |
-| `TEAM_PASSWORD` | Team-Passwort für den Wettbewerb – nur `/log` + `/leaderboard`, keine Kontaktdaten        |
-| `REPORT_PASSWORD` | Berichts-Passwort für Vorgesetzte – nur `/report`, aggregierte Zahlen ohne Kundendaten  |
+Beim ersten Aufruf von `/login` wird einmalig das Admin-Konto angelegt. Dafür
+Name und E-Mail-Adresse eingeben und als Passwort das bisherige `APP_PASSWORD`
+verwenden. Alle bisher vorhandenen Kontakte werden dabei diesem Admin-Konto
+zugeordnet. Danach ist das Admin-Passwort das persönliche Passwort dieses
+Kontos.
 
-Beide URLs stehen im Supabase-Dashboard unter **Connect → ORMs → Prisma**.
+Danach legt der Admin unter `/team` die Konten für alle weiteren Mitglieder an.
+Ein neues Konto verknüpft automatisch ein Ranglistenprofil mit dem gewählten
+Namen.
 
-## Deployment (Vercel)
+## Vercel-Deployment
 
-1. Repo pushen und in Vercel importieren.
-2. Die drei Env-Variablen oben setzen (Production + Preview).
-3. Deploy – `postinstall` führt `prisma generate` automatisch aus.
+In Vercel für **Production** setzen:
 
-Migrationen laufen nicht automatisch beim Deploy; bei Schemaänderungen einmal
-lokal `npx prisma migrate deploy` gegen die Supabase-DB ausführen.
+| Variable | Zweck |
+| --- | --- |
+| `DATABASE_URL` | Supabase Transaction Pooler (Port 6543, inklusive `?pgbouncer=true`) |
+| `DIRECT_URL` | Supabase Session Pooler (Port 5432) für Migrationen |
+| `APP_PASSWORD` | Einmaliges Bootstrap-Passwort für das erste Admin-Konto |
+| `SESSION_SECRET` | Langes zufälliges Geheimnis für signierte Sitzungen |
+| `REPORT_PASSWORD` | Optionaler, separater Nur-Lese-Zugang zum Bericht |
 
-## Seiten
+Wichtig: Bei einem bestehenden Vercel-Deployment zuerst `npx prisma migrate deploy`
+gegen dieselbe Produktionsdatenbank ausführen und erst danach den Code deployen.
+Ohne Migration gibt es die Tabellen für die Benutzerkonten noch nicht.
 
-- `/dashboard` – Kontakte je Status als Kacheln
-- `/contacts` – Liste mit Status-Filter
-- `/contacts/new` – Kontakt anlegen
-- `/contacts/[id]` – Detailseite mit Aktivitäten-Log
-- `/contacts/[id]/edit` – Kontakt bearbeiten
-- `/login` – Passwortschutz
+## Zugriffsmodell
 
-## Team-Wettbewerb
+- **Mitglied:** eigenes Dashboard und eigene Kontakte, Team-Log und Rangliste
+- **Admin:** zusätzlich Teamverwaltung und Gesamtbericht
+- **Berichts-Passwort:** ausschließlich den aggregierten Bericht
 
-Netzwerkweit teilbarer Bereich, getrennt vom privaten Kontakt-CRM:
-
-- `/log` – tägliche Zähler loggen (Anrufe, Nummern gezogen, Termine vereinbart),
-  Name wird beim ersten Mal frei gewählt (kein eigener Account nötig)
-- `/leaderboard` – Rangliste Heute / Woche / Monat, sortiert nach Gesamtzahl
-
-Wer sich mit `TEAM_PASSWORD` anmeldet, sieht **nur** diese beiden Seiten –
-Kontaktdaten (Namen, Telefonnummern, Notizen) bleiben privat hinter
-`APP_PASSWORD`. Zum Verteilen im Netzwerk: URL + Team-Passwort weitergeben.
-
-## Tätigkeitsbericht für Vorgesetzte
-
-- `/report` – aggregierte Übersicht: Aktivitäten (Woche/Monat/gesamt),
-  Pipeline nach Status, Wochen-Verlauf der letzten 8 Wochen, Quellen-Verteilung
-- Zugang über `REPORT_PASSWORD` – sieht ausschließlich diese Seite
-- Datenschutz: nur Zahlen und Typen (Anruf/Meeting/E-Mail), niemals
-  Kundennamen, Kontaktdaten oder Gesprächsnotizen
+Die früheren globalen Zugänge `TEAM_PASSWORD` und das gemeinsame CRM-Passwort
+werden nicht mehr für den täglichen Zugang verwendet.

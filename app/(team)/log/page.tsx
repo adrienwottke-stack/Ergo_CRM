@@ -1,45 +1,19 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { requireUser, requireUserPerson } from "@/lib/auth";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
-import { personCookieName } from "@/lib/auth";
 import { allQuotaTypes, quotaTypeLabels } from "@/lib/labels";
-import {
-  berlinDayOf,
-  berlinToday,
-  dayDisplayFormat,
-  dayToUtcDate,
-} from "@/lib/dates";
+import { berlinDayOf, berlinToday, dayDisplayFormat, dayToUtcDate } from "@/lib/dates";
 import { streakDays } from "@/lib/stats";
-import { LogoMark } from "@/components/Logo";
 import QuickCounter from "@/components/QuickCounter";
-import {
-  CalendarCheckIcon,
-  ChevronRightIcon,
-  FlameIcon,
-  HashIcon,
-  PhoneIcon,
-} from "@/components/icons";
-import {
-  btnPrimary,
-  card,
-  input,
-  label,
-  pageTitle,
-  sectionTitle,
-} from "@/components/ui";
-import { deleteLog, logDaily, selectPerson, switchPerson } from "./actions";
+import { CalendarCheckIcon, ChevronRightIcon, FlameIcon, HashIcon, PhoneIcon } from "@/components/icons";
+import { btnPrimary, card, input, label, pageTitle, sectionTitle } from "@/components/ui";
+import { deleteLog, logDaily } from "./actions";
 import { quickLog } from "./quickLogAction";
 
 export const dynamic = "force-dynamic";
 
-function QuotaIcon({
-  type,
-  className,
-}: {
-  type: QuotaType;
-  className?: string;
-}) {
+function QuotaIcon({ type, className }: { type: QuotaType; className?: string }) {
   if (type === "CALL") return <PhoneIcon className={className} />;
   if (type === "NUMBERS_PULLED") return <HashIcon className={className} />;
   return <CalendarCheckIcon className={className} />;
@@ -52,55 +26,8 @@ const quotaIconStyles: Record<QuotaType, string> = {
 };
 
 export default async function LogPage() {
-  const cookieStore = await cookies();
-  const personId = cookieStore.get(personCookieName)?.value;
-  const person = personId
-    ? await prisma.person.findUnique({ where: { id: personId } })
-    : null;
-
-  if (!person) {
-    const persons = await prisma.person.findMany({ orderBy: { name: "asc" } });
-
-    return (
-      <div className="mx-auto max-w-md space-y-6 pt-6">
-        <div className="flex flex-col items-center text-center">
-          <LogoMark className="h-12 w-12" />
-          <h1 className={`${pageTitle} mt-4`}>Wer bist du?</h1>
-          <p className="mt-1.5 text-sm text-slate-500">
-            Wähle deinen Namen oder leg ihn neu an – unter diesem Namen
-            erscheinen deine Zahlen in der Rangliste.
-          </p>
-        </div>
-        <form action={selectPerson} className={`${card} space-y-5 p-6 sm:p-8`}>
-          <div>
-            <label htmlFor="name" className={label}>
-              Dein Name *
-            </label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              required
-              maxLength={60}
-              list="person-names"
-              placeholder="z. B. Max Mustermann"
-              className={input}
-            />
-            <datalist id="person-names">
-              {persons.map((p) => (
-                <option key={p.id} value={p.name} />
-              ))}
-            </datalist>
-          </div>
-          <button type="submit" className={`${btnPrimary} w-full`}>
-            Weiter
-            <ChevronRightIcon className="h-4 w-4" />
-          </button>
-        </form>
-      </div>
-    );
-  }
-
+  const user = await requireUser();
+  const person = await requireUserPerson(user.id);
   const today = berlinToday();
   const todayDate = dayToUtcDate(today);
 
@@ -132,141 +59,83 @@ export default async function LogPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className={pageTitle}>Aktivität loggen</h1>
-            {streak >= 2 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2.5 py-1 text-xs font-semibold text-gold-600 ring-1 ring-inset ring-gold-600/25">
-                <FlameIcon className="h-3.5 w-3.5" />
-                {streak} Tage Serie
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-slate-500">
-            Du loggst als{" "}
-            <span className="font-medium text-slate-900">{person.name}</span>
-          </p>
+      <div>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className={pageTitle}>Meine Aktivitäten</h1>
+          {streak >= 2 && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2.5 py-1 text-xs font-semibold text-gold-600 ring-1 ring-inset ring-gold-600/25">
+              <FlameIcon className="h-3.5 w-3.5" />
+              {streak} Tage Serie
+            </span>
+          )}
         </div>
-        <form action={switchPerson}>
-          <button
-            type="submit"
-            className="text-sm font-medium text-slate-500 transition hover:text-slate-900"
-          >
-            Nicht du? Wechseln
-          </button>
-        </form>
+        <p className="mt-1 text-sm text-slate-500">
+          Du loggst als <span className="font-medium text-slate-900">{person.name}</span>.
+          Anrufe und Termine aus deinem CRM werden automatisch gezählt.
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         {allQuotaTypes.map((type) => (
-          <QuickCounter
-            key={type}
-            type={type}
-            label={quotaTypeLabels[type]}
-            count={todayByType.get(type) ?? 0}
-            action={quickLog}
-          />
+          <QuickCounter key={type} type={type} label={quotaTypeLabels[type]} count={todayByType.get(type) ?? 0} action={quickLog} />
         ))}
       </div>
 
       <form action={logDaily} className={`${card} space-y-5 p-6 sm:p-8`}>
-        <h2 className={sectionTitle}>Mehrere auf einmal loggen</h2>
+        <h2 className={sectionTitle}>Zusätzlich manuell loggen</h2>
+        <p className="text-sm text-slate-500">
+          Nur für Aktivitäten, die nicht über einen CRM-Kontakt erfasst wurden.
+        </p>
         <div className="grid gap-5 sm:grid-cols-3">
           {allQuotaTypes.map((type) => (
             <div key={type}>
-              <label htmlFor={type} className={label}>
-                {quotaTypeLabels[type]}
-              </label>
-              <input
-                id={type}
-                name={type}
-                type="number"
-                min={0}
-                max={999}
-                placeholder="0"
-                className={input}
-              />
+              <label htmlFor={type} className={label}>{quotaTypeLabels[type]}</label>
+              <input id={type} name={type} type="number" min={0} max={999} placeholder="0" className={input} />
             </div>
           ))}
         </div>
         <div>
-          <label htmlFor="day" className={label}>
-            Tag
-          </label>
-          <input
-            id="day"
-            name="day"
-            type="date"
-            defaultValue={today}
-            max={today}
-            className={input}
-          />
+          <label htmlFor="day" className={label}>Tag</label>
+          <input id="day" name="day" type="date" defaultValue={today} max={today} className={input} />
         </div>
         <div className="flex justify-end border-t border-slate-100 pt-5">
-          <button type="submit" className={btnPrimary}>
-            Speichern
-          </button>
+          <button type="submit" className={btnPrimary}>Speichern</button>
         </div>
       </form>
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className={sectionTitle}>Deine letzten Einträge</h2>
-          <Link
-            href="/leaderboard"
-            className="inline-flex items-center gap-1 text-sm font-medium text-navy-600 transition hover:gap-1.5 hover:underline"
-          >
-            Zur Rangliste
-            <ChevronRightIcon className="h-4 w-4" />
+          <Link href="/leaderboard" className="inline-flex items-center gap-1 text-sm font-medium text-navy-600 transition hover:gap-1.5 hover:underline">
+            Zur Rangliste <ChevronRightIcon className="h-4 w-4" />
           </Link>
         </div>
         {recentLogs.length === 0 ? (
           <div className={`${card} px-6 py-12 text-center`}>
-            <p className="text-sm font-medium text-slate-900">
-              Noch nichts geloggt
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Starte mit deinem ersten Eintrag – die Rangliste wartet.
-            </p>
+            <p className="text-sm font-medium text-slate-900">Noch nichts geloggt</p>
+            <p className="mt-1 text-sm text-slate-500">Deine CRM-Aktivitäten erscheinen hier automatisch.</p>
           </div>
         ) : (
           <ul className={`${card} divide-y divide-slate-100`}>
             {recentLogs.map((log) => {
               const isToday = log.date.getTime() === todayDate.getTime();
               return (
-                <li
-                  key={log.id}
-                  className="flex items-center justify-between gap-4 px-5 py-3.5 text-sm"
-                >
+                <li key={log.id} className="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
                   <span className="flex items-center gap-3">
-                    <span
-                      className={`flex h-8 w-8 items-center justify-center rounded-full ${quotaIconStyles[log.type]}`}
-                    >
+                    <span className={`flex h-8 w-8 items-center justify-center rounded-full ${quotaIconStyles[log.type]}`}>
                       <QuotaIcon type={log.type} className="h-4 w-4" />
                     </span>
                     <span>
-                      <span className="font-semibold text-slate-900">
-                        +{log.count}
-                      </span>{" "}
-                      <span className="text-slate-600">
-                        {quotaTypeLabels[log.type]}
-                      </span>
+                      <span className="font-semibold text-slate-900">+{log.count}</span>{" "}
+                      <span className="text-slate-600">{quotaTypeLabels[log.type]}</span>
                     </span>
                   </span>
                   <span className="flex items-center gap-4">
-                    <span className="text-xs tabular-nums text-slate-500">
-                      {dayDisplayFormat.format(log.date)}
-                    </span>
-                    {isToday && (
+                    <span className="text-xs tabular-nums text-slate-500">{dayDisplayFormat.format(log.date)}</span>
+                    {isToday && !log.activityId && (
                       <form action={deleteLog}>
                         <input type="hidden" name="logId" value={log.id} />
-                        <button
-                          type="submit"
-                          className="text-xs font-medium text-slate-500 transition hover:text-red-600"
-                        >
-                          Löschen
-                        </button>
+                        <button type="submit" className="text-xs font-medium text-slate-500 transition hover:text-red-600">Löschen</button>
                       </form>
                     )}
                   </span>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import type { ActivityType } from "@/lib/generated/prisma/enums";
 import StatusBadge from "@/components/StatusBadge";
@@ -19,7 +20,8 @@ import {
   pageTitle,
   sectionTitle,
 } from "@/components/ui";
-import { createActivity } from "../actions";
+import NoteTemplates from "@/components/NoteTemplates";
+import { createActivity, deleteActivity } from "../actions";
 
 const dateTimeFormat = new Intl.DateTimeFormat("de-DE", {
   dateStyle: "medium",
@@ -55,8 +57,9 @@ export default async function ContactDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const contact = await prisma.contact.findUnique({
-    where: { id },
+  const user = await requireUser();
+  const contact = await prisma.contact.findFirst({
+    where: { id, ownerId: user.id },
     include: { activities: { orderBy: { date: "desc" } } },
   });
 
@@ -229,6 +232,7 @@ export default async function ContactDetailPage({
               placeholder="z. B. Telefonat: Interesse an Beratungstermin, meldet sich nächste Woche"
               className={input}
             />
+            <NoteTemplates targetInputId="text" />
           </div>
           <div className="flex justify-end border-t border-slate-100 pt-5">
             <button type="submit" className={btnPrimary}>
@@ -266,9 +270,30 @@ export default async function ContactDetailPage({
                     <span className="text-[13px] font-semibold text-slate-900">
                       {activityTypeLabels[activity.type]}
                     </span>
-                    <span className="text-xs text-slate-400">
-                      {dateTimeFormat.format(activity.date)}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-slate-400">
+                        {dateTimeFormat.format(activity.date)}
+                      </span>
+                      <form action={deleteActivity}>
+                        <input
+                          type="hidden"
+                          name="activityId"
+                          value={activity.id}
+                        />
+                        <input
+                          type="hidden"
+                          name="contactId"
+                          value={contact.id}
+                        />
+                        <button
+                          type="submit"
+                          className="text-xs font-medium text-red-600 transition hover:text-red-800 hover:underline"
+                          aria-label={`Aktivität vom ${dateTimeFormat.format(activity.date)} löschen`}
+                        >
+                          Löschen
+                        </button>
+                      </form>
+                    </div>
                   </div>
                   <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
                     {activity.text}

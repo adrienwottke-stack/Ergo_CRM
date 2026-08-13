@@ -1,6 +1,7 @@
 import type { Contact } from "@/lib/generated/prisma/client";
 import { allContactStatuses, contactStatusLabels } from "@/lib/labels";
 import { btnPrimary, card, input, label } from "@/components/ui";
+import NoteTemplates from "@/components/NoteTemplates";
 
 export default function ContactForm({
   action,
@@ -127,6 +128,7 @@ export default function ContactForm({
           defaultValue={contact?.note ?? ""}
           className={input}
         />
+        <NoteTemplates targetInputId="note" />
       </div>
 
       <div className="flex justify-end border-t border-slate-100 pt-5">
