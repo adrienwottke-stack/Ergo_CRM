@@ -21,6 +21,41 @@ export function PhoneIcon({ className }: { className?: string }) {
   );
 }
 
+export function LogoutIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+      <path d="M10 8 6 12l4 4M6 12h9" />
+    </svg>
+  );
+}
+
+export function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="m5 13 4 4L19 7" />
+    </svg>
+  );
+}
+
+export function TargetIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="3.5" />
+    </svg>
+  );
+}
+
+export function LayersIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="m12 3 9 5-9 5-9-5 9-5" />
+      <path d="m3 13 9 5 9-5" />
+    </svg>
+  );
+}
+
 export function HashIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>

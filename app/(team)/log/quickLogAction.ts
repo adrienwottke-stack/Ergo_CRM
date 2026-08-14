@@ -3,13 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
-import { isQuotaType } from "@/lib/labels";
+import { isQuotaType, manualQuotaTypes } from "@/lib/labels";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 
 export async function quickLog(type: string, count: number) {
   const user = await requireUser();
   const person = await requireUserPerson(user.id);
-  if (!isQuotaType(type) || !Number.isFinite(count)) return;
+  if (!isQuotaType(type) || !manualQuotaTypes.includes(type) || !Number.isFinite(count)) return;
 
   await prisma.dailyLog.create({
     data: {

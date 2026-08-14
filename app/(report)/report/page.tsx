@@ -1,17 +1,18 @@
 import { prisma } from "@/lib/prisma";
 import { requireReportAccess } from "@/lib/auth";
-import type {
-  ActivityType,
-  ContactStatus,
-  QuotaType,
-} from "@/lib/generated/prisma/enums";
+import type { ActivityType, ContactStage } from "@/lib/generated/prisma/enums";
 import {
   activityTypeLabels,
   allActivityTypes,
-  allContactStatuses,
   allQuotaTypes,
+  emptyQuotaCounts,
   quotaTypeLabels,
 } from "@/lib/labels";
+import {
+  ACQUISITION_STAGES,
+  CONTACT_STAGES,
+  contactStagePalette,
+} from "@/lib/pipeline";
 import {
   berlinDayOf,
   berlinToday,
@@ -19,7 +20,7 @@ import {
   mondayOf,
   shiftDay,
 } from "@/lib/dates";
-import StatusBadge from "@/components/StatusBadge";
+import StageBadge from "@/components/StageBadge";
 import PrintButton from "@/components/PrintButton";
 import { LockIcon } from "@/components/icons";
 import { card, pageTitle, sectionTitle } from "@/components/ui";
@@ -33,14 +34,6 @@ const shortDate = new Intl.DateTimeFormat("de-DE", {
   month: "2-digit",
   timeZone: "UTC",
 });
-
-const statusBarColors: Record<ContactStatus, string> = {
-  NEW: "bg-blue-500",
-  CONTACTED: "bg-amber-500",
-  APPOINTMENT: "bg-violet-500",
-  CLOSED: "bg-emerald-500",
-  REJECTED: "bg-slate-400",
-};
 
 function weekLabel(monday: string): string {
   return `${shortDate.format(dayToUtcDate(monday))} – ${shortDate.format(
@@ -56,7 +49,7 @@ export default async function ReportPage() {
   const oldestMonday = shiftDay(thisMonday, -7 * (WEEKS_SHOWN - 1));
 
   const [
-    statusGroups,
+    stageGroups,
     totalContacts,
     newContactsMonth,
     sourceGroups,
@@ -65,7 +58,7 @@ export default async function ReportPage() {
     totalTeamActivities,
     recentTeamLogs,
   ] = await Promise.all([
-    prisma.contact.groupBy({ by: ["status"], _count: { _all: true } }),
+    prisma.contact.groupBy({ by: ["stage"], _count: { _all: true } }),
     prisma.contact.count(),
     prisma.contact.count({
       where: { createdAt: { gte: dayToUtcDate(monthStartDay) } },
@@ -113,14 +106,9 @@ export default async function ReportPage() {
 
   // Team-Logging ist vom privaten Kontakt-Log getrennt. Hier werden nur
   // Summen ausgewertet, damit der Bericht keine Personen- oder Kundendaten zeigt.
-  const teamCounts = (): Record<QuotaType, number> => ({
-    CALL: 0,
-    NUMBERS_PULLED: 0,
-    APPOINTMENT_SET: 0,
-  });
-  const teamToday = teamCounts();
-  const teamThisWeek = teamCounts();
-  const teamThisMonth = teamCounts();
+  const teamToday = emptyQuotaCounts();
+  const teamThisWeek = emptyQuotaCounts();
+  const teamThisMonth = emptyQuotaCounts();
   for (const log of recentTeamLogs) {
     const day = berlinDayOf(log.date);
     if (day === today) teamToday[log.type] += log.count;
@@ -144,8 +132,8 @@ export default async function ReportPage() {
     ...[...byWeek.values()].map((entry) => entry.total)
   );
 
-  const countsByStatus = new Map<ContactStatus, number>(
-    statusGroups.map((entry) => [entry.status, entry._count._all])
+  const countsByStage = new Map<ContactStage, number>(
+    stageGroups.map((entry) => [entry.stage, entry._count._all])
   );
 
   const sources = sourceGroups
@@ -171,11 +159,15 @@ export default async function ReportPage() {
   const lastWeekEntry = byWeek.get(shiftDay(thisMonday, -7));
   const weekDelta =
     (thisWeekEntry?.total ?? 0) - (lastWeekEntry?.total ?? 0);
-  const activePipeline =
-    (countsByStatus.get("NEW") ?? 0) +
-    (countsByStatus.get("CONTACTED") ?? 0) +
-    (countsByStatus.get("APPOINTMENT") ?? 0);
-  const closedTotal = countsByStatus.get("CLOSED") ?? 0;
+  const activePipeline = ACQUISITION_STAGES.reduce(
+    (sum, stage) => sum + (countsByStage.get(stage) ?? 0),
+    0
+  );
+  // Kunde und alles danach zaehlt als abgeschlossen mindestens einmal.
+  const closedTotal = CONTACT_STAGES.slice(4).reduce(
+    (sum, stage) => sum + (countsByStage.get(stage) ?? 0),
+    0
+  );
 
   return (
     <div className="space-y-8">
@@ -280,19 +272,19 @@ export default async function ReportPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className={`${card} p-6 sm:p-8`}>
-          <h2 className={sectionTitle}>Pipeline nach Status</h2>
+          <h2 className={sectionTitle}>Pipeline nach Phase</h2>
           <p className="mt-1 text-sm text-slate-500">
             Wo die Kontakte im Prozess stehen.
           </p>
           <ul className="mt-6 space-y-4">
-            {allContactStatuses.map((status) => {
-              const count = countsByStatus.get(status) ?? 0;
+            {CONTACT_STAGES.map((stage) => {
+              const count = countsByStage.get(stage) ?? 0;
               const share =
                 totalContacts > 0 ? (count / totalContacts) * 100 : 0;
               return (
-                <li key={status}>
+                <li key={stage}>
                   <div className="flex items-center justify-between gap-4">
-                    <StatusBadge status={status} />
+                    <StageBadge stage={stage} />
                     <span className="text-sm font-semibold tabular-nums text-slate-900">
                       {count}
                       <span className="ml-1.5 font-normal text-slate-400">
@@ -302,7 +294,7 @@ export default async function ReportPage() {
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
                     <div
-                      className={`h-full rounded-full ${statusBarColors[status]}`}
+                      className={`h-full rounded-full ${contactStagePalette[stage].bar}`}
                       style={{ width: `${count > 0 ? Math.max(share, 2) : 0}%` }}
                     />
                   </div>

@@ -14,6 +14,8 @@ const iconStyles: Record<QuotaType, string> = {
   CALL: "bg-blue-50 text-blue-600",
   NUMBERS_PULLED: "bg-navy-50 text-navy-600",
   APPOINTMENT_SET: "bg-emerald-50 text-emerald-600",
+  APPOINTMENT_HELD: "bg-violet-50 text-violet-600",
+  DEAL_WON: "bg-gold-100 text-gold-600",
 };
 
 function QuotaIcon({ type }: { type: QuotaType }) {

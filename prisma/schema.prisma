@@ -7,12 +7,62 @@ datasource db {
   provider = "postgresql"
 }
 
-enum ContactStatus {
-  NEW
-  CONTACTED
-  APPOINTMENT
-  CLOSED
-  REJECTED
+// --- Pipeline ---------------------------------------------------------------
+// Der Kontakt traegt die Beziehungsphase (Akquise -> Kunde -> Betreuung),
+// der Vorgang (Deal) die einzelne Sparte. Der Ausgang liegt getrennt von der
+// Phase, damit sichtbar bleibt, WO ein Kontakt verloren gegangen ist.
+
+enum ContactStage {
+  NEU
+  KONTAKTIERT
+  TERMIN_VEREINBART
+  IN_BERATUNG
+  KUNDE
+  EMPFEHLUNG_ERFRAGT
+  CHECKUP_GEPLANT
+  BESTAND
+}
+
+enum Outcome {
+  OFFEN
+  GEWONNEN
+  VERLOREN
+}
+
+enum LostReason {
+  KEIN_BEDARF
+  KEIN_INTERESSE
+  UNERREICHBAR
+  KONKURRENZ
+  PREIS
+  TERMIN_GEPLATZT
+  SPAETER_NOCHMAL
+  SONSTIGES
+}
+
+enum NextStepType {
+  ANRUF
+  TERMIN
+  TERMIN_VORBEREITEN
+  ANGEBOT_ERSTELLEN
+  NACHFASSEN
+  ANTRAG_EINREICHEN
+  EMPFEHLUNG_ERFRAGEN
+  CHECKUP_TERMINIEREN
+  SONSTIGES
+}
+
+enum DealStage {
+  BEDARF
+  ANGEBOT
+  ANTRAG
+  GEWONNEN
+}
+
+enum DealLine {
+  PAV
+  BU
+  UNBEKANNT // nur fuer Platzhalter-Vorgaenge aus der Alt-Datenmigration
 }
 
 enum ActivityType {
@@ -27,34 +77,115 @@ enum UserRole {
 }
 
 model Contact {
-  id           String        @id @default(cuid())
-  name         String
-  phone        String?
-  email        String?
-  source       String?
-  status       ContactStatus @default(NEW)
-  note         String?
-  nextFollowUp DateTime?
-  appointmentLoggedAt DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  ownerId      String?
-  owner        User?         @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  activities   Activity[]
+  id     String @id @default(cuid())
+  name   String
+  phone  String?
+  email  String?
+  source String?
+  note   String?
+
+  stage      ContactStage @default(NEU)
+  outcome    Outcome      @default(OFFEN)
+  lostReason LostReason?
+  lostAt     DateTime?
+
+  // Genau ein offener naechster Schritt je Kontakt. In IN_BERATUNG liegt der
+  // Schritt stattdessen am Vorgang, damit keine doppelten Fristen entstehen.
+  nextStepType NextStepType?
+  nextStepAt   DateTime?
+  nextStepNote String?
+
+  appointmentAt DateTime? // naechster Termin, mit Uhrzeit
+  checkupDueAt  DateTime? // faellig ab (Bestandskunden)
+
+  // Zeitstempel gegen doppelte Wettbewerbspunkte
+  appointmentLoggedAt     DateTime?
+  appointmentHeldLoggedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownerId String?
+  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  referredById String?
+  referredBy   Contact?  @relation("Empfehlung", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals    Contact[] @relation("Empfehlung")
+
+  activities  Activity[]
+  deals       Deal[]
+  stageEvents StageEvent[]
 
   @@index([ownerId, updatedAt])
+  @@index([ownerId, nextStepAt])
+  @@index([ownerId, stage, outcome])
+  @@index([referredById])
+}
+
+model Deal {
+  id        String  @id @default(cuid())
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  line  DealLine
+  title String?
+
+  stage      DealStage   @default(BEDARF)
+  outcome    Outcome     @default(OFFEN)
+  lostReason LostReason?
+
+  // Wert in internen Einheiten. 100 EUR Monatsbeitrag = 82 Einheiten,
+  // unitFactorPermille (1000 = 1,0) haelt spaetere Laufzeitfaktoren offen.
+  monthlyPremiumCents Int?
+  unitFactorPermille  Int     @default(1000)
+  units               Int?
+  unitsManual         Boolean @default(false)
+
+  closedAt    DateTime?
+  wonLoggedAt DateTime?
+
+  nextStepType NextStepType?
+  nextStepAt   DateTime?
+  nextStepNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stageEvents StageEvent[]
+
+  @@index([contactId])
+  @@index([stage, outcome])
+  @@index([nextStepAt])
+}
+
+// Phasenhistorie: Grundlage fuer Uebergangsquoten und Durchlaufzeiten.
+model StageEvent {
+  id        String   @id @default(cuid())
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId    String?
+  deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  fromStage String?
+  toStage   String
+  at        DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([contactId, at])
+  @@index([dealId, at])
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String       @id @default(cuid())
+  email        String       @unique
   name         String
   passwordSalt String
   passwordHash String
-  role         UserRole @default(MEMBER)
-  createdAt    DateTime @default(now())
+  role         UserRole     @default(MEMBER)
+  createdAt    DateTime     @default(now())
   contacts     Contact[]
   person       Person?
+  stageEvents  StageEvent[]
 }
 
 model Activity {
@@ -76,6 +207,8 @@ enum QuotaType {
   CALL
   NUMBERS_PULLED
   APPOINTMENT_SET
+  APPOINTMENT_HELD
+  DEAL_WON
 }
 
 model Person {
@@ -88,15 +221,15 @@ model Person {
 }
 
 model DailyLog {
-  id        String    @id @default(cuid())
-  personId  String
-  person    Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
-  activityId String?  @unique
+  id         String    @id @default(cuid())
+  personId   String
+  person     Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  activityId String?   @unique
   activity   Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  type      QuotaType
-  count     Int
-  date      DateTime  @default(now())
-  createdAt DateTime  @default(now())
+  type       QuotaType
+  count      Int
+  date       DateTime  @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([personId, date])
 }

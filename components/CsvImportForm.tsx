@@ -11,7 +11,6 @@ interface ParsedContact {
   email?: string;
   source?: string;
   note?: string;
-  status?: string;
 }
 
 export default function CsvImportForm() {

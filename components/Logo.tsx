@@ -35,11 +35,14 @@ export function Wordmark({
   onDark?: boolean;
 }) {
   return (
-    <span className="flex items-center gap-2.5">
+    // min-w-0 + truncate: die Wortmarke darf schrumpfen statt die Kopfzeile
+    // breiter als den Bildschirm zu machen (sonst scrollt die Seite seitlich
+    // und der sticky Header endet vor dem rechten Rand).
+    <span className="flex min-w-0 items-center gap-2.5">
       <LogoMark className="h-8 w-8 shrink-0" />
-      <span className="leading-tight">
+      <span className="min-w-0 leading-tight">
         <span
-          className={`block text-[15px] font-semibold tracking-tight ${
+          className={`block truncate text-[15px] font-semibold tracking-tight ${
             onDark ? "text-white" : "text-slate-900"
           }`}
         >
@@ -47,7 +50,7 @@ export function Wordmark({
         </span>
         {sub && (
           <span
-            className={`block text-[11px] font-medium ${
+            className={`hidden truncate text-[11px] font-medium sm:block ${
               onDark ? "text-slate-400" : "text-slate-500"
             }`}
           >

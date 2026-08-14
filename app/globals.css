@@ -25,9 +25,24 @@
   --color-gold-600: #a97f24;
 }
 
+html {
+  /* Sicherung gegen seitliches Scrollen: ein zu breites Element wuerde sonst
+     die Seite verschieben, und der sticky Header endet an der Bildschirm-
+     statt an der Seitenbreite. "clip" (nicht "hidden") laesst sticky heil,
+     weil dadurch kein eigener Scroll-Container entsteht. */
+  overflow-x: clip;
+  /* Platz fuer die Scrollleiste dauerhaft reservieren, damit das Oeffnen
+     eines Dialogs (body overflow: hidden) den Header nicht springen laesst. */
+  scrollbar-gutter: stable;
+}
+
 body {
   background: #f4f6f9;
   color: #0f172a;
+  /* Kein Gummiband-Effekt am oberen Rand: sonst schiebt sich beim Ueberziehen
+     der helle Seitenhintergrund ueber den dunklen Header und die Seite
+     schliesst oben nicht sauber ab. Nebenwirkung: kein Pull-to-Refresh. */
+  overscroll-behavior-y: none;
 }
 
 ::selection {

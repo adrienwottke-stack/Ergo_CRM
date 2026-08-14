@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { allQuotaTypes, quotaTypeLabels } from "@/lib/labels";
+import {
+  allQuotaTypes,
+  emptyQuotaCounts,
+  quotaTypeLabels,
+  quotaTypePoints,
+} from "@/lib/labels";
 import {
   berlinDayOf,
   berlinToday,
@@ -127,13 +132,14 @@ export default async function LeaderboardPage({
       row = {
         personId: entry.personId,
         name: nameById.get(entry.personId) ?? "Unbekannt",
-        byType: { CALL: 0, NUMBERS_PULLED: 0, APPOINTMENT_SET: 0 },
+        byType: emptyQuotaCounts(),
         total: 0,
       };
       rows.set(entry.personId, row);
     }
     row.byType[entry.type] += count;
-    row.total += count;
+    // Ein Abschluss zaehlt fuenffach, alles andere einfach.
+    row.total += count * quotaTypePoints[entry.type];
   }
 
   const ranking = [...rows.values()].sort((a, b) => b.total - a.total);
@@ -148,7 +154,7 @@ export default async function LeaderboardPage({
           <p className="mt-1 text-sm text-slate-500">
             {ranking.length === 0
               ? "Noch alles offen."
-              : `${ranking[0]!.name} führt mit ${ranking[0]!.total} Aktivitäten.`}
+              : `${ranking[0]!.name} führt mit ${ranking[0]!.total} Punkten.`}
           </p>
         </div>
         <Link href="/log" className={btnPrimary}>
@@ -216,7 +222,7 @@ export default async function LeaderboardPage({
                     </p>
                     <span className="text-xs text-slate-500">
                       {index === 0
-                        ? "Aktivitäten"
+                        ? "Punkte"
                         : `−${gap} auf Platz 1`}
                     </span>
                   </div>

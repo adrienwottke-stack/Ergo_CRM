@@ -1,40 +1,12 @@
-import {
-  ActivityType,
-  ContactStatus,
-  QuotaType,
-} from "@/lib/generated/prisma/enums";
-
-export const contactStatusLabels: Record<ContactStatus, string> = {
-  NEW: "Neu",
-  CONTACTED: "Kontaktiert",
-  APPOINTMENT: "Termin",
-  CLOSED: "Abgeschlossen",
-  REJECTED: "Abgelehnt",
-};
-
-export const contactStatusBadgeClasses: Record<ContactStatus, string> = {
-  NEW: "bg-blue-100 text-blue-800",
-  CONTACTED: "bg-amber-100 text-amber-800",
-  APPOINTMENT: "bg-violet-100 text-violet-800",
-  CLOSED: "bg-green-100 text-green-800",
-  REJECTED: "bg-stone-200 text-stone-600",
-};
+import { ActivityType, QuotaType } from "@/lib/generated/prisma/enums";
 
 export const activityTypeLabels: Record<ActivityType, string> = {
   CALL: "Anruf",
-  MEETING: "Meeting",
+  MEETING: "Termin",
   EMAIL: "E-Mail",
 };
 
-export const allContactStatuses = Object.values(
-  ContactStatus
-) as ContactStatus[];
-
 export const allActivityTypes = Object.values(ActivityType) as ActivityType[];
-
-export function isContactStatus(value: string): value is ContactStatus {
-  return (allContactStatuses as string[]).includes(value);
-}
 
 export function isActivityType(value: string): value is ActivityType {
   return (allActivityTypes as string[]).includes(value);
@@ -44,10 +16,37 @@ export const quotaTypeLabels: Record<QuotaType, string> = {
   CALL: "Anrufe",
   NUMBERS_PULLED: "Nummern gezogen",
   APPOINTMENT_SET: "Termine vereinbart",
+  APPOINTMENT_HELD: "Termine gehalten",
+  DEAL_WON: "Abschlüsse",
+};
+
+// Gewichtung im Wettbewerb: ein Abschluss zaehlt fuenffach.
+export const quotaTypePoints: Record<QuotaType, number> = {
+  CALL: 1,
+  NUMBERS_PULLED: 1,
+  APPOINTMENT_SET: 1,
+  APPOINTMENT_HELD: 1,
+  DEAL_WON: 5,
 };
 
 export const allQuotaTypes = Object.values(QuotaType) as QuotaType[];
 
+// Gehaltene Termine und Abschluesse entstehen ausschliesslich aus der
+// Pipeline – sonst waeren sie doppelt zaehlbar.
+export const manualQuotaTypes: QuotaType[] = [
+  "CALL",
+  "NUMBERS_PULLED",
+  "APPOINTMENT_SET",
+];
+
 export function isQuotaType(value: string): value is QuotaType {
   return (allQuotaTypes as string[]).includes(value);
 }
+
+export const emptyQuotaCounts = (): Record<QuotaType, number> => ({
+  CALL: 0,
+  NUMBERS_PULLED: 0,
+  APPOINTMENT_SET: 0,
+  APPOINTMENT_HELD: 0,
+  DEAL_WON: 0,
+});

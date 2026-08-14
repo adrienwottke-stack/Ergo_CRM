@@ -1,16 +1,30 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import type { ContactStatus } from "@/lib/generated/prisma/enums";
-import { allContactStatuses, contactStatusLabels } from "@/lib/labels";
-import { berlinToday, dayToUtcDate, mondayOf, shiftDay } from "@/lib/dates";
+import type { ContactStage } from "@/lib/generated/prisma/enums";
+import {
+  ACQUISITION_STAGES,
+  CARE_STAGES,
+  contactStageLabels,
+  contactStagePalette,
+} from "@/lib/pipeline";
+import {
+  addDays,
+  berlinToday,
+  dayToUtcDate,
+  dueState,
+  hasTimeOfDay,
+  mondayOf,
+  shiftDay,
+} from "@/lib/dates";
 import { weeklyTotals } from "@/lib/stats";
-import StatusBadge from "@/components/StatusBadge";
+import NextStepBadge from "@/components/NextStepBadge";
 import SparkBars from "@/components/SparkBars";
+import DailyTargetCard from "@/components/DailyTargetCard";
 import {
   BellIcon,
   ChevronRightIcon,
-  ClockIcon,
+  LayersIcon,
   UsersIcon,
 } from "@/components/icons";
 import { card, kicker, pageTitle } from "@/components/ui";
@@ -18,81 +32,91 @@ import { card, kicker, pageTitle } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 const WEEKS_SHOWN = 8;
-const STALE_DAYS = 14;
-
-const dateFormat = new Intl.DateTimeFormat("de-DE", {
-  day: "2-digit",
-  month: "2-digit",
-  timeZone: "UTC",
-});
-
-import DailyTargetCard from "@/components/DailyTargetCard";
 
 export default async function DashboardPage() {
   const user = await requireUser();
   const today = berlinToday();
   const thisMonday = mondayOf(today);
   const oldestMonday = shiftDay(thisMonday, -7 * (WEEKS_SHOWN - 1));
-  const staleBefore = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000);
-
   const todayStart = dayToUtcDate(today);
+  const tomorrow = addDays(todayStart, 1);
 
-  const [grouped, recentActivities, dueFollowUps, staleContacts, todayCallsCount, todayAppointmentsCount] =
-    await Promise.all([
-      prisma.contact.groupBy({
-        by: ["status"],
-        where: { ownerId: user.id },
-        _count: { _all: true },
-      }),
-      prisma.activity.findMany({
-        where: {
-          date: { gte: dayToUtcDate(oldestMonday) },
-          contact: { is: { ownerId: user.id } },
-        },
-        select: { date: true },
-      }),
-      prisma.contact.findMany({
-        where: {
-          ownerId: user.id,
-          nextFollowUp: { lte: dayToUtcDate(today) },
-          status: { notIn: ["CLOSED", "REJECTED"] },
-        },
-        orderBy: { nextFollowUp: "asc" },
-        take: 5,
-        select: { id: true, name: true, nextFollowUp: true, status: true },
-      }),
-      prisma.contact.findMany({
-        where: {
-          ownerId: user.id,
-          updatedAt: { lt: staleBefore },
-          status: { in: ["NEW", "CONTACTED", "APPOINTMENT"] },
-        },
-        orderBy: { updatedAt: "asc" },
-        take: 5,
-        select: { id: true, name: true, updatedAt: true, status: true },
-      }),
-      prisma.activity.count({
-        where: {
-          type: "CALL",
-          date: { gte: todayStart },
-          contact: { is: { ownerId: user.id } },
-        },
-      }),
-      prisma.contact.count({
-        where: {
-          ownerId: user.id,
-          appointmentLoggedAt: { gte: todayStart },
-        },
-      }),
-    ]);
+  const [
+    grouped,
+    recentActivities,
+    dueSteps,
+    dueDeals,
+    stepless,
+    openDeals,
+    todayCallsCount,
+    todayAppointmentsCount,
+  ] = await Promise.all([
+    prisma.contact.groupBy({
+      by: ["stage"],
+      where: { ownerId: user.id, outcome: { not: "VERLOREN" } },
+      _count: { _all: true },
+    }),
+    prisma.activity.findMany({
+      where: {
+        date: { gte: dayToUtcDate(oldestMonday) },
+        contact: { is: { ownerId: user.id } },
+      },
+      select: { date: true },
+    }),
+    prisma.contact.findMany({
+      where: {
+        ownerId: user.id,
+        nextStepType: { not: null },
+        nextStepAt: { lt: tomorrow },
+      },
+      orderBy: { nextStepAt: "asc" },
+      take: 6,
+      select: {
+        id: true,
+        name: true,
+        stage: true,
+        outcome: true,
+        nextStepType: true,
+        nextStepAt: true,
+      },
+    }),
+    prisma.deal.count({
+      where: {
+        contact: { is: { ownerId: user.id } },
+        outcome: "OFFEN",
+        nextStepType: { not: null },
+        nextStepAt: { lt: tomorrow },
+      },
+    }),
+    prisma.contact.findMany({
+      where: {
+        ownerId: user.id,
+        nextStepType: null,
+        outcome: { not: "VERLOREN" },
+      },
+      select: { id: true, stage: true, deals: { where: { outcome: "OFFEN" }, select: { id: true } } },
+    }),
+    prisma.deal.aggregate({
+      where: { contact: { is: { ownerId: user.id } }, outcome: "OFFEN" },
+      _sum: { units: true },
+      _count: { _all: true },
+    }),
+    prisma.activity.count({
+      where: {
+        type: "CALL",
+        date: { gte: todayStart },
+        contact: { is: { ownerId: user.id } },
+      },
+    }),
+    prisma.contact.count({
+      where: { ownerId: user.id, appointmentLoggedAt: { gte: todayStart } },
+    }),
+  ]);
 
-  const countsByStatus = new Map<ContactStatus, number>(
-    grouped.map((entry) => [entry.status, entry._count._all])
+  const countsByStage = new Map<ContactStage, number>(
+    grouped.map((entry) => [entry.stage, entry._count._all])
   );
-  const totalCount = grouped.reduce(
-    (sum, entry) => sum + entry._count._all,
-    0
-  );
+  const totalCount = grouped.reduce((sum, entry) => sum + entry._count._all, 0);
 
   const weekly = weeklyTotals(
     recentActivities.map((a) => a.date),
@@ -103,15 +127,17 @@ export default async function DashboardPage() {
   const lastWeek = weekly[WEEKS_SHOWN - 2]!;
   const delta = thisWeek - lastWeek;
 
-  const hasTodos = dueFollowUps.length > 0 || staleContacts.length > 0;
+  // In Beratung fuehrt der Vorgang den Schritt – das ist kein Versaeumnis.
+  const orphanCount = stepless.filter(
+    (contact) => !(contact.stage === "IN_BERATUNG" && contact.deals.length > 0)
+  ).length;
+  const dueCount = dueSteps.length + dueDeals;
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className={pageTitle}>Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Dein Netzwerk auf einen Blick.
-        </p>
+        <p className="mt-1 text-sm text-slate-500">Dein Netzwerk auf einen Blick.</p>
       </div>
 
       <DailyTargetCard
@@ -120,162 +146,173 @@ export default async function DashboardPage() {
       />
 
       <section className={`${card} p-6 sm:p-7`}>
-        <div className="flex items-center gap-2">
-          <BellIcon className="h-4.5 w-4.5 text-navy-600" />
-          <h2 className="text-sm font-semibold text-slate-900">Heute dran</h2>
-        </div>
-        {hasTodos ? (
-          <div className="mt-4 grid gap-6 sm:grid-cols-2">
-            <div>
-              <p className={kicker}>Fällige Wiedervorlagen</p>
-              {dueFollowUps.length === 0 ? (
-                <p className="mt-2 text-sm text-slate-500">Keine – sauber.</p>
-              ) : (
-                <ul className="mt-2 divide-y divide-slate-100">
-                  {dueFollowUps.map((contact) => (
-                    <li key={contact.id}>
-                      <Link
-                        href={`/contacts/${contact.id}`}
-                        className="group flex items-center justify-between gap-3 py-2"
-                      >
-                        <span className="text-sm font-medium text-slate-900 group-hover:text-navy-700">
-                          {contact.name}
-                        </span>
-                        <span className="flex items-center gap-2 text-xs text-amber-700">
-                          fällig {dateFormat.format(contact.nextFollowUp!)}
-                          <ChevronRightIcon className="h-3.5 w-3.5 text-slate-400" />
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div>
-              <p className={kicker}>
-                Länger als {STALE_DAYS} Tage unberührt
-              </p>
-              {staleContacts.length === 0 ? (
-                <p className="mt-2 text-sm text-slate-500">Keine – stark.</p>
-              ) : (
-                <ul className="mt-2 divide-y divide-slate-100">
-                  {staleContacts.map((contact) => (
-                    <li key={contact.id}>
-                      <Link
-                        href={`/contacts/${contact.id}`}
-                        className="group flex items-center justify-between gap-3 py-2"
-                      >
-                        <span className="text-sm font-medium text-slate-900 group-hover:text-navy-700">
-                          {contact.name}
-                        </span>
-                        <span className="flex items-center gap-2 text-xs text-slate-500">
-                          <ClockIcon className="h-3.5 w-3.5" />
-                          zuletzt {dateFormat.format(contact.updatedAt)}
-                          <ChevronRightIcon className="h-3.5 w-3.5 text-slate-400" />
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <BellIcon className="h-4.5 w-4.5 text-navy-600" />
+            <h2 className="text-sm font-semibold text-slate-900">
+              Fällig heute und überfällig
+            </h2>
           </div>
+          <Link
+            href="/heute"
+            className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-navy-600 hover:underline"
+          >
+            Zur Heute-Liste
+            <ChevronRightIcon className="h-4 w-4" />
+          </Link>
+        </div>
+
+        {dueCount === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">
+            Nichts offen – alles abgearbeitet.
+          </p>
         ) : (
-          <p className="mt-2 text-sm text-slate-500">
-            Keine fälligen Wiedervorlagen, nichts liegt lange still – alles im
-            Griff. Wiedervorlagen setzt du beim Bearbeiten eines Kontakts.
+          <ul className="mt-4 divide-y divide-slate-100">
+            {dueSteps.map((contact) => (
+              <li key={contact.id}>
+                <Link
+                  href={`/contacts/${contact.id}`}
+                  className="group flex min-h-11 flex-wrap items-center justify-between gap-3 py-2.5"
+                >
+                  <span className="text-sm font-medium text-slate-900 group-hover:text-navy-700">
+                    {contact.name}
+                  </span>
+                  <NextStepBadge
+                    type={contact.nextStepType!}
+                    at={contact.nextStepAt!}
+                    state={dueState(contact.nextStepAt!, today)}
+                    withTime={hasTimeOfDay(contact.nextStepAt!)}
+                  />
+                </Link>
+              </li>
+            ))}
+            {dueDeals > 0 && (
+              <li className="py-2.5 text-sm text-slate-500">
+                + {dueDeals} fällige {dueDeals === 1 ? "Vorgang" : "Vorgänge"}
+              </li>
+            )}
+          </ul>
+        )}
+
+        {orphanCount > 0 && (
+          <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            {orphanCount} {orphanCount === 1 ? "Kontakt hat" : "Kontakte haben"} keinen
+            nächsten Schritt.{" "}
+            <Link href="/heute" className="font-semibold underline">
+              Nacharbeiten
+            </Link>
           </p>
         )}
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link
           href="/contacts"
-          className={`${card} group relative flex flex-col justify-between overflow-hidden p-6 transition hover:border-navy-300 lg:row-span-2`}
+          className={`${card} group p-5 transition hover:border-navy-300`}
         >
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-navy-50"
-          />
-          <div className="relative flex items-center gap-2 text-slate-600">
+          <div className="flex items-center gap-2 text-slate-600">
             <UsersIcon className="h-5 w-5 text-navy-600" />
-            <span className="text-[13px] font-medium">Kontakte gesamt</span>
+            <span className="text-[13px] font-medium">Kontakte</span>
           </div>
-          <div className="relative mt-6">
-            <p className="text-6xl font-semibold tracking-tight text-slate-900">
-              {totalCount}
-            </p>
-            <p className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-navy-600 transition group-hover:gap-2">
-              Alle Kontakte ansehen
-              <ChevronRightIcon className="h-4 w-4" />
-            </p>
-          </div>
+          <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+            {totalCount}
+          </p>
         </Link>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2 lg:grid-cols-3">
-          <div className={`${card} p-5 sm:col-span-2`}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[13px] font-medium text-slate-600">
-                  Aktivitäten diese Woche
-                </p>
-                <div className="mt-3 flex items-baseline gap-3">
-                  <p className="text-3xl font-semibold tracking-tight text-slate-900">
-                    {thisWeek}
-                  </p>
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${
-                      delta >= 0
-                        ? "bg-emerald-50 text-emerald-800 ring-emerald-600/15"
-                        : "bg-red-50 text-red-700 ring-red-600/15"
-                    }`}
-                  >
-                    {delta >= 0 ? `+${delta}` : delta} vs. Vorwoche
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500">
-                  Letzte {WEEKS_SHOWN} Wochen
-                </p>
-              </div>
-              <SparkBars values={weekly} className="mt-1 h-12 w-24 shrink-0" />
-            </div>
+        <Link
+          href="/vorgaenge"
+          className={`${card} group p-5 transition hover:border-navy-300`}
+        >
+          <div className="flex items-center gap-2 text-slate-600">
+            <LayersIcon className="h-5 w-5 text-navy-600" />
+            <span className="text-[13px] font-medium">Offene Vorgänge</span>
           </div>
+          <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+            {openDeals._count._all}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {openDeals._sum.units ?? 0} Einheiten in der Pipeline
+          </p>
+        </Link>
 
-          <Link
-            href="/leaderboard"
-            className={`${card} group flex flex-col justify-between bg-navy-800 p-5 transition hover:bg-navy-900`}
-          >
-            <p className="text-[13px] font-medium text-slate-300">
-              Team-Wettbewerb
+        <div className={`${card} p-5`}>
+          <p className="text-[13px] font-medium text-slate-600">
+            Aktivitäten diese Woche
+          </p>
+          <div className="mt-3 flex items-baseline gap-3">
+            <p className="text-3xl font-semibold tracking-tight text-slate-900">
+              {thisWeek}
             </p>
-            <p className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-white transition group-hover:gap-2">
-              Zur Rangliste
-              <ChevronRightIcon className="h-4 w-4 text-gold-400" />
-            </p>
-          </Link>
-
-          {allContactStatuses.map((status) => {
-            const count = countsByStatus.get(status) ?? 0;
-            const share =
-              totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
-            return (
-              <Link
-                key={status}
-                href={`/contacts?status=${status}`}
-                className={`${card} group p-5 transition hover:border-navy-300`}
-              >
-                <StatusBadge status={status} />
-                <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
-                  {count}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {share} % · {contactStatusLabels[status]}
-                </p>
-              </Link>
-            );
-          })}
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${
+                delta >= 0
+                  ? "bg-emerald-50 text-emerald-800 ring-emerald-600/15"
+                  : "bg-red-50 text-red-700 ring-red-600/15"
+              }`}
+            >
+              {delta >= 0 ? `+${delta}` : delta}
+            </span>
+          </div>
+          <SparkBars values={weekly} className="mt-2 h-10 w-full" />
         </div>
+
+        <Link
+          href="/leaderboard"
+          className={`${card} group flex flex-col justify-between bg-navy-800 p-5 transition hover:bg-navy-900`}
+        >
+          <p className="text-[13px] font-medium text-slate-300">Team-Wettbewerb</p>
+          <p className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-white transition group-hover:gap-2">
+            Zur Rangliste
+            <ChevronRightIcon className="h-4 w-4 text-gold-400" />
+          </p>
+        </Link>
       </div>
+
+      <section className={`${card} p-6 sm:p-7`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-slate-900">Verteilung im Trichter</h2>
+          <Link
+            href="/pipeline"
+            className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-navy-600 hover:underline"
+          >
+            Zur Pipeline
+            <ChevronRightIcon className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="mt-4 space-y-5">
+          {[
+            { title: "Akquise", stages: ACQUISITION_STAGES },
+            { title: "Betreuung", stages: CARE_STAGES },
+          ].map((group) => (
+            <div key={group.title}>
+              <p className={kicker}>{group.title}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                {group.stages.map((stage) => {
+                  const count = countsByStage.get(stage) ?? 0;
+                  return (
+                    <Link
+                      key={stage}
+                      href={`/contacts?stage=${stage}`}
+                      className="rounded-xl border border-slate-200 p-3 transition hover:border-navy-300"
+                    >
+                      <span
+                        className={`inline-block h-1.5 w-8 rounded-full ${contactStagePalette[stage].bar}`}
+                      />
+                      <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                        {count}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {contactStageLabels[stage]}
+                      </p>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

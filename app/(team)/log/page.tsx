@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
-import { allQuotaTypes, quotaTypeLabels } from "@/lib/labels";
+import { manualQuotaTypes, quotaTypeLabels } from "@/lib/labels";
 import { berlinDayOf, berlinToday, dayDisplayFormat, dayToUtcDate } from "@/lib/dates";
 import { streakDays } from "@/lib/stats";
 import QuickCounter from "@/components/QuickCounter";
@@ -23,6 +23,8 @@ const quotaIconStyles: Record<QuotaType, string> = {
   CALL: "bg-blue-50 text-blue-600",
   NUMBERS_PULLED: "bg-navy-50 text-navy-600",
   APPOINTMENT_SET: "bg-emerald-50 text-emerald-600",
+  APPOINTMENT_HELD: "bg-violet-50 text-violet-600",
+  DEAL_WON: "bg-gold-100 text-gold-600",
 };
 
 export default async function LogPage() {
@@ -76,7 +78,7 @@ export default async function LogPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        {allQuotaTypes.map((type) => (
+        {manualQuotaTypes.map((type) => (
           <QuickCounter key={type} type={type} label={quotaTypeLabels[type]} count={todayByType.get(type) ?? 0} action={quickLog} />
         ))}
       </div>
@@ -87,7 +89,7 @@ export default async function LogPage() {
           Nur für Aktivitäten, die nicht über einen CRM-Kontakt erfasst wurden.
         </p>
         <div className="grid gap-5 sm:grid-cols-3">
-          {allQuotaTypes.map((type) => (
+          {manualQuotaTypes.map((type) => (
             <div key={type}>
               <label htmlFor={type} className={label}>{quotaTypeLabels[type]}</label>
               <input id={type} name={type} type="number" min={0} max={999} placeholder="0" className={input} />

@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { berlinToday, dayToUtcDate } from "@/lib/dates";
+import {
+  addDays,
+  berlinToday,
+  dayToUtcDate,
+  utcToBerlinLocalInput,
+} from "@/lib/dates";
 import FocusDialer from "@/components/FocusDialer";
 import { pageTitle } from "@/components/ui";
 
@@ -9,34 +14,42 @@ export const dynamic = "force-dynamic";
 
 export default async function FocusPage() {
   const user = await requireUser();
-  const today = berlinToday();
-  const todayDate = dayToUtcDate(today);
+  const tomorrow = addDays(dayToUtcDate(berlinToday()), 1);
 
-  // Load contacts that need attention today: due follow ups or new contacts without follow-up
+  // Anruf-Warteschlange: alles, was heute faellig ist, plus unberuehrte Neue.
   const queueContacts = await prisma.contact.findMany({
     where: {
       ownerId: user.id,
-      status: { notIn: ["CLOSED", "REJECTED"] },
-      OR: [
-        { nextFollowUp: { lte: todayDate } },
-        { status: "NEW" },
-      ],
+      outcome: "OFFEN",
+      OR: [{ nextStepAt: { lt: tomorrow } }, { stage: "NEU" }],
     },
-    orderBy: [
-      { nextFollowUp: "asc" },
-      { updatedAt: "desc" },
-    ],
-    include: {
-      activities: {
-        orderBy: { date: "desc" },
-        take: 3,
-      },
-    },
+    orderBy: [{ nextStepAt: "asc" }, { updatedAt: "desc" }],
+    include: { activities: { orderBy: { date: "desc" }, take: 3 } },
   });
 
+  const queue = queueContacts.map((contact) => ({
+    id: contact.id,
+    name: contact.name,
+    phone: contact.phone,
+    email: contact.email,
+    source: contact.source,
+    stage: contact.stage,
+    outcome: contact.outcome,
+    note: contact.note,
+    appointmentLocal: contact.appointmentAt
+      ? utcToBerlinLocalInput(contact.appointmentAt)
+      : null,
+    activities: contact.activities.map((activity) => ({
+      id: activity.id,
+      type: activity.type,
+      text: activity.text,
+      date: activity.date.toISOString(),
+    })),
+  }));
+
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className={pageTitle}>🎯 Fokus-Modus (Anruftag)</h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -44,14 +57,14 @@ export default async function FocusPage() {
           </p>
         </div>
         <Link
-          href="/dashboard"
-          className="text-sm font-medium text-slate-500 hover:text-slate-900 transition"
+          href="/heute"
+          className="flex min-h-11 items-center text-sm font-medium text-slate-500 transition hover:text-slate-900"
         >
           ✕ Beenden
         </Link>
       </div>
 
-      <FocusDialer queue={queueContacts} />
+      <FocusDialer queue={queue} />
     </div>
   );
 }

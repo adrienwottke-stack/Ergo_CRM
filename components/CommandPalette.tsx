@@ -9,7 +9,7 @@ interface SearchResult {
   name: string;
   phone?: string | null;
   email?: string | null;
-  status: string;
+  stage: string;
 }
 
 export default function CommandPalette({ searchAction }: { searchAction: (query: string) => Promise<SearchResult[]> }) {

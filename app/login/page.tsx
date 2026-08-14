@@ -18,7 +18,7 @@ export default async function LoginPage({
   const isFirstSetup = userCount === 0;
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-navy-950 p-4">
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-navy-950 p-4">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"

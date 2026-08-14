@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { quickLogCall, quickSetStatus } from "@/app/(app)/contacts/actions";
-import type { ContactStatus } from "@/lib/generated/prisma/enums";
-import StatusBadge from "@/components/StatusBadge";
+import { quickLogCall } from "@/app/(app)/contacts/actions";
+import type { ContactStage, Outcome } from "@/lib/generated/prisma/enums";
+import StageBadge from "@/components/StageBadge";
+import ContactActionDialog, {
+  type ActionMode,
+  type ContactLite,
+} from "@/components/ContactActionDialog";
 import { PhoneIcon, CalendarCheckIcon, ChevronRightIcon } from "@/components/icons";
 import { btnPrimary, btnSecondary, card } from "@/components/ui";
 
@@ -21,30 +25,37 @@ interface Contact {
   phone?: string | null;
   email?: string | null;
   source?: string | null;
-  status: ContactStatus;
+  stage: ContactStage;
+  outcome: Outcome;
   note?: string | null;
-  nextFollowUp?: string | Date | null;
+  appointmentLocal: string | null;
   activities: Activity[];
 }
+
+const bigButton =
+  "flex min-h-14 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition disabled:opacity-50";
 
 export default function FocusDialer({ queue }: { queue: Contact[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [noteText, setNoteText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dialogMode, setDialogMode] = useState<ActionMode>("stage");
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   if (queue.length === 0 || currentIndex >= queue.length) {
     return (
-      <div className={`${card} p-10 text-center space-y-4`}>
+      <div className={`${card} space-y-4 p-10 text-center`}>
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-2xl text-emerald-600">
           🎉
         </div>
         <h2 className="text-xl font-bold text-slate-900">Klasse gemacht!</h2>
-        <p className="text-sm text-slate-600 max-w-md mx-auto">
-          Du hast alle fälligen Kontakte für deinen heutigen Fokus-Durchlauf abgearbeitet.
+        <p className="mx-auto max-w-md text-sm text-slate-600">
+          Du hast alle fälligen Kontakte für deinen heutigen Fokus-Durchlauf
+          abgearbeitet.
         </p>
-        <div className="pt-4 flex justify-center gap-3">
-          <Link href="/dashboard" className={btnPrimary}>
-            Zurück zum Dashboard
+        <div className="flex flex-col justify-center gap-3 pt-4 sm:flex-row">
+          <Link href="/heute" className={btnPrimary}>
+            Zur Heute-Liste
           </Link>
           <Link href="/leaderboard" className={btnSecondary}>
             Rangliste ansehen 🏆
@@ -55,19 +66,31 @@ export default function FocusDialer({ queue }: { queue: Contact[] }) {
   }
 
   const current = queue[currentIndex]!;
-  const progressPercent = Math.round(((currentIndex) / queue.length) * 100);
+  const progressPercent = Math.round((currentIndex / queue.length) * 100);
 
-  const handleAction = async (actionFn: (formData: FormData) => Promise<void>, extraFields?: Record<string, string>) => {
+  const lite: ContactLite = {
+    id: current.id,
+    name: current.name,
+    phone: current.phone ?? null,
+    stage: current.stage,
+    outcome: current.outcome,
+    appointmentLocal: current.appointmentLocal,
+    hasStep: true,
+  };
+
+  const advance = () => {
+    setNoteText("");
+    setCurrentIndex((prev) => prev + 1);
+  };
+
+  const handleQuickCall = async (extraFields: Record<string, string>) => {
     setIsSubmitting(true);
     try {
       const formData = new FormData();
       formData.set("contactId", current.id);
-      if (extraFields) {
-        Object.entries(extraFields).forEach(([k, v]) => formData.set(k, v));
-      }
-      await actionFn(formData);
-      setNoteText("");
-      setCurrentIndex((prev) => prev + 1);
+      Object.entries(extraFields).forEach(([key, value]) => formData.set(key, value));
+      await quickLogCall(formData);
+      advance();
     } catch (err) {
       console.error(err);
     } finally {
@@ -75,29 +98,34 @@ export default function FocusDialer({ queue }: { queue: Contact[] }) {
     }
   };
 
+  const openDialog = (mode: ActionMode) => {
+    setDialogMode(mode);
+    setDialogOpen(true);
+  };
+
   return (
     <div className="space-y-5">
-      {/* Progress Bar */}
-      <div className={`${card} p-4 space-y-2`}>
+      <div className={`${card} space-y-2 p-4`}>
         <div className="flex justify-between text-xs font-semibold text-slate-600">
-          <span>Fortschritt: {currentIndex + 1} von {queue.length} Kontakten</span>
+          <span>
+            Fortschritt: {currentIndex + 1} von {queue.length} Kontakten
+          </span>
           <span>{progressPercent}%</span>
         </div>
-        <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
           <div
-            className="h-full bg-navy-600 transition-all duration-300 rounded-full"
+            className="h-full rounded-full bg-navy-600 transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
       </div>
 
-      {/* Main Focus Card */}
-      <div className={`${card} p-6 sm:p-8 space-y-6`}>
+      <div className={`${card} space-y-6 p-6 sm:p-8`}>
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-6">
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-2xl font-bold text-slate-900">{current.name}</h2>
-              <StatusBadge status={current.status} />
+              <StageBadge stage={current.stage} outcome={current.outcome} />
             </div>
             {current.source && (
               <p className="mt-1 text-xs text-slate-500">Quelle: {current.source}</p>
@@ -106,21 +134,22 @@ export default function FocusDialer({ queue }: { queue: Contact[] }) {
           <Link
             href={`/contacts/${current.id}`}
             target="_blank"
-            className="text-xs font-medium text-navy-600 hover:underline flex items-center gap-1"
+            className="flex min-h-11 items-center gap-1 text-xs font-medium text-navy-600 hover:underline"
           >
             Vollständiges Profil ↗
           </Link>
         </div>
 
-        {/* Quick Call Header */}
-        <div className="grid gap-4 sm:grid-cols-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Telefon</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Telefon
+            </span>
             {current.phone ? (
-              <div className="mt-1 flex items-center gap-3">
+              <div className="mt-1">
                 <a
                   href={`tel:${current.phone}`}
-                  className="text-lg font-bold text-navy-700 hover:underline flex items-center gap-2"
+                  className="flex min-h-11 items-center gap-2 text-lg font-bold text-navy-700 hover:underline"
                 >
                   <PhoneIcon className="h-5 w-5 text-emerald-600" />
                   {current.phone}
@@ -132,10 +161,12 @@ export default function FocusDialer({ queue }: { queue: Contact[] }) {
           </div>
 
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">E-Mail</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              E-Mail
+            </span>
             {current.email ? (
               <p className="mt-1 text-sm font-medium text-slate-800">
-                <a href={`mailto:${current.email}`} className="hover:underline text-navy-600">
+                <a href={`mailto:${current.email}`} className="text-navy-600 hover:underline">
                   {current.email}
                 </a>
               </p>
@@ -145,23 +176,30 @@ export default function FocusDialer({ queue }: { queue: Contact[] }) {
           </div>
         </div>
 
-        {/* Notes & Context */}
         {current.note && (
-          <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl p-4">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-800">Notiz zum Kontakt</span>
-            <p className="mt-1 text-sm text-amber-900 whitespace-pre-wrap">{current.note}</p>
+          <div className="rounded-xl border border-amber-200/80 bg-amber-50/60 p-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
+              Notiz zum Kontakt
+            </span>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900">
+              {current.note}
+            </p>
           </div>
         )}
 
-        {/* Last Activities */}
         {current.activities.length > 0 && (
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Letzte Aktivitäten</h4>
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+              Letzte Aktivitäten
+            </h4>
             <div className="space-y-2">
               {current.activities.map((act) => (
-                <div key={act.id} className="text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex justify-between">
+                <div
+                  key={act.id}
+                  className="flex justify-between rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-xs"
+                >
                   <span className="font-medium text-slate-700">{act.text}</span>
-                  <span className="text-slate-400">
+                  <span className="shrink-0 pl-2 text-slate-400">
                     {new Date(act.date).toLocaleDateString("de-DE")}
                   </span>
                 </div>
@@ -170,12 +208,15 @@ export default function FocusDialer({ queue }: { queue: Contact[] }) {
           </div>
         )}
 
-        {/* Action Panel */}
-        <div className="border-t border-slate-100 pt-6 space-y-4">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+        <div className="space-y-4 border-t border-slate-100 pt-6">
+          <label
+            htmlFor="focusNote"
+            className="block text-xs font-bold uppercase tracking-wider text-slate-600"
+          >
             Gesprächsergebnis / Notiz eintragen:
           </label>
           <textarea
+            id="focusNote"
             rows={2}
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
@@ -187,8 +228,13 @@ export default function FocusDialer({ queue }: { queue: Contact[] }) {
             <button
               type="button"
               disabled={isSubmitting}
-              onClick={() => handleAction(quickLogCall, { note: noteText || "Anruf getätigt (Fokus-Modus)", followUpDays: "7" })}
-              className="flex items-center justify-center gap-2 rounded-lg bg-navy-600 px-4 py-3 text-sm font-semibold text-white hover:bg-navy-700 transition disabled:opacity-50"
+              onClick={() =>
+                handleQuickCall({
+                  note: noteText || "Anruf getätigt (Fokus-Modus)",
+                  followUpDays: "7",
+                })
+              }
+              className={`${bigButton} bg-navy-600 text-white hover:bg-navy-700`}
             >
               <PhoneIcon className="h-4 w-4" /> Anruf geloggt & +7d
             </button>
@@ -196,17 +242,22 @@ export default function FocusDialer({ queue }: { queue: Contact[] }) {
             <button
               type="button"
               disabled={isSubmitting}
-              onClick={() => handleAction(quickSetStatus, { status: "APPOINTMENT" })}
-              className="flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700 transition disabled:opacity-50"
+              onClick={() => openDialog("stage")}
+              className={`${bigButton} bg-purple-600 text-white hover:bg-purple-700`}
             >
-              <CalendarCheckIcon className="h-4 w-4" /> 📅 Termin vereinbart 🎉
+              <CalendarCheckIcon className="h-4 w-4" /> Termin vereinbart
             </button>
 
             <button
               type="button"
               disabled={isSubmitting}
-              onClick={() => handleAction(quickLogCall, { note: noteText || "Mailbox besprochen / Nicht erreicht", followUpDays: "2" })}
-              className="flex items-center justify-center gap-2 rounded-lg bg-amber-100 px-4 py-2.5 text-sm font-semibold text-amber-800 hover:bg-amber-200 transition disabled:opacity-50"
+              onClick={() =>
+                handleQuickCall({
+                  note: noteText || "Mailbox besprochen / Nicht erreicht",
+                  followUpDays: "2",
+                })
+              }
+              className={`${bigButton} bg-amber-100 text-amber-800 hover:bg-amber-200`}
             >
               🗣️ Mailbox / +2d
             </button>
@@ -214,14 +265,31 @@ export default function FocusDialer({ queue }: { queue: Contact[] }) {
             <button
               type="button"
               disabled={isSubmitting}
-              onClick={() => setCurrentIndex((prev) => prev + 1)}
-              className="flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+              onClick={() => openDialog("lost")}
+              className={`${bigButton} bg-slate-100 text-slate-700 hover:bg-slate-200`}
+            >
+              Kein Interesse
+            </button>
+
+            <button
+              type="button"
+              onClick={advance}
+              className={`${bigButton} border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 sm:col-span-2`}
             >
               Überspringen <ChevronRightIcon className="h-4 w-4" />
             </button>
           </div>
         </div>
       </div>
+
+      <ContactActionDialog
+        open={dialogOpen}
+        mode={dialogMode}
+        contact={lite}
+        targetStage={dialogMode === "stage" ? "TERMIN_VEREINBART" : undefined}
+        onClose={() => setDialogOpen(false)}
+        onSuccess={advance}
+      />
     </div>
   );
 }

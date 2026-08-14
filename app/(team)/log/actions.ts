@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, isValidDay } from "@/lib/dates";
-import { QuotaType } from "@/lib/generated/prisma/enums";
+import { manualQuotaTypes } from "@/lib/labels";
+import type { QuotaType } from "@/lib/generated/prisma/enums";
 
 export async function logDaily(formData: FormData) {
   const user = await requireUser();
@@ -14,7 +15,8 @@ export async function logDaily(formData: FormData) {
   const day = dayRaw && isValidDay(dayRaw) ? dayRaw : berlinToday();
   const entries: { type: QuotaType; count: number }[] = [];
 
-  for (const type of Object.values(QuotaType)) {
+  // Gehaltene Termine und Abschluesse kommen nur aus der Pipeline.
+  for (const type of manualQuotaTypes) {
     const raw = (formData.get(type) as string | null)?.trim();
     const count = raw ? parseInt(raw, 10) : 0;
     if (Number.isFinite(count) && count > 0) {

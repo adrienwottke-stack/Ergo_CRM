@@ -1,5 +1,11 @@
 import type { Contact } from "@/lib/generated/prisma/client";
-import { allContactStatuses, contactStatusLabels } from "@/lib/labels";
+import {
+  ALL_NEXT_STEP_TYPES,
+  CONTACT_STAGES,
+  contactStageLabels,
+  nextStepLabels,
+} from "@/lib/pipeline";
+import { utcToBerlinLocalInput } from "@/lib/dates";
 import { btnPrimary, card, input, label } from "@/components/ui";
 import NoteTemplates from "@/components/NoteTemplates";
 
@@ -14,9 +20,7 @@ export default function ContactForm({
 }) {
   return (
     <form action={action} className={`${card} space-y-5 p-6 sm:p-8`}>
-      {contact && (
-        <input type="hidden" name="contactId" value={contact.id} />
-      )}
+      {contact && <input type="hidden" name="contactId" value={contact.id} />}
       <div>
         <label htmlFor="name" className={label}>
           Name *
@@ -76,18 +80,18 @@ export default function ContactForm({
           />
         </div>
         <div>
-          <label htmlFor="status" className={label}>
-            Status
+          <label htmlFor="stage" className={label}>
+            Phase
           </label>
           <select
-            id="status"
-            name="status"
-            defaultValue={contact?.status ?? "NEW"}
+            id="stage"
+            name="stage"
+            defaultValue={contact?.stage ?? "NEU"}
             className={input}
           >
-            {allContactStatuses.map((status) => (
-              <option key={status} value={status}>
-                {contactStatusLabels[status]}
+            {CONTACT_STAGES.map((stage) => (
+              <option key={stage} value={stage}>
+                {contactStageLabels[stage]}
               </option>
             ))}
           </select>
@@ -96,23 +100,78 @@ export default function ContactForm({
 
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
-          <label htmlFor="nextFollowUp" className={label}>
-            Wiedervorlage
+          <label htmlFor="appointmentAt" className={label}>
+            Termin
           </label>
           <input
-            id="nextFollowUp"
-            name="nextFollowUp"
-            type="date"
+            id="appointmentAt"
+            name="appointmentAt"
+            type="datetime-local"
             defaultValue={
-              contact?.nextFollowUp
-                ? contact.nextFollowUp.toISOString().slice(0, 10)
+              contact?.appointmentAt
+                ? utcToBerlinLocalInput(contact.appointmentAt)
                 : ""
             }
             className={input}
           />
           <p className="mt-1.5 text-xs text-slate-500">
-            {"Ab diesem Tag erscheint der Kontakt im Dashboard unter „Heute dran“."}
+            Pflicht für die Phasen „Termin vereinbart“ und „Checkup geplant“.
           </p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+        <p className="text-[13px] font-semibold text-slate-900">Nächster Schritt</p>
+        <p className="mt-0.5 text-xs text-slate-500">
+          Leer lassen: dann setzt das Playbook den passenden Schritt zur Phase.
+        </p>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="nextStepType" className={label}>
+              Was ist zu tun?
+            </label>
+            <select
+              id="nextStepType"
+              name="nextStepType"
+              defaultValue={contact?.nextStepType ?? ""}
+              className={input}
+            >
+              <option value="">Aus dem Playbook übernehmen</option>
+              {ALL_NEXT_STEP_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {nextStepLabels[type]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="nextStepDate" className={label}>
+              Fällig am
+            </label>
+            <input
+              id="nextStepDate"
+              name="nextStepDate"
+              type="date"
+              defaultValue={
+                contact?.nextStepAt
+                  ? contact.nextStepAt.toISOString().slice(0, 10)
+                  : ""
+              }
+              className={input}
+            />
+          </div>
+        </div>
+        <div className="mt-4">
+          <label htmlFor="nextStepNote" className={label}>
+            Notiz zum Schritt
+          </label>
+          <input
+            id="nextStepNote"
+            name="nextStepNote"
+            type="text"
+            defaultValue={contact?.nextStepNote ?? ""}
+            className={input}
+          />
         </div>
       </div>
 
