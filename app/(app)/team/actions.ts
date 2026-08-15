@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { hashPassword, newPasswordSalt, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { pfadUnter, umhaengen } from "@/lib/struktur";
+import { ablaufDatum, neuerCode } from "@/lib/einladung";
 
 function value(formData: FormData, key: string) {
   const raw = formData.get(key);
@@ -67,6 +68,40 @@ export async function createTeamMember(formData: FormData) {
   revalidatePath("/team");
   revalidatePath("/leaderboard");
   redirect("/team?created=1");
+}
+
+// Einladungslink erzeugen. Ein Code, eine Nutzung, 14 Tage gueltig - der Neue
+// setzt sein Passwort selbst, damit keine Startpasswoerter durchs Netzwerk
+// wandern.
+export async function einladungErzeugen(formData: FormData) {
+  const admin = await requireAdmin();
+  const note = value(formData, "note").slice(0, 80) || null;
+  const leaderId = value(formData, "leaderId") || admin.id;
+
+  const leader = await prisma.user.findUnique({
+    where: { id: leaderId },
+    select: { id: true },
+  });
+  if (!leader) redirect("/team?error=invalid");
+
+  await prisma.invite.create({
+    data: { code: neuerCode(), leaderId: leader.id, note, expiresAt: ablaufDatum() },
+  });
+
+  revalidatePath("/team");
+  redirect("/team?invited=1");
+}
+
+// Nur noch nicht eingeloeste Einladungen lassen sich zuruecknehmen - eine
+// verbrauchte zu loeschen wuerde die Herkunft des Kontos verwischen.
+export async function einladungZuruecknehmen(formData: FormData) {
+  await requireAdmin();
+  const inviteId = value(formData, "inviteId");
+  if (inviteId) {
+    await prisma.invite.deleteMany({ where: { id: inviteId, usedById: null } });
+  }
+  revalidatePath("/team");
+  redirect("/team?revoked=1");
 }
 
 // Berater unter eine andere Fuehrungskraft haengen. Leere Auswahl macht ihn zur

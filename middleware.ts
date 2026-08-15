@@ -24,7 +24,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Login, das bewusst oeffentliche Storno-Spiel, Next-Assets und statische
-  // Dateien bleiben erreichbar. Alles andere verlangt ein persoenliches Konto.
-  matcher: ["/((?!login|storno|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)"],
+  // Login, die Einladungsseite (wer eingeladen wird, hat noch kein Konto), das
+  // bewusst oeffentliche Storno-Spiel, Next-Assets und statische Dateien
+  // bleiben erreichbar. Alles andere verlangt ein persoenliches Konto.
+  matcher: [
+    "/((?!login|einladung|storno|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)",
+  ],
 };

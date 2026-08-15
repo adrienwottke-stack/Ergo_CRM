@@ -261,9 +261,34 @@ model User {
   stageEvents StageEvent[]
   guides      Guide[]
   undoEntries UndoEntry[]
+  invites     Invite[] @relation("Einladender")
+  invite      Invite?  @relation("Eingeloest")
 
   @@index([leaderId])
   @@index([path])
+}
+
+// Einladung in die Struktur. Ein Code, eine Nutzung: der Neue setzt Name,
+// E-Mail und Passwort selbst und haengt danach unter dem Einladenden. Ohne das
+// muesste jedes Konto ueber den Admin laufen und Startpasswoerter wanderten
+// per Nachricht durchs Netzwerk.
+model Invite {
+  id       String @id @default(cuid())
+  code     String @unique
+  leaderId String
+  leader   User   @relation("Einladender", fields: [leaderId], references: [id], onDelete: Cascade)
+
+  note      String? // "Max aus dem Infoabend"
+  expiresAt DateTime
+
+  // Eindeutig: ein Konto kann aus hoechstens einer Einladung entstehen.
+  usedById String?   @unique
+  usedBy   User?     @relation("Eingeloest", fields: [usedById], references: [id], onDelete: SetNull)
+  usedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([leaderId, createdAt])
 }
 
 // Rueckgaengig fuer Ein-Tipp-Aktionen. Ohne das darf keine Schnellaktion

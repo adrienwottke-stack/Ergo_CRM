@@ -12,6 +12,7 @@ export {
   authCookieName,
   reportCookieName,
   reportTokenValue,
+  sessionCookieOptions,
   sessionUserId,
 } from "@/lib/session";
 export { createSession } from "@/lib/session";

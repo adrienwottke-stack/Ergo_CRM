@@ -1,8 +1,14 @@
+import { headers } from "next/headers";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ebene, liegtImAst } from "@/lib/struktur";
 import { btnPrimary, card, input, label, pageTitle, sectionTitle, td, th } from "@/components/ui";
-import { beraterUmhaengen, createTeamMember } from "./actions";
+import {
+  beraterUmhaengen,
+  createTeamMember,
+  einladungErzeugen,
+  einladungZuruecknehmen,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -20,33 +26,54 @@ const fehlertexte: Record<string, string> = {
 export default async function TeamPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; created?: string; moved?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    created?: string;
+    moved?: string;
+    invited?: string;
+    revoked?: string;
+  }>;
 }) {
   await requireAdmin();
-  const [{ error, created, moved }, users] = await Promise.all([
-    searchParams,
-    prisma.user.findMany({
-      // Nach Pfad sortiert steht der Baum von selbst in der richtigen Reihenfolge:
-      // jede Führungskraft direkt vor ihren Leuten.
-      orderBy: { path: "asc" },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        path: true,
-        leaderId: true,
-        startedAt: true,
-        createdAt: true,
-        visibility: true,
-        deactivatedAt: true,
-        person: { select: { _count: { select: { dailyLogs: true } } } },
-        _count: { select: { contacts: true, team: true } },
-      },
-    }),
-  ]);
+  const [{ error, created, moved, invited, revoked }, kopfzeilen, users, invites] =
+    await Promise.all([
+      searchParams,
+      headers(),
+      prisma.user.findMany({
+        // Nach Pfad sortiert steht der Baum von selbst richtig herum: jede
+        // Führungskraft unmittelbar vor ihren Leuten.
+        orderBy: { path: "asc" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          path: true,
+          leaderId: true,
+          startedAt: true,
+          createdAt: true,
+          visibility: true,
+          deactivatedAt: true,
+          person: { select: { _count: { select: { dailyLogs: true } } } },
+          _count: { select: { contacts: true, team: true } },
+        },
+      }),
+      prisma.invite.findMany({
+        where: { usedById: null, expiresAt: { gt: new Date() } },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          code: true,
+          note: true,
+          expiresAt: true,
+          leader: { select: { name: true } },
+        },
+      }),
+    ]);
 
   const nameById = new Map(users.map((user) => [user.id, user.name]));
+  // Der Link muss vollstaendig dastehen, damit er sich weiterschicken laesst.
+  const herkunft = `${kopfzeilen.get("x-forwarded-proto") ?? "http"}://${kopfzeilen.get("host") ?? ""}`;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -74,6 +101,78 @@ export default async function TeamPage({
           Berater wurde umgehängt.
         </p>
       )}
+      {invited && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+          Einladung erzeugt – der Link steht unten.
+        </p>
+      )}
+      {revoked && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+          Einladung zurückgenommen.
+        </p>
+      )}
+
+      <section className={`${card} space-y-5 p-6 sm:p-8`}>
+        <div>
+          <h2 className={sectionTitle}>Einladen</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Der Eingeladene setzt Name und Passwort selbst und hängt danach automatisch
+            unter der gewählten Führungskraft. Ein Code, eine Nutzung, 14 Tage gültig.
+          </p>
+        </div>
+
+        <form action={einladungErzeugen} className="grid gap-5 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <div>
+            <label htmlFor="inviteNote" className={label}>Notiz (nur für dich)</label>
+            <input
+              id="inviteNote"
+              name="note"
+              type="text"
+              maxLength={80}
+              placeholder="Max aus dem Infoabend"
+              className={input}
+            />
+          </div>
+          <div>
+            <label htmlFor="inviteLeaderId" className={label}>Hängt unter</label>
+            <select id="inviteLeaderId" name="leaderId" className={input} defaultValue="">
+              <option value="">Mir selbst</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>{user.name}</option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" className={`${btnPrimary} min-h-[44px]`}>Link erzeugen</button>
+        </form>
+
+        {invites.length > 0 && (
+          <ul className="space-y-3 border-t border-slate-100 pt-5">
+            {invites.map((invite) => (
+              <li key={invite.id} className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <code className="block break-all text-sm font-medium text-slate-900">
+                    {herkunft}/einladung/{invite.code}
+                  </code>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    für {invite.leader.name}
+                    {invite.note ? ` · ${invite.note}` : ""} · gültig bis{" "}
+                    {createdFormat.format(invite.expiresAt)}
+                  </p>
+                </div>
+                <form action={einladungZuruecknehmen}>
+                  <input type="hidden" name="inviteId" value={invite.id} />
+                  <button
+                    type="submit"
+                    className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-red-700"
+                  >
+                    Zurücknehmen
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <form action={createTeamMember} className={`${card} space-y-5 p-6 sm:p-8`}>
         <div>

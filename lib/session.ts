@@ -3,6 +3,16 @@
 export const authCookieName = "ergo_crm_session";
 export const reportCookieName = "ergo_crm_report_auth";
 
+// Gilt fuer beide Zugaenge. Liegt hier statt in einer "use server"-Datei, weil
+// die nur asynchrone Funktionen ausfuehren darf.
+export const sessionCookieOptions = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+  maxAge: 60 * 60 * 24 * 30,
+  path: "/",
+};
+
 function toBase64(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes));
 }
