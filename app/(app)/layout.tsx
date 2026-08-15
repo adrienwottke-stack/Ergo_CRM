@@ -26,10 +26,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b border-white/10 bg-navy-950">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-6">
-            <Wordmark onDark sub="Beraterbereich" />
-            <div className="hidden min-w-0 lg:block"><NavLinks links={links} /></div>
-          </div>
+          <Wordmark onDark sub="Beraterbereich" />
           <div className="flex shrink-0 items-center gap-1 sm:gap-3">
             <CommandPalette searchAction={searchContacts} />
             <form action={logout}>
@@ -45,7 +42,11 @@ export default async function AppLayout({ children }: Readonly<{ children: React
             </form>
           </div>
         </div>
-        <div className="border-t border-white/10 px-4 pb-1.5 pt-0.5 lg:hidden"><NavLinks links={links} /></div>
+        {/* Navigation ueber die volle Breite: neben der Wortmarke wird es fuer
+            zehn Eintraege zu eng, dann scrollt die Leiste unnoetig. */}
+        <div className="mx-auto max-w-6xl border-t border-white/10 px-4 pb-1.5 pt-0.5 sm:px-6">
+          <NavLinks links={links} />
+        </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">{children}</main>
     </div>

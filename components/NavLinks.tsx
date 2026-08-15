@@ -11,8 +11,9 @@ export default function NavLinks({
   const pathname = usePathname();
 
   return (
-    // Am Handy seitlich scrollbar statt umbrechend – die Kopfzeile bleibt einzeilig.
-    <nav className="-mx-1 flex items-center gap-1 overflow-x-auto px-1">
+    // Seitlich scrollbar statt umbrechend – die Kopfzeile bleibt einzeilig.
+    // Ohne sichtbaren Balken, der wuerde die Leiste optisch zerschneiden.
+    <nav className="no-scrollbar -mx-1 flex items-center gap-1 overflow-x-auto px-1">
       {links.map((link) => {
         const active = link.exact
           ? pathname === link.href

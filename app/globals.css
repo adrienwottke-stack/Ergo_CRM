@@ -49,6 +49,17 @@ body {
   background: var(--color-navy-100);
 }
 
+/* Seitlich scrollbare Leisten ohne sichtbaren Balken (Windows zeigt ihn sonst
+   dauerhaft an). Gescrollt werden kann weiterhin – per Wischen oder Shift+Rad. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   opacity: 1;
