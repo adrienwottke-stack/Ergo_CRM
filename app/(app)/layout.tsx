@@ -1,5 +1,6 @@
 import { logout } from "@/app/login/actions";
 import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { Wordmark } from "@/components/Logo";
 import NavLinks from "@/components/NavLinks";
 import CommandPalette from "@/components/CommandPalette";
@@ -10,6 +11,11 @@ import { setBeginnerMode } from "@/app/(app)/namen/actions";
 
 export default async function AppLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await requireUser();
+  // "Mannschaft" taucht nur auf, wenn wirklich jemand unter dir haengt:
+  // Führungskraft ist eine Position im Baum, keine Rolle, die man vergibt.
+  const gefuehrte = await prisma.user.count({
+    where: { leaderId: user.id, deactivatedAt: null },
+  });
   // Einsteiger sehen drei Einträge statt zehn. Nichts ist gesperrt, nur
   // ausgeblendet – ein Tipp auf "Alles anzeigen" holt das volle CRM zurück.
   const links = user.beginnerMode
@@ -27,6 +33,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
         { href: "/focus", label: "🎯 Fokus" },
         { href: "/dashboard", label: "Dashboard" },
         { href: "/trichter", label: "Trichter" },
+        ...(gefuehrte > 0 ? [{ href: "/mannschaft", label: "Mannschaft" }] : []),
         { href: "/leaderboard", label: "Wettbewerb" },
         ...(user.role === "ADMIN"
           ? [{ href: "/team", label: "Team" }, { href: "/report", label: "Bericht" }]
