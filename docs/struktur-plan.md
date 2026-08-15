@@ -513,3 +513,33 @@ Dazu zwei Punkte, die außerhalb des Codes liegen — am 15.08. bestätigt, du e
 2. **Ansage an die Mannschaft.** Bevor der erste Berater eingeladen wird, muss stehen, was
    die Führungskraft sieht und was nicht. Wenn das jemand später selbst herausfindet, ist
    das Vertrauen weg — und mit ihm die Datenqualität.
+
+---
+
+## 11. Umsetzungsstand (15.08.2026)
+
+| Schritt | Stand | Commit |
+|---|---|---|
+| 0 · Zugriffsgrenze zentral | **fertig** | `a2cf4ec` |
+| 1 · Struktur-Baum | **fertig** | `26208cf` |
+| 2 · Einladungslinks | **fertig** | `3401067` |
+| 3–11 | offen | |
+
+**Bewusste Abweichungen vom Plan:**
+
+| Thema | Plan | Umgesetzt | Warum |
+|---|---|---|---|
+| Umfang der Sichtbarkeit | `EIGENE`, `DIREKTE`, `STRUKTUR` | zusätzlich `ALLE` | Die Trichter-Team-Ansicht des Admins sah bisher alle Konten. Das als Sonderfall in `STRUKTUR` zu verstecken hätte Systemverwaltung und Führungsposition vermischt — als eigener Wert bleibt der Unterschied lesbar |
+| `recruitedById` | Freitextfeld ohne Logik | echte Beziehung auf `User` | Kostet nichts und verhindert verwaiste IDs. Logik hängt weiterhin keine daran |
+| Einladen | jede Führungskraft | vorerst nur Admin | Deckt die beschlossene Reichweite (du plus zwei, drei Testleute) vollständig ab. Öffnet sich in Bauabschnitt 3, wenn nachgeordnete Führungskräfte eine eigene Seite bekommen |
+| `path` bei Bestandskonten | — | jedes wird eigene Wurzel | Wer unter wem hängt, weiß die Datenbank nicht. Das Einhängen passiert von Hand auf `/team` |
+
+**Was noch aussteht:**
+
+1. **Migrationen anwenden.** `20260815150000_struktur` und `20260815160000_einladungen` sind
+   geschrieben, aber **nicht eingespielt**. Das passiert beim nächsten Deploy automatisch
+   (`npm run build` führt `prisma migrate deploy` aus). Bis dahin läuft die Anwendung gegen
+   die Live-Datenbank ins Leere, weil `User.path` und die Tabelle `Invite` dort fehlen.
+2. **Kein Live-Test.** Weder der Baum noch der Einladungsweg wurden im Browser durchgeklickt
+   — dafür müssten die Migrationen stehen. Geprüft ist bisher `prisma validate`, `tsc`,
+   `eslint` und `next build`.
