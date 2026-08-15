@@ -523,7 +523,12 @@ Dazu zwei Punkte, die außerhalb des Codes liegen — am 15.08. bestätigt, du e
 | 0 · Zugriffsgrenze zentral | **fertig** | `a2cf4ec` |
 | 1 · Struktur-Baum | **fertig** | `26208cf` |
 | 2 · Einladungslinks | **fertig** | `3401067` |
-| 3–11 | offen | |
+| 3 · Mannschafts-Übersicht | **fertig** | `3444128` |
+| 4 · Signale und Ampel | **fertig** | `891f890` |
+| 5–11 | offen | |
+
+Stand 0–4 ist auf https://ergo-crm.vercel.app ausgeliefert, beide Migrationen sind
+eingespielt.
 
 **Bewusste Abweichungen vom Plan:**
 
@@ -536,10 +541,14 @@ Dazu zwei Punkte, die außerhalb des Codes liegen — am 15.08. bestätigt, du e
 
 **Was noch aussteht:**
 
-1. **Migrationen anwenden.** `20260815150000_struktur` und `20260815160000_einladungen` sind
-   geschrieben, aber **nicht eingespielt**. Das passiert beim nächsten Deploy automatisch
-   (`npm run build` führt `prisma migrate deploy` aus). Bis dahin läuft die Anwendung gegen
-   die Live-Datenbank ins Leere, weil `User.path` und die Tabelle `Invite` dort fehlen.
-2. **Kein Live-Test.** Weder der Baum noch der Einladungsweg wurden im Browser durchgeklickt
-   — dafür müssten die Migrationen stehen. Geprüft ist bisher `prisma validate`, `tsc`,
-   `eslint` und `next build`.
+1. **Einhängen.** Die Migration hat jedes Bestandskonto als eigene Wurzel angelegt. Solange
+   niemand unter dir hängt, zeigt `/mannschaft` genau eine Zeile — deine eigene. Das
+   passiert von Hand auf `/team`.
+2. **Kein Test hinter dem Login.** `/team`, `/mannschaft` und der Einladungsweg wurden nicht
+   durchgeklickt — dafür wäre ein Passwort nötig. Öffentlich geprüft ist nur, dass
+   `/einladung/‹unbekannter-code›` sauber antwortet (beweist: Tabelle `Invite` steht, und
+   die Middleware lässt die Seite ohne Konto durch). Sonst geprüft: `prisma validate`,
+   `tsc`, `eslint`, `next build`.
+3. **Zwei Prozesse auf einem `.next`.** Läuft parallel ein Dev-Server mit Turbopack, bricht
+   `next build` mit `Cannot find module '[turbopack]_runtime.js'` ab. Kein Codefehler —
+   vor einem Build den Dev-Server beenden oder `.next` löschen.
