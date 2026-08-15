@@ -76,6 +76,15 @@ enum UserRole {
   MEMBER
 }
 
+// Was eine Fuehrungskraft von einem Berater ihrer Struktur sieht. ZAHLEN ist
+// das Minimum und nicht abwaehlbar - sonst waere die Mannschafts-Uebersicht
+// loechrig und damit wertlos. Kundennamen deckt KEINE der beiden Stufen ab;
+// dafuer gibt es die befristete Einzelfreigabe (Bauabschnitt 8).
+enum TeamVisibility {
+  ZAHLEN // Aktivitaeten, Quoten, Summen
+  PIPELINE // zusaetzlich Phasenverteilung, Fristen, Ueberfaelligkeiten
+}
+
 // --- Namensliste ------------------------------------------------------------
 // Vorstufe zum vollen CRM: Name, Nummer, Naehe. Kein eigener Datensatz, nur
 // eine schlanke Sicht auf denselben Kontakt.
@@ -219,11 +228,42 @@ model User {
   // gesperrt, nur ausgeblendet - jederzeit selbst umschaltbar.
   beginnerMode Boolean      @default(false)
   createdAt    DateTime     @default(now())
-  contacts     Contact[]
-  person       Person?
-  stageEvents  StageEvent[]
-  guides       Guide[]
-  undoEntries  UndoEntry[]
+
+  // --- Struktur (docs/struktur-plan.md, Abschnitt 2) -------------------------
+  // Fuehrungskraft ist keine Rolle, sondern eine Position: wer Direkte unter
+  // sich hat, fuehrt. Kein zweites Kennzeichen, das falsch stehen kann.
+  leaderId String?
+  leader   User?   @relation("Struktur", fields: [leaderId], references: [id], onDelete: SetNull)
+  team     User[]  @relation("Struktur")
+
+  // Materialisierter Pfad mit fuehrendem und schliessendem Schraegstrich und
+  // der eigenen Id am Ende: "/clx1/clx7/". "Ich und alles unter mir" ist damit
+  // ein startsWith mit Index statt einer rekursiven Abfrage, die Prisma nicht
+  // kann. Wird NIE direkt geschrieben, nur ueber lib/struktur.ts.
+  path String @default("/")
+
+  // Wer geworben hat. Reine Information, an der keine Logik haengt - gefuehrt
+  // wird ueber leaderId, und die beiden fallen im Strukturvertrieb auseinander.
+  recruitedById String?
+  recruitedBy   User?   @relation("Werbung", fields: [recruitedById], references: [id], onDelete: SetNull)
+  recruited     User[]  @relation("Werbung")
+
+  startedAt   DateTime? // Eintritt: Grundlage fuer "neu" und die 90-Tage-Sicht
+  careerLevel String?
+  visibility  TeamVisibility @default(PIPELINE)
+
+  // Ausgetretene bleiben im Baum, damit die Historie stimmt, zaehlen aber in
+  // keiner laufenden Auswertung mehr mit.
+  deactivatedAt DateTime?
+
+  contacts    Contact[]
+  person      Person?
+  stageEvents StageEvent[]
+  guides      Guide[]
+  undoEntries UndoEntry[]
+
+  @@index([leaderId])
+  @@index([path])
 }
 
 // Rueckgaengig fuer Ein-Tipp-Aktionen. Ohne das darf keine Schnellaktion

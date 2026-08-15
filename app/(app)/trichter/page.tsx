@@ -35,7 +35,7 @@ export default async function TrichterPage({
   const teamView = isAdmin && team === "1";
   // Frueher stand hier `teamView ? {} : { ownerId: user.id }` – eine unbegrenzte
   // Abfrage ueber alle Konten inklusive der Kontakte ohne Eigentuemer.
-  const sicht = await sichtbarkeit(user, teamView ? "STRUKTUR" : "EIGENE");
+  const sicht = await sichtbarkeit(user, teamView ? "ALLE" : "EIGENE");
   const scope = sicht.kontakte;
 
   const [contacts, events, deals, owners] = await Promise.all([

@@ -8,14 +8,20 @@
 // Siehe docs/struktur-plan.md, Abschnitt 3.1.
 
 import { prisma } from "@/lib/prisma";
+import { direkteKonten, strukturKonten } from "@/lib/struktur";
 import type { UserRole } from "@/lib/generated/prisma/enums";
 
 /**
  * EIGENE   – nur die eigenen Daten.
  * DIREKTE  – man selbst plus die direkt unterstellten Berater.
  * STRUKTUR – man selbst plus alles darunter, ueber alle Ebenen.
+ * ALLE     – jedes Konto der Instanz. Nur fuer ADMIN, und bewusst als eigener
+ *            Wert statt als Sonderfall in STRUKTUR: die Systemverwaltung ist
+ *            etwas anderes als eine Fuehrungsposition, und wer beides in einen
+ *            Wert packt, kann spaeter nicht mehr unterscheiden. Fuer alle
+ *            anderen faellt ALLE auf STRUKTUR zurueck.
  */
-export type Umfang = "EIGENE" | "DIREKTE" | "STRUKTUR";
+export type Umfang = "EIGENE" | "DIREKTE" | "STRUKTUR" | "ALLE";
 
 export type Betrachter = { id: string; role: UserRole };
 
@@ -28,23 +34,21 @@ export type Sichtbarkeit = {
   ueberKontakt: { contact: { is: { ownerId: { in: string[] } } } };
 };
 
-/**
- * Loest den Umfang in eine Liste von Konten auf.
- *
- * Der Struktur-Baum (`leaderId` / `path`) kommt erst in Bauabschnitt 1. Bis
- * dahin gilt die Uebergangsregel: ein ADMIN sieht bei STRUKTUR weiterhin alle
- * Konten – das ist genau das bisherige Verhalten der Trichter-Team-Ansicht –,
- * alle anderen sehen nur sich selbst. Sobald der Baum steht, wird nur diese
- * Funktion angefasst, kein einziger Aufrufer.
- */
+/** Loest den Umfang ueber den Struktur-Baum in eine Liste von Konten auf. */
 export async function beraterIds(
   betrachter: Betrachter,
   umfang: Umfang
 ): Promise<string[]> {
   if (umfang === "EIGENE") return [betrachter.id];
-  if (betrachter.role !== "ADMIN") return [betrachter.id];
+  if (umfang === "DIREKTE") return direkteKonten(betrachter.id);
+  if (umfang === "STRUKTUR") return strukturKonten(betrachter.id);
 
-  const konten = await prisma.user.findMany({ select: { id: true } });
+  // ALLE
+  if (betrachter.role !== "ADMIN") return strukturKonten(betrachter.id);
+  const konten = await prisma.user.findMany({
+    where: { deactivatedAt: null },
+    select: { id: true },
+  });
   return konten.map((konto) => konto.id);
 }
 

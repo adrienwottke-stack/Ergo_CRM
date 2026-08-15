@@ -11,6 +11,7 @@ import {
   reportCookieName,
   reportTokenValue,
 } from "@/lib/auth";
+import { pfadUnter } from "@/lib/struktur";
 
 const cookieOptions = {
   httpOnly: true,
@@ -40,7 +41,19 @@ async function bootstrapAdmin(formData: FormData, password: string) {
   const passwordHash = await hashPassword(password, salt);
   const admin = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
-      data: { email, name, passwordSalt: salt, passwordHash, role: "ADMIN" },
+      data: {
+        email,
+        name,
+        passwordSalt: salt,
+        passwordHash,
+        role: "ADMIN",
+        startedAt: new Date(),
+      },
+    });
+    // Das erste Konto ist die Wurzel der Struktur.
+    await tx.user.update({
+      where: { id: user.id },
+      data: { path: pfadUnter(null, user.id) },
     });
     const existingPerson = await tx.person.findUnique({ where: { name } });
     if (existingPerson) {
