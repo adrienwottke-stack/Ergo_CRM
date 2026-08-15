@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { eigene } from "@/lib/scope";
 import {
   CONTACT_STAGES,
   contactStageLabels,
@@ -35,7 +36,7 @@ export default async function ContactsPage({
 
   const contacts = await prisma.contact.findMany({
     where: {
-      ownerId: user.id,
+      ...eigene(user.id).kontakte,
       ...(stageFilter ? { stage: stageFilter } : {}),
       ...(showLost ? { outcome: "VERLOREN" as const } : {}),
     },

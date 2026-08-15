@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { eigene } from "@/lib/scope";
 import {
   berlinToday,
   dueState,
@@ -39,7 +40,7 @@ export default async function PipelinePage({
 
   const contacts = await prisma.contact.findMany({
     where: {
-      ownerId: user.id,
+      ...eigene(user.id).kontakte,
       stage: { in: stages },
       ...(showLost ? {} : { outcome: { not: "VERLOREN" } }),
     },

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { eigene } from "@/lib/scope";
 import {
   berlinToday,
   dueState,
@@ -81,7 +82,7 @@ export default async function ContactDetailPage({
   const { id } = await params;
   const user = await requireUser();
   const contact = await prisma.contact.findFirst({
-    where: { id, ownerId: user.id },
+    where: { id, ...eigene(user.id).kontakte },
     include: {
       activities: { orderBy: { date: "desc" } },
       deals: { orderBy: { createdAt: "desc" } },

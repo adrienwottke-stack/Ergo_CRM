@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { eigene } from "@/lib/scope";
 import ContactForm from "@/components/ContactForm";
 import { pageTitle } from "@/components/ui";
 import { updateContact } from "../../actions";
@@ -14,7 +15,7 @@ export default async function EditContactPage({
   const { id } = await params;
   const user = await requireUser();
   const contact = await prisma.contact.findFirst({
-    where: { id, ownerId: user.id },
+    where: { id, ...eigene(user.id).kontakte },
   });
 
   if (!contact) {

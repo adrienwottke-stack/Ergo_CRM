@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
+import { eigene } from "@/lib/scope";
 import { isActivityType } from "@/lib/labels";
 import {
   CONTACT_PLAYBOOK,
@@ -74,6 +75,7 @@ function contactDataFromForm(formData: FormData) {
 
 function refreshContactViews(contactId?: string) {
   revalidatePath("/contacts");
+  revalidatePath("/namen");
   revalidatePath("/heute");
   revalidatePath("/pipeline");
   revalidatePath("/vorgaenge");
@@ -125,7 +127,7 @@ export async function updateContact(formData: FormData) {
   if (!contactId) throw new Error("Kontakt-ID fehlt.");
   const data = contactDataFromForm(formData);
   const current = await prisma.contact.findFirst({
-    where: { id: contactId, ownerId: user.id },
+    where: { id: contactId, ...eigene(user.id).kontakte },
     select: { appointmentLoggedAt: true, stage: true },
   });
   if (!current) throw new Error("Kontakt nicht gefunden.");
@@ -176,7 +178,7 @@ export async function createActivity(formData: FormData) {
   if (!contactId || !text) throw new Error("Kontakt-ID und Beschreibung sind Pflichtfelder.");
 
   const contact = await prisma.contact.findFirst({
-    where: { id: contactId, ownerId: user.id },
+    where: { id: contactId, ...eigene(user.id).kontakte },
     select: { id: true },
   });
   if (!contact) throw new Error("Kontakt nicht gefunden.");
@@ -213,7 +215,7 @@ export async function deleteActivity(formData: FormData) {
   if (!activityId || !contactId) throw new Error("Aktivität oder Kontakt-ID fehlt.");
 
   await prisma.activity.deleteMany({
-    where: { id: activityId, contactId, contact: { is: { ownerId: user.id } } },
+    where: { id: activityId, contactId, ...eigene(user.id).ueberKontakt },
   });
   // Automatisch aus Anrufen erzeugte Ranglistenpunkte werden per Cascade mit gelöscht.
   refreshContactViews(contactId);
@@ -232,7 +234,7 @@ export async function quickLogCall(formData: FormData) {
   const followUpDays = followUpDaysRaw ? parseInt(followUpDaysRaw, 10) : null;
 
   const contact = await prisma.contact.findFirst({
-    where: { id: contactId, ownerId: user.id },
+    where: { id: contactId, ...eigene(user.id).kontakte },
     select: { id: true, stage: true },
   });
   if (!contact) throw new Error("Kontakt nicht gefunden.");
@@ -341,7 +343,7 @@ export async function searchContacts(query: string) {
 
   const contacts = await prisma.contact.findMany({
     where: {
-      ownerId: user.id,
+      ...eigene(user.id).kontakte,
       OR: [
         { name: { contains: trimmed, mode: "insensitive" } },
         { phone: { contains: trimmed, mode: "insensitive" } },

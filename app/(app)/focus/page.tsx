@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { eigene } from "@/lib/scope";
 import {
   addDays,
   berlinToday,
@@ -14,12 +15,13 @@ export const dynamic = "force-dynamic";
 
 export default async function FocusPage() {
   const user = await requireUser();
+  const sicht = eigene(user.id);
   const tomorrow = addDays(dayToUtcDate(berlinToday()), 1);
 
   // Anruf-Warteschlange: alles, was heute faellig ist, plus unberuehrte Neue.
   const queueContacts = await prisma.contact.findMany({
     where: {
-      ownerId: user.id,
+      ...sicht.kontakte,
       outcome: "OFFEN",
       OR: [{ nextStepAt: { lt: tomorrow } }, { stage: "NEU" }],
     },

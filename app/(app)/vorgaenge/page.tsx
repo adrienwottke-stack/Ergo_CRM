@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { eigene } from "@/lib/scope";
 import { berlinToday, dueState } from "@/lib/dates";
 import { formatEuro } from "@/lib/pipeline";
 import DealBoard, { type BoardDeal } from "@/components/DealBoard";
@@ -9,10 +10,11 @@ export const dynamic = "force-dynamic";
 
 export default async function VorgaengePage() {
   const user = await requireUser();
+  const sicht = eigene(user.id);
   const today = berlinToday();
 
   const deals = await prisma.deal.findMany({
-    where: { contact: { is: { ownerId: user.id } } },
+    where: sicht.ueberKontakt,
     orderBy: [{ nextStepAt: "asc" }, { updatedAt: "desc" }],
     include: { contact: { select: { name: true } } },
   });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { sichtbarkeit } from "@/lib/scope";
 import type { LostReason } from "@/lib/generated/prisma/enums";
 import {
   CONTACT_STAGES,
@@ -32,7 +33,10 @@ export default async function TrichterPage({
   const { team } = await searchParams;
   const isAdmin = user.role === "ADMIN";
   const teamView = isAdmin && team === "1";
-  const scope = teamView ? {} : { ownerId: user.id };
+  // Frueher stand hier `teamView ? {} : { ownerId: user.id }` – eine unbegrenzte
+  // Abfrage ueber alle Konten inklusive der Kontakte ohne Eigentuemer.
+  const sicht = await sichtbarkeit(user, teamView ? "STRUKTUR" : "EIGENE");
+  const scope = sicht.kontakte;
 
   const [contacts, events, deals, owners] = await Promise.all([
     prisma.contact.findMany({
@@ -56,7 +60,10 @@ export default async function TrichterPage({
       select: { stage: true, outcome: true, units: true, lostReason: true },
     }),
     teamView
-      ? prisma.user.findMany({ select: { id: true, name: true } })
+      ? prisma.user.findMany({
+          where: { id: { in: sicht.beraterIds } },
+          select: { id: true, name: true },
+        })
       : Promise.resolve([]),
   ]);
 

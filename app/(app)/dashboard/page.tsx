@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { eigene } from "@/lib/scope";
 import type { ContactStage } from "@/lib/generated/prisma/enums";
 import {
   ACQUISITION_STAGES,
@@ -35,6 +36,7 @@ const WEEKS_SHOWN = 8;
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  const sicht = eigene(user.id);
   const today = berlinToday();
   const thisMonday = mondayOf(today);
   const oldestMonday = shiftDay(thisMonday, -7 * (WEEKS_SHOWN - 1));
@@ -53,19 +55,19 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     prisma.contact.groupBy({
       by: ["stage"],
-      where: { ownerId: user.id, outcome: { not: "VERLOREN" } },
+      where: { ...sicht.kontakte, outcome: { not: "VERLOREN" } },
       _count: { _all: true },
     }),
     prisma.activity.findMany({
       where: {
         date: { gte: dayToUtcDate(oldestMonday) },
-        contact: { is: { ownerId: user.id } },
+        ...sicht.ueberKontakt,
       },
       select: { date: true },
     }),
     prisma.contact.findMany({
       where: {
-        ownerId: user.id,
+        ...sicht.kontakte,
         nextStepType: { not: null },
         nextStepAt: { lt: tomorrow },
       },
@@ -82,7 +84,7 @@ export default async function DashboardPage() {
     }),
     prisma.deal.count({
       where: {
-        contact: { is: { ownerId: user.id } },
+        ...sicht.ueberKontakt,
         outcome: "OFFEN",
         nextStepType: { not: null },
         nextStepAt: { lt: tomorrow },
@@ -90,14 +92,14 @@ export default async function DashboardPage() {
     }),
     prisma.contact.findMany({
       where: {
-        ownerId: user.id,
+        ...sicht.kontakte,
         nextStepType: null,
         outcome: { not: "VERLOREN" },
       },
       select: { id: true, stage: true, deals: { where: { outcome: "OFFEN" }, select: { id: true } } },
     }),
     prisma.deal.aggregate({
-      where: { contact: { is: { ownerId: user.id } }, outcome: "OFFEN" },
+      where: { ...sicht.ueberKontakt, outcome: "OFFEN" },
       _sum: { units: true },
       _count: { _all: true },
     }),
@@ -105,11 +107,11 @@ export default async function DashboardPage() {
       where: {
         type: "CALL",
         date: { gte: todayStart },
-        contact: { is: { ownerId: user.id } },
+        ...sicht.ueberKontakt,
       },
     }),
     prisma.contact.count({
-      where: { ownerId: user.id, appointmentLoggedAt: { gte: todayStart } },
+      where: { ...sicht.kontakte, appointmentLoggedAt: { gte: todayStart } },
     }),
   ]);
 

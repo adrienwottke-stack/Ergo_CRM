@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
+import { eigene } from "@/lib/scope";
 import {
   addDays,
   addMonths,
@@ -35,6 +36,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 
 function refreshPipelineViews(contactId?: string) {
   revalidatePath("/heute");
+  revalidatePath("/namen");
   revalidatePath("/pipeline");
   revalidatePath("/vorgaenge");
   revalidatePath("/contacts");
@@ -173,7 +175,7 @@ async function syncBeratungStep(tx: Tx, contactId: string) {
 
 async function loadOwnContact(userId: string, contactId: string) {
   const contact = await prisma.contact.findFirst({
-    where: { id: contactId, ownerId: userId },
+    where: { id: contactId, ...eigene(userId).kontakte },
   });
   if (!contact) throw new Error("Kontakt nicht gefunden.");
   return contact;
@@ -181,7 +183,7 @@ async function loadOwnContact(userId: string, contactId: string) {
 
 async function loadOwnDeal(userId: string, dealId: string) {
   const deal = await prisma.deal.findFirst({
-    where: { id: dealId, contact: { is: { ownerId: userId } } },
+    where: { id: dealId, ...eigene(userId).ueberKontakt },
     include: { contact: { select: { id: true, stage: true, outcome: true } } },
   });
   if (!deal) throw new Error("Vorgang nicht gefunden.");

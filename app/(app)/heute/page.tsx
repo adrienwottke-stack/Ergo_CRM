@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { eigene } from "@/lib/scope";
 import {
   addDays,
   berlinToday,
@@ -24,13 +25,14 @@ export const dynamic = "force-dynamic";
 
 export default async function HeutePage() {
   const user = await requireUser();
+  const sicht = eigene(user.id);
   const today = berlinToday();
   const horizon = addDays(dayToUtcDate(today), 8);
 
   const [contacts, deals, stepless] = await Promise.all([
     prisma.contact.findMany({
       where: {
-        ownerId: user.id,
+        ...sicht.kontakte,
         nextStepType: { not: null },
         nextStepAt: { lt: horizon },
       },
@@ -38,7 +40,7 @@ export default async function HeutePage() {
     }),
     prisma.deal.findMany({
       where: {
-        contact: { is: { ownerId: user.id } },
+        ...sicht.ueberKontakt,
         outcome: "OFFEN",
         nextStepType: { not: null },
         nextStepAt: { lt: horizon },
@@ -48,7 +50,7 @@ export default async function HeutePage() {
     }),
     prisma.contact.findMany({
       where: {
-        ownerId: user.id,
+        ...sicht.kontakte,
         nextStepType: null,
         outcome: { not: "VERLOREN" },
       },
