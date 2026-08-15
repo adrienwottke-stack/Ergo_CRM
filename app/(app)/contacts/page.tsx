@@ -10,6 +10,7 @@ import {
 import { berlinToday, dueState, hasTimeOfDay } from "@/lib/dates";
 import StageBadge from "@/components/StageBadge";
 import NextStepBadge from "@/components/NextStepBadge";
+import DeleteContactButton from "@/components/DeleteContactButton";
 import { BellIcon, PlusIcon, UsersIcon } from "@/components/icons";
 import { btnPrimary, btnSecondary, card, filterPill, pageTitle, td, th } from "@/components/ui";
 
@@ -216,12 +217,21 @@ export default async function ContactsPage({
                       {contact._count.deals}
                     </td>
                     <td className={`${td} text-right`}>
-                      <Link
-                        href={`/contacts/${contact.id}/edit`}
-                        className="text-sm font-medium text-navy-600 hover:underline"
-                      >
-                        Bearbeiten
-                      </Link>
+                      <div className="flex items-center justify-end gap-4">
+                        <Link
+                          href={`/contacts/${contact.id}/edit`}
+                          className="text-sm font-medium text-navy-600 hover:underline"
+                        >
+                          Bearbeiten
+                        </Link>
+                        <DeleteContactButton
+                          contactId={contact.id}
+                          contactName={contact.name}
+                          activityCount={contact._count.activities}
+                          dealCount={contact._count.deals}
+                          variant="link"
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}

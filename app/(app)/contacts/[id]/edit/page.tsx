@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
 import ContactForm from "@/components/ContactForm";
-import { pageTitle } from "@/components/ui";
+import DeleteContactButton from "@/components/DeleteContactButton";
+import { card, kicker, pageTitle } from "@/components/ui";
 import { updateContact } from "../../actions";
 
 export default async function EditContactPage({
@@ -16,6 +17,9 @@ export default async function EditContactPage({
   const user = await requireUser();
   const contact = await prisma.contact.findFirst({
     where: { id, ...eigene(user.id).kontakte },
+    include: {
+      _count: { select: { activities: true, deals: true, referrals: true } },
+    },
   });
 
   if (!contact) {
@@ -38,6 +42,23 @@ export default async function EditContactPage({
         contact={contact}
         submitLabel="Änderungen speichern"
       />
+
+      <section className={`${card} border-red-200/70 p-6`}>
+        <p className={kicker}>Gefahrenzone</p>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
+          <p className="max-w-sm text-sm text-slate-600">
+            Kontakt mitsamt Aktivitäten und Vorgängen entfernen. Nicht
+            rückgängig zu machen.
+          </p>
+          <DeleteContactButton
+            contactId={contact.id}
+            contactName={contact.name}
+            activityCount={contact._count.activities}
+            dealCount={contact._count.deals}
+            referralCount={contact._count.referrals}
+          />
+        </div>
+      </section>
     </div>
   );
 }

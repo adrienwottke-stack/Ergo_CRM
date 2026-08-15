@@ -76,6 +76,22 @@ enum UserRole {
   MEMBER
 }
 
+// --- Namensliste ------------------------------------------------------------
+// Vorstufe zum vollen CRM: Name, Nummer, Naehe. Kein eigener Datensatz, nur
+// eine schlanke Sicht auf denselben Kontakt.
+
+// Naehe zur Person, nicht Erfolgsaussicht.
+enum ContactRating {
+  A // enger Kreis: Familie, beste Freunde
+  B // Bekannte: Kollegen, Verein, Nachbarn
+  C // lose Kontakte
+}
+
+enum ListKind {
+  RECRUITING
+  VERKAUF
+}
+
 model Contact {
   id     String @id @default(cuid())
   name   String
@@ -84,10 +100,20 @@ model Contact {
   source String?
   note   String?
 
+  // Beruf als Freitext, im Formular ueber Bausteine ("Student", "Azubi", ...)
+  // mit einem Tipp gefuellt. Bewusst kein Aufzaehlungstyp: die haeufigen Faelle
+  // deckt die Baustein-Leiste ab, alles andere wird getippt.
+  job String?
+
   stage      ContactStage @default(NEU)
   outcome    Outcome      @default(OFFEN)
   lostReason LostReason?
   lostAt     DateTime?
+
+  // Namensliste: leere listKinds heisst "steht nicht auf der Liste", der
+  // Kontakt ist dann ein normaler CRM-Kontakt.
+  rating    ContactRating?
+  listKinds ListKind[]
 
   // Genau ein offener naechster Schritt je Kontakt. In IN_BERATUNG liegt der
   // Schritt stattdessen am Vorgang, damit keine doppelten Fristen entstehen.
@@ -101,6 +127,12 @@ model Contact {
   // Zeitstempel gegen doppelte Wettbewerbspunkte
   appointmentLoggedAt     DateTime?
   appointmentHeldLoggedAt DateTime?
+
+  // Ein Formular = ein Kontakt. Jedes gerenderte Anlege-Formular bringt einen
+  // eigenen Schluessel mit; der eindeutige Index laesst den zweiten Klick
+  // auflaufen, statt eine Dublette anzulegen. NULL bleibt erlaubt (Import,
+  // Namensliste, Altdaten) – Postgres zaehlt NULLs nicht als Dubletten.
+  formToken String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -119,6 +151,7 @@ model Contact {
   @@index([ownerId, updatedAt])
   @@index([ownerId, nextStepAt])
   @@index([ownerId, stage, outcome])
+  @@index([ownerId, rating])
   @@index([referredById])
 }
 
@@ -182,10 +215,50 @@ model User {
   passwordSalt String
   passwordHash String
   role         UserRole     @default(MEMBER)
+  // Einsteiger sehen nur Namensliste, Heute und Wettbewerb. Nichts wird
+  // gesperrt, nur ausgeblendet - jederzeit selbst umschaltbar.
+  beginnerMode Boolean      @default(false)
   createdAt    DateTime     @default(now())
   contacts     Contact[]
   person       Person?
   stageEvents  StageEvent[]
+  guides       Guide[]
+  undoEntries  UndoEntry[]
+}
+
+// Rueckgaengig fuer Ein-Tipp-Aktionen. Ohne das darf keine Schnellaktion
+// gebaut werden: ein Fehlgriff waere sonst eine Aufraeumaktion aus sechs
+// Schritten, und der Wettbewerbspunkt bliebe stehen.
+//
+// Aufgenommen wird kein Aktions-Protokoll, sondern ein Vorher-Zustand: die
+// geaenderten Kontaktfelder plus die IDs der neu entstandenen Zeilen. Damit
+// funktioniert es fuer jede bestehende Server-Action, ohne sie anzufassen.
+model UndoEntry {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  contactId String?
+  patch     Json
+  createdAt DateTime  @default(now())
+  undoneAt  DateTime?
+
+  @@index([userId, createdAt])
+}
+
+// Persoenlich ueberschriebener Gespraechsleitfaden. Fehlt die Zeile, gilt der
+// Standardtext aus lib/guides.ts - so erreichen Verbesserungen am Standard
+// jeden, der nichts eigenes gespeichert hat.
+model Guide {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  key       String
+  title     String
+  body      String
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerId, key])
 }
 
 model Activity {

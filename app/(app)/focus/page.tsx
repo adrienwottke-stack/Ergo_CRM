@@ -34,6 +34,7 @@ export default async function FocusPage() {
     name: contact.name,
     phone: contact.phone,
     email: contact.email,
+    job: contact.job,
     source: contact.source,
     stage: contact.stage,
     outcome: contact.outcome,

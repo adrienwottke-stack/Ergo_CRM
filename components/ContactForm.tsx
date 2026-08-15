@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import type { Contact } from "@/lib/generated/prisma/client";
 import {
   ALL_NEXT_STEP_TYPES,
@@ -6,10 +7,12 @@ import {
   nextStepLabels,
 } from "@/lib/pipeline";
 import { utcToBerlinLocalInput } from "@/lib/dates";
-import { btnPrimary, card, input, label } from "@/components/ui";
+import { card, input, label } from "@/components/ui";
+import JobField from "@/components/JobField";
 import NoteTemplates from "@/components/NoteTemplates";
+import SubmitButton from "@/components/SubmitButton";
 
-export default function ContactForm({
+export default async function ContactForm({
   action,
   contact,
   submitLabel,
@@ -18,9 +21,20 @@ export default function ContactForm({
   contact?: Contact;
   submitLabel: string;
 }) {
+  // Schluessel gegen doppelt angelegte Kontakte: ein Wert je gerendertem
+  // Formular, egal wie oft abgeschickt wird. connection() haelt die Seite
+  // dynamisch – ein zur Bauzeit vorgerendertes Formular haette fuer alle
+  // Nutzer denselben Schluessel und wuerde echte Kontakte verschlucken.
+  let formToken: string | null = null;
+  if (!contact) {
+    await connection();
+    formToken = crypto.randomUUID();
+  }
+
   return (
     <form action={action} className={`${card} space-y-5 p-6 sm:p-8`}>
       {contact && <input type="hidden" name="contactId" value={contact.id} />}
+      {formToken && <input type="hidden" name="formToken" value={formToken} />}
       <div>
         <label htmlFor="name" className={label}>
           Name *
@@ -64,6 +78,8 @@ export default function ContactForm({
           />
         </div>
       </div>
+
+      <JobField defaultValue={contact?.job} />
 
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
@@ -191,9 +207,7 @@ export default function ContactForm({
       </div>
 
       <div className="flex justify-end border-t border-slate-100 pt-5">
-        <button type="submit" className={btnPrimary}>
-          {submitLabel}
-        </button>
+        <SubmitButton label={submitLabel} />
       </div>
     </form>
   );

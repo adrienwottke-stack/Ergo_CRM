@@ -13,6 +13,7 @@ import type { ActivityType } from "@/lib/generated/prisma/enums";
 import StageBadge, { DealStageBadge } from "@/components/StageBadge";
 import NextStepBadge, { formatDue } from "@/components/NextStepBadge";
 import ContactActions from "@/components/ContactActions";
+import DeleteContactButton from "@/components/DeleteContactButton";
 import DealActions, { CreateDealButton } from "@/components/DealActions";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import type { DealLite } from "@/components/DealActionDialog";
@@ -141,9 +142,18 @@ export default async function ContactDetailPage({
               </p>
             </div>
           </div>
-          <Link href={`/contacts/${contact.id}/edit`} className={btnSecondary}>
-            Bearbeiten
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href={`/contacts/${contact.id}/edit`} className={btnSecondary}>
+              Bearbeiten
+            </Link>
+            <DeleteContactButton
+              contactId={contact.id}
+              contactName={contact.name}
+              activityCount={contact.activities.length}
+              dealCount={contact.deals.length}
+              referralCount={contact.referrals.length}
+            />
+          </div>
         </div>
       </div>
 
@@ -190,6 +200,10 @@ export default async function ContactDetailPage({
       </section>
 
       <div className={`${card} grid gap-x-8 gap-y-5 p-6 sm:grid-cols-2 sm:p-8`}>
+        <div className="sm:col-span-2">
+          <p className={kicker}>Beruf</p>
+          <p className="mt-1 text-sm text-slate-900">{contact.job ?? "–"}</p>
+        </div>
         <div>
           <p className={kicker}>Telefon</p>
           <p className="mt-1 text-sm text-slate-900">

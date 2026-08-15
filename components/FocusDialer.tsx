@@ -24,6 +24,7 @@ interface Contact {
   name: string;
   phone?: string | null;
   email?: string | null;
+  job?: string | null;
   source?: string | null;
   stage: ContactStage;
   outcome: Outcome;
@@ -126,6 +127,12 @@ export default function FocusDialer({ queue }: { queue: Contact[] }) {
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-2xl font-bold text-slate-900">{current.name}</h2>
               <StageBadge stage={current.stage} outcome={current.outcome} />
+              {/* Der Beruf ist der Gespraechsaufhaenger – er gehoert neben den Namen. */}
+              {current.job && (
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                  {current.job}
+                </span>
+              )}
             </div>
             {current.source && (
               <p className="mt-1 text-xs text-slate-500">Quelle: {current.source}</p>

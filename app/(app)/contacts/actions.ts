@@ -64,6 +64,7 @@ function contactDataFromForm(formData: FormData) {
     stage,
     phone: optional(formData, "phone"),
     email: optional(formData, "email"),
+    job: optional(formData, "job"),
     source: optional(formData, "source"),
     note: optional(formData, "note"),
     appointmentAt,
@@ -86,6 +87,35 @@ function refreshContactViews(contactId?: string) {
   if (contactId) revalidatePath(`/contacts/${contactId}`);
 }
 
+// Wurde dieses Formular schon einmal abgeschickt?
+//   null        – noch nicht, der Schluessel ist frei
+//   { id }      – derselbe Mensch steht schon da, dorthin weiterleiten
+//   { id: null} – Schluessel vergeben, aber fuer jemand anderen: wer ueber die
+//                 Zurueck-Taste dasselbe Formular neu benutzt, meint wirklich
+//                 einen zweiten Kontakt
+async function contactFromSameForm(
+  formToken: string,
+  name: string,
+  userId: string
+): Promise<{ id: string | null } | null> {
+  const twin = await prisma.contact.findUnique({
+    where: { formToken },
+    select: { id: true, name: true, ownerId: true },
+  });
+  if (!twin || twin.ownerId !== userId) return null;
+  const sameName = twin.name.trim().toLowerCase() === name.trim().toLowerCase();
+  return { id: sameName ? twin.id : null };
+}
+
+// Prisma meldet einen verletzten Eindeutigkeits-Index als P2002.
+function isDuplicate(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: string }).code === "P2002"
+  );
+}
+
 export async function createContact(formData: FormData) {
   const user = await requireUser();
   const person = await requireUserPerson(user.id);
@@ -93,28 +123,50 @@ export async function createContact(formData: FormData) {
   const date = dayToUtcDate(berlinToday());
   const appointmentSet = data.stage === "TERMIN_VEREINBART";
 
-  const contact = await prisma.$transaction(async (tx) => {
-    const created = await tx.contact.create({
-      data: {
-        ...data,
-        ownerId: user.id,
-        outcome: data.stage === "KUNDE" ? "GEWONNEN" : "OFFEN",
-        appointmentLoggedAt: appointmentSet ? new Date() : null,
-      },
+  // Ein Formular darf genau einen Kontakt erzeugen. Der zweite Klick landet
+  // beim bereits angelegten Kontakt statt bei einer Dublette.
+  let formToken = optional(formData, "formToken");
+  if (formToken) {
+    const twin = await contactFromSameForm(formToken, data.name, user.id);
+    if (twin?.id) redirect(`/contacts/${twin.id}`);
+    // Schluessel schon vergeben, aber fuer jemand anderen: dieser Kontakt
+    // laeuft ohne – sonst wuerde der eindeutige Index ihn abweisen.
+    if (twin) formToken = null;
+  }
+
+  let contact;
+  try {
+    contact = await prisma.$transaction(async (tx) => {
+      const created = await tx.contact.create({
+        data: {
+          ...data,
+          formToken,
+          ownerId: user.id,
+          outcome: data.stage === "KUNDE" ? "GEWONNEN" : "OFFEN",
+          appointmentLoggedAt: appointmentSet ? new Date() : null,
+        },
+      });
+      await tx.stageEvent.create({
+        data: { contactId: created.id, toStage: data.stage, userId: user.id },
+      });
+      await tx.dailyLog.createMany({
+        data: [
+          { personId: person.id, type: "NUMBERS_PULLED", count: 1, date },
+          ...(appointmentSet
+            ? [{ personId: person.id, type: "APPOINTMENT_SET" as const, count: 1, date }]
+            : []),
+        ],
+      });
+      return created;
     });
-    await tx.stageEvent.create({
-      data: { contactId: created.id, toStage: data.stage, userId: user.id },
-    });
-    await tx.dailyLog.createMany({
-      data: [
-        { personId: person.id, type: "NUMBERS_PULLED", count: 1, date },
-        ...(appointmentSet
-          ? [{ personId: person.id, type: "APPOINTMENT_SET" as const, count: 1, date }]
-          : []),
-      ],
-    });
-    return created;
-  });
+  } catch (error) {
+    // Beide Klicks gleichzeitig unterwegs: die Abfrage oben sah noch nichts,
+    // der Index hat den Nachzuegler gestoppt. Der Kontakt existiert bereits.
+    if (!isDuplicate(error) || !formToken) throw error;
+    const winner = await contactFromSameForm(formToken, data.name, user.id);
+    if (!winner?.id) throw error;
+    redirect(`/contacts/${winner.id}`);
+  }
 
   refreshContactViews(contact.id);
   redirect(`/contacts/${contact.id}`);
@@ -168,6 +220,36 @@ export async function updateContact(formData: FormData) {
 
   refreshContactViews(contactId);
   redirect(`/contacts/${contactId}`);
+}
+
+/**
+ * Loescht einen Kontakt endgueltig.
+ *
+ * Was per Cascade mitgeht: Aktivitaeten, Vorgaenge, Phasenwechsel – und mit den
+ * Aktivitaeten auch die daraus entstandenen Anruf-Punkte. Was bewusst stehen
+ * bleibt: empfohlene Kontakte (nur die Verknuepfung faellt weg) und die Punkte
+ * ohne Kontaktbezug (Nummer gezogen, Termin vereinbart, Abschluss) – die haengen
+ * an der Person, nicht am Kontakt.
+ *
+ * Kein Papierkorb: der Weg dahin ist "Verloren", der den Kontakt auswertbar
+ * haelt. Loeschen ist fuer Fehleingaben und Dubletten gedacht.
+ */
+export async function deleteContact(formData: FormData) {
+  const user = await requireUser();
+  const contactId = (formData.get("contactId") as string | null)?.trim();
+  if (!contactId) throw new Error("Kontakt-ID fehlt.");
+
+  const { count } = await prisma.contact.deleteMany({
+    where: { id: contactId, ...eigene(user.id).kontakte },
+  });
+  if (count === 0) throw new Error("Kontakt nicht gefunden.");
+
+  // UndoEntry haengt ohne Fremdschluessel am Kontakt: sonst bliebe in der
+  // Rueckgaengig-Leiste ein Eintrag stehen, der ins Leere greift.
+  await prisma.undoEntry.deleteMany({ where: { userId: user.id, contactId } });
+
+  refreshContactViews(contactId);
+  redirect("/contacts");
 }
 
 export async function createActivity(formData: FormData) {
@@ -348,6 +430,7 @@ export async function searchContacts(query: string) {
         { name: { contains: trimmed, mode: "insensitive" } },
         { phone: { contains: trimmed, mode: "insensitive" } },
         { email: { contains: trimmed, mode: "insensitive" } },
+        { job: { contains: trimmed, mode: "insensitive" } },
         { note: { contains: trimmed, mode: "insensitive" } },
       ],
     },

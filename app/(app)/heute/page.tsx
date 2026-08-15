@@ -14,7 +14,7 @@ import {
 import { dealLineShortLabels, formatEuro } from "@/lib/pipeline";
 import StageBadge from "@/components/StageBadge";
 import NextStepBadge from "@/components/NextStepBadge";
-import ContactActions from "@/components/ContactActions";
+import QuickRowActions from "@/components/QuickRowActions";
 import DealActions from "@/components/DealActions";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import type { DealLite } from "@/components/DealActionDialog";
@@ -22,6 +22,12 @@ import { card, pageTitle } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
+
+const kurzDatum = new Intl.DateTimeFormat("de-DE", {
+  day: "2-digit",
+  month: "2-digit",
+  timeZone: "Europe/Berlin",
+});
 
 export default async function HeutePage() {
   const user = await requireUser();
@@ -37,6 +43,15 @@ export default async function HeutePage() {
         nextStepAt: { lt: horizon },
       },
       orderBy: { nextStepAt: "asc" },
+      // Die letzte Aktivitaet gleich mitnehmen: vor einem Anruf will man
+      // wissen, was beim letzten Mal war – ohne dafuer ins Profil zu springen.
+      include: {
+        activities: {
+          orderBy: { date: "desc" },
+          take: 1,
+          select: { text: true, date: true },
+        },
+      },
     }),
     prisma.deal.findMany({
       where: {
@@ -187,8 +202,31 @@ export default async function HeutePage() {
                             </span>
                           )}
                         </div>
+
+                        {/* Vorgeschichte in der Zeile statt im Profil. */}
+                        {(contact.activities[0] || contact.note) && (
+                          <div className="mt-2 space-y-0.5 border-l-2 border-slate-100 pl-2.5">
+                            {contact.activities[0] && (
+                              <p className="line-clamp-2 text-xs text-slate-500">
+                                <span className="text-slate-400">
+                                  Zuletzt {kurzDatum.format(contact.activities[0].date)}:
+                                </span>{" "}
+                                {contact.activities[0].text}
+                              </p>
+                            )}
+                            {contact.note && (
+                              <p className="line-clamp-2 text-xs text-amber-800">
+                                {contact.note}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
                         <div className="mt-3 border-t border-slate-100 pt-3">
-                          <ContactActions contact={lite} />
+                          <QuickRowActions
+                            contact={lite}
+                            istAnruf={contact.nextStepType === "ANRUF"}
+                          />
                         </div>
                       </li>
                     );
@@ -283,7 +321,7 @@ export default async function HeutePage() {
                   <StageBadge stage={contact.stage} outcome={contact.outcome} />
                 </div>
                 <div className="mt-3 border-t border-slate-100 pt-3">
-                  <ContactActions
+                  <QuickRowActions
                     contact={{
                       id: contact.id,
                       name: contact.name,
@@ -295,6 +333,11 @@ export default async function HeutePage() {
                         : null,
                       hasStep: false,
                     }}
+                    // Ohne Schritt, aber noch in der Akquise: dann ist der
+                    // naechste Griff ohnehin das Telefon.
+                    istAnruf={
+                      contact.stage === "NEU" || contact.stage === "KONTAKTIERT"
+                    }
                   />
                 </div>
               </li>

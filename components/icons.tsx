@@ -30,6 +30,15 @@ export function LogoutIcon({ className }: { className?: string }) {
   );
 }
 
+export function UndoIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h9a7 7 0 0 1 0 14h-3" />
+    </svg>
+  );
+}
+
 export function CheckIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>
@@ -154,6 +163,15 @@ export function LockIcon({ className }: { className?: string }) {
     <svg {...iconProps(className)}>
       <rect x="5" y="10.5" width="14" height="9.5" rx="2" />
       <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14.5v2" />
+    </svg>
+  );
+}
+
+export function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M4 7h16M10 4h4M6 7l1 13h10l1-13" />
+      <path d="M10 11v5M14 11v5" />
     </svg>
   );
 }
