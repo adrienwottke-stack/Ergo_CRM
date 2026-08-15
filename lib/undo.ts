@@ -10,9 +10,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
+import { UNDO_WINDOW_SECONDS } from "@/lib/undo-window";
 
-/** So lange bietet die Oberflaeche das Zuruecknehmen an. */
-export const UNDO_WINDOW_SECONDS = 30;
+export { UNDO_WINDOW_SECONDS };
 
 // Etwas Luft fuer den Weg zum Server: wer bei Sekunde 29 tippt, soll nicht
 // ins Leere greifen.
@@ -48,10 +48,28 @@ const DATE_FIELDS = new Set([
   "appointmentHeldLoggedAt",
 ]);
 
+// Vorgangsfelder, die eine Kontaktaktion mit veraendern kann: `markContactLost`
+// schliesst alle offenen Vorgaenge mit. Ohne diesen Teil waere ein
+// zurueckgenommenes "Kein Interesse" nur halb zurueckgenommen.
+const DEAL_FIELDS = [
+  "stage",
+  "outcome",
+  "lostReason",
+  "closedAt",
+  "wonLoggedAt",
+  "nextStepType",
+  "nextStepAt",
+  "nextStepNote",
+] as const;
+
+const DEAL_DATE_FIELDS = new Set(["closedAt", "wonLoggedAt", "nextStepAt"]);
+
 type ContactState = Record<string, unknown>;
+type DealState = Record<string, unknown>;
 
 type Snapshot = {
   contact: ContactState | null;
+  deals: Record<string, DealState>;
   activityIds: string[];
   stageEventIds: string[];
   dailyLogIds: string[];
@@ -60,6 +78,7 @@ type Snapshot = {
 export type UndoPatch = {
   contactId: string;
   contactBefore: ContactState | null;
+  dealsBefore: Record<string, DealState>;
   newActivityIds: string[];
   newStageEventIds: string[];
   newDailyLogIds: string[];
@@ -67,8 +86,9 @@ export type UndoPatch = {
 
 async function snapshot(contactId: string, personId: string): Promise<Snapshot> {
   const today = dayToUtcDate(berlinToday());
-  const [contact, activities, stageEvents, dailyLogs] = await Promise.all([
+  const [contact, deals, activities, stageEvents, dailyLogs] = await Promise.all([
     prisma.contact.findUnique({ where: { id: contactId } }),
+    prisma.deal.findMany({ where: { contactId } }),
     prisma.activity.findMany({ where: { contactId }, select: { id: true } }),
     prisma.stageEvent.findMany({ where: { contactId }, select: { id: true } }),
     // Punkte ohne Aktivitaetsbezug (Termin vereinbart, Abschluss) haengen nicht
@@ -83,8 +103,16 @@ async function snapshot(contactId: string, personId: string): Promise<Snapshot> 
     ? Object.fromEntries(CONTACT_FIELDS.map((field) => [field, contact[field]]))
     : null;
 
+  const dealStates: Record<string, DealState> = {};
+  for (const deal of deals) {
+    dealStates[deal.id] = Object.fromEntries(
+      DEAL_FIELDS.map((field) => [field, deal[field]])
+    );
+  }
+
   return {
     contact: state,
+    deals: dealStates,
     activityIds: activities.map((row) => row.id),
     stageEventIds: stageEvents.map((row) => row.id),
     dailyLogIds: dailyLogs.map((row) => row.id),
@@ -118,9 +146,20 @@ export async function withUndo<T>(
 
   try {
     const after = await snapshot(params.contactId, params.personId);
+
+    // Nur die Vorgaenge festhalten, die sich wirklich veraendert haben.
+    const dealsBefore: Record<string, DealState> = {};
+    for (const [id, vorher] of Object.entries(before.deals)) {
+      const nachher = after.deals[id];
+      if (nachher && JSON.stringify(vorher) !== JSON.stringify(nachher)) {
+        dealsBefore[id] = vorher;
+      }
+    }
+
     const patch: UndoPatch = {
       contactId: params.contactId,
       contactBefore: changed(before.contact, after.contact) ? before.contact : null,
+      dealsBefore,
       newActivityIds: added(before.activityIds, after.activityIds),
       newStageEventIds: added(before.stageEventIds, after.stageEventIds),
       newDailyLogIds: added(before.dailyLogIds, after.dailyLogIds),
@@ -128,6 +167,7 @@ export async function withUndo<T>(
 
     const nothingToUndo =
       !patch.contactBefore &&
+      Object.keys(dealsBefore).length === 0 &&
       patch.newActivityIds.length === 0 &&
       patch.newStageEventIds.length === 0 &&
       patch.newDailyLogIds.length === 0;
@@ -208,6 +248,22 @@ export async function undoAusfuehren(userId: string, entryId?: string) {
       // Der Kontakt kann zwischenzeitlich geloescht worden sein.
       await tx.contact.updateMany({
         where: { id: patch.contactId, ownerId: userId },
+        data,
+      });
+    }
+
+    // Mitgeschlossene Vorgaenge wieder oeffnen.
+    for (const [dealId, vorher] of Object.entries(patch.dealsBefore ?? {})) {
+      const data: Record<string, unknown> = {};
+      for (const [field, value] of Object.entries(vorher)) {
+        data[field] = DEAL_DATE_FIELDS.has(field)
+          ? value
+            ? new Date(value as string)
+            : null
+          : value;
+      }
+      await tx.deal.updateMany({
+        where: { id: dealId, contact: { is: { ownerId: userId } } },
         data,
       });
     }

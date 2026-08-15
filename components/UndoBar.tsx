@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getOpenUndo, undoLast } from "@/app/(app)/contacts/results";
-import { UNDO_WINDOW_SECONDS } from "@/lib/undo";
+import { UNDO_WINDOW_SECONDS } from "@/lib/undo-window";
 import { UndoIcon } from "@/components/icons";
 
 const UNDO_EVENT = "crm:undo";
