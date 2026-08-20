@@ -61,10 +61,11 @@ export default function ChatFaden({
   useEffect(() => {
     if (queue.length > 0 || tippt || fertig) return;
     if (!schritt) {
+      // Nur den Zustand kippen - den onDone-Timer plant der eigene Effekt
+      // darunter. Wuerde er hier geplant, raeumte ihn das Re-Render durch
+      // setFertig sofort wieder ab, und der Chat bliebe fuer immer stehen.
       setFertig(true);
-      // Kurze Pause, damit die letzte Blase gelesen werden kann.
-      const timer = setTimeout(onDone, sofort.current ? 0 : 700);
-      return () => clearTimeout(timer);
+      return;
     }
     if (schritt.art === "blase") {
       setQueue([schritt.text]);
@@ -79,6 +80,16 @@ export default function ChatFaden({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue, tippt, schrittIndex, fertig]);
+
+  // Fertig: kurze Pause, damit die letzte Blase gelesen werden kann, dann
+  // weiter. Eigener Effekt, damit ihn kein anderes Re-Render abraeumt -
+  // fertig kippt genau einmal von false auf true.
+  useEffect(() => {
+    if (!fertig) return;
+    const timer = setTimeout(onDone, sofort.current ? 0 : 700);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fertig]);
 
   useEffect(() => {
     endeRef.current?.scrollIntoView({ block: "end", behavior: sofort.current ? "auto" : "smooth" });
