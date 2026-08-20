@@ -844,7 +844,39 @@ Arena-Tabellen stehen noch nicht in der Datenbank.
 | Reihenfolge | A → G | A, B, C, D teilweise; E, F, G offen | Ein Abend ist ein Abend |
 | Feed und Reaktionen | Paket C | **nicht gebaut**, steht als Wunsch Nr. 1 auf dem Wunschzettel | Mit drei Köpfen erzeugt ein Feed keine Ereignisse |
 
-### 15.4 Was vor dem Start noch passieren muss
+### 15.4 Ausgeliefert am 20.08.2026
+
+Alles live auf https://ergo-crm.vercel.app, Commit `c833806`.
+
+| | |
+|---|---|
+| Arena, Werkstatt, Fairness, neue Gewichte | live |
+| Willkommen-Zweig, Start-Schleuse, Einladen-Seite, Service Worker | live (parallele Arbeit, mit ausgeliefert) |
+| Navigation auf `/arena` und `/werkstatt` | live |
+| Migrationen | 15 von 15 angewandt |
+| Startprobe `scripts/arena-check.mjs` | 8 von 8 Tabellen, 7 Bausteine, 13 Wünsche |
+
+**Ein Fehler auf dem Weg dahin, als Lehre notiert:** Der erste Deploy (`d81459f`) ist
+gescheitert, weil in den `"use server"`-Dateien Konstanten neben den Aktionen standen —
+dort sind ausschließlich async Funktionen erlaubt. `tsc` und `eslint` prüfen diese
+Next-Regel **nicht**, nur `next build` fällt darüber. Behoben in `c61a098`. Regel für
+künftige Abende: **vor jedem Push ein vollständiger `next build`**, auch wenn Typprüfung
+und Lint sauber sind.
+
+### 15.5 Was jetzt noch fehlt — und es ist kein Code
+
+Die Startprobe sagt es in einer Zeile: **ein Kopf.** Bausteine, Tabellen und Wünsche stehen,
+aber Duelle brauchen zwei, der Puls braucht Publikum und die Werkstatt braucht Stimmen.
+
+1. **Einladungen verschicken.** `/einladen` ist live, jeder kann Codes erzeugen.
+2. **Erster gemeinsamer Sprint** zu einer festen Uhrzeit, in der Gruppe angesagt.
+3. **Nach drei Wochen die Werkstatt lesen** und abreißen, was von weniger als drei Köpfen
+   benutzt wurde.
+4. **Nach vier Wochen `scripts/nullmessung.mjs` erneut laufen lassen** und gegen 15.1
+   halten. Aktive Logger pro Woche und Anrufe je aktivem Kopf — bewegt sich das nicht, ist
+   die Arena Unterhaltung und kein Werkzeug.
+
+### 15.6 Historie: was vor dem Start noch offen war
 
 1. **Migration einspielen.** Vier Migrationen stehen offen, alle additiv:
    `npx prisma migrate deploy`. Ohne sie stürzt `/arena` hinter dem Login ab. Der
