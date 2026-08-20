@@ -787,3 +787,76 @@ Funktionen und Messwerte für sieben.
 
 Danach: **Eröffnungstag.** Und ab da entscheidet nicht mehr dieses Dokument, sondern die
 Werkstatt.
+
+---
+
+## 15. Umsetzungsstand (20.08.2026)
+
+### 15.1 Nullmessung — der Vorher-Wert
+
+Gemessen am 20.08.2026, 12:35 Uhr, mit `scripts/nullmessung.mjs` (wiederholbar, liest nur):
+
+| | |
+|---|---|
+| Aktive Konten | **1** |
+| Wettbewerbs-Personen | **1** |
+| Einträge in `DailyLog` | **33**, Zeitraum 12.–16.08. |
+| Beste Woche (ab 10.08.) | 1 Kopf · 13 Anrufe · 16 Nummern · 4 Termine · 13,0 Anrufe/Kopf |
+| Anteil aus dem CRM | **9 %** |
+
+**Die wichtigste Zahl in dieser Tabelle ist die Eins.** Die Arena ist am Starttag kein
+Feature-Problem, sondern ein Menschen-Problem: Duelle brauchen zwei, der Puls braucht
+Publikum, die Werkstatt braucht Stimmen. Wie gut der Start wird, entscheidet die Zahl der
+Einladungen, nicht die Zahl der Funktionen.
+
+Daraus folgt für die Reihenfolge am Starttag: Der **Sprint** ist wichtiger als das Duell —
+er funktioniert ab zwei Köpfen und ist ein Termin, kein Feature.
+
+### 15.2 Gebaut
+
+| Baustein | Stand | Commit |
+|---|---|---|
+| Schalter und Zählstelle (`lib/features.ts`) | **fertig** | `574c4fe` |
+| Werkstatt: Funktions-Rangliste, Stimmen neben Nutzung, Wunschzettel, Friedhof | **fertig** | `574c4fe` |
+| „Taugt das?" an jedem Baustein | **fertig** | `574c4fe` |
+| Fairness: Tageskappen, Nachtragsfenster zwei Tage | **fertig** | `574c4fe` |
+| Punktegewichte 1/1/3/5/10 | **fertig** | `574c4fe` |
+| Nullmessung | **fertig** | `574c4fe` |
+| Arena: Kommentator, Abpfiff-Restzeit | **fertig** | `123dfaf` |
+| Arena: Puls mit Selbst-Nachladen (30 s, im Sprint 10 s) | **fertig** | `123dfaf` |
+| Arena: Zweikampf-Block, Abstand in Handlungen, Bestmarke | **fertig** | `123dfaf` |
+| Arena: Duelle inkl. Abpfiff ohne Cron | **fertig** | `123dfaf` |
+| Arena: gemeinsamer Sprint | **fertig** | `123dfaf` |
+| Navigation auf `/arena` und `/werkstatt` | geschrieben, **nicht committet** — siehe 15.4 |
+
+Geprüft: `prisma validate`, `tsc --noEmit`, `eslint` — alle sauber. `/arena` und `/werkstatt`
+antworten am laufenden Dev-Server mit 307 auf `/login`, kompilieren also.
+
+**Nicht geprüft:** die Ansicht hinter dem Login. Dafür wäre ein Passwort nötig, und die
+Arena-Tabellen stehen noch nicht in der Datenbank.
+
+### 15.3 Bewusste Abweichungen
+
+| Thema | Plan | Umgesetzt | Warum |
+|---|---|---|---|
+| Ort | Umbau von `/leaderboard` | **neue Seite `/arena`**, `/leaderboard` bleibt unverändert | An `/leaderboard` wird parallel gearbeitet. Zwei Sitzungen in einer Datei zerstören sich gegenseitig |
+| Zwei Ranglisten | eine | Arena **und** Rangliste stehen nebeneinander in der Navigation | Passt zum Kurs: welche bleibt, entscheidet die Werkstatt — nicht wir |
+| Reihenfolge | A → G | A, B, C, D teilweise; E, F, G offen | Ein Abend ist ein Abend |
+| Feed und Reaktionen | Paket C | **nicht gebaut**, steht als Wunsch Nr. 1 auf dem Wunschzettel | Mit drei Köpfen erzeugt ein Feed keine Ereignisse |
+
+### 15.4 Was vor dem Start noch passieren muss
+
+1. **Migration einspielen.** Vier Migrationen stehen offen, alle additiv:
+   `npx prisma migrate deploy`. Ohne sie stürzt `/arena` hinter dem Login ab. Der
+   Vercel-Build macht das ohnehin — vorher lokal laufen zu lassen ist die Probe, ob die
+   Migration sauber durchläuft.
+2. **Der Willkommen-Zweig muss fertig sein.** Er blockiert den Start doppelt:
+   `app/(willkommen)/willkommen/page.tsx` kompiliert noch nicht (fehlende Komponente), und
+   `requireOnboardedUser` schickt jedes Konto mit `onboardingDoneAt = NULL` dorthin — nach
+   der Migration ist das **jedes bestehende Konto**. Deploy ohne fertige Seite heißt: alle
+   landen auf 404.
+3. **Navigation committen.** Die zwei Zeilen liegen in `app/(team)/layout.tsx` und
+   `app/(app)/layout.tsx` — beides Dateien der parallelen Arbeit. Sie fahren mit deren
+   Commit mit.
+4. **Einladungen verschicken.** Siehe 15.1.
+5. **Sprint ansetzen.** Feste Uhrzeit in der Gruppe, alle gleichzeitig.
