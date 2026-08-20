@@ -18,6 +18,14 @@ import { emptyQuotaCounts, quotaTypePoints } from "@/lib/labels";
 import { streakDays } from "@/lib/stats";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
 
+// Regeln des Wettkampfs. Sie stehen hier und nicht in actions.ts, weil eine
+// "use server"-Datei ausschliesslich async Funktionen exportieren darf -
+// Konstanten daneben brechen den Produktionsbau (und nur den: tsc und eslint
+// pruefen diese Next-Regel nicht).
+export const MAX_DUELLE = 2;
+export const ANNAHME_STUNDEN = 24;
+export const SPRINT_MINUTEN = 25;
+
 export type ArenaZeile = {
   personId: string;
   name: string;
@@ -186,6 +194,39 @@ export async function duellStand(duel: {
     else rechts += wert;
   }
   return { links, rechts };
+}
+
+// Abpfiff ohne Cron: wer die Arena als Erster nach Ablauf oeffnet, schliesst
+// die faelligen Duelle ab. Ein naechtlicher Lauf, der einmal ausfaellt,
+// verschluckt einen ganzen Spieltag - das hier kann nicht ausfallen.
+//
+// Bewusst eine gewoehnliche Funktion und keine Server-Action: sie wird nur
+// beim Rendern aufgerufen und soll kein von aussen aufrufbarer Endpunkt sein.
+export async function duelleAbschliessen() {
+  const heute = dayToUtcDate(berlinToday());
+  const verfallsgrenze = new Date(Date.now() - ANNAHME_STUNDEN * 3_600_000);
+
+  await prisma.duel.updateMany({
+    where: { status: "OFFEN", createdAt: { lt: verfallsgrenze } },
+    data: { status: "VERFALLEN", decidedAt: new Date() },
+  });
+
+  const faellig = await prisma.duel.findMany({
+    where: { status: "LAEUFT", endDay: { lt: heute } },
+  });
+
+  for (const duel of faellig) {
+    const stand = await duellStand(duel);
+    await prisma.duel.update({
+      where: { id: duel.id },
+      data: {
+        status: "ENTSCHIEDEN",
+        challengerScore: stand.links,
+        opponentScore: stand.rechts,
+        decidedAt: new Date(),
+      },
+    });
+  }
 }
 
 // --- Sprint -----------------------------------------------------------------

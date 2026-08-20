@@ -3,10 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireUser, requireUserPerson } from "@/lib/auth";
+import { WUNSCH_STIMMEN } from "@/lib/features";
 import type { FeatureState } from "@/lib/generated/prisma/enums";
-
-// Drei Stimmen je Kopf. Wer alles gut findet, sagt nichts aus.
-export const WUNSCH_STIMMEN = 3;
 
 const zustaende: FeatureState[] = ["TEST", "LAEUFT", "AUS", "ABGERISSEN"];
 

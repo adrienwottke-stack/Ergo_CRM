@@ -1,20 +1,17 @@
 "use server";
 
+// Nur async Funktionen: eine "use server"-Datei darf nichts anderes
+// exportieren. Die Regeln des Wettkampfs und der Abpfiff stehen deshalb in
+// lib/arena.ts.
+
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, mondayOf, shiftDay } from "@/lib/dates";
 import { isQuotaType } from "@/lib/labels";
-import { duellStand } from "@/lib/arena";
+import { MAX_DUELLE, SPRINT_MINUTEN } from "@/lib/arena";
 import { merkeNutzung } from "@/lib/features";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
-
-// Hoechstens zwei laufende Duelle je Kopf. Wer gegen alle gleichzeitig
-// antritt, hat kein Duell mehr, sondern wieder eine Rangliste.
-export const MAX_DUELLE = 2;
-// Eine Forderung, die keiner annimmt, verschwindet nach einem Tag - geraeuschlos.
-export const ANNAHME_STUNDEN = 24;
-export const SPRINT_MINUTEN = 25;
 
 function duellEnde(dauer: string, heute = berlinToday()): string {
   if (dauer === "tag") return heute;
@@ -34,6 +31,8 @@ export async function duellFordern(formData: FormData) {
   const gegner = await prisma.person.findUnique({ where: { id: opponentId } });
   if (!gegner) return;
 
+  // Hoechstens zwei laufende Duelle je Kopf. Wer gegen alle gleichzeitig
+  // antritt, hat kein Duell mehr, sondern wieder eine Rangliste.
   const laufend = await prisma.duel.count({
     where: {
       status: { in: ["OFFEN", "LAEUFT"] },
@@ -96,36 +95,6 @@ export async function duellAntwort(formData: FormData) {
   }
 
   revalidatePath("/arena");
-}
-
-// Abpfiff ohne Cron: wer die Seite als Erster nach Ablauf oeffnet, schliesst
-// ab. Ein naechtlicher Lauf, der einmal ausfaellt, verschluckt einen ganzen
-// Spieltag - das hier kann nicht ausfallen.
-export async function duelleAbschliessen() {
-  const heute = dayToUtcDate(berlinToday());
-  const verfallsgrenze = new Date(Date.now() - ANNAHME_STUNDEN * 3_600_000);
-
-  await prisma.duel.updateMany({
-    where: { status: "OFFEN", createdAt: { lt: verfallsgrenze } },
-    data: { status: "VERFALLEN", decidedAt: new Date() },
-  });
-
-  const faellig = await prisma.duel.findMany({
-    where: { status: "LAEUFT", endDay: { lt: heute } },
-  });
-
-  for (const duel of faellig) {
-    const stand = await duellStand(duel);
-    await prisma.duel.update({
-      where: { id: duel.id },
-      data: {
-        status: "ENTSCHIEDEN",
-        challengerScore: stand.links,
-        opponentScore: stand.rechts,
-        decidedAt: new Date(),
-      },
-    });
-  }
 }
 
 export async function sprintStarten() {

@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, shiftDay } from "@/lib/dates";
-import { merkeNutzung } from "@/lib/features";
+import { WUNSCH_STIMMEN, merkeNutzung } from "@/lib/features";
 import Taugt from "@/components/Taugt";
 import { card, input, kicker, pageTitle, sectionTitle, td, th } from "@/components/ui";
-import { WUNSCH_STIMMEN, schalten, wunschAnlegen, wunschStimme } from "./actions";
+import { schalten, wunschAnlegen, wunschStimme } from "./actions";
 
 export const dynamic = "force-dynamic";
 

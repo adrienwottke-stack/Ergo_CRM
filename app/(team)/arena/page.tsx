@@ -3,8 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, startOfWeek } from "@/lib/dates";
 import {
+  MAX_DUELLE,
+  SPRINT_MINUTEN,
   abpfiffDieserWoche,
   duellStand,
+  duelleAbschliessen,
   ladeBestmarke,
   ladePuls,
   ladeRangliste,
@@ -19,7 +22,7 @@ import SprintUhr from "@/components/SprintUhr";
 import Taugt from "@/components/Taugt";
 import { FlameIcon, TrophyIcon } from "@/components/icons";
 import { btnPrimary, btnSecondary, card, kicker, pageTitle, sectionTitle } from "@/components/ui";
-import { MAX_DUELLE, SPRINT_MINUTEN, duellAntwort, duellFordern, duelleAbschliessen, sprintStarten } from "./actions";
+import { duellAntwort, duellFordern, sprintStarten } from "./actions";
 
 export const dynamic = "force-dynamic";
 
