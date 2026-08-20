@@ -226,8 +226,16 @@ model User {
   role         UserRole     @default(MEMBER)
   // Einsteiger sehen nur Namensliste, Heute und Wettbewerb. Nichts wird
   // gesperrt, nur ausgeblendet - jederzeit selbst umschaltbar.
-  beginnerMode Boolean      @default(false)
+  // Voreinstellung an: wer neu dazukommt, soll drei Eintraege sehen und
+  // nicht zehn. Wer mehr will, holt es sich mit einem Tipp auf "Alles
+  // anzeigen".
+  beginnerMode Boolean      @default(true)
   createdAt    DateTime     @default(now())
+
+  // Erster Start vom Startbildschirm aus. NULL = arbeitet noch im Browser-Tab.
+  // Einmal gesetzt, danach nie wieder angefasst: damit steht in der Mannschaft,
+  // wer die App wirklich auf dem Handy hat - und wer sie wieder geloescht hat.
+  installedAt DateTime?
 
   // --- Struktur (docs/struktur-plan.md, Abschnitt 2) -------------------------
   // Fuehrungskraft ist keine Rolle, sondern eine Position: wer Direkte unter
@@ -256,6 +264,42 @@ model User {
   // keiner laufenden Auswertung mehr mit.
   deactivatedAt DateTime?
 
+  // --- Willkommen (docs/willkommen-plan.md) ----------------------------------
+  // NULL = hat den Start noch nie gesehen. Einmalig gesetzt, danach nie wieder
+  // automatisch. Bewusst kein Schritt-Zaehler: wer mittendrin abbricht, faengt
+  // von vorn an - bei drei Minuten ist das die richtige Antwort.
+  onboardingDoneAt    DateTime?
+  onboardingStartedAt DateTime?
+  // Messen statt hoffen: je Akt ein Zeitstempel ("chat": "...", "sprint": ...).
+  // Ohne das laesst sich nie sagen, WO die Leute aussteigen.
+  onboardingSteps Json?
+
+  // Die Weiche vom Start: Kunden gewinnen (VERKAUF) oder Team aufbauen
+  // (RECRUITING). Steuert Leitfaden, Einwaende und die Liste des Sprints.
+  startTrack ListKind?
+
+  // Der Brief an sich selbst: warum er das macht, in eigenen Worten. Kommt
+  // genau einmal zurueck - in dem Moment, in dem er hinschmeissen will
+  // (14 Tage dabei, eine Woche Stille). whyShownAt haelt fest, dass der
+  // Moment verbraucht ist.
+  whyLetter   String?
+  whyShownAt  DateTime?
+
+  // Das 30-Tage-Versprechen: selbst gesetztes Terminziel. Steht ab dann jeden
+  // Tag auf /heute, an Tag 30 kommt die Abrechnung (pledgeShownAt = gesehen).
+  pledgeTarget  Int?
+  pledgeSetAt   DateTime?
+  pledgeShownAt DateTime?
+
+  // Kleines Selfie fuer die Rangliste, als komprimierte Data-URL (~10 KB).
+  // Bewusst kein Datei-Speicher: ein Feld, keine neue Infrastruktur.
+  photoDataUrl String?
+
+  // Aus welcher Einladung dieses Konto entstand. Ersetzt fuer Mehrfach-Codes
+  // (QR am Infoabend) die alte 1:1-Rueckverknuepfung Invite.usedById.
+  herkunftId String?
+  herkunft   Invite? @relation("Herkunft", fields: [herkunftId], references: [id], onDelete: SetNull)
+
   contacts    Contact[]
   person      Person?
   stageEvents StageEvent[]
@@ -281,12 +325,34 @@ model Invite {
   note      String? // "Max aus dem Infoabend"
   expiresAt DateTime
 
-  // Eindeutig: ein Konto kann aus hoechstens einer Einladung entstehen.
+  // Notausgang aus der Installations-Schleuse: normalerweise erscheint das
+  // Anmeldeformular erst, wenn die Seite vom Startbildschirm laeuft. Laesst
+  // sich ein Geraet partout nicht dazu bewegen, gibt der Einladende diese eine
+  // Einladung frei. Setzt nie der Eingeladene.
+  browserFreigabe Boolean @default(false)
+
+  // Persoenliche erste Chatnachricht im Willkommens-Ablauf: "Max, du hast
+  // gesagt du willst raus aus dem Lager. Los geht's." Kein Template schlaegt das.
+  greeting String?
+
+  // Der Einsatz des Einladenden fuer die Startwoche ("Essen geht auf mich").
+  // Steht sichtbar auf dem Starterpass.
+  stake String?
+
+  // Wie oft der Code einloesbar ist. 1 = klassischer Einzel-Link,
+  // NULL = unbegrenzt (QR-Code am Infoabend, zwanzig Handys gleichzeitig).
+  maxUses   Int? @default(1)
+  usedCount Int  @default(0)
+
+  // Erste Einloesung - bleibt fuer Einzel-Links erhalten. Welche Konten aus
+  // einem Mehrfach-Code entstanden, steht an User.herkunftId.
   usedById String?   @unique
   usedBy   User?     @relation("Eingeloest", fields: [usedById], references: [id], onDelete: SetNull)
   usedAt   DateTime?
 
   createdAt DateTime @default(now())
+
+  angekommene User[] @relation("Herkunft")
 
   @@index([leaderId, createdAt])
 }
@@ -356,6 +422,19 @@ model Person {
   user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt DateTime   @default(now())
   dailyLogs DailyLog[]
+
+  // --- Arena (docs/wettbewerb-plan.md) --------------------------------------
+  // Zuletzt gesehener Platz. Daraus entsteht "du wurdest ueberholt", ohne dass
+  // dafuer nachts etwas laufen muesste: fortgeschrieben wird beim Aufruf der
+  // Rangliste.
+  lastRank   Int?
+  lastRankAt DateTime?
+
+  votes           FeatureVote[]
+  wuensche        WunschVote[]
+  duelleGefordert Duel[]            @relation("Fordert")
+  duelleErhalten  Duel[]            @relation("Gefordert")
+  sprints         SprintTeilnahme[]
 }
 
 model DailyLog {
@@ -370,4 +449,145 @@ model DailyLog {
   createdAt  DateTime  @default(now())
 
   @@index([personId, date])
+}
+
+// --- Arena: Werkstatt, Duelle, Sprints --------------------------------------
+// docs/wettbewerb-plan.md, Abschnitte 7 und 14.
+//
+// Grundregel dieses Blocks: JEDER neue Baustein bekommt einen Schluessel, einen
+// Schalter und eine Zaehlstelle. Ohne das laesst sich nach drei Wochen nicht
+// sagen, was bleiben soll - und genau darum geht es beim Kurs "alles rein,
+// dann abstimmen lassen".
+
+enum FeatureState {
+  TEST // laeuft, wird noch beurteilt
+  LAEUFT // bleibt
+  AUS // abgeschaltet, Daten bleiben stehen
+  ABGERISSEN // Friedhof
+}
+
+model Feature {
+  key   String       @id // "duell", "sprint", "puls"
+  titel String
+  state FeatureState @default(TEST)
+  // "Bleibt drin, weil ..." - steht sichtbar in der Werkstatt, wenn gegen die
+  // Stimmen entschieden wurde. Eine Abstimmung ohne Folgen wird nicht mehr
+  // benutzt, eine bindende wird zur Fessel.
+  grund String?
+  seit  DateTime     @default(now())
+
+  votes FeatureVote[]
+}
+
+enum Urteil {
+  STARK
+  GEHT_SO
+  WEG_DAMIT
+}
+
+model FeatureVote {
+  id         String   @id @default(cuid())
+  featureKey String
+  feature    Feature  @relation(fields: [featureKey], references: [key], onDelete: Cascade)
+  personId   String
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  urteil     Urteil
+  createdAt  DateTime @default(now())
+
+  @@unique([featureKey, personId])
+  @@index([featureKey])
+}
+
+// Nutzung statt Meinung. Bewusst ohne Beziehung auf Person: die Zeile wird bei
+// jedem Aufruf hochgezaehlt und niemals einzeln angezeigt - sichtbar ist
+// ausschliesslich die Summe ueber Koepfe. Der Leitsatz gilt auch fuer die
+// Messung: sie zeigt nie auf eine Person.
+model FeatureUse {
+  featureKey String
+  personId   String
+  day        DateTime
+  count      Int      @default(1)
+
+  @@id([featureKey, personId, day])
+  @@index([featureKey, day])
+}
+
+model Wunsch {
+  id        String       @id @default(cuid())
+  titel     String
+  stand     String       @default("OFFEN") // OFFEN | GEBAUT | VERWORFEN
+  createdAt DateTime     @default(now())
+  votes     WunschVote[]
+}
+
+model WunschVote {
+  id        String   @id @default(cuid())
+  wunschId  String
+  wunsch    Wunsch   @relation(fields: [wunschId], references: [id], onDelete: Cascade)
+  personId  String
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([wunschId, personId])
+  @@index([personId])
+}
+
+enum DuelStatus {
+  OFFEN // Forderung steht, 24 Stunden
+  LAEUFT
+  ENTSCHIEDEN
+  ABGELEHNT
+  VERFALLEN
+}
+
+model Duel {
+  id           String @id @default(cuid())
+  challengerId String
+  challenger   Person @relation("Fordert", fields: [challengerId], references: [id], onDelete: Cascade)
+  opponentId   String
+  opponent     Person @relation("Gefordert", fields: [opponentId], references: [id], onDelete: Cascade)
+
+  metric   QuotaType? // NULL = Gesamtpunkte
+  startDay DateTime
+  endDay   DateTime
+  status   DuelStatus @default(OFFEN)
+
+  // Beim Abpfiff eingefroren: ein Nachtrag darf kein Ergebnis mehr kippen.
+  challengerScore Int?
+  opponentScore   Int?
+
+  acceptedAt DateTime?
+  decidedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([challengerId, status])
+  @@index([opponentId, status])
+  @@index([status, endDay])
+}
+
+// Gemeinsamer Block: 25 Minuten, alle gleichzeitig. Gezaehlt wird ueber
+// DailyLog.createdAt im Fenster - kein zweiter Zaehler, der auseinanderlaufen
+// kann.
+model Sprint {
+  id          String   @id @default(cuid())
+  startAt     DateTime
+  endAt       DateTime
+  startedById String?
+  titel       String?
+  createdAt   DateTime @default(now())
+
+  teilnahmen SprintTeilnahme[]
+
+  @@index([startAt])
+}
+
+model SprintTeilnahme {
+  id       String   @id @default(cuid())
+  sprintId String
+  sprint   Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  personId String
+  person   Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now())
+
+  @@unique([sprintId, personId])
 }

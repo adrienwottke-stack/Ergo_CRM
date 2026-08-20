@@ -6,13 +6,17 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, isValidDay } from "@/lib/dates";
 import { manualQuotaTypes } from "@/lib/labels";
+import { kappeRest, tagImFenster } from "@/lib/fairness";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
 
 export async function logDaily(formData: FormData) {
   const user = await requireUser();
   const person = await requireUserPerson(user.id);
   const dayRaw = (formData.get("day") as string | null)?.trim();
-  const day = dayRaw && isValidDay(dayRaw) ? dayRaw : berlinToday();
+  const gewuenscht = dayRaw && isValidDay(dayRaw) ? dayRaw : berlinToday();
+  // Nachtragsfenster: heute und die zwei Vortage. Alles davor waere eine
+  // erfundene Woche (docs/wettbewerb-plan.md, Abschnitt 4).
+  const day = tagImFenster(gewuenscht) ? gewuenscht : berlinToday();
   const entries: { type: QuotaType; count: number }[] = [];
 
   // Gehaltene Termine und Abschluesse kommen nur aus der Pipeline.
@@ -20,7 +24,12 @@ export async function logDaily(formData: FormData) {
     const raw = (formData.get(type) as string | null)?.trim();
     const count = raw ? parseInt(raw, 10) : 0;
     if (Number.isFinite(count) && count > 0) {
-      entries.push({ type, count: Math.min(count, 999) });
+      // Tageskappe je Art: die Summe des Tages zaehlt, nicht der einzelne
+      // Eintrag. Was drueber liegt, wird stumm gekappt statt abgewiesen -
+      // eine Fehlermeldung fuer einen Tippfehler hilft niemandem.
+      const rest = await kappeRest(person.id, type, day);
+      const erlaubt = Math.min(count, 999, rest);
+      if (erlaubt > 0) entries.push({ type, count: erlaubt });
     }
   }
   if (entries.length) {
