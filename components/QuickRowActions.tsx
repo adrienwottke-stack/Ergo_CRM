@@ -28,14 +28,22 @@ import {
   LOST_CHIPS,
 } from "@/components/ResultDialogs";
 import { undoMoeglich } from "@/components/UndoBar";
-import { CheckIcon, PhoneIcon } from "@/components/icons";
+import {
+  CalendarCheckIcon,
+  CheckIcon,
+  ClockIcon,
+  PhoneIcon,
+  PhoneOffIcon,
+  XIcon,
+} from "@/components/icons";
 
 const knopf =
   "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium transition active:scale-[0.98] disabled:opacity-50";
 
 const stil = {
   call: `${knopf} bg-emerald-50 text-emerald-700 hover:bg-emerald-100`,
-  primaer: `${knopf} bg-navy-800 text-white hover:bg-navy-900`,
+  primaer: `${knopf} bg-navy-900 text-white hover:bg-navy-950`,
+  erfolg: `${knopf} bg-emerald-600 text-white hover:bg-emerald-700`,
   neutral: `${knopf} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`,
   weich: `${knopf} bg-slate-100 text-slate-600 hover:bg-slate-200`,
   warm: `${knopf} bg-amber-100 text-amber-900 hover:bg-amber-200`,
@@ -100,7 +108,7 @@ export default function QuickRowActions({
               onClick={() => senden(recordCallResult, { result: "unreachable" })}
               className={stil.weich}
             >
-              📵 Nicht erreicht
+              <PhoneOffIcon className="h-4 w-4" /> Nicht erreicht
             </button>
             <button
               type="button"
@@ -108,15 +116,15 @@ export default function QuickRowActions({
               onClick={() => setDialog("later")}
               className={stil.warm}
             >
-              ⏳ Später
+              <ClockIcon className="h-4 w-4" /> Später
             </button>
             <button
               type="button"
               disabled={pending}
               onClick={() => setDialog("appointment")}
-              className={stil.primaer}
+              className={stil.erfolg}
             >
-              ✅ Termin
+              <CalendarCheckIcon className="h-4 w-4" /> Termin
             </button>
             <button
               type="button"
@@ -124,7 +132,7 @@ export default function QuickRowActions({
               onClick={() => setDialog("lost")}
               className={stil.neutral}
             >
-              ✕ Kein Interesse
+              <XIcon className="h-4 w-4" /> Kein Interesse
             </button>
           </>
         )}

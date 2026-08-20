@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { bulkImportContacts } from "@/app/(app)/contacts/actions";
 import { btnPrimary, card, input } from "@/components/ui";
+import { CheckIcon } from "@/components/icons";
 
 interface ParsedContact {
   name: string;
@@ -83,7 +84,7 @@ export default function CsvImportForm() {
   return (
     <div className={`${card} p-6 sm:p-8 space-y-6 max-w-3xl mx-auto`}>
       <div>
-        <h2 className="text-lg font-bold text-slate-900">📥 Kontakte per CSV importieren</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-slate-900">Kontakte per CSV importieren</h2>
         <p className="mt-1 text-sm text-slate-500">
           Lade eine `.csv` Datei hoch oder füge kommaseparierten Text ein.
         </p>
@@ -91,7 +92,7 @@ export default function CsvImportForm() {
 
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
             CSV-Datei auswählen:
           </label>
           <input
@@ -109,7 +110,7 @@ export default function CsvImportForm() {
         </div>
 
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
             Format: Name, Telefon, E-Mail, Quelle, Notiz
           </label>
           <textarea
@@ -125,14 +126,14 @@ export default function CsvImportForm() {
       {parsedContacts.length > 0 && (
         <div className="space-y-3 border-t border-slate-100 pt-5">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-800">
+            <h3 className="text-sm font-semibold text-slate-800">
               Vorschau ({parsedContacts.length} Kontakte erkannt)
             </h3>
           </div>
 
           <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
+              <thead className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700">
                 <tr>
                   <th className="p-2.5">Name</th>
                   <th className="p-2.5">Telefon</th>
@@ -167,8 +168,11 @@ export default function CsvImportForm() {
       )}
 
       {importedCount !== null && (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-center text-sm font-bold text-emerald-800">
-          ✅ Erfolgreich {importedCount} Kontakte importiert! Weiterleitung...
+        <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-center text-sm font-medium text-emerald-800">
+          <span className="inline-flex items-center gap-1.5">
+            <CheckIcon className="h-4 w-4" />
+            {importedCount} Kontakte importiert – Weiterleitung …
+          </span>
         </div>
       )}
     </div>

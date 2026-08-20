@@ -5,6 +5,7 @@ import { resetGuide, saveGuide } from "@/app/(app)/namen/actions";
 import { countPlaceholders } from "@/lib/guides";
 import GuideBody from "@/components/GuideBody";
 import { btnPrimary, btnSecondary, card } from "@/components/ui";
+import { ChevronDownIcon, ChevronRightIcon } from "@/components/icons";
 
 export default function GuidePanel({
   guideKey,
@@ -64,8 +65,13 @@ export default function GuidePanel({
         onClick={() => setOpen((value) => !value)}
         className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left"
       >
-        <span className="text-sm font-semibold text-slate-800">
-          {open ? "▾" : "▸"} {title}
+        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+          {open ? (
+            <ChevronDownIcon className="h-4 w-4 text-slate-400" />
+          ) : (
+            <ChevronRightIcon className="h-4 w-4 text-slate-400" />
+          )}
+          {title}
         </span>
         <span className="flex shrink-0 items-center gap-2">
           {isDraft && (

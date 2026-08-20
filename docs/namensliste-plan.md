@@ -1,6 +1,6 @@
 # Namensliste (Ergo CRM)
 
-Stand: 15.08.2026 — Planungsdokument, noch nicht implementiert.
+Stand: 15.08.2026 — **umgesetzt**, Bauabschnitte 1–6 sind gebaut.
 
 Ziel: Ein Einsteiger legt am ersten Tag 20 Namen an, sortiert sie nach Nähe (A/B/C) und
 telefoniert sie ab — **anrufen, Ergebnis, anrufen, Ergebnis**, ohne einmal ein Formular zu
@@ -179,10 +179,16 @@ sonst Standard. „Zurücksetzen" löscht die Zeile wieder. Vorteil gegenüber e
 Verbesserst du den Standardtext, erreicht das sofort jeden, der nichts eigenes gespeichert
 hat — ohne Migration.
 
-> **Von dir gebraucht:** den TVB-Leitfaden im Wortlaut, und was ihr sonst noch benutzt. Ich
-> baue die Struktur, aber ich erfinde euch keinen Gesprächseinstieg — ein ausgedachter
-> Leitfaden ist schlimmer als gar keiner. Bis dein Text da ist, steht das Gerüst oben mit
-> Platzhaltern drin, sodass die Technik trotzdem fertig gebaut und getestet werden kann.
+**Stand der Leitfäden.** Der **TVB-Leitfaden** liegt vollständig im Wortlaut vor und hängt
+an der **Verkauf**-Liste — inhaltlich ist er ein Terminierungsleitfaden fürs Finanzthema
+(Smalltalk → Aufhänger Geld → Bedarfsfrage → Verzweigung A/B/C → Alternativtechnik →
+Checkliste), kein Recruiting-Gespräch. Für **Recruiting** steht weiter ein Gerüst mit
+Platzhaltern; es ist in der Oberfläche als „Gerüst“ gekennzeichnet, damit niemand einen
+halbfertigen Text für einen fertigen hält. Sobald jemand selbst hineinschreibt, verschwindet
+die Kennzeichnung.
+
+Die eckigen Klammern im TVB (`[Haus]`, `[Tätigkeit]`, `[Vorteile unseres Produkts nennen]`)
+sind kein Mangel, sondern Einsetzstellen je Gespräch — deshalb lösen sie keinen Hinweis aus.
 
 ---
 
@@ -294,14 +300,14 @@ Zurückkommen vom Telefonat, 5–6 sind überschaubar.
 
 ---
 
-## 10. Was ich von dir brauche
+## 10. Was noch offen ist
 
-1. **Der TVB-Leitfaden im Wortlaut** — und welche anderen Leitfäden noch rein sollen
-   (Verkauf-Erstkontakt? Einwandbehandlung getrennt?). Ohne deinen Text bleibt Abschnitt 5
-   ein Gerüst.
-2. **Die vier Annahmen aus Abschnitt 1** — passen sie, oder willst du etwas anders?
-3. **Heißt es „Namensliste" oder anders bei euch?** Die Beschriftung im Menü sollte das Wort
-   benutzen, das ihr im Gespräch benutzt.
-4. **Zählt ein Recruiting-Gespräch bei euch anders für den Wettbewerb** als ein
+1. **Der Recruiting-Leitfaden** — Struktur steht, Wortlaut fehlt. Direkt in der App unter
+   „Leitfaden bearbeiten“ eintragbar, ohne Code-Eingriff.
+2. **Heißt es „Namensliste" oder anders bei euch?** Die Beschriftung im Menü sollte das Wort
+   benutzen, das ihr im Gespräch benutzt. Aktuell steht dort „Namen“.
+3. **Zählt ein Recruiting-Gespräch bei euch anders für den Wettbewerb** als ein
    Verkaufsgespräch? Heute ist ein `CALL` ein `CALL`. Wenn du das getrennt sehen willst,
-   sag es jetzt — nachträglich ist es eine Migration.
+   ist es nachträglich eine Migration.
+4. **Durchklick am echten Gerät** — Build, Typprüfung und Leitfaden-Zerlegung sind geprüft,
+   der Ablauf am Handy noch nicht.

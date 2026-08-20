@@ -20,10 +20,10 @@ function QuotaIcon({ type, className }: { type: QuotaType; className?: string })
 }
 
 const quotaIconStyles: Record<QuotaType, string> = {
-  CALL: "bg-blue-50 text-blue-600",
+  CALL: "bg-navy-50 text-navy-700",
   NUMBERS_PULLED: "bg-navy-50 text-navy-600",
   APPOINTMENT_SET: "bg-emerald-50 text-emerald-600",
-  APPOINTMENT_HELD: "bg-violet-50 text-violet-600",
+  APPOINTMENT_HELD: "bg-teal-50 text-teal-700",
   DEAL_WON: "bg-gold-100 text-gold-600",
 };
 

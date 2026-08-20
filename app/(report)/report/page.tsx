@@ -206,7 +206,7 @@ export default async function ReportPage() {
             <p className="text-[13px] font-medium text-slate-500">
               {kpi.label}
             </p>
-            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+            <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums text-slate-900">
               {kpi.value}
             </p>
             {kpi.sub && (
@@ -407,7 +407,7 @@ export default async function ReportPage() {
         </table>
       </section>
 
-      <div className="flex items-start gap-3 rounded-2xl border border-navy-100 bg-navy-50/60 px-5 py-4">
+      <div className="flex items-start gap-3 rounded-xl border border-navy-100 bg-navy-50/60 px-5 py-4">
         <LockIcon className="mt-0.5 h-4.5 w-4.5 shrink-0 text-navy-600" />
         <p className="text-sm leading-relaxed text-navy-800">
           <span className="font-semibold">Datenschutz:</span> Dieser Bericht

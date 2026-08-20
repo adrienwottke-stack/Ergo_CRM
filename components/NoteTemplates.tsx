@@ -1,11 +1,11 @@
 "use client";
 
 const TEMPLATES = [
-  { label: "📞 Erstgespräch", text: "Erstgespräch geführt. Beratungstermin angefragt, Rückmeldung in Kürze." },
-  { label: "🗣️ Mailbox besprochen", text: "Telefonisch nicht erreicht. Nachricht auf Mailbox hinterlassen mit Bitte um Rückruf." },
-  { label: "📅 Termin vereinbart", text: "Beratungstermin erfolgreich vereinbart." },
-  { label: "⏳ Kein Bedarf z.Zt.", text: "Aktuell kein Bedarf. Wiedervorlage für spätere Nachfassaktion eingeplant." },
-  { label: "📧 Angebot gesendet", text: "Unterlagen und Angebot per E-Mail versendet." },
+  { label: "Erstgespräch", text: "Erstgespräch geführt. Beratungstermin angefragt, Rückmeldung in Kürze." },
+  { label: "Mailbox besprochen", text: "Telefonisch nicht erreicht. Nachricht auf Mailbox hinterlassen mit Bitte um Rückruf." },
+  { label: "Termin vereinbart", text: "Beratungstermin erfolgreich vereinbart." },
+  { label: "Kein Bedarf z. Zt.", text: "Aktuell kein Bedarf. Wiedervorlage für spätere Nachfassaktion eingeplant." },
+  { label: "Angebot gesendet", text: "Unterlagen und Angebot per E-Mail versendet." },
 ];
 
 export default function NoteTemplates({
@@ -41,7 +41,7 @@ export default function NoteTemplates({
           key={tmpl.label}
           type="button"
           onClick={() => handleClick(tmpl.text)}
-          className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-navy-50 hover:text-navy-700 transition"
+          className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:border-navy-200 hover:bg-navy-50 hover:text-navy-800"
         >
           {tmpl.label}
         </button>

@@ -24,12 +24,10 @@ import {
   lostReasonLabels,
 } from "@/lib/pipeline";
 import { activityTypeLabels, allActivityTypes } from "@/lib/labels";
-import {
-  CalendarCheckIcon,
+import { ArrowLeftIcon, CalendarCheckIcon,
   ClipboardIcon,
   PhoneIcon,
-  PlusIcon,
-} from "@/components/icons";
+  PlusIcon } from "@/components/icons";
 import {
   btnPrimary,
   btnSecondary,
@@ -70,8 +68,8 @@ function ActivityIcon({ type }: { type: ActivityType }) {
 }
 
 const activityDotStyles: Record<ActivityType, string> = {
-  CALL: "bg-blue-50 text-blue-600 ring-blue-600/15",
-  MEETING: "bg-violet-50 text-violet-600 ring-violet-600/15",
+  CALL: "bg-navy-50 text-navy-700 ring-navy-600/15",
+  MEETING: "bg-teal-50 text-teal-700 ring-teal-600/15",
   EMAIL: "bg-slate-100 text-slate-500 ring-slate-500/15",
 };
 
@@ -122,9 +120,10 @@ export default async function ContactDetailPage({
       <div>
         <Link
           href="/pipeline"
-          className="text-sm font-medium text-slate-500 transition hover:text-slate-900"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
         >
-          ← Zur Pipeline
+          <ArrowLeftIcon className="h-4 w-4" />
+          Zur Pipeline
         </Link>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">

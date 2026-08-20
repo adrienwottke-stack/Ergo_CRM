@@ -100,7 +100,7 @@ export default async function NamenPage({
               href={`/namen?liste=${value}`}
               className={`flex min-h-11 flex-1 items-center justify-center rounded-full text-sm font-semibold transition ${
                 active
-                  ? "bg-white text-navy-800 shadow-sm"
+                  ? "bg-white text-navy-900 ring-1 ring-slate-200"
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >

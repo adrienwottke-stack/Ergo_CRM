@@ -220,7 +220,7 @@ export default async function DashboardPage() {
             <UsersIcon className="h-5 w-5 text-navy-600" />
             <span className="text-[13px] font-medium">Kontakte</span>
           </div>
-          <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+          <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums text-slate-900">
             {totalCount}
           </p>
         </Link>
@@ -233,7 +233,7 @@ export default async function DashboardPage() {
             <LayersIcon className="h-5 w-5 text-navy-600" />
             <span className="text-[13px] font-medium">Offene Vorgänge</span>
           </div>
-          <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+          <p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums text-slate-900">
             {openDeals._count._all}
           </p>
           <p className="mt-1 text-xs text-slate-500">
@@ -246,7 +246,7 @@ export default async function DashboardPage() {
             Aktivitäten diese Woche
           </p>
           <div className="mt-3 flex items-baseline gap-3">
-            <p className="text-3xl font-semibold tracking-tight text-slate-900">
+            <p className="text-3xl font-semibold tracking-tight tabular-nums text-slate-900">
               {thisWeek}
             </p>
             <span
@@ -264,7 +264,7 @@ export default async function DashboardPage() {
 
         <Link
           href="/leaderboard"
-          className={`${card} group flex flex-col justify-between bg-navy-800 p-5 transition hover:bg-navy-900`}
+          className={`${card} group flex flex-col justify-between bg-navy-900 p-5 transition hover:bg-navy-950`}
         >
           <p className="text-[13px] font-medium text-slate-300">Team-Wettbewerb</p>
           <p className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-white transition group-hover:gap-2">
@@ -305,7 +305,7 @@ export default async function DashboardPage() {
                       <span
                         className={`inline-block h-1.5 w-8 rounded-full ${contactStagePalette[stage].bar}`}
                       />
-                      <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                      <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-slate-900">
                         {count}
                       </p>
                       <p className="mt-0.5 text-xs text-slate-500">

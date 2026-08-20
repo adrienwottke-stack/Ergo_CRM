@@ -18,6 +18,7 @@ import QuickRowActions from "@/components/QuickRowActions";
 import DealActions from "@/components/DealActions";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import type { DealLite } from "@/components/DealActionDialog";
+import ErsteWoche from "@/components/ErsteWoche";
 import { btnPrimary, card, pageTitle } from "@/components/ui";
 import { CheckIcon, TargetIcon } from "@/components/icons";
 
@@ -141,6 +142,10 @@ export default async function HeutePage() {
         </Link>
       </div>
 
+      {/* Startwoche, Brief, Versprechen, Wiedereinstieg - meldet sich nur,
+          wenn einer dieser Momente wirklich ansteht. */}
+      <ErsteWoche user={user} />
+
       {rows.length === 0 && orphans.length === 0 ? (
         <div className={`${card} flex flex-col items-center px-6 py-16 text-center`}>
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
@@ -156,6 +161,14 @@ export default async function HeutePage() {
             </Link>{" "}
             an.
           </p>
+          {/* Der Willkommens-Ablauf bleibt aufrufbar - zum Vorfuehren am
+              Launch-Tag und fuer alle, die ihn weggeklickt haben. */}
+          <Link
+            href="/willkommen"
+            className="mt-4 text-xs font-medium text-slate-400 hover:text-navy-700 hover:underline"
+          >
+            Wie das hier gedacht ist — der Start, nochmal
+          </Link>
         </div>
       ) : (
         groups
@@ -266,7 +279,7 @@ export default async function HeutePage() {
                         >
                           {deal.contact.name}
                         </Link>
-                        <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/15">
+                        <span className="inline-flex items-center rounded-full bg-navy-50 px-2.5 py-1 text-xs font-medium text-navy-700 ring-1 ring-inset ring-navy-600/15">
                           Vorgang {dealLineShortLabels[deal.line]}
                           {deal.units ? ` · ${deal.units} Einh.` : ""}
                         </span>

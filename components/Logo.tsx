@@ -1,4 +1,5 @@
-// Abstrakte Wortmarke: Signet (aufsteigender Kurs im Rondell) + Schriftzug.
+// Das Zeichen: eine Namensliste, drei Zeilen, die oberste im Fokus.
+// Kein Kurs-Chart, kein Verlauf, kein Gold - die Liste IST das Produkt.
 
 export function LogoMark({ className }: { className?: string }) {
   return (
@@ -8,21 +9,13 @@ export function LogoMark({ className }: { className?: string }) {
       aria-hidden
       fill="none"
     >
-      <rect width="32" height="32" rx="9" fill="var(--color-navy-800)" />
-      <path
-        d="M8 20.5 13.5 15l3.5 3.5 7-7.5"
-        stroke="var(--color-gold-400)"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M20.5 11h3.5v3.5"
-        stroke="var(--color-gold-400)"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <rect width="32" height="32" rx="8" fill="var(--color-navy-950)" />
+      <circle cx="9.6" cy="9.8" r="1.8" fill="#ffffff" />
+      <rect x="13.4" y="8.6" width="10.8" height="2.4" rx="1.2" fill="#ffffff" />
+      <circle cx="9.6" cy="16" r="1.8" fill="#ffffff" opacity="0.38" />
+      <rect x="13.4" y="14.8" width="10.8" height="2.4" rx="1.2" fill="#ffffff" opacity="0.38" />
+      <circle cx="9.6" cy="22.2" r="1.8" fill="#ffffff" opacity="0.38" />
+      <rect x="13.4" y="21" width="10.8" height="2.4" rx="1.2" fill="#ffffff" opacity="0.38" />
     </svg>
   );
 }

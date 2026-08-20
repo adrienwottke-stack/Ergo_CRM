@@ -47,7 +47,7 @@ export const LOST_CHIPS: { label: string; reason: string }[] = [
 const chip = (active: boolean) =>
   `inline-flex min-h-11 items-center rounded-full px-3.5 text-sm font-medium transition ${
     active
-      ? "bg-navy-800 text-white"
+      ? "bg-navy-900 text-white"
       : "border border-slate-300 bg-white text-slate-600 hover:border-slate-400"
   }`;
 

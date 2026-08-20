@@ -59,7 +59,7 @@ export default function UserMenu({
         aria-expanded={open}
         aria-label="Konto und Einstellungen"
         className={`inline-flex min-h-11 items-center gap-1.5 rounded-full pl-1 pr-1.5 transition sm:pr-2 ${
-          open ? "bg-white/12" : "hover:bg-white/6"
+          open ? "bg-slate-100" : "hover:bg-slate-100"
         }`}
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-700 text-[13px] font-semibold text-white">
@@ -71,7 +71,7 @@ export default function UserMenu({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-30 mt-2 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_16px_40px_-12px_rgb(15_23_42/0.35)]"
+          className="absolute right-0 top-full z-30 mt-2 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_16px_40px_-12px_rgb(15_23_42/0.35)]"
         >
           <div className="border-b border-slate-100 px-4 pb-2.5 pt-1.5">
             <p className="truncate text-sm font-semibold text-slate-900">{name}</p>

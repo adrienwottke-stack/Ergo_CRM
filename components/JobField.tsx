@@ -40,7 +40,7 @@ export default function JobField({ defaultValue }: { defaultValue?: string | nul
               onClick={() => setJob(active ? "" : block)}
               className={`inline-flex min-h-9 items-center rounded-full px-3 text-xs font-medium transition ${
                 active
-                  ? "bg-navy-800 text-white shadow-sm"
+                  ? "bg-navy-900 text-white"
                   : "bg-slate-100 text-slate-700 hover:bg-navy-50 hover:text-navy-700"
               }`}
             >

@@ -33,7 +33,7 @@ function Card({
     <div
       draggable={Boolean(onStageDrag)}
       onDragStart={onStageDrag}
-      className={`rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:shadow-md ${
+      className={`rounded-xl border border-slate-200 bg-white p-3.5 transition hover:border-slate-300 ${
         onStageDrag ? "cursor-grab active:cursor-grabbing" : ""
       }`}
     >
@@ -66,7 +66,7 @@ function Card({
         ) : null}
 
         {contact.openDeals > 0 && (
-          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/15">
+          <span className="inline-flex items-center rounded-full bg-navy-50 px-2.5 py-1 text-xs font-medium text-navy-700 ring-1 ring-inset ring-navy-600/15">
             {contact.openDeals} {contact.openDeals === 1 ? "Vorgang" : "Vorgänge"}
             {contact.openUnits > 0 ? ` · ${contact.openUnits} Einh.` : ""}
           </span>
@@ -124,12 +124,12 @@ export default function PipelineBoard({
                   className={`flex items-center justify-between rounded-lg px-3 py-2 ${palette.headerBg}`}
                 >
                   <h3
-                    className={`text-[11px] font-bold uppercase tracking-wider ${palette.text}`}
+                    className={`text-[11px] font-semibold uppercase tracking-wider ${palette.text}`}
                   >
                     {contactStageLabels[stage]}
                   </h3>
                   <span
-                    className={`rounded-full bg-white px-2 py-0.5 text-xs font-semibold ${palette.text} shadow-sm`}
+                    className={`rounded-full bg-white px-2 py-0.5 text-xs font-semibold ${palette.text} ring-1 ring-slate-900/5`}
                   >
                     {items.length}
                   </span>
@@ -172,12 +172,12 @@ export default function PipelineBoard({
                 className={`flex min-h-12 cursor-pointer list-none items-center justify-between px-4 ${palette.headerBg}`}
               >
                 <span
-                  className={`text-[13px] font-bold uppercase tracking-wider ${palette.text}`}
+                  className={`text-[13px] font-semibold uppercase tracking-wider ${palette.text}`}
                 >
                   {contactStageLabels[stage]}
                 </span>
                 <span
-                  className={`rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold ${palette.text} shadow-sm`}
+                  className={`rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold ${palette.text} ring-1 ring-slate-900/5`}
                 >
                   {items.length}
                 </span>

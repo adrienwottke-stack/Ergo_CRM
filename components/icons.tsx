@@ -192,3 +192,72 @@ export function SearchIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export function XIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="m6 6 12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
+export function ArrowRightIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+export function ArrowLeftIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M19 12H5M11 6l-6 6 6 6" />
+    </svg>
+  );
+}
+
+export function ArrowUpRightIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M7 17 17 7M8.5 7H17v8.5" />
+    </svg>
+  );
+}
+
+export function MailIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+      <path d="m4.5 7.5 7.5 5.5 7.5-5.5" />
+    </svg>
+  );
+}
+
+export function PhoneOffIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 1.8 2.8M14.6 15.4l.4-.4 5 2v4a2 2 0 0 1-2 2 16 16 0 0 1-10.4-4.8A16 16 0 0 1 3 6a2 2 0 0 1 2-2" />
+      <path d="m4 4 16 16" />
+    </svg>
+  );
+}
+
+export function VoicemailIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <circle cx="6.5" cy="12" r="3" />
+      <circle cx="17.5" cy="12" r="3" />
+      <path d="M6.5 15h11" />
+    </svg>
+  );
+}
+
+export function UploadIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M12 15V4M7.5 8 12 3.5 16.5 8" />
+      <path d="M4.5 15.5V19a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3.5" />
+    </svg>
+  );
+}

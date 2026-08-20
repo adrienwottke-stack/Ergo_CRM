@@ -14,7 +14,7 @@ const action =
 
 const variants = {
   call: `${action} bg-emerald-50 text-emerald-700 hover:bg-emerald-100`,
-  done: `${action} bg-navy-800 text-white hover:bg-navy-900`,
+  done: `${action} bg-navy-900 text-white hover:bg-navy-950`,
   stage: `${action} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`,
   soft: `${action} bg-slate-100 text-slate-600 hover:bg-slate-200`,
   danger: `${action} text-red-600 hover:bg-red-50`,

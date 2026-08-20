@@ -6,6 +6,7 @@ import { btnPrimary, card, input, label, pageTitle, sectionTitle, td, th } from 
 import {
   beraterUmhaengen,
   createTeamMember,
+  einladungBrowserFreigabe,
   einladungErzeugen,
   einladungZuruecknehmen,
 } from "./actions";
@@ -59,19 +60,29 @@ export default async function TeamPage({
         },
       }),
       prisma.invite.findMany({
-        where: { usedById: null, expiresAt: { gt: new Date() } },
+        // "Noch Platz" laesst sich nicht als Spaltenvergleich abfragen
+        // (usedCount < maxUses) - deshalb grob vorfiltern und unten in
+        // JavaScript nachschaerfen. Die Tabelle ist klein.
+        where: { expiresAt: { gt: new Date() } },
         orderBy: { createdAt: "desc" },
         select: {
           id: true,
           code: true,
           note: true,
           expiresAt: true,
+          maxUses: true,
+          usedCount: true,
+          browserFreigabe: true,
           leader: { select: { name: true } },
         },
       }),
     ]);
 
   const nameById = new Map(users.map((user) => [user.id, user.name]));
+  // Nachschaerfen: nur Einladungen mit Restplaetzen (maxUses NULL = unbegrenzt).
+  const offeneInvites = invites.filter(
+    (invite) => invite.maxUses === null || invite.usedCount < invite.maxUses
+  );
   // Der Link muss vollstaendig dastehen, damit er sich weiterschicken laesst.
   const herkunft = `${kopfzeilen.get("x-forwarded-proto") ?? "http"}://${kopfzeilen.get("host") ?? ""}`;
 
@@ -118,6 +129,8 @@ export default async function TeamPage({
           <p className="mt-1 text-sm text-slate-500">
             Der Eingeladene setzt Name und Passwort selbst und hängt danach automatisch
             unter der gewählten Führungskraft. Ein Code, eine Nutzung, 14 Tage gültig.
+            Er startet in der einfachen Ansicht – Namen, Heute, Wettbewerb – und holt
+            sich den Rest mit einem Tipp auf „Alles anzeigen“.
           </p>
         </div>
 
@@ -145,9 +158,9 @@ export default async function TeamPage({
           <button type="submit" className={`${btnPrimary} min-h-[44px]`}>Link erzeugen</button>
         </form>
 
-        {invites.length > 0 && (
+        {offeneInvites.length > 0 && (
           <ul className="space-y-3 border-t border-slate-100 pt-5">
-            {invites.map((invite) => (
+            {offeneInvites.map((invite) => (
               <li key={invite.id} className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <code className="block break-all text-sm font-medium text-slate-900">
@@ -157,17 +170,37 @@ export default async function TeamPage({
                     für {invite.leader.name}
                     {invite.note ? ` · ${invite.note}` : ""} · gültig bis{" "}
                     {createdFormat.format(invite.expiresAt)}
+                    {invite.maxUses === null
+                      ? ` · Mehrfach-Code, ${invite.usedCount}× eingelöst`
+                      : invite.maxUses > 1
+                        ? ` · ${invite.usedCount} von ${invite.maxUses} eingelöst`
+                        : ""}
+                    {invite.browserFreigabe ? " · ohne App-Pflicht" : ""}
                   </p>
                 </div>
-                <form action={einladungZuruecknehmen}>
-                  <input type="hidden" name="inviteId" value={invite.id} />
-                  <button
-                    type="submit"
-                    className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-red-700"
-                  >
-                    Zurücknehmen
-                  </button>
-                </form>
+                <div className="flex items-center gap-1">
+                  {/* Notausgang: nur anfassen, wenn ein Geraet die Installation
+                      wirklich nicht schafft. Sonst bleibt die Schleuse zu. */}
+                  <form action={einladungBrowserFreigabe}>
+                    <input type="hidden" name="inviteId" value={invite.id} />
+                    <input type="hidden" name="on" value={invite.browserFreigabe ? "0" : "1"} />
+                    <button
+                      type="submit"
+                      className="min-h-[44px] rounded-lg px-3 text-xs font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                    >
+                      {invite.browserFreigabe ? "App-Pflicht zurück" : "Ohne App erlauben"}
+                    </button>
+                  </form>
+                  <form action={einladungZuruecknehmen}>
+                    <input type="hidden" name="inviteId" value={invite.id} />
+                    <button
+                      type="submit"
+                      className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-red-700"
+                    >
+                      Zurücknehmen
+                    </button>
+                  </form>
+                </div>
               </li>
             ))}
           </ul>

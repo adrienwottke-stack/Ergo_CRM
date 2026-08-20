@@ -6,11 +6,11 @@ export default function PageSkeleton() {
         <div className="h-4 w-72 rounded bg-slate-200/60" />
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="h-36 rounded-2xl bg-slate-200/60" />
-        <div className="h-36 rounded-2xl bg-slate-200/60" />
-        <div className="h-36 rounded-2xl bg-slate-200/60" />
+        <div className="h-36 rounded-xl bg-slate-200/60" />
+        <div className="h-36 rounded-xl bg-slate-200/60" />
+        <div className="h-36 rounded-xl bg-slate-200/60" />
       </div>
-      <div className="h-72 rounded-2xl bg-slate-200/60" />
+      <div className="h-72 rounded-xl bg-slate-200/60" />
     </div>
   );
 }

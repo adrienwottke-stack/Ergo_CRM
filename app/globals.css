@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -37,8 +37,13 @@ html {
 }
 
 body {
-  background: #f4f6f9;
+  background: #f7f8f9;
   color: #0f172a;
+  /* Ziffern gleich breit ausrichten waere hier falsch (Fliesstext) - aber
+     die Standard-Ligaturen von Inter bleiben an. Tabellenziffern setzen
+     die Bausteine gezielt per "tabular-nums". */
+  font-feature-settings: "cv05";
+  letter-spacing: -0.006em;
   /* Kein Gummiband-Effekt am oberen Rand: sonst schiebt sich beim Ueberziehen
      der helle Seitenhintergrund ueber den dunklen Header und die Seite
      schliesst oben nicht sauber ab. Nebenwirkung: kein Pull-to-Refresh. */

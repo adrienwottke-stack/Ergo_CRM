@@ -25,10 +25,16 @@ export function ablaufDatum(ab: Date = new Date()): Date {
 
 export type EinladungStatus = "offen" | "eingeloest" | "abgelaufen";
 
+// Ein Code kann seit den Mehrfach-Einladungen (QR am Infoabend) mehr als
+// einmal einloesbar sein: maxUses NULL heisst unbegrenzt. "eingeloest" heisst
+// deshalb "aufgebraucht", nicht "schon einmal benutzt".
 export function statusVon(invite: {
-  usedById: string | null;
+  usedCount: number;
+  maxUses: number | null;
   expiresAt: Date;
 }): EinladungStatus {
-  if (invite.usedById) return "eingeloest";
+  if (invite.maxUses !== null && invite.usedCount >= invite.maxUses) {
+    return "eingeloest";
+  }
   return invite.expiresAt.getTime() < Date.now() ? "abgelaufen" : "offen";
 }

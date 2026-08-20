@@ -114,12 +114,16 @@ export default async function PipelinePage({
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 px-6 py-16 text-center">
+        <div className="rounded-xl border border-dashed border-slate-300 px-6 py-16 text-center">
           <p className="text-sm font-medium text-slate-900">
             Keine Kontakte in dieser Ansicht
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            Wechsle die Ansicht oder leg einen neuen Kontakt an.
+            Die Pipeline füllt sich von allein: sobald aus einem Namen auf deiner{" "}
+            <Link href="/namen" className="font-medium text-navy-600 hover:underline">
+              Namensliste
+            </Link>{" "}
+            ein Termin wird, taucht er hier auf.
           </p>
         </div>
       ) : (

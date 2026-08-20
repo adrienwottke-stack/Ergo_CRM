@@ -286,7 +286,7 @@ export default async function TrichterPage({
           <div className="mt-5 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4">
             <div>
               <p className={kicker}>Gewonnen</p>
-              <p className="mt-1 text-2xl font-semibold text-slate-900">
+              <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums text-slate-900">
                 {dealsWon.length}
               </p>
               <p className="text-xs text-slate-500">
@@ -295,7 +295,7 @@ export default async function TrichterPage({
             </div>
             <div>
               <p className={kicker}>Verloren</p>
-              <p className="mt-1 text-2xl font-semibold text-slate-900">
+              <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums text-slate-900">
                 {dealsLost.length}
               </p>
               <p className="text-xs text-slate-500">

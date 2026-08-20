@@ -61,6 +61,16 @@ export async function requireUser() {
   return user;
 }
 
+// Wie requireUser, plus die Willkommens-Weiche: wer den Start noch nie
+// gesehen hat, wird einmalig dorthin geschickt (docs/willkommen-plan.md).
+// Bewusst hier und nicht in der Middleware - die laeuft auf der Edge-Runtime
+// und hat keine Datenbankverbindung. Die Layouts laden den Benutzer ohnehin.
+export async function requireOnboardedUser() {
+  const user = await requireUser();
+  if (user.onboardingDoneAt === null) redirect("/willkommen");
+  return user;
+}
+
 export async function requireAdmin() {
   const user = await requireUser();
   if (user.role !== "ADMIN") redirect("/dashboard");

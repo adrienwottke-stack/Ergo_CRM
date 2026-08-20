@@ -18,7 +18,7 @@ import {
   targetPercent,
 } from "@/lib/namelist";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
-import { PhoneIcon, PlusIcon } from "@/components/icons";
+import { CheckIcon, PhoneIcon, PlusIcon, XIcon } from "@/components/icons";
 import { card, filterPill, input } from "@/components/ui";
 
 export type NameEntry = {
@@ -138,12 +138,12 @@ export default function NameList({
             {total} von {NAME_TARGET} Namen
           </span>
           <span className="text-xs font-medium text-slate-500">
-            {total >= NAME_TARGET ? "Ziel erreicht 🎉" : `${percent} %`}
+            {total >= NAME_TARGET ? "Ziel erreicht" : `${percent} %`}
           </span>
         </div>
-        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="h-[3px] w-full overflow-hidden rounded-full bg-slate-100">
           <div
-            className="h-full rounded-full bg-navy-600 transition-all duration-300"
+            className="h-full rounded-full bg-navy-700 transition-all duration-300"
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -183,7 +183,7 @@ export default function NameList({
             type="button"
             onClick={submitName}
             aria-label="Namen hinzufügen"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-navy-800 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-navy-900 active:scale-[0.99]"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-navy-900 px-4 text-sm font-medium text-white transition hover:bg-navy-950 active:scale-[0.99]"
           >
             <PlusIcon className="h-4 w-4" />
             <span className="sm:hidden">Hinzufügen</span>
@@ -227,7 +227,7 @@ export default function NameList({
             }`}
             className={`flex min-h-14 items-center justify-center gap-2 rounded-xl text-base font-semibold transition ${
               callable > 0
-                ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 active:scale-[0.99]"
+                ? "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99]"
                 : "pointer-events-none bg-slate-100 text-slate-400"
             }`}
           >
@@ -274,8 +274,9 @@ export default function NameList({
             onClick={() => setShowDone((value) => !value)}
             className="flex min-h-14 w-full items-center justify-between px-4 text-left"
           >
-            <span className="text-sm font-semibold text-emerald-800">
-              ✅ Geschafft · {done.length}
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-800">
+              <CheckIcon className="h-4 w-4" />
+              Geschafft · {done.length}
             </span>
             <span className="text-xs text-slate-400">
               {showDone ? "Zuklappen" : "Anzeigen"}
@@ -383,7 +384,7 @@ function NameRow({
             : "Einstufen"
         }
         title={entry.rating ? ratingHints[entry.rating] : "Einstufen"}
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-bold transition active:scale-95 ${
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-semibold transition active:scale-95 ${
           palette
             ? palette.chip
             : "border border-dashed border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600"
@@ -433,7 +434,7 @@ function NameRow({
         title="Von der Liste nehmen (Kontakt bleibt erhalten)"
         className="flex h-11 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-50 hover:text-slate-500"
       >
-        ✕
+        <XIcon className="h-4.5 w-4.5" />
       </button>
     </li>
   );

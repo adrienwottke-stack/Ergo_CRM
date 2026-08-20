@@ -61,79 +61,71 @@ export type StagePalette = {
   bar: string;
 };
 
+// Farbe traegt Bedeutung, nicht Reihenfolge:
+//   slate   = ruhend (noch nichts passiert / betreut und still)
+//   amber   = wartet auf Reaktion
+//   teal    = ein Termin steht
+//   navy    = in Arbeit
+//   emerald = Erfolg
+const slatePalette: StagePalette = {
+  pill: "bg-slate-100 text-slate-700 ring-slate-500/15",
+  dot: "bg-slate-400",
+  bg: "bg-slate-50",
+  border: "border-slate-200",
+  headerBg: "bg-slate-100",
+  text: "text-slate-600",
+  bar: "bg-slate-400",
+};
+
+const amberPalette: StagePalette = {
+  pill: "bg-amber-50 text-amber-800 ring-amber-600/20",
+  dot: "bg-amber-500",
+  bg: "bg-amber-50/50",
+  border: "border-amber-200",
+  headerBg: "bg-amber-100",
+  text: "text-amber-700",
+  bar: "bg-amber-500",
+};
+
+const tealPalette: StagePalette = {
+  pill: "bg-teal-50 text-teal-800 ring-teal-600/15",
+  dot: "bg-teal-500",
+  bg: "bg-teal-50/50",
+  border: "border-teal-200",
+  headerBg: "bg-teal-100",
+  text: "text-teal-700",
+  bar: "bg-teal-500",
+};
+
+const navyPalette: StagePalette = {
+  pill: "bg-navy-50 text-navy-800 ring-navy-600/15",
+  dot: "bg-navy-500",
+  bg: "bg-navy-50/50",
+  border: "border-navy-200",
+  headerBg: "bg-navy-100",
+  text: "text-navy-700",
+  bar: "bg-navy-500",
+};
+
+const emeraldPalette: StagePalette = {
+  pill: "bg-emerald-50 text-emerald-800 ring-emerald-600/15",
+  dot: "bg-emerald-500",
+  bg: "bg-emerald-50/50",
+  border: "border-emerald-200",
+  headerBg: "bg-emerald-100",
+  text: "text-emerald-700",
+  bar: "bg-emerald-500",
+};
+
 export const contactStagePalette: Record<ContactStage, StagePalette> = {
-  NEU: {
-    pill: "bg-blue-50 text-blue-800 ring-blue-600/15",
-    dot: "bg-blue-500",
-    bg: "bg-blue-50/50",
-    border: "border-blue-200",
-    headerBg: "bg-blue-100",
-    text: "text-blue-700",
-    bar: "bg-blue-500",
-  },
-  KONTAKTIERT: {
-    pill: "bg-amber-50 text-amber-800 ring-amber-600/20",
-    dot: "bg-amber-500",
-    bg: "bg-amber-50/50",
-    border: "border-amber-200",
-    headerBg: "bg-amber-100",
-    text: "text-amber-700",
-    bar: "bg-amber-500",
-  },
-  TERMIN_VEREINBART: {
-    pill: "bg-violet-50 text-violet-800 ring-violet-600/15",
-    dot: "bg-violet-500",
-    bg: "bg-violet-50/50",
-    border: "border-violet-200",
-    headerBg: "bg-violet-100",
-    text: "text-violet-700",
-    bar: "bg-violet-500",
-  },
-  IN_BERATUNG: {
-    pill: "bg-indigo-50 text-indigo-800 ring-indigo-600/15",
-    dot: "bg-indigo-500",
-    bg: "bg-indigo-50/50",
-    border: "border-indigo-200",
-    headerBg: "bg-indigo-100",
-    text: "text-indigo-700",
-    bar: "bg-indigo-500",
-  },
-  KUNDE: {
-    pill: "bg-emerald-50 text-emerald-800 ring-emerald-600/15",
-    dot: "bg-emerald-500",
-    bg: "bg-emerald-50/50",
-    border: "border-emerald-200",
-    headerBg: "bg-emerald-100",
-    text: "text-emerald-700",
-    bar: "bg-emerald-500",
-  },
-  EMPFEHLUNG_ERFRAGT: {
-    pill: "bg-teal-50 text-teal-800 ring-teal-600/15",
-    dot: "bg-teal-500",
-    bg: "bg-teal-50/50",
-    border: "border-teal-200",
-    headerBg: "bg-teal-100",
-    text: "text-teal-700",
-    bar: "bg-teal-500",
-  },
-  CHECKUP_GEPLANT: {
-    pill: "bg-cyan-50 text-cyan-800 ring-cyan-600/15",
-    dot: "bg-cyan-500",
-    bg: "bg-cyan-50/50",
-    border: "border-cyan-200",
-    headerBg: "bg-cyan-100",
-    text: "text-cyan-700",
-    bar: "bg-cyan-500",
-  },
-  BESTAND: {
-    pill: "bg-slate-100 text-slate-700 ring-slate-500/15",
-    dot: "bg-slate-400",
-    bg: "bg-slate-50",
-    border: "border-slate-200",
-    headerBg: "bg-slate-200",
-    text: "text-slate-600",
-    bar: "bg-slate-400",
-  },
+  NEU: slatePalette,
+  KONTAKTIERT: amberPalette,
+  TERMIN_VEREINBART: tealPalette,
+  IN_BERATUNG: navyPalette,
+  KUNDE: emeraldPalette,
+  EMPFEHLUNG_ERFRAGT: navyPalette,
+  CHECKUP_GEPLANT: tealPalette,
+  BESTAND: slatePalette,
 };
 
 export const DEAL_STAGES: DealStage[] = ["BEDARF", "ANGEBOT", "ANTRAG", "GEWONNEN"];

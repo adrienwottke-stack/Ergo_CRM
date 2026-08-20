@@ -89,19 +89,19 @@ export default function CommandPalette({ searchAction }: { searchAction: (query:
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/20 hover:text-white transition"
+        className="flex min-h-9 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
       >
         <SearchIcon className="h-3.5 w-3.5 text-slate-400" />
-        <span className="hidden md:inline">Suche...</span>
-        <kbd className="rounded bg-navy-900/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300 border border-white/10">
-          ⌘K
+        <span className="hidden md:inline">Suche</span>
+        <kbd className="hidden rounded border border-slate-200 bg-white px-1.5 py-0.5 font-sans text-[10px] font-medium text-slate-400 sm:inline">
+          Strg K
         </kbd>
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 bg-slate-900/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 bg-slate-950/40 backdrop-blur-sm p-4">
           <div
-            className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
+            className="w-full max-w-xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center border-b border-slate-100 px-4 py-3">
@@ -138,12 +138,12 @@ export default function CommandPalette({ searchAction }: { searchAction: (query:
                     <button
                       key={res.id}
                       onClick={() => handleSelect(`/contacts/${res.id}`)}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl text-left transition ${
+                      className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition ${
                         idx === selectedIndex ? "bg-navy-50 text-navy-900" : "hover:bg-slate-50 text-slate-800"
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-100 text-xs font-bold text-navy-700">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-700">
                           {res.name.slice(0, 2).toUpperCase()}
                         </div>
                         <div>
@@ -155,13 +155,13 @@ export default function CommandPalette({ searchAction }: { searchAction: (query:
                           )}
                         </div>
                       </div>
-                      <span className="text-xs font-medium text-slate-400">Öffnen ↵</span>
+                      <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-sans text-[10px] font-medium text-slate-400">Enter</kbd>
                     </button>
                   ))}
 
                   <button
                     onClick={() => handleSelect("/contacts/new")}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl text-left text-navy-700 hover:bg-navy-50 transition border-t border-slate-100 mt-2"
+                    className="w-full flex items-center gap-3 p-3 rounded-lg text-left text-navy-700 hover:bg-navy-50 transition border-t border-slate-100 mt-2"
                   >
                     <PlusIcon className="h-4 w-4" />
                     <span className="text-xs font-semibold">Neuen Kontakt anlegen</span>

@@ -19,7 +19,9 @@ export default function NavLinks({ links }: { links: NavLink[] }) {
   return (
     // Seitlich scrollbar statt umbrechend – die Kopfzeile bleibt einzeilig.
     // Ohne sichtbaren Balken, der wuerde die Leiste optisch zerschneiden.
-    <nav className="no-scrollbar -mx-1 flex items-center gap-1 overflow-x-auto px-1">
+    // Aktiv ist ein 2-px-Unterstrich auf der Haarlinie der Kopfzeile
+    // (der Container zieht sich per -mb-px auf sie drauf), keine Pille.
+    <nav className="no-scrollbar -mb-px flex items-center gap-4 overflow-x-auto sm:gap-5">
       {links.map((link) => {
         const active = link.exact
           ? pathname === link.href
@@ -31,10 +33,10 @@ export default function NavLinks({ links }: { links: NavLink[] }) {
             key={link.href}
             href={link.href}
             aria-current={active ? "page" : undefined}
-            className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-sm font-medium transition sm:min-h-9 ${
+            className={`inline-flex h-11 shrink-0 items-center whitespace-nowrap border-b-2 px-0.5 text-sm font-medium transition ${
               active
-                ? "bg-white/12 text-white"
-                : "text-slate-300 hover:bg-white/6 hover:text-white"
+                ? "border-navy-800 text-slate-900"
+                : "border-transparent text-slate-500 hover:text-slate-900"
             }`}
           >
             {link.label}

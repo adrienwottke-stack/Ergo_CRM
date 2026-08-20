@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeftIcon } from "@/components/icons";
 import ContactForm from "@/components/ContactForm";
 import { pageTitle } from "@/components/ui";
 import { createContact } from "../actions";
@@ -9,9 +10,10 @@ export default function NewContactPage() {
       <div>
         <Link
           href="/contacts"
-          className="text-sm font-medium text-slate-500 transition hover:text-slate-900"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
         >
-          ← Alle Kontakte
+          <ArrowLeftIcon className="h-4 w-4" />
+          Alle Kontakte
         </Link>
         <h1 className={`${pageTitle} mt-2`}>Neuer Kontakt</h1>
       </div>

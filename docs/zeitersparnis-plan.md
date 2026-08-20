@@ -1,6 +1,6 @@
 # Zeitersparnis-Plan (Ergo CRM)
 
-Stand: 15.08.2026 — Planungsdokument, noch nicht implementiert.
+Stand: 15.08.2026 — **umgesetzt bis Bauabschnitt 3**. Stand und Abweichungen in Abschnitt 9.
 
 Vorstufe zum [Assistenten](assistent-plan.md): **Wie sparen wir Zeit, ohne KI?**
 Jede Sekunde, die hier eingespart wird, kostet keine API-Gebühr, wartet nicht auf eine
@@ -346,3 +346,60 @@ Abschnitt 0 bis 3 sind zusammen kleiner als der Pipeline-Umbau.
    Komponente, statt eine zweite zu erzeugen. Dabei sollte `recordNameCall` aus
    `namen/actions.ts` an eine neutrale Stelle wandern; unter dem jetzigen Namen und Ort
    findet sie in `/heute` niemand.
+
+---
+
+## 9. Umsetzungsstand (15.08.2026)
+
+**Die Ausgangslage war besser als in Abschnitt 2 angenommen.** Während dieser Plan
+geschrieben wurde, war der `NameDialer` bereits fertig — und er enthielt schon M1, M2, M4
+und M7 in guter Qualität: vier Ergebnis-Knöpfe, Termin über Tag- und Uhrzeit-Chips,
+Später-Auswahl, Rückkehr-Erkennung nach dem Telefonat, Notiz eingeklappt.
+
+Nur war das alles ausschließlich über `/namen/anrufen` erreichbar. Die Umsetzung bestand
+deshalb nicht im Neubauen, sondern im **Herausziehen und Einhängen**.
+
+### Gebaut
+
+| Maßnahme | Was passiert ist |
+|---|---|
+| **M0 Rückgängig** | Neu. `UndoEntry` + `lib/undo.ts` + Streifen unten am Bildschirm, 30 Sekunden |
+| **M1 Ergebnis-Knöpfe** | `recordCallResult` aus `namen/actions.ts` nach `contacts/results.ts` gehoben, neue `QuickRowActions` in der Heute-Liste |
+| **M2 Termin-Schnellwahl** | `AppointmentDialog` aus dem `NameDialer` nach `components/ResultDialogs.tsx` gezogen, beide Stellen nutzen ihn |
+| **M3 Kontext in der Zeile** | Heute-Zeile zeigt letzte Aktivität mit Datum und die Kontaktnotiz |
+| **M4 Wiedervorlage-Chips** | Morgen / +3 Tage / Nächste Woche für Nicht-Anruf-Schritte |
+| **Pflicht-Freitext weg** | `completeStepQuick` erledigt ohne Textzwang |
+
+### Zwei Entscheidungen, die beim Bauen dazukamen
+
+**Zwei Modi je Zeile.** Nicht jeder fällige Schritt ist ein Anruf. Bei `nextStepType =
+ANRUF` (und bei Kontakten ohne Schritt in `NEU`/`KONTAKTIERT`) stehen die vier
+Gesprächsergebnisse; bei allem anderen — Angebot erstellen, Police prüfen, Checkup
+terminieren — stehen *Erledigt* und die Verschiebe-Chips. Vier Anrufergebnisse an einem
+Angebotsschritt wären Unsinn gewesen.
+
+**Rückgängig nimmt auch Vorgänge zurück.** „Kein Interesse" schließt über
+`markContactLost` alle offenen Vorgänge mit. Der erste Entwurf des Schnappschusses hat nur
+den Kontakt gesichert — ein zurückgenommenes „Kein Interesse" hätte die Vorgänge
+geschlossen zurückgelassen. Der Schnappschuss umfasst jetzt auch sie.
+
+### Nicht gebaut
+
+M5 (Schnell-Erfassung), M6 (Tastaturbedienung), M8 (Massenaktion), M9 (Fokus und Heute
+zusammenführen). Der Plan sagt in Abschnitt 6: nach Abschnitt 1 ist der Großteil der
+Ersparnis da — das ist der Punkt, an dem eine Woche Arbeit mehr wert ist als das nächste
+Feature.
+
+### Was noch nicht geprüft ist
+
+Getestet sind Typen, Lint und Produktions-Build. **Nicht im Browser durchgeklickt**, weil
+die Tabelle `UndoEntry` noch nicht auf der Datenbank liegt. Anzuwenden sind drei
+Migrationen, davon zwei aus paralleler Arbeit (`formToken`, `beruf`):
+
+```
+npx prisma migrate deploy
+```
+
+Danach gehören diese drei Wege einmal von Hand geprüft: „Nicht erreicht" plus Rückgängig,
+„Termin" über die Chips, und „Kein Interesse" bei einem Kontakt **mit offenem Vorgang** —
+der letzte deckt die Vorgangs-Wiederherstellung ab.

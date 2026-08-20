@@ -98,10 +98,28 @@ export async function einladungZuruecknehmen(formData: FormData) {
   await requireAdmin();
   const inviteId = value(formData, "inviteId");
   if (inviteId) {
-    await prisma.invite.deleteMany({ where: { id: inviteId, usedById: null } });
+    await prisma.invite.deleteMany({ where: { id: inviteId, usedCount: 0 } });
   }
   revalidatePath("/team");
   redirect("/team?revoked=1");
+}
+
+// Der Notausgang aus der Installations-Schleuse (docs/willkommen-plan.md, 7.6).
+// Normalerweise erscheint das Anmeldeformular erst, wenn die Einladungsseite
+// vom Startbildschirm laeuft. Laesst sich ein Geraet partout nicht dazu
+// bewegen, gibt der Einladende diese eine Einladung frei - bewusst ein
+// einzelner Griff und danach hier sichtbar.
+export async function einladungBrowserFreigabe(formData: FormData) {
+  await requireAdmin();
+  const inviteId = value(formData, "inviteId");
+  if (inviteId) {
+    await prisma.invite.updateMany({
+      where: { id: inviteId },
+      data: { browserFreigabe: value(formData, "on") === "1" },
+    });
+  }
+  revalidatePath("/team");
+  redirect("/team");
 }
 
 // Berater unter eine andere Fuehrungskraft haengen. Leere Auswahl macht ihn zur

@@ -64,25 +64,25 @@ export default async function VorgaengePage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className={`${card} p-4`}>
           <p className={kicker}>Offen</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+          <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-slate-900">
             {open.length}
           </p>
         </div>
         <div className={`${card} p-4`}>
           <p className={kicker}>Einheiten offen</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+          <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-slate-900">
             {openUnits}
           </p>
         </div>
         <div className={`${card} p-4`}>
           <p className={kicker}>Abgeschlossen</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+          <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-slate-900">
             {won.length}
           </p>
         </div>
         <div className={`${card} p-4`}>
           <p className={kicker}>Einheiten gewonnen</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+          <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-slate-900">
             {wonUnits}
           </p>
           <p className="mt-1 text-xs text-slate-500">
@@ -92,7 +92,7 @@ export default async function VorgaengePage() {
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 px-6 py-16 text-center">
+        <div className="rounded-xl border border-dashed border-slate-300 px-6 py-16 text-center">
           <p className="text-sm font-medium text-slate-900">Noch keine Vorgänge</p>
           <p className="mt-1 text-sm text-slate-500">
             Vorgänge legst du auf der Kontaktseite an, sobald der Termin gehalten ist.

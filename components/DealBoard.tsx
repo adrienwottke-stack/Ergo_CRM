@@ -33,7 +33,7 @@ function Card({
     <div
       draggable={Boolean(onDrag)}
       onDragStart={onDrag}
-      className={`rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:shadow-md ${
+      className={`rounded-xl border border-slate-200 bg-white p-3.5 transition hover:border-slate-300 ${
         onDrag ? "cursor-grab active:cursor-grabbing" : ""
       }`}
     >
@@ -116,12 +116,12 @@ export default function DealBoard({ deals }: { deals: BoardDeal[] }) {
                 >
                   <div className="flex items-center justify-between">
                     <h3
-                      className={`text-[11px] font-bold uppercase tracking-wider ${palette.text}`}
+                      className={`text-[11px] font-semibold uppercase tracking-wider ${palette.text}`}
                     >
                       {dealStageLabels[stage]}
                     </h3>
                     <span
-                      className={`rounded-full bg-white px-2 py-0.5 text-xs font-semibold ${palette.text} shadow-sm`}
+                      className={`rounded-full bg-white px-2 py-0.5 text-xs font-semibold ${palette.text} ring-1 ring-slate-900/5`}
                     >
                       {items.length}
                     </span>
@@ -165,12 +165,12 @@ export default function DealBoard({ deals }: { deals: BoardDeal[] }) {
                 className={`flex min-h-12 cursor-pointer list-none items-center justify-between px-4 ${palette.headerBg}`}
               >
                 <span
-                  className={`text-[13px] font-bold uppercase tracking-wider ${palette.text}`}
+                  className={`text-[13px] font-semibold uppercase tracking-wider ${palette.text}`}
                 >
                   {dealStageLabels[stage]}
                 </span>
                 <span
-                  className={`rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold ${palette.text} shadow-sm`}
+                  className={`rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold ${palette.text} ring-1 ring-slate-900/5`}
                 >
                   {items.length} · {unitsOf(items)} Einh.
                 </span>
@@ -193,7 +193,7 @@ export default function DealBoard({ deals }: { deals: BoardDeal[] }) {
         <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50">
           <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-[13px] font-semibold text-slate-600">
             Verlorene Vorgänge
-            <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-500 shadow-sm">
+            <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-500 ring-1 ring-slate-900/5">
               {lost.length}
             </span>
           </summary>

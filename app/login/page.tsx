@@ -18,21 +18,12 @@ export default async function LoginPage({
   const isFirstSetup = userCount === 0;
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-navy-950 p-4">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(60rem 40rem at 70% -10%, rgb(58 107 164 / 0.35), transparent 60%), radial-gradient(40rem 30rem at 10% 110%, rgb(169 127 36 / 0.18), transparent 60%)",
-        }}
-      />
-
-      <div className="relative w-full max-w-sm">
-        <div className="rounded-2xl border border-white/10 bg-white p-8 shadow-2xl">
+    <main className="flex min-h-dvh items-center justify-center bg-[#f7f8f9] p-4">
+      <div className="w-full max-w-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-8">
           <div className="flex flex-col items-center text-center">
             <LogoMark className="h-12 w-12" />
-            <h1 className="mt-4 text-xl font-semibold tracking-tight text-slate-900">
+            <h1 className="mt-4 text-xl font-semibold tracking-[-0.02em] text-slate-900">
               {isFirstSetup ? "Admin-Konto einrichten" : "Ergo CRM"}
             </h1>
             <p className="mt-1 text-sm text-slate-500">

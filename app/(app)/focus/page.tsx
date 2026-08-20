@@ -10,6 +10,7 @@ import {
 } from "@/lib/dates";
 import FocusDialer from "@/components/FocusDialer";
 import { pageTitle } from "@/components/ui";
+import { XIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -54,16 +55,17 @@ export default async function FocusPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className={pageTitle}>🎯 Fokus-Modus (Anruftag)</h1>
+          <h1 className={pageTitle}>Fokus-Modus</h1>
           <p className="mt-1 text-sm text-slate-500">
             Arbeite deine Tagesliste Schritt für Schritt effizient ab.
           </p>
         </div>
         <Link
           href="/heute"
-          className="flex min-h-11 items-center text-sm font-medium text-slate-500 transition hover:text-slate-900"
+          className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
         >
-          ✕ Beenden
+          <XIcon className="h-4 w-4" />
+          Beenden
         </Link>
       </div>
 

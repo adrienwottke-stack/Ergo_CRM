@@ -12,6 +12,7 @@ import {
 import { DEFAULT_GUIDES, guideKeyForList } from "@/lib/guides";
 import NameDialer, { type DialerEntry } from "@/components/NameDialer";
 import { pageTitle } from "@/components/ui";
+import { XIcon } from "@/components/icons";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
 
 export const dynamic = "force-dynamic";
@@ -91,9 +92,10 @@ export default async function AnrufenPage({
         </div>
         <Link
           href={`/namen?liste=${kind}`}
-          className="flex min-h-11 items-center text-sm font-medium text-slate-500 transition hover:text-slate-900"
+          className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
         >
-          ✕ Beenden
+          <XIcon className="h-4 w-4" />
+          Beenden
         </Link>
       </div>
 

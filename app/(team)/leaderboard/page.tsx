@@ -49,7 +49,7 @@ const podiumStyles = [
     label: "Platz 2",
   },
   {
-    chip: "bg-orange-100 text-orange-700 ring-orange-600/20",
+    chip: "bg-amber-100 text-amber-700 ring-amber-600/20",
     card: "border-slate-200/80 bg-white",
     label: "Platz 3",
   },
@@ -60,7 +60,7 @@ function RankChip({ rank }: { rank: number }) {
   if (style) {
     return (
       <span
-        className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-bold ring-1 ring-inset ${style.chip}`}
+        className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-semibold ring-1 ring-inset ${style.chip}`}
       >
         {rank}
       </span>
@@ -217,7 +217,7 @@ export default async function LeaderboardPage({
                     {row.name}
                   </p>
                   <div className="mt-1 flex items-baseline gap-2">
-                    <p className="text-4xl font-semibold tracking-tight text-slate-900">
+                    <p className="text-4xl font-semibold tracking-tight tabular-nums text-slate-900">
                       {row.total}
                     </p>
                     <span className="text-xs text-slate-500">

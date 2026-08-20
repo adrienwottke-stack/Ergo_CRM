@@ -106,6 +106,8 @@ export default async function MannschaftPage() {
         startedAt: true,
         visibility: true,
         deactivatedAt: true,
+        onboardingDoneAt: true,
+        installedAt: true,
         _count: { select: { team: true } },
       },
     }),
@@ -311,11 +313,11 @@ export default async function MannschaftPage() {
           <p className="text-sm font-medium text-slate-900">Noch niemand in deiner Struktur</p>
           <p className="mt-1 text-sm text-slate-600">
             Unter{" "}
-            <Link href="/team" className="font-medium text-navy-700 hover:underline">
-              Team
+            <Link href="/einladen" className="font-medium text-navy-700 hover:underline">
+              Einladen
             </Link>{" "}
-            hängst du Berater unter dich oder erzeugst einen Einladungslink. Bis dahin
-            steht hier nur deine eigene Zeile.
+            erzeugst du einen Link oder QR-Code — wer ihn einlöst, hängt automatisch
+            unter dir. Bis dahin steht hier nur deine eigene Zeile.
           </p>
         </div>
       )}
@@ -337,6 +339,22 @@ export default async function MannschaftPage() {
               </span>
               {person.id === user.id && (
                 <span className="text-xs text-slate-400">du</span>
+              )}
+              {/* Frisch durch den Start: der Moment, in dem ein Anruf der
+                  Fuehrungskraft am meisten wert ist. */}
+              {person.onboardingDoneAt &&
+                tageSeit(person.onboardingDoneAt) <= 2 &&
+                person.id !== user.id && (
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                    {tageSeit(person.onboardingDoneAt) === 0
+                      ? "heute gestartet"
+                      : "frisch gestartet"}
+                  </span>
+                )}
+              {/* Wer die App nicht auf dem Handy hat, loggt nicht unterwegs -
+                  und faellt still. Das gehoert neben die Ampel. */}
+              {person.installedAt === null && person.id !== user.id && (
+                <span className="text-[11px] text-slate-400">noch im Browser</span>
               )}
               {person._count.team > 0 && (
                 <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs text-navy-700">

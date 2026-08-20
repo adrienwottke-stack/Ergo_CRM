@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { ArrowLeftIcon } from "@/components/icons";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
@@ -31,9 +32,10 @@ export default async function EditContactPage({
       <div>
         <Link
           href={`/contacts/${contact.id}`}
-          className="text-sm font-medium text-slate-500 transition hover:text-slate-900"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
         >
-          ← Zurück zu {contact.name}
+          <ArrowLeftIcon className="h-4 w-4" />
+          Zurück zu {contact.name}
         </Link>
         <h1 className={`${pageTitle} mt-2`}>Kontakt bearbeiten</h1>
       </div>

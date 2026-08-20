@@ -44,7 +44,8 @@ export async function einladungEinloesen(formData: FormData) {
     where: { code },
     select: {
       id: true,
-      usedById: true,
+      usedCount: true,
+      maxUses: true,
       expiresAt: true,
       leader: { select: { id: true, path: true } },
     },
@@ -73,6 +74,7 @@ export async function einladungEinloesen(formData: FormData) {
           passwordHash,
           leaderId: invite.leader.id,
           recruitedById: invite.leader.id,
+          herkunftId: invite.id,
           startedAt: new Date(),
         },
       });
@@ -83,14 +85,28 @@ export async function einladungEinloesen(formData: FormData) {
         data: { path: pfadUnter(invite.leader.path, user.id) },
       });
 
-      // updateMany statt update: nur hier laesst sich "nur wenn noch offen"
-      // ausdruecken. Trifft es keine Zeile, war jemand schneller - dann faellt
-      // die ganze Transaktion, und es entsteht kein zweites Konto.
+      // updateMany statt update: nur hier laesst sich "nur wenn noch Platz"
+      // ausdruecken. Die Bedingung prueft usedCount gegen den vorhin gelesenen
+      // maxUses-Wert - der aendert sich nicht nebenher, usedCount schon.
+      // Trifft es keine Zeile, war jemand schneller - dann faellt die ganze
+      // Transaktion, und es entsteht kein Konto zu viel.
       const entwertet = await tx.invite.updateMany({
+        where: {
+          id: invite.id,
+          ...(invite.maxUses === null
+            ? {}
+            : { usedCount: { lt: invite.maxUses } }),
+        },
+        data: { usedCount: { increment: 1 } },
+      });
+      if (entwertet.count !== 1) throw new Error(VERBRAUCHT);
+
+      // Erste Einloesung zusaetzlich am alten Feld festhalten - fuer
+      // Einzel-Links bleibt damit sichtbar, WER den Code verbraucht hat.
+      await tx.invite.updateMany({
         where: { id: invite.id, usedById: null },
         data: { usedById: user.id, usedAt: new Date() },
       });
-      if (entwertet.count !== 1) throw new Error(VERBRAUCHT);
 
       if (existingPerson) {
         await tx.person.update({
@@ -110,5 +126,7 @@ export async function einladungEinloesen(formData: FormData) {
 
   const cookieStore = await cookies();
   cookieStore.set(authCookieName, await createSession(neuId), sessionCookieOptions);
-  redirect("/heute");
+  // Nicht in die leere App, sondern in den Willkommens-Ablauf: drei Minuten,
+  // an deren Ende die ersten Namen in der Liste stehen.
+  redirect("/willkommen");
 }
