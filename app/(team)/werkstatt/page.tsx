@@ -76,9 +76,19 @@ export default async function WerkstattPage() {
       stark: f.votes.filter((v) => v.urteil === "STARK").length,
     }))
     .sort((a, b) => b.stark - a.stark)[0];
-  const abstieg = lebend.find(
-    (f) => f.state === "TEST" && (kopfZahl.get(f.key)?.size ?? 0) < ABRISS_KOEPFE
-  );
+  // Vom Abstieg reden ergibt erst Sinn, wenn ueberhaupt genug Koepfe da sind,
+  // um die Schwelle zu reissen - und nie ueber den Fuehrenden selbst. Sonst
+  // steht bei zwei Koepfen "Der Kommentator fuehrt - Der Kommentator steht
+  // auf Abstieg" da (Live-Fund vom 20.08.).
+  const abstieg =
+    koepfe >= ABRISS_KOEPFE
+      ? lebend.find(
+          (f) =>
+            f.state === "TEST" &&
+            f.titel !== bester?.titel &&
+            (kopfZahl.get(f.key)?.size ?? 0) < ABRISS_KOEPFE
+        )
+      : undefined;
 
   const sortierteWuensche = [...wuensche].sort(
     (a, b) => b._count.votes - a._count.votes || a.titel.localeCompare(b.titel)
@@ -131,8 +141,13 @@ export default async function WerkstattPage() {
                 <tr key={feature.key} className="align-top">
                   <td className={`${td} font-medium text-slate-900`}>
                     {feature.titel}
+                    {feature.beschreibung && (
+                      <p className="mt-1 max-w-sm text-xs font-normal leading-relaxed text-slate-500">
+                        {feature.beschreibung}
+                      </p>
+                    )}
                     {feature.grund && (
-                      <p className="mt-1 max-w-xs text-xs font-normal text-slate-500">
+                      <p className="mt-1 max-w-sm text-xs font-normal text-slate-500">
                         Bleibt drin, weil: {feature.grund}
                       </p>
                     )}
@@ -147,9 +162,13 @@ export default async function WerkstattPage() {
                     )}
                   </td>
                   <td className={`${td} text-right tabular-nums`}>
+                    {/* Warnfarbe erst, wenn die Schwelle ueberhaupt reissbar ist -
+                        bei zwei Koepfen waere sonst alles orange. */}
                     <span
                       className={
-                        benutzt < ABRISS_KOEPFE ? "text-amber-600" : "text-slate-900"
+                        koepfe >= ABRISS_KOEPFE && benutzt < ABRISS_KOEPFE
+                          ? "text-amber-600"
+                          : "text-slate-900"
                       }
                     >
                       {benutzt}
@@ -225,7 +244,14 @@ export default async function WerkstattPage() {
                 key={wunsch.id}
                 className="flex items-center justify-between gap-4 px-5 py-3 text-sm"
               >
-                <span className="text-slate-800">{wunsch.titel}</span>
+                <span className="min-w-0">
+                  <span className="text-slate-800">{wunsch.titel}</span>
+                  {wunsch.beschreibung && (
+                    <span className="mt-0.5 block max-w-xl text-xs leading-relaxed text-slate-500">
+                      {wunsch.beschreibung}
+                    </span>
+                  )}
+                </span>
                 <form action={wunschStimme} className="flex shrink-0 items-center gap-3">
                   <input type="hidden" name="wunschId" value={wunsch.id} />
                   <span className="w-6 text-right tabular-nums text-slate-500">

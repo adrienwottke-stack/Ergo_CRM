@@ -469,6 +469,9 @@ enum FeatureState {
 model Feature {
   key   String       @id // "duell", "sprint", "puls"
   titel String
+  // Ein konkreter Satz mit Beispiel. Wer nicht versteht, worueber er
+  // abstimmt, stimmt nicht ab.
+  beschreibung String?
   state FeatureState @default(TEST)
   // "Bleibt drin, weil ..." - steht sichtbar in der Werkstatt, wenn gegen die
   // Stimmen entschieden wurde. Eine Abstimmung ohne Folgen wird nicht mehr
@@ -513,9 +516,10 @@ model FeatureUse {
 }
 
 model Wunsch {
-  id        String       @id @default(cuid())
-  titel     String
-  stand     String       @default("OFFEN") // OFFEN | GEBAUT | VERWORFEN
+  id           String  @id @default(cuid())
+  titel        String
+  beschreibung String?
+  stand        String  @default("OFFEN") // OFFEN | GEBAUT | VERWORFEN
   createdAt DateTime     @default(now())
   votes     WunschVote[]
 }
