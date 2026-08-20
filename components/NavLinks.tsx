@@ -3,11 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export default function NavLinks({
-  links,
-}: {
-  links: { href: string; label: string; exact?: boolean }[];
-}) {
+export interface NavLink {
+  href: string;
+  label: string;
+  exact?: boolean;
+  // Weitere Pfade, die zu diesem Punkt gehoeren. "Pipeline" bleibt markiert,
+  // waehrend man in den Unterreitern Vorgaenge oder Kontakte steht – sonst
+  // faellt die Markierung weg und man weiss nicht mehr, wo man ist.
+  match?: string[];
+}
+
+export default function NavLinks({ links }: { links: NavLink[] }) {
   const pathname = usePathname();
 
   return (
@@ -17,11 +23,14 @@ export default function NavLinks({
       {links.map((link) => {
         const active = link.exact
           ? pathname === link.href
-          : pathname === link.href || pathname.startsWith(`${link.href}/`);
+          : [link.href, ...(link.match ?? [])].some(
+              (path) => pathname === path || pathname.startsWith(`${path}/`)
+            );
         return (
           <Link
             key={link.href}
             href={link.href}
+            aria-current={active ? "page" : undefined}
             className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-sm font-medium transition sm:min-h-9 ${
               active
                 ? "bg-white/12 text-white"

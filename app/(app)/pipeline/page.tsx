@@ -16,6 +16,8 @@ import {
 import PipelineBoard, { type BoardContact } from "@/components/PipelineBoard";
 import { btnPrimary, filterPill, pageTitle } from "@/components/ui";
 import { PlusIcon } from "@/components/icons";
+import SectionTabs from "@/components/SectionTabs";
+import { PIPELINE_TABS } from "@/lib/nav";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +77,8 @@ export default async function PipelinePage({
 
   return (
     <div className="space-y-5">
+      <SectionTabs tabs={PIPELINE_TABS} />
+
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className={pageTitle}>Pipeline</h1>

@@ -5,6 +5,8 @@ import { berlinToday, dueState } from "@/lib/dates";
 import { formatEuro } from "@/lib/pipeline";
 import DealBoard, { type BoardDeal } from "@/components/DealBoard";
 import { card, kicker, pageTitle } from "@/components/ui";
+import SectionTabs from "@/components/SectionTabs";
+import { PIPELINE_TABS } from "@/lib/nav";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +52,8 @@ export default async function VorgaengePage() {
 
   return (
     <div className="space-y-5">
+      <SectionTabs tabs={PIPELINE_TABS} />
+
       <div>
         <h1 className={pageTitle}>Vorgänge</h1>
         <p className="mt-1 text-sm text-slate-500">

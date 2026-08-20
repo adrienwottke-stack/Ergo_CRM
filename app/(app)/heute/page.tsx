@@ -18,8 +18,8 @@ import QuickRowActions from "@/components/QuickRowActions";
 import DealActions from "@/components/DealActions";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import type { DealLite } from "@/components/DealActionDialog";
-import { card, pageTitle } from "@/components/ui";
-import { CheckIcon } from "@/components/icons";
+import { btnPrimary, card, pageTitle } from "@/components/ui";
+import { CheckIcon, TargetIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -123,13 +123,22 @@ export default async function HeutePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className={pageTitle}>Heute</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {openCount === 0
-            ? "Nichts offen – alles abgearbeitet."
-            : `${openCount} ${openCount === 1 ? "Schritt" : "Schritte"} offen (überfällig und heute).`}
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className={pageTitle}>Heute</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {openCount === 0
+              ? "Nichts offen – alles abgearbeitet."
+              : `${openCount} ${openCount === 1 ? "Schritt" : "Schritte"} offen (überfällig und heute).`}
+          </p>
+        </div>
+        {/* Der Fokus-Modus arbeitet dieselbe Liste ab, nur ohne Klicken
+            zwischendurch. Deshalb steht er hier als Aktion und nicht als
+            eigener Punkt in der Kopfzeile. */}
+        <Link href="/focus" className={btnPrimary}>
+          <TargetIcon className="h-4 w-4" />
+          Fokus starten
+        </Link>
       </div>
 
       {rows.length === 0 && orphans.length === 0 ? (

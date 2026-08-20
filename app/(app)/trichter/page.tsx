@@ -14,6 +14,8 @@ import {
   lostReasonLabels,
 } from "@/lib/pipeline";
 import { card, filterPill, kicker, pageTitle, td, th } from "@/components/ui";
+import SectionTabs from "@/components/SectionTabs";
+import { ZAHLEN_TABS } from "@/lib/nav";
 
 export const dynamic = "force-dynamic";
 
@@ -160,6 +162,8 @@ export default async function TrichterPage({
 
   return (
     <div className="space-y-6">
+      <SectionTabs tabs={ZAHLEN_TABS} />
+
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className={pageTitle}>Trichter</h1>

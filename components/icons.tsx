@@ -108,6 +108,14 @@ export function ChevronRightIcon({ className }: { className?: string }) {
   );
 }
 
+export function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="m5 9 7 7 7-7" />
+    </svg>
+  );
+}
+
 export function PlusIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>

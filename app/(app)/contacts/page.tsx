@@ -13,6 +13,8 @@ import NextStepBadge from "@/components/NextStepBadge";
 import DeleteContactButton from "@/components/DeleteContactButton";
 import { BellIcon, PlusIcon, UsersIcon } from "@/components/icons";
 import { btnPrimary, btnSecondary, card, filterPill, pageTitle, td, th } from "@/components/ui";
+import SectionTabs from "@/components/SectionTabs";
+import { PIPELINE_TABS } from "@/lib/nav";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +60,8 @@ export default async function ContactsPage({
 
   return (
     <div className="space-y-6">
+      <SectionTabs tabs={PIPELINE_TABS} />
+
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className={pageTitle}>Kontakte</h1>

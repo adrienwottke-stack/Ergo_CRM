@@ -16,12 +16,15 @@ export default async function AppLayout({ children }: Readonly<{ children: React
   const gefuehrte = await prisma.user.count({
     where: { leaderId: user.id, deactivatedAt: null },
   });
-  // Einsteiger sehen drei Einträge statt zehn. Nichts ist gesperrt, nur
-  // ausgeblendet – ein Tipp auf "Alles anzeigen" holt das volle CRM zurück.
+  // Einsteiger sehen drei Einträge statt zehn – plus "Mannschaft", sobald
+  // jemand unter ihnen hängt: wer führt, braucht die Übersicht ab dem ersten
+  // Tag. Nichts ist gesperrt, nur ausgeblendet – ein Tipp auf "Alles anzeigen"
+  // holt das volle CRM zurück.
   const links = user.beginnerMode
     ? [
         { href: "/namen", label: "Namen" },
         { href: "/heute", label: "Heute" },
+        ...(gefuehrte > 0 ? [{ href: "/mannschaft", label: "Mannschaft" }] : []),
         { href: "/leaderboard", label: "Wettbewerb" },
       ]
     : [

@@ -29,6 +29,8 @@ import {
   UsersIcon,
 } from "@/components/icons";
 import { card, kicker, pageTitle } from "@/components/ui";
+import SectionTabs from "@/components/SectionTabs";
+import { ZAHLEN_TABS } from "@/lib/nav";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +139,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <SectionTabs tabs={ZAHLEN_TABS} />
+
       <div>
         <h1 className={pageTitle}>Dashboard</h1>
         <p className="mt-1 text-sm text-slate-500">Dein Netzwerk auf einen Blick.</p>
