@@ -5,8 +5,13 @@
 // Drei Woerter, ein Tipp, kein Freitext. Wer tippen muss, tippt nicht - und
 // Freitext hiesse Moderation, dauerhaft. Nach der Stimme verschwindet die
 // Frage: sie ist kein Dauermoebel, sondern eine Frage.
+//
+// Bewusst useState statt useOptimistic: der "aendern"-Griff braucht einen
+// Zustand, der auch AUSSERHALB einer laufenden Transition gesetzt werden darf.
+// Ein useOptimistic-Setter ausserhalb einer Transition wird von React sofort
+// verworfen - der Knopf sah aus wie tot (im Live-Test am 20.08. bestaetigt).
 
-import { useOptimistic, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { urteilen } from "@/app/(team)/werkstatt/urteilAction";
 
 const antworten = [
@@ -25,26 +30,29 @@ export default function Taugt({
   kompakt?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
-  const [optimistisch, setzeOptimistisch] = useOptimistic(
-    stimme,
-    (_aktuell, neu: string) => neu
-  );
+  // Lokal getroffene Wahl. Faellt nach dem Server-Refresh mit `stimme`
+  // zusammen; bis dahin traegt sie die Anzeige.
+  const [wahl, setWahl] = useState<string | null>(null);
+  const [offen, setOffen] = useState(false);
+
+  const anzeige = offen ? null : (wahl ?? stimme);
 
   const waehle = (wert: string) => {
+    setWahl(wert);
+    setOffen(false);
     startTransition(async () => {
-      setzeOptimistisch(wert);
       await urteilen(featureKey, wert);
     });
   };
 
-  if (optimistisch) {
+  if (anzeige) {
     return (
       <p className="text-[11px] text-slate-400">
-        Dein Urteil: {antworten.find((a) => a.wert === optimistisch)?.text}
+        Dein Urteil: {antworten.find((a) => a.wert === anzeige)?.text}
         {" · "}
         <button
           type="button"
-          onClick={() => setzeOptimistisch("")}
+          onClick={() => setOffen(true)}
           className="underline transition hover:text-slate-600"
         >
           ändern

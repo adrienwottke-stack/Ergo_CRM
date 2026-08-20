@@ -24,6 +24,12 @@ export type Lage = {
   abschlussHeute: { name: string } | null;
 };
 
+// "1 Punkt", "2 Punkte" - der Kommentator ist das Gesicht der Arena, ein
+// falscher Plural faellt dort mehr auf als irgendwo sonst.
+export function punkteText(n: number): string {
+  return `${n} ${n === 1 ? "Punkt" : "Punkte"}`;
+}
+
 export function kommentar(lage: Lage): string {
   const [erster, , dritter] = lage.spitze;
 
@@ -44,7 +50,7 @@ export function kommentar(lage: Lage): string {
   }
 
   if (lage.stundenBisAbpfiff <= 0) {
-    return `Spieltag vorbei. ${erster.name} gewinnt mit ${erster.punkte} Punkten.`;
+    return `Spieltag vorbei. ${erster.name} gewinnt mit ${punkteText(erster.punkte)}.`;
   }
 
   // Enges Rennen an der Spitze.
@@ -64,10 +70,10 @@ export function kommentar(lage: Lage): string {
   }
 
   if (lage.heuteAktiv === 0) {
-    return `${erster.name} führt mit ${erster.punkte} Punkten. Heute hat das Board noch keiner angefasst.`;
+    return `${erster.name} führt mit ${punkteText(erster.punkte)}. Heute hat das Board noch keiner angefasst.`;
   }
 
-  return `${erster.name} führt mit ${erster.punkte} Punkten. ${lage.heuteAktiv} von ${lage.koepfe} waren heute schon dran.`;
+  return `${erster.name} führt mit ${punkteText(erster.punkte)}. ${lage.heuteAktiv} von ${lage.koepfe} waren heute schon dran.`;
 }
 
 // Zeile fuer die eigene Lage - hier und NUR hier darf Abwesenheit vorkommen.
@@ -85,11 +91,11 @@ export function eigenerHinweis(opts: {
     return "Du warst heute noch nicht dran.";
   }
   if (opts.bestmarke !== null && opts.punkte > 0 && opts.punkte >= opts.bestmarke) {
-    return `${opts.punkte} Punkte — das ist deine beste Woche.`;
+    return `${punkteText(opts.punkte)} — das ist deine beste Woche.`;
   }
   if (opts.bestmarke !== null && opts.bestmarke > opts.punkte) {
     const fehlen = opts.bestmarke - opts.punkte;
-    return `${opts.punkte} Punkte diese Woche. Deine beste Woche stand bei ${opts.bestmarke} — fehlen ${fehlen}.`;
+    return `${punkteText(opts.punkte)} diese Woche. Deine beste Woche stand bei ${opts.bestmarke} — fehlen ${fehlen}.`;
   }
   return null;
 }

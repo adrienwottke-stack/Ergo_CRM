@@ -14,7 +14,7 @@ import {
   sprintStand,
   stundenBis,
 } from "@/lib/arena";
-import { abstandInHandlungen, eigenerHinweis, kommentar } from "@/lib/kommentator";
+import { abstandInHandlungen, eigenerHinweis, kommentar, punkteText } from "@/lib/kommentator";
 import { merkeNutzung, schalter } from "@/lib/features";
 import { quotaTypeLabels } from "@/lib/labels";
 import ArenaTakt from "@/components/ArenaTakt";
@@ -441,14 +441,14 @@ export default async function ArenaPage() {
           {vorMir && (
             <p className="mt-3 text-sm text-slate-700">
               <span className="font-semibold">
-                {vorMir.punkte - meine.punkte} Punkte auf {vorMir.name}.
+                {punkteText(vorMir.punkte - meine.punkte)} auf {vorMir.name}.
               </span>{" "}
               {abstandInHandlungen(vorMir.punkte - meine.punkte)}
             </p>
           )}
           {!vorMir && (
             <p className="mt-3 text-sm text-slate-700">
-              Du führst. {hinterMir ? `${meine.punkte - hinterMir.punkte} Punkte Vorsprung auf ${hinterMir.name}.` : ""}
+              Du führst. {hinterMir ? `${punkteText(meine.punkte - hinterMir.punkte)} Vorsprung auf ${hinterMir.name}.` : ""}
             </p>
           )}
           <Taugt featureKey="zweikampf" stimme={stimmen.get("zweikampf") ?? null} />
