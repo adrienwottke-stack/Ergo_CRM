@@ -48,3 +48,7 @@ next-env.d.ts
 
 # .env.example darf committet werden
 !.env.example
+
+# Audit-Werkzeuge dieser Sitzung: schreiben in die echte Datenbank, gehoeren
+# nicht ins Repo.
+scripts/_audit/

@@ -193,9 +193,10 @@ export default async function TrichterPage({
 
             {engpass && (
               <p className="mt-6 border-t border-slate-100 pt-4 text-sm text-slate-700">
-                <span className="font-semibold">
-                  Engpass: {engpass.titel.toLowerCase()}.
-                </span>{" "}
+                {/* Nicht kleinschreiben: "Engpass: abschlüsse" ist ein
+                    Substantiv in Kleinschreibung und stand auf jeder
+                    Trichter-Seite. */}
+                <span className="font-semibold">Engpass: {engpass.titel}.</span>{" "}
                 {engpass.hinweis}
               </p>
             )}

@@ -12,14 +12,18 @@ import {
   type DueState,
 } from "@/lib/dates";
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
+import { faelligeAufgaben, fuehrungsSchritt, mannschaftsLage } from "@/lib/fuehrung";
+import FuehrungsAufgabe from "@/components/FuehrungsAufgabe";
 import StageBadge from "@/components/StageBadge";
 import NextStepBadge from "@/components/NextStepBadge";
 import QuickRowActions from "@/components/QuickRowActions";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import ErsteWoche from "@/components/ErsteWoche";
 import Meldungen from "@/components/Meldungen";
+import Postfach from "@/components/Postfach";
+import NummerHinterlegen from "@/components/NummerHinterlegen";
 import { card, pageTitle } from "@/components/ui";
-import { CheckIcon, PhoneIcon, SparkIcon } from "@/components/icons";
+import { CheckIcon, ChevronRightIcon, PhoneIcon, SparkIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +39,8 @@ export default async function HeutePage() {
   const today = berlinToday();
   const horizon = addDays(dayToUtcDate(today), 8);
 
-  const [contacts, orphans, offeneNamen] = await Promise.all([
+  const [contacts, orphans, offeneNamen, meineFuehrung, gefuehrte, nachrichten] =
+    await Promise.all([
     prisma.contact.findMany({
       where: {
         ...sicht.kontakte,
@@ -73,7 +78,55 @@ export default async function HeutePage() {
         stage: { in: ["NEU", "KONTAKTIERT"] },
       },
     }),
+    // Wer ueber mir haengt - fuer die Frage nach der eigenen Nummer. Ohne
+    // Fuehrungskraft gibt es niemanden, der anrufen wuerde, also wird auch
+    // nicht gefragt.
+    user.phone === null && user.leaderId
+      ? prisma.user.findUnique({
+          where: { id: user.leaderId },
+          select: { name: true },
+        })
+      : Promise.resolve(null),
+    // Fuehrungskraft ist eine Position, keine Rolle: wer Direkte hat, fuehrt.
+    // Billige Zaehlung vorweg, damit die teure Mannschafts-Rechnung nur bei
+    // denen laeuft, fuer die sie ueberhaupt etwas anzeigt.
+    prisma.user.count({ where: { leaderId: user.id, deactivatedAt: null } }),
+    // Was Kollegen und die eigene Fuehrungskraft geschrieben haben.
+    //
+    // Bis hierhin lagen Nachrichten ausschliesslich in der Arena. Wer aus der
+    // Mannschaft heraus schrieb ("Ich komme zu deinem naechsten Termin mit"),
+    // schickte sie damit an eine Stelle, die der Empfaenger vielleicht am
+    // Freitag oeffnet. Eine Nachricht, die niemand liest, ist keine Handlung.
+    //
+    // Bewusst nach Zeitfenster und NICHT nach "ungelesen": das Ansehen setzt
+    // den Haken, und eine Abfrage auf ungelesen haette den Stapel im selben
+    // Wimpernschlag wieder ausgeblendet - gelesen hatte ihn dann niemand.
+    prisma.nachricht.findMany({
+      where: { anId: user.id, createdAt: { gte: new Date(Date.now() - 3 * 86_400_000) } },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: { id: true, text: true, gelesenAt: true, von: { select: { name: true } } },
+    }),
   ]);
+
+  // Emil oeffnet die App morgens im Auto und landet hier - nicht auf
+  // /mannschaft. Bis hierhin erfuhr er von einem stillen Partner erst, wenn er
+  // von sich aus nachsah. Eine Zeile, nicht mehr: wer, und der naechste Schritt.
+  const [lage, aufgaben] =
+    gefuehrte > 0
+      ? await Promise.all([mannschaftsLage(user), faelligeAufgaben(user.id)])
+      : [null, []];
+  const brauchenDich = lage?.dringend.filter((person) => person.ampel === "rot") ?? [];
+
+  // Faellige Fuehrungsaufgaben gehoeren in dieselben Gruppen wie die
+  // Kundenschritte - eine Fuehrungskraft hat EINE Liste. Was ueberfaellig ist,
+  // steht oben; was heute faellig ist, bei heute.
+  const aufgabenJe: Record<DueState, typeof aufgaben> = {
+    overdue: aufgaben.filter((aufgabe) => aufgabe.ueberfaellig),
+    today: aufgaben.filter((aufgabe) => !aufgabe.ueberfaellig),
+    week: [],
+    later: [],
+  };
 
   type Row = { at: Date; due: DueState; data: (typeof contacts)[number] };
 
@@ -122,6 +175,59 @@ export default async function HeutePage() {
       <div>
         <h1 className={pageTitle}>Heute</h1>
       </div>
+
+      {/* Was jemand geschrieben hat, steht vor der Arbeit - es dauert zehn
+          Sekunden und ist der Grund, warum sich das Werkzeug nach Mannschaft
+          anfuehlt und nicht nach Verwaltung. */}
+      {nachrichten.length > 0 && (
+        <Postfach
+          nachrichten={nachrichten.map((nachricht) => ({
+            id: nachricht.id,
+            von: nachricht.von.name,
+            text: nachricht.text,
+            neu: nachricht.gelesenAt === null,
+          }))}
+          ungelesen={nachrichten.filter((n) => n.gelesenAt === null).length}
+        />
+      )}
+
+      {/* Fragt genau einmal und verschwindet danach fuer immer. Es gibt
+          bewusst keine Kontoseite dafuer - ein Bildschirm mit einem Feld
+          darauf ist ein Bildschirm zu viel. */}
+      {meineFuehrung && (
+        <NummerHinterlegen fuehrungskraft={meineFuehrung.name.split(" ")[0] ?? meineFuehrung.name} />
+      )}
+
+      {/* Fuehrung zuerst, eigenes Geschaeft darunter: ein stiller Partner
+          kostet mehr als ein liegengebliebener Anruf. Steht nur da, wenn
+          wirklich jemand rot ist - sonst waere es Tapete. */}
+      {brauchenDich.length > 0 && (
+        <Link
+          href="/mannschaft"
+          className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50/70 p-4 transition hover:bg-red-50 sm:p-5"
+        >
+          <span aria-hidden className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-slate-900">
+              {brauchenDich.length === 1
+                ? `${brauchenDich[0]!.name} braucht dich`
+                : brauchenDich.length === 2
+                  ? `${brauchenDich[0]!.vorname} und ${brauchenDich[1]!.vorname} brauchen dich`
+                  : `${brauchenDich[0]!.vorname}, ${brauchenDich[1]!.vorname} und ${
+                      brauchenDich.length - 2
+                    } weitere brauchen dich`}
+            </span>
+            <span className="mt-0.5 block text-sm text-slate-600">
+              {brauchenDich.length === 1
+                ? fuehrungsSchritt(brauchenDich[0]!)
+                : "Aus deiner Mannschaft. In der Übersicht steht, was jeweils ansteht."}
+            </span>
+          </span>
+          <span aria-hidden className="mt-0.5 shrink-0 text-slate-400">
+            <ChevronRightIcon className="h-5 w-5" />
+          </span>
+        </Link>
+      )}
 
       {/* Beim Oeffnen steht da, was heute zu tun ist - als Zahl, nicht als
           Liste, aus der man erst auswaehlen muss. */}
@@ -196,7 +302,7 @@ export default async function HeutePage() {
           wenn einer dieser Momente wirklich ansteht. */}
       <ErsteWoche user={user} />
 
-      {rows.length === 0 && orphans.length === 0 ? (
+      {rows.length === 0 && orphans.length === 0 && aufgaben.length === 0 ? (
         <div className={`${card} flex flex-col items-center px-6 py-16 text-center`}>
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
             <CheckIcon className="h-6 w-6" />
@@ -222,20 +328,25 @@ export default async function HeutePage() {
         </div>
       ) : (
         groups
-          .filter((group) => group.rows.length > 0)
+          .filter((group) => group.rows.length + aufgabenJe[group.key].length > 0)
           .map((group) => (
             <section key={group.key} className="space-y-3">
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className="text-base font-semibold text-slate-900">
                   {group.title}
                   <span className="ml-2 text-sm font-normal text-slate-400">
-                    {group.rows.length}
+                    {group.rows.length + aufgabenJe[group.key].length}
                   </span>
                 </h2>
                 <span className="text-xs text-slate-500">{group.hint}</span>
               </div>
 
               <ul className="space-y-3">
+                {/* Menschen vor Kunden: wenn heute beides ansteht, ist der
+                    stille Partner das Teurere. */}
+                {aufgabenJe[group.key].map((aufgabe) => (
+                  <FuehrungsAufgabe key={aufgabe.id} aufgabe={aufgabe} />
+                ))}
                 {group.rows.map((row) => {
                   const contact = row.data;
                   const lite: ContactLite = {

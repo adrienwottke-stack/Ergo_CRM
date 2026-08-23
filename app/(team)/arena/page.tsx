@@ -14,8 +14,8 @@ import {
 import { abstandInHandlungen, eigenerHinweis, punkteText } from "@/lib/kommentator";
 import { merkeNutzung, schalter } from "@/lib/features";
 import ArenaTakt from "@/components/ArenaTakt";
+import WettbewerbNav from "@/components/WettbewerbNav";
 import SprintUhr from "@/components/SprintUhr";
-import Taugt from "@/components/Taugt";
 import NachrichtSenden from "@/components/NachrichtSenden";
 import Postfach from "@/components/Postfach";
 import { FlameIcon, TrophyIcon } from "@/components/icons";
@@ -48,16 +48,11 @@ export default async function ArenaPage() {
 
   const an = await schalter("puls", "zweikampf", "bestmarke", "sprint");
 
-  const [zeilen, puls, bestmarke, meineStimmen, sprint, nachrichten, konten] =
+  const [zeilen, puls, bestmarke, sprint, nachrichten, konten] =
     await Promise.all([
     ladeRangliste(wochenStart),
     ladePuls(),
     ladeBestmarke(person.id),
-    // Nur die Schluessel: wer schon geurteilt hat, sieht die Frage nie wieder.
-    prisma.featureVote.findMany({
-      where: { personId: person.id },
-      select: { featureKey: true },
-    }),
     prisma.sprint.findFirst({
       where: { endAt: { gt: new Date() } },
       orderBy: { startAt: "desc" },
@@ -90,7 +85,11 @@ export default async function ArenaPage() {
   );
   const ungelesen = nachrichten.filter((n) => n.gelesenAt === null).length;
 
-  const gestimmt = new Set(meineStimmen.map((v) => v.featureKey));
+  // Gemessen wird weiter, gefragt nicht mehr: die Abstimmung ueber Bausteine
+  // ("Taugt das?") stand an jedem Block der Arena und war Produktverwaltung im
+  // Produkt (docs/audit-kernmodell.md, 5.14). Sie kostete den Partner
+  // Aufmerksamkeit und brachte ihm keinen Termin. Was ein Baustein wert ist,
+  // sagt ohnehin die Nutzung - und die laeuft still weiter.
   const gesehen: Promise<void>[] = [];
   if (an.puls) gesehen.push(merkeNutzung("puls", person.id));
   if (an.zweikampf) gesehen.push(merkeNutzung("zweikampf", person.id));
@@ -133,6 +132,8 @@ export default async function ArenaPage() {
   return (
     <div className="space-y-8">
       <ArenaTakt sekunden={sprint ? 10 : 30} />
+
+      <WettbewerbNav />
 
       <div>
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -217,7 +218,6 @@ export default async function ArenaPage() {
               )}
             </div>
           )}
-          <Taugt featureKey="sprint" schonGestimmt={gestimmt.has("sprint")} />
         </div>
       )}
 
@@ -240,7 +240,6 @@ export default async function ArenaPage() {
               ))}
             </ul>
           )}
-          <Taugt featureKey="puls" schonGestimmt={gestimmt.has("puls")} />
         </div>
       )}
 
@@ -281,7 +280,6 @@ export default async function ArenaPage() {
               Du führst. {hinterMir ? `${punkteText(meine.punkte - hinterMir.punkte)} Vorsprung auf ${hinterMir.name}.` : ""}
             </p>
           )}
-          <Taugt featureKey="zweikampf" schonGestimmt={gestimmt.has("zweikampf")} />
         </div>
       )}
 

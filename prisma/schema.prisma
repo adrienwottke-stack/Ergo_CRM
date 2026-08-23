@@ -60,6 +60,21 @@ enum UserRole {
   MEMBER
 }
 
+// Was eine Fuehrungskraft sich vornimmt. Aus einem Signal entstanden, aber
+// NIE automatisch: dazwischen liegt immer ein Tipp (docs/struktur-plan.md,
+// Abschnitt 5, und audit-kernmodell.md, Abschnitt 9 - "automatisch erzeugte
+// Aufgaben aus Signalen" stehen dort ausdruecklich unter "bewusst nicht
+// gebaut", weil man nach zwei Wochen zweihundert davon hat).
+enum LeadershipTaskType {
+  EINS_ZU_EINS
+  BEGLEITUNG
+  ANRUF
+  SCHULUNG
+  VEREINBARUNG_NACHFASSEN
+  ONBOARDING_CHECK
+  SONSTIGES
+}
+
 // Was eine Fuehrungskraft von einem Berater ihrer Struktur sieht. ZAHLEN ist
 // das Minimum und nicht abwaehlbar - sonst waere die Mannschafts-Uebersicht
 // loechrig und damit wertlos. Kundennamen deckt KEINE der beiden Stufen ab;
@@ -176,6 +191,12 @@ model User {
   role         UserRole @default(MEMBER)
   createdAt    DateTime @default(now())
 
+  // Die eigene Nummer, damit die Fuehrungskraft anrufen kann statt zu
+  // schreiben. Traegt IMMER der Mensch selbst ein - nie die Fuehrungskraft,
+  // nie Pflicht. Ohne Nummer fehlt der Anruf-Knopf kommentarlos; ein Hinweis
+  // "Nummer fehlt" waere eine Aufforderung an die Falsche.
+  phone String?
+
   // Erster Start vom Startbildschirm aus. NULL = arbeitet noch im Browser-Tab.
   // Einmal gesetzt, danach nie wieder angefasst: damit steht in der Mannschaft,
   // wer die App wirklich auf dem Handy hat - und wer sie wieder geloescht hat.
@@ -239,11 +260,15 @@ model User {
   herkunftId String?
   herkunft   Invite? @relation("Herkunft", fields: [herkunftId], references: [id], onDelete: SetNull)
 
-  contacts    Contact[]
-  person      Person?
-  stageEvents StageEvent[]
-  undoEntries UndoEntry[]
-  pushAbos    PushAbo[]
+  contacts       Contact[]
+  person         Person?
+  stageEvents    StageEvent[]
+  undoEntries    UndoEntry[]
+  pushAbos       PushAbo[]
+  passwortResets PasswortReset[]
+
+  fuehrungsAufgaben LeadershipTask[] @relation("Fuehrt")
+  betrifftMich      LeadershipTask[] @relation("Betrifft")
 
   nachrichtenGesendet Nachricht[] @relation("NachrichtVon")
   nachrichtenErhalten Nachricht[] @relation("NachrichtAn")
@@ -299,6 +324,44 @@ model Invite {
   @@index([leaderId, createdAt])
 }
 
+// Was die Fuehrungskraft sich vorgenommen hat (docs/struktur-plan.md, 5).
+//
+// Der Grund, warum es das ueberhaupt gibt: die Fruehwarn-Signale rechnen sich
+// bei jedem Aufruf neu und wissen nichts davon, dass die Fuehrungskraft schon
+// gehandelt hat. Emil ruft Marc an, Marc loggt am naechsten Tag nichts - und
+// Marc steht wieder rot da, mit demselben Satz. Am vierten Tag liest Emil die
+// rote Liste nicht mehr. Eine Aufgabe ist der Merkzettel, der das verhindert:
+// solange sie offen und die Frist nicht erreicht ist, ruht das Signal.
+//
+// Zwei Festlegungen:
+//   1. NIE automatisch erzeugt. Dazwischen liegt immer ein Tipp.
+//   2. Faellig gehoert sie auf /heute, zwischen die Kundenschritte - nicht in
+//      eine zweite Liste. Eine Fuehrungskraft hat EINE Liste; genau das macht
+//      aus einem Berichts-Werkzeug ein Fuehrungs-Werkzeug.
+model LeadershipTask {
+  id       String @id @default(cuid())
+  leaderId String
+  leader   User   @relation("Fuehrt", fields: [leaderId], references: [id], onDelete: Cascade)
+  memberId String
+  member   User   @relation("Betrifft", fields: [memberId], references: [id], onDelete: Cascade)
+
+  type  LeadershipTaskType @default(ANRUF)
+  dueAt DateTime
+
+  // Der Anlass, eingefroren im Wortlaut des Signals ("Seit 8 Tagen keine
+  // Aktivitaet"). Bewusst eine Kopie und kein Verweis: das Signal kann bis zur
+  // Faelligkeit verschwunden sein, und dann ergaebe die Aufgabe keinen Sinn
+  // mehr.
+  note   String?
+  signal String?
+
+  doneAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([leaderId, dueAt])
+  @@index([memberId])
+}
+
 // Kurznachrichten zwischen Partnern (docs/audit-kernmodell.md, 10.6).
 //
 // Bis hierhin sahen sich Partner ausschliesslich als Zeile mit einer Zahl.
@@ -345,6 +408,28 @@ model PushAbo {
   letzteZustellung DateTime?
 
   @@index([userId])
+}
+
+// Ein Link zum Passwort-Neusetzen.
+//
+// Kein Versand per E-Mail: dafuer braeuchte es einen Maildienst, eine Domain
+// mit SPF und jemanden, der sich um Zustellbarkeit kuemmert. In diesem Netzwerk
+// laufen Einladungen ohnehin per Nachricht - der Reset-Link geht denselben Weg.
+//
+// Deshalb ist der Code hier laenger und zufaelliger als ein Einladungscode: er
+// wird nie vorgelesen, nur weitergeschickt, und wer ihn hat, kommt in ein
+// fremdes Konto. Einmal benutzbar, danach verbraucht.
+model PasswortReset {
+  id     String @id @default(cuid())
+  code   String @unique
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // Rueckgaengig fuer Ein-Tipp-Aktionen. Ohne das darf keine Schnellaktion

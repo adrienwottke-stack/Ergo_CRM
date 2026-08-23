@@ -6,14 +6,14 @@ import { schalten } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-// Der Pruefstand. Bewusst nur fuer den Admin: die Abstimmung selbst laeuft
-// unauffaellig in der Arena ("Taugt das?", eine Stimme je Kopf, danach weg).
-// Die Auswertung ist Produktarbeit und gehoert nicht in den Alltag eines
-// Partners - der soll Termine machen, nicht Software verwalten.
+// Der Pruefstand. Bewusst nur fuer den Admin: Produktarbeit gehoert nicht in
+// den Alltag eines Partners - der soll Termine machen, nicht Software
+// verwalten.
 //
-// Was hier zusammenkommt, sind zwei getrennte Fragen an jeden Baustein:
-// Was sagen die Leute? Und - unabhaengig davon - benutzt ihn ueberhaupt jemand?
-// Nutzung schlaegt Stimmen: was keiner anfasst, kann noch so gut gefallen.
+// Eine Frage an jeden Baustein: benutzt ihn ueberhaupt jemand? Die Abstimmung
+// ("Taugt das?") stand frueher an jedem Block der Arena und ist raus
+// (docs/audit-kernmodell.md, 5.14). Nutzung schlaegt Stimmen ohnehin - was
+// keiner anfasst, kann noch so gut gefallen.
 
 const standTexte: Record<string, string> = {
   TEST: "Test",
@@ -38,10 +38,7 @@ export default async function WerkstattPage() {
   const sieben = dayToUtcDate(shiftDay(berlinToday(), -7));
 
   const [features, nutzung, koepfe] = await Promise.all([
-    prisma.feature.findMany({
-      orderBy: { titel: "asc" },
-      include: { votes: { select: { urteil: true } } },
-    }),
+    prisma.feature.findMany({ orderBy: { titel: "asc" } }),
     prisma.featureUse.findMany({
       where: { day: { gte: sieben } },
       select: { featureKey: true, personId: true },
@@ -64,9 +61,8 @@ export default async function WerkstattPage() {
       <div>
         <h1 className={pageTitle}>Werkstatt</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Nur für dich. Was die Leute über jeden Baustein gesagt haben — und
-          davon getrennt, wie viele ihn in den letzten sieben Tagen überhaupt
-          benutzt haben.
+          Nur für dich. Wie viele Köpfe jeden Baustein in den letzten sieben
+          Tagen überhaupt benutzt haben.
         </p>
       </div>
 
@@ -75,7 +71,6 @@ export default async function WerkstattPage() {
           <thead className="border-b border-slate-200/80 bg-slate-50/60">
             <tr>
               <th className={th}>Baustein</th>
-              <th className={th}>Stimmen</th>
               <th className={`${th} text-right`}>Benutzt von</th>
               <th className={th}>Stand</th>
               <th className={th}>Schalter</th>
@@ -83,9 +78,6 @@ export default async function WerkstattPage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {features.map((feature) => {
-              const stark = feature.votes.filter((v) => v.urteil === "STARK").length;
-              const gehtSo = feature.votes.filter((v) => v.urteil === "GEHT_SO").length;
-              const weg = feature.votes.filter((v) => v.urteil === "WEG_DAMIT").length;
               const benutzt = kopfZahl.get(feature.key)?.size ?? 0;
               return (
                 <tr key={feature.key} className="align-top">
@@ -101,18 +93,6 @@ export default async function WerkstattPage() {
                         Bleibt drin, weil: {feature.grund}
                       </p>
                     )}
-                  </td>
-                  <td className={`${td} tabular-nums text-slate-600`}>
-                    {feature.votes.length === 0 ? (
-                      <span className="text-slate-400">noch keine</span>
-                    ) : (
-                      <span className="whitespace-nowrap">
-                        {stark} stark · {gehtSo} geht so · {weg} weg
-                      </span>
-                    )}
-                    <span className="mt-0.5 block text-xs text-slate-400">
-                      {feature.votes.length} von {koepfe} haben geantwortet
-                    </span>
                   </td>
                   <td className={`${td} text-right tabular-nums`}>
                     {/* Warnfarbe erst, wenn die Schwelle ueberhaupt reissbar ist -
@@ -175,8 +155,9 @@ export default async function WerkstattPage() {
       <p className={kicker}>
         Gezählt wird, von wie vielen Köpfen ein Baustein benutzt wurde — nie, von
         wem. Was von weniger als {ABRISS_KOEPFE} Personen benutzt wird, steht nach
-        drei Wochen zur Abschaltung. Gestimmt wird einmal je Kopf; danach
-        verschwindet die Frage aus der Arena.
+        drei Wochen zur Abschaltung. Nutzung statt Meinung: die Abstimmung in der
+        Arena ist weg, sie kostete den Partner Aufmerksamkeit und brachte ihm
+        keinen Termin.
       </p>
     </div>
   );

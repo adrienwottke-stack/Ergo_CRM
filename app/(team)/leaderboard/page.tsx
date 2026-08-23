@@ -16,6 +16,7 @@ import {
 } from "@/lib/dates";
 import { streakDays } from "@/lib/stats";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
+import WettbewerbNav from "@/components/WettbewerbNav";
 import { FlameIcon, PlusIcon, TrophyIcon } from "@/components/icons";
 import {
   btnPrimary,
@@ -148,6 +149,8 @@ export default async function LeaderboardPage({
 
   return (
     <div className="space-y-6">
+      <WettbewerbNav />
+
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className={pageTitle}>Rangliste</h1>

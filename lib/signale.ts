@@ -1,6 +1,6 @@
 // Fruehwarn-Signale fuer die Mannschafts-Uebersicht.
 //
-// Zwei Festlegungen, die den Rest erklaeren:
+// Drei Festlegungen, die den Rest erklaeren:
 //
 // 1. Signale werden BERECHNET, nicht gespeichert. Wer sie automatisch in
 //    Aufgaben verwandelt, hat nach zwei Wochen zweihundert davon und schaut
@@ -8,6 +8,10 @@
 //    Fuehrungskraft es antippt.
 // 2. Die Schwellwerte stehen hier oben an einer Stelle. Nach dem ersten echten
 //    Monat wird daran geschraubt, und dann will man nicht im Code suchen.
+// 3. Ein Signal, das bei einem Konto vom dritten Tag losgeht, verbrennt die
+//    ganze Ampel. Wer einmal "Lange gar nichts" bei jemandem gelesen hat, der
+//    vorgestern eingeladen wurde, glaubt der Farbe danach nicht mehr. Deshalb
+//    hat jedes Signal eine Untergrenze an Tagen, unter der es schweigt.
 //
 // Siehe docs/struktur-plan.md, Abschnitt 4.2.
 
@@ -20,6 +24,13 @@ export const SCHWELLEN = {
   ueberfaelligMax: 10,
   onboardingWochen: 8,
   empfehlungTage: 30,
+  // Vor diesem Tag sagt ausser "nicht angekommen" kein Signal etwas. Ein
+  // Berater, der seit vier Tagen dabei ist, hat noch keine Quote und keinen
+  // Rueckstand - er hat einen Sponsor, und der weiss das ohne Ampel.
+  schonungstage: 5,
+  // Ab hier ist "noch nicht angekommen" nicht mehr Anlaufzeit, sondern der
+  // haeufigste stille Abgang ueberhaupt: eingeladen, nie gestartet.
+  ankunftFristTage: 2,
 };
 
 export type Schwere = "rot" | "gelb";
@@ -42,6 +53,8 @@ export type SignalEingabe = {
   abschluesseMonat: number;
   abschluesseGesamt: number;
   tageDabei: number | null;
+  /** Hat den Willkommens-Ablauf abgeschlossen. Ohne das ist alles andere Lärm. */
+  angekommen: boolean;
 
   /** Stufe 2 – nur wenn der Berater seinen Trichter sichtbar macht. */
   pipelineSichtbar: boolean;
@@ -51,18 +64,57 @@ export type SignalEingabe = {
   termineOhneEmpfehlung: number;
 };
 
+/** "3 Tagen" / "2 Wochen" – unter zwei Wochen zaehlt der Mensch in Tagen. */
+function dauer(tage: number): string {
+  if (tage < 14) return `${tage} ${tage === 1 ? "Tag" : "Tagen"}`;
+  const wochen = Math.floor(tage / 7);
+  return `${wochen} ${wochen === 1 ? "Woche" : "Wochen"}`;
+}
+
+function termine(anzahl: number): string {
+  return `${anzahl} ${anzahl === 1 ? "Termin" : "Termine"}`;
+}
+
 export function signaleFuer(e: SignalEingabe): Signal[] {
   const signale: Signal[] = [];
+  const tageDabei = e.tageDabei;
+  // Frisch eingeladen: alles ausser der Ankunft schweigt. Sonst steht bei
+  // jedem Neuen am zweiten Tag eine rote Ampel mit drei Vorwuerfen.
+  const frisch = tageDabei !== null && tageDabei < SCHWELLEN.schonungstage;
+
+  // Der haeufigste stille Abgang im Strukturvertrieb: eingeladen, Konto
+  // angelegt, Start nie zu Ende gebracht. Das sieht in jeder Zahlenspalte aus
+  // wie "faul" und ist in Wahrheit "steht vor einer Huerde".
+  if (!e.angekommen) {
+    const wartet = tageDabei ?? 0;
+    signale.push({
+      schluessel: "nicht_angekommen",
+      titel:
+        wartet <= 1
+          ? "Gerade erst dazugekommen"
+          : `Seit ${dauer(wartet)} dabei, Start nie beendet`,
+      schritt:
+        wartet <= SCHWELLEN.ankunftFristTage
+          ? "Kurz anrufen und den Start gemeinsam durchgehen. Dauert drei Minuten."
+          : "Nicht schreiben — anrufen. Wer hier hängen bleibt, meldet sich nie von selbst.",
+      schwere: wartet <= SCHWELLEN.ankunftFristTage ? "gelb" : "rot",
+    });
+    // Alles Weitere waere eine Auswertung eines Kontos, das nie gearbeitet hat.
+    return signale;
+  }
 
   // Stille ist das wichtigste Signal ueberhaupt: sie geht der Kuendigung
   // voraus, nicht schlechte Zahlen.
-  if (e.tageSeitAktivitaet === null || e.tageSeitAktivitaet >= SCHWELLEN.stilleTage) {
+  if (
+    !frisch &&
+    (e.tageSeitAktivitaet === null || e.tageSeitAktivitaet >= SCHWELLEN.stilleTage)
+  ) {
     signale.push({
       schluessel: "stille",
       titel:
         e.tageSeitAktivitaet === null
-          ? "Lange gar nichts"
-          : `Seit ${e.tageSeitAktivitaet} Tagen keine Aktivität`,
+          ? "Seit dem Start nichts gemacht"
+          : `Seit ${dauer(e.tageSeitAktivitaet)} keine Aktivität`,
       schritt: "Anrufen. Nicht nach Zahlen fragen, sondern wie es läuft.",
       schwere: "rot",
     });
@@ -74,7 +126,7 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
   ) {
     signale.push({
       schluessel: "termine_platzen",
-      titel: `${e.termineGehalten14} von ${e.termineVereinbart14} Terminen gehalten`,
+      titel: `${e.termineGehalten14} von ${termine(e.termineVereinbart14)} gehalten`,
       schritt: "Termine platzen oder werden gemieden. Vorbereitung gemeinsam ansehen.",
       schwere: "gelb",
     });
@@ -86,30 +138,36 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
   ) {
     signale.push({
       schluessel: "kein_abschluss",
-      titel: `${e.termineGehaltenMonat} Termine, kein Abschluss`,
+      titel: `${termine(e.termineGehaltenMonat)}, kein Abschluss`,
       schritt: "Abschlussschwäche. Begleitung vereinbaren, nicht mehr Termine fordern.",
       schwere: "gelb",
     });
   }
 
+  // Der teuerste Moment im Strukturvertrieb - aber erst, wenn die Anlaufzeit
+  // vorbei ist. An Tag drei ist "noch kein Abschluss" der Normalfall.
   if (
-    e.tageDabei !== null &&
-    e.tageDabei <= SCHWELLEN.onboardingWochen * 7 &&
+    tageDabei !== null &&
+    tageDabei >= SCHWELLEN.schonungstage * 2 &&
+    tageDabei <= SCHWELLEN.onboardingWochen * 7 &&
     e.abschluesseGesamt === 0
   ) {
     signale.push({
       schluessel: "onboarding",
-      titel: `Seit ${Math.floor(e.tageDabei / 7)} Wochen dabei, noch kein Abschluss`,
+      titel: `Seit ${dauer(tageDabei)} dabei, noch kein Abschluss`,
       schritt: "Der teuerste Moment. Diese Woche gemeinsam einen Termin machen.",
       schwere: "rot",
     });
   }
 
-  if (e.pipelineSichtbar) {
+  if (e.pipelineSichtbar && !frisch) {
     if (e.kontakteInAkquise < SCHWELLEN.pipelineMindestbestand) {
       signale.push({
         schluessel: "pipeline_leer",
-        titel: `Nur ${e.kontakteInAkquise} Kontakte in der Akquise`,
+        titel:
+          e.kontakteInAkquise === 0
+            ? "Keine offenen Namen mehr"
+            : `Nur noch ${e.kontakteInAkquise} offene Namen`,
         schritt: "Kein Verkaufs-, sondern ein Nachschubproblem. Gemeinsam telefonieren.",
         schwere: "gelb",
       });
@@ -127,7 +185,7 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
     if (e.termineOhneEmpfehlung > 0) {
       signale.push({
         schluessel: "empfehlungen",
-        titel: `${e.termineOhneEmpfehlung} gehaltene Termine ohne Empfehlungsfrage`,
+        titel: `${termine(e.termineOhneEmpfehlung)} ohne Empfehlungsfrage`,
         schritt: "Der billigste ungenutzte Hebel. Frage einüben.",
         schwere: "gelb",
       });
@@ -140,6 +198,19 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
 export function ampelVon(signale: Signal[]): Ampel {
   if (signale.some((signal) => signal.schwere === "rot")) return "rot";
   return signale.length > 0 ? "gelb" : "gruen";
+}
+
+/**
+ * Sortierschluessel fuer "wer zuerst". Klein = dringender.
+ *
+ * Ohne das steht die Mannschaft in Baumreihenfolge da, und die Fuehrungskraft
+ * muss sich selbst zusammenreimen, wo sie anfaengt. Genau die Arbeit soll ihr
+ * das Werkzeug abnehmen.
+ */
+export function dringlichkeit(signale: Signal[]): number {
+  const rot = signale.filter((signal) => signal.schwere === "rot").length;
+  if (rot > 0) return 100 - rot;
+  return signale.length > 0 ? 200 - signale.length : 300;
 }
 
 export const ampelFarben: Record<Ampel, string> = {

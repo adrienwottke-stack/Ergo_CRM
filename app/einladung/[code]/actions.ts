@@ -31,6 +31,8 @@ export async function einladungEinloesen(formData: FormData) {
   const name = text(formData, "name").slice(0, 60);
   const email = text(formData, "email").toLowerCase();
   const password = text(formData, "password");
+  // Freiwillig. Leer bleibt leer - ein Konto ohne Nummer ist kein Fehler.
+  const phone = text(formData, "phone").slice(0, 30) || null;
 
   // Die Typannotation gehoert an die Variable, nicht nur an die Funktion: nur
   // dann weiss TypeScript, dass der Aufruf nie zurueckkehrt, und haelt danach
@@ -70,6 +72,7 @@ export async function einladungEinloesen(formData: FormData) {
         data: {
           email,
           name,
+          phone,
           passwordSalt: salt,
           passwordHash,
           leaderId: invite.leader.id,

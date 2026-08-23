@@ -48,7 +48,10 @@ export default function Postfach({
         className="flex min-h-12 w-full items-center justify-between gap-3 px-4 text-left"
       >
         <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
-          Von deinen Leuten
+          {/* Nicht "von deinen Leuten": aus der Mannschafts-Uebersicht
+              schreibt die Fuehrungskraft nach unten, und die Zeile stand dann
+              falsch herum. */}
+          Für dich
           {ungelesen > 0 && (
             <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gold-400 px-1.5 text-[11px] font-bold text-navy-950">
               {ungelesen}

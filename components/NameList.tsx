@@ -11,7 +11,6 @@ import {
 import {
   NACHFUELL_SCHWELLE,
   NAME_TARGET,
-  RATINGS,
   nextRating,
   ratingHints,
   ratingLabels,
@@ -20,7 +19,7 @@ import {
 } from "@/lib/namelist";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
 import { CheckIcon, PhoneIcon, PlusIcon, SparkIcon, XIcon } from "@/components/icons";
-import { card, filterPill, input } from "@/components/ui";
+import { card, input } from "@/components/ui";
 
 export type NameEntry = {
   id: string;
@@ -69,7 +68,6 @@ export default function NameList({
 }) {
   const [optimistic, applyOptimistic] = useOptimistic(entries, applyPatch);
   const [, startTransition] = useTransition();
-  const [ratingFilter, setRatingFilter] = useState<ContactRating | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
   const [showLost, setShowLost] = useState(false);
@@ -81,13 +79,12 @@ export default function NameList({
   const done = optimistic.filter((entry) => entry.section === "geschafft");
   const lost = optimistic.filter((entry) => entry.section === "raus");
 
-  const visible = ratingFilter
-    ? open.filter((entry) => entry.rating === ratingFilter)
-    : open;
-
   const total = optimistic.length;
   const percent = targetPercent(total);
-  const callable = visible.filter((entry) => entry.phone).length;
+  const callable = open.filter((entry) => entry.phone).length;
+  // Ueber die ganze offene Liste, nicht nur die gefilterte Sicht: der Nachtrag
+  // arbeitet ohnehin alle ab.
+  const ohneNummer = open.filter((entry) => !entry.phone).length;
 
   const submitName = () => {
     const name = nameRef.current?.value.trim() ?? "";
@@ -118,6 +115,13 @@ export default function NameList({
   };
 
   const cycleRating = (entry: NameEntry) => {
+    // Eine optimistisch eingefuegte Zeile traegt noch keine echte Id (siehe
+    // applyPatch). Wer sofort auf den Buchstaben tippt, wuerde sie an den
+    // Server schicken - der findet nichts, und die Einstufung waere still weg.
+    // Das Fenster ist kurz, aber es ist genau der Moment, in dem jemand zwanzig
+    // Namen hintereinander eintippt.
+    if (entry.id.startsWith("neu-")) return;
+
     const next = nextRating(entry.rating);
     const data = new FormData();
     data.set("contactId", entry.id);
@@ -230,62 +234,53 @@ export default function NameList({
 
       {open.length > 0 && (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setRatingFilter(null)}
-              className={filterPill(ratingFilter === null)}
-            >
-              Alle
-            </button>
-            {RATINGS.map((value) => {
-              const count = open.filter((entry) => entry.rating === value).length;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() =>
-                    setRatingFilter(ratingFilter === value ? null : value)
-                  }
-                  title={ratingHints[value]}
-                  className={filterPill(ratingFilter === value)}
-                >
-                  {value} · {ratingLabels[value]}
-                  <span className="ml-1.5 opacity-60">{count}</span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Hier stand eine Filterleiste nach A/B/C. Sie war ein
+              Entscheidungspunkt, den der Nutzer nicht treffen soll
+              (docs/audit-kernmodell.md, 1.5 und 10.9): der Durchlauf sortiert
+              ohnehin nach Naehe, enger Kreis zuerst. Wer filtern konnte, konnte
+              vor allem eines - die unangenehmen Namen wegblenden. */}
 
-          <Link
-            href={`/namen/anrufen?liste=${kind}${
-              ratingFilter ? `&stufe=${ratingFilter}` : ""
-            }`}
-            className={`flex min-h-14 items-center justify-center gap-2 rounded-xl text-base font-semibold transition ${
-              callable > 0
-                ? "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99]"
-                : "pointer-events-none bg-slate-100 text-slate-400"
-            }`}
-          >
-            <PhoneIcon className="h-5 w-5" />
-            {callable > 0
-              ? `Durchlauf starten · ${callable} ${callable === 1 ? "Name" : "Namen"}`
-              : "Erst Nummern eintragen"}
-          </Link>
+          {/* Ohne Nummer kein Anruf. Frueher stand hier ein toter Knopf
+              ("Erst Nummern eintragen") und der Partner musste sich selbst
+              ausdenken, wie er zwanzig Nummern in die Liste bekommt. Jetzt ist
+              der Satz der Weg. */}
+          {callable > 0 ? (
+            <Link
+              href={`/namen/anrufen?liste=${kind}`}
+              className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-base font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.99]"
+            >
+              <PhoneIcon className="h-5 w-5" />
+              Durchlauf starten · {callable} {callable === 1 ? "Name" : "Namen"}
+            </Link>
+          ) : (
+            <Link
+              href={`/namen/nummern?liste=${kind}`}
+              className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-navy-900 text-base font-semibold text-white transition hover:bg-navy-950 active:scale-[0.99]"
+            >
+              <PhoneIcon className="h-5 w-5" />
+              Nummern nachtragen · {ohneNummer}{" "}
+              {ohneNummer === 1 ? "Name" : "Namen"}
+            </Link>
+          )}
+
+          {callable > 0 && ohneNummer > 0 && (
+            <Link
+              href={`/namen/nummern?liste=${kind}`}
+              className="-mt-2 inline-flex min-h-11 items-center justify-center gap-1.5 text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
+            >
+              {ohneNummer} {ohneNummer === 1 ? "Name hat" : "Namen haben"} noch
+              keine Nummer — nachtragen
+            </Link>
+          )}
 
           <ul className="space-y-2">
-            {visible.map((entry) => (
+            {open.map((entry) => (
               <NameRow
                 key={entry.id}
                 entry={entry}
                 onCycleRating={() => cycleRating(entry)}
               />
             ))}
-            {visible.length === 0 && (
-              <li className="rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
-                Kein Name mit dieser Einstufung.
-              </li>
-            )}
           </ul>
         </>
       )}

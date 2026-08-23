@@ -16,7 +16,7 @@ import { addName } from "@/app/(app)/namen/actions";
 import { STUETZEN, STUETZEN_ANZAHL } from "@/lib/gedaechtnisstuetzen";
 import { NAME_TARGET, listKindLabels } from "@/lib/namelist";
 import type { ListKind } from "@/lib/generated/prisma/enums";
-import { ArrowLeftIcon, CheckIcon, PlusIcon } from "@/components/icons";
+import { ArrowLeftIcon, CheckIcon, PhoneIcon, PlusIcon } from "@/components/icons";
 import { btnPrimary, card, input } from "@/components/ui";
 
 export default function NamenSammeln({
@@ -36,10 +36,16 @@ export default function NamenSammeln({
   const [, startTransition] = useTransition();
   const feldRef = useRef<HTMLInputElement>(null);
 
+  // Eingefroren beim Betreten. addName laesst den Server neu rechnen, und der
+  // liefert `vorhanden` dann INKLUSIVE der gerade gesammelten Namen - waehrend
+  // `gesammelt` sie ebenfalls zaehlt. Ohne das Einfrieren stand nach drei
+  // Namen "6 von 20" da, und zwar schon im Fortschritt waehrend des Sammelns.
+  const [basis] = useState(vorhanden);
+
   const fertig = stufe >= STUETZEN_ANZAHL;
   const stuetze = fertig ? null : STUETZEN[stufe]!;
   const neueNamen = gesammelt.flat();
-  const gesamt = vorhanden + neueNamen.length;
+  const gesamt = basis + neueNamen.length;
 
   const eintragen = () => {
     const name = feldRef.current?.value.trim() ?? "";
@@ -83,21 +89,52 @@ export default function NamenSammeln({
             ? `Damit stehen ${gesamt} auf deiner Liste. Das reicht zum Loslegen.`
             : `Damit stehen ${gesamt} von ${NAME_TARGET} auf deiner Liste.`}
         </p>
-        <Link href={`/namen?liste=${kind}`} className={`${btnPrimary} mt-6`}>
-          Zur Namensliste
-        </Link>
-        {gesamt < NAME_TARGET && (
-          <button
-            type="button"
-            onClick={() => {
-              setGesammelt(STUETZEN.map(() => []));
-              setStufe(0);
-            }}
-            className="mt-3 min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
-          >
-            Noch eine Runde
-          </button>
+
+        {/* Ohne Nummer kein Anruf: die frisch gesammelten Namen haben noch
+            keine. Hier endete die Kette frueher - der naechste Schritt stand
+            nirgends, und auf der Liste wartete ein toter Knopf. */}
+        {neueNamen.length > 0 ? (
+          <>
+            <Link
+              href={`/namen/nummern?liste=${kind}`}
+              className={`${btnPrimary} mt-6`}
+            >
+              <PhoneIcon className="h-4 w-4" />
+              Nummern nachtragen
+            </Link>
+            <p className="mt-2 max-w-xs text-xs text-slate-400">
+              Ohne Nummer kein Anruf. Geht am schnellsten am Stück — ein Name,
+              ein Feld.
+            </p>
+          </>
+        ) : (
+          <Link href={`/namen?liste=${kind}`} className={`${btnPrimary} mt-6`}>
+            Zur Namensliste
+          </Link>
         )}
+
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4">
+          {gesamt < NAME_TARGET && (
+            <button
+              type="button"
+              onClick={() => {
+                setGesammelt(STUETZEN.map(() => []));
+                setStufe(0);
+              }}
+              className="min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
+            >
+              Noch eine Runde
+            </button>
+          )}
+          {neueNamen.length > 0 && (
+            <Link
+              href={`/namen?liste=${kind}`}
+              className="min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
+            >
+              Zur Namensliste
+            </Link>
+          )}
+        </div>
       </div>
     );
   }

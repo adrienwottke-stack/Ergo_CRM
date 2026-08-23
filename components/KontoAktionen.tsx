@@ -1,0 +1,161 @@
+"use client";
+
+// Die drei Griffe je Konto in der Strukturverwaltung.
+//
+// Der wichtigste Teil ist die Trennung von Austragen und Loeschen. Sie sehen
+// nebeneinander gleich aus und sind es nicht:
+//
+//   Austragen  – jemand hoert auf. Das Konto bleibt im Baum, damit die
+//                Historie stimmt, zaehlt aber nirgends mehr mit.
+//   Loeschen   – ein Testkonto oder ein Fehlgriff. Alles geht mit.
+//
+// Deshalb liegt Loeschen hinter einem Dialog, der ausschreibt, was mitgeht -
+// nicht hinter einem "Sicher?", das man wegklickt.
+
+import { useState } from "react";
+import { useFormStatus } from "react-dom";
+import Modal from "@/components/Modal";
+import {
+  benutzerAustragen,
+  benutzerLoeschen,
+  passwortResetErzeugen,
+} from "@/app/(app)/team/actions";
+import { TrashIcon } from "@/components/icons";
+import { btnSecondary } from "@/components/ui";
+
+function LoeschKnopf() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-5 text-sm font-medium text-white transition hover:bg-red-700 active:scale-[0.99] disabled:opacity-60"
+    >
+      {pending ? "Löscht …" : "Endgültig löschen"}
+    </button>
+  );
+}
+
+const still =
+  "inline-flex min-h-11 items-center rounded-lg px-2.5 text-xs font-medium transition";
+
+export default function KontoAktionen({
+  userId,
+  name,
+  ausgetragen,
+  kontakte,
+  gefuehrte,
+  istDu,
+}: {
+  userId: string;
+  name: string;
+  ausgetragen: boolean;
+  kontakte: number;
+  gefuehrte: number;
+  /** Das eigene Konto: austragen und loeschen sperren wir. */
+  istDu: boolean;
+}) {
+  const [offen, setOffen] = useState(false);
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <form action={passwortResetErzeugen}>
+        <input type="hidden" name="userId" value={userId} />
+        <button
+          type="submit"
+          title={`${name} ein neues Passwort setzen lassen`}
+          className={`${still} text-slate-500 hover:bg-slate-50 hover:text-navy-700`}
+        >
+          Passwort-Link
+        </button>
+      </form>
+
+      {!istDu && (
+        <form action={benutzerAustragen}>
+          <input type="hidden" name="userId" value={userId} />
+          <input type="hidden" name="wieder" value={ausgetragen ? "1" : "0"} />
+          <button
+            type="submit"
+            title={
+              ausgetragen
+                ? `${name} wieder aufnehmen`
+                : `${name} austragen – bleibt im Baum, zählt nicht mehr mit`
+            }
+            className={`${still} text-slate-500 hover:bg-slate-50 hover:text-slate-900`}
+          >
+            {ausgetragen ? "Zurückholen" : "Austragen"}
+          </button>
+        </form>
+      )}
+
+      {!istDu && (
+        <button
+          type="button"
+          onClick={() => setOffen(true)}
+          aria-label={`${name} löschen`}
+          className={`${still} text-slate-300 hover:bg-red-50 hover:text-red-700`}
+        >
+          <TrashIcon className="h-4 w-4" />
+        </button>
+      )}
+
+      <Modal
+        open={offen}
+        onClose={() => setOffen(false)}
+        title="Konto löschen?"
+        subtitle={name}
+      >
+        <form action={benutzerLoeschen}>
+          <input type="hidden" name="userId" value={userId} />
+
+          <p className="text-sm text-slate-700">
+            Das lässt sich nicht rückgängig machen.
+          </p>
+
+          <ul className="mt-3 space-y-1.5 text-sm text-slate-600">
+            <li className="flex gap-2">
+              <span aria-hidden className="text-slate-300">
+                —
+              </span>
+              {kontakte === 0
+                ? "Keine Kontakte vorhanden."
+                : `${kontakte} ${kontakte === 1 ? "Kontakt geht" : "Kontakte gehen"} mit, samt Vorgeschichte.`}
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden className="text-slate-300">
+                —
+              </span>
+              Ranglisten-Einträge und Wettbewerbspunkte verschwinden.
+            </li>
+            {gefuehrte > 0 && (
+              <li className="flex gap-2">
+                <span aria-hidden className="text-slate-300">
+                  —
+                </span>
+                {gefuehrte === 1 ? "Der Berater" : `Die ${gefuehrte} Berater`}{" "}
+                darunter {gefuehrte === 1 ? "rückt" : "rücken"} eine Ebene
+                hoch — samt eigener Leute.
+              </li>
+            )}
+          </ul>
+
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Nur für Testkonten und Fehlgriffe. Wer aufhört, gehört auf
+            „Austragen“ — dann bleibt die Historie stehen.
+          </p>
+
+          <div className="mt-5 flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setOffen(false)}
+              className={btnSecondary}
+            >
+              Abbrechen
+            </button>
+            <LoeschKnopf />
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}

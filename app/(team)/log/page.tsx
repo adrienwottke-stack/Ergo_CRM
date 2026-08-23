@@ -6,6 +6,7 @@ import { manualQuotaTypes, quotaTypeLabels } from "@/lib/labels";
 import { berlinDayOf, berlinToday, dayDisplayFormat, dayToUtcDate } from "@/lib/dates";
 import { streakDays } from "@/lib/stats";
 import QuickCounter from "@/components/QuickCounter";
+import WettbewerbNav from "@/components/WettbewerbNav";
 import { CalendarCheckIcon, ChevronRightIcon, FlameIcon, HashIcon, PhoneIcon } from "@/components/icons";
 import { btnPrimary, card, input, label, pageTitle, sectionTitle } from "@/components/ui";
 import { deleteLog, logDaily } from "./actions";
@@ -61,6 +62,8 @@ export default async function LogPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
+      <WettbewerbNav />
+
       <div>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className={pageTitle}>Meine Aktivitäten</h1>

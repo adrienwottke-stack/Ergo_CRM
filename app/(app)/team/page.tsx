@@ -2,7 +2,8 @@ import { headers } from "next/headers";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ebene, liegtImAst } from "@/lib/struktur";
-import { btnPrimary, card, input, label, pageTitle, sectionTitle, td, th } from "@/components/ui";
+import { btnPrimary, card, input, kicker, label, pageTitle, sectionTitle, td, th } from "@/components/ui";
+import KontoAktionen from "@/components/KontoAktionen";
 import {
   beraterUmhaengen,
   einladungBrowserFreigabe,
@@ -16,6 +17,7 @@ const createdFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium" });
 
 const fehlertexte: Record<string, string> = {
   invalid: "Die Angabe konnte nicht gelesen werden.",
+  sich_selbst_konto: "Das eigene Konto lässt sich hier nicht ändern.",
   sich_selbst: "Ein Berater kann nicht seine eigene Führungskraft sein.",
   eigener_ast:
     "Das würde einen Kreis erzeugen: die gewählte Führungskraft hängt selbst unter diesem Berater.",
@@ -30,10 +32,19 @@ export default async function TeamPage({
     moved?: string;
     invited?: string;
     revoked?: string;
+    ausgetragen?: string;
+    zurueck?: string;
+    geloescht?: string;
+    reset?: string;
   }>;
 }) {
-  await requireAdmin();
-  const [{ error, moved, invited, revoked }, kopfzeilen, users, invites] =
+  const admin = await requireAdmin();
+  const [
+    { error, moved, invited, revoked, ausgetragen, zurueck, geloescht, reset },
+    kopfzeilen,
+    users,
+    invites,
+  ] =
     await Promise.all([
       searchParams,
       headers(),
@@ -113,6 +124,38 @@ export default async function TeamPage({
         <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
           Einladung zurückgenommen.
         </p>
+      )}
+      {ausgetragen && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+          Konto ausgetragen. Es bleibt im Baum stehen und zählt nirgends mehr mit.
+        </p>
+      )}
+      {zurueck && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+          Konto wieder aufgenommen.
+        </p>
+      )}
+      {geloescht && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+          Konto gelöscht. Wer darunter hing, ist eine Ebene hochgerückt.
+        </p>
+      )}
+
+      {/* Der Reset-Link steht genau einmal da - danach ist er nur noch in der
+          Nachricht, in der er verschickt wurde. */}
+      {reset && (
+        <section className={`${card} space-y-2 p-5`}>
+          <p className="text-sm font-semibold text-slate-900">
+            Link zum Passwort-Setzen
+          </p>
+          <code className="block break-all rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-800">
+            {herkunft}/neues-passwort/{reset}
+          </code>
+          <p className={kicker}>
+            Einen Tag gültig, einmal benutzbar. Schick ihn dem Betroffenen — er
+            setzt sein Passwort selbst, du bekommst es nie zu sehen.
+          </p>
+        </section>
       )}
 
       <section className={`${card} space-y-5 p-6 sm:p-8`}>
@@ -204,6 +247,18 @@ export default async function TeamPage({
           <p className="mt-1 text-sm text-slate-500">
             Einrückung zeigt die Ebene. Umhängen schreibt den ganzen Ast mit.
           </p>
+          {/* Der haeufigste Griff, der nicht selbsterklaerend ist: jemanden
+              UEBER sich einhaengen. Die Reihenfolge ist Pflicht - anders herum
+              entstuende ein Kreis, und das Umhaengen wird abgewiesen. */}
+          <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            <span className="font-medium text-slate-800">
+              Jemanden über dir einhängen
+            </span>{" "}
+            (deine eigene Führungskraft): erst einladen, dann hier bei ihr{" "}
+            <span className="font-medium">„keine (Wurzel)“</span> setzen — und
+            erst danach dich selbst unter sie hängen. In dieser Reihenfolge,
+            sonst entsteht ein Kreis.
+          </p>
         </div>
         <table className="mt-4 w-full min-w-[760px] text-left text-sm">
           <thead className="border-y border-slate-200/80 bg-slate-50/60">
@@ -215,6 +270,7 @@ export default async function TeamPage({
               <th className={`${th} text-right`}>Ranglisten-Einträge</th>
               <th className={th}>Führungskraft</th>
               <th className={th}>Dabei seit</th>
+              <th className={th}>Konto</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -271,6 +327,16 @@ export default async function TeamPage({
                   </td>
                   <td className={`${td} text-slate-500`}>
                     {createdFormat.format(user.startedAt ?? user.createdAt)}
+                  </td>
+                  <td className={td}>
+                    <KontoAktionen
+                      userId={user.id}
+                      name={user.name}
+                      ausgetragen={user.deactivatedAt !== null}
+                      kontakte={user._count.contacts}
+                      gefuehrte={user._count.team}
+                      istDu={user.id === admin.id}
+                    />
                   </td>
                 </tr>
               );

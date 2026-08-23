@@ -66,10 +66,20 @@ export default async function LoginPage({
               {isFirstSetup ? "Admin-Konto erstellen" : "Anmelden"}
             </button>
           </form>
+          {!isFirstSetup && (
+            <p className="mt-5 border-t border-slate-100 pt-4 text-center text-xs text-slate-500">
+              Passwort vergessen? Melde dich bei deiner Führungskraft — sie
+              schickt dir einen Link, mit dem du ein neues setzt.
+            </p>
+          )}
         </div>
 
+        {/* Konten entstehen ueber Einladungslinks (/einladung/[code]), nicht
+            ueber einen Admin. Hier stand vorher das Gegenteil - ausgerechnet
+            auf der Seite, auf der ein Eingeladener landet, wenn er den Link
+            verlegt hat. */}
         <p className="mt-4 text-center text-xs text-slate-400">
-          Neue Teamkonten werden von einem Admin angelegt.
+          Noch kein Konto? Du brauchst den Einladungslink deiner Führungskraft.
         </p>
       </div>
     </main>

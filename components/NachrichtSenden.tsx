@@ -15,9 +15,16 @@ import { input } from "@/components/ui";
 export default function NachrichtSenden({
   anId,
   name,
+  schnelltexte = SCHNELLTEXTE,
+  variante = "symbol",
 }: {
   anId: string;
   name: string;
+  /** Die vier fertigen Saetze. In der Mannschaft spricht eine Fuehrungskraft,
+      in der Arena ein Konkurrent - das sind andere Saetze. */
+  schnelltexte?: readonly string[];
+  /** "symbol" = Briefchen in einer Tabellenzeile, "knopf" = beschriftet. */
+  variante?: "symbol" | "knopf";
 }) {
   const [offen, setOffen] = useState(false);
   const [eigener, setEigener] = useState("");
@@ -44,17 +51,30 @@ export default function NachrichtSenden({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOffen(true)}
-        aria-label={`${name} etwas schreiben`}
-        title="Etwas schreiben"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-100 hover:text-navy-700"
-      >
-        <span aria-hidden className="text-base leading-none">
-          ✉
-        </span>
-      </button>
+      {variante === "knopf" ? (
+        <button
+          type="button"
+          onClick={() => setOffen(true)}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-[13px] font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
+        >
+          <span aria-hidden className="text-base leading-none">
+            ✉
+          </span>
+          {name.split(" ")[0]} schreiben
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOffen(true)}
+          aria-label={`${name} etwas schreiben`}
+          title="Etwas schreiben"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-100 hover:text-navy-700"
+        >
+          <span aria-hidden className="text-base leading-none">
+            ✉
+          </span>
+        </button>
+      )}
 
       <Modal
         open={offen}
@@ -69,7 +89,7 @@ export default function NachrichtSenden({
         ) : (
           <div className="space-y-4">
             <div className="space-y-2">
-              {SCHNELLTEXTE.map((text) => (
+              {schnelltexte.map((text) => (
                 <button
                   key={text}
                   type="button"

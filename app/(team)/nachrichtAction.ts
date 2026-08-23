@@ -37,6 +37,11 @@ export async function nachrichtSenden(formData: FormData) {
 
   revalidatePath("/arena");
   revalidatePath("/leaderboard");
+  // Auch aus der Mannschaft heraus wird geschrieben - dort steht danach der
+  // Knopf im selben Zustand wie vorher, wenn die Seite nicht neu rechnet.
+  revalidatePath("/mannschaft");
+  // Der Empfaenger sieht Ungelesenes auf seiner Startseite.
+  revalidatePath("/heute");
 }
 
 export async function nachrichtenGelesen() {
@@ -46,4 +51,7 @@ export async function nachrichtenGelesen() {
     data: { gelesenAt: new Date() },
   });
   revalidatePath("/arena");
+  // Ungelesenes steht auch auf /heute - sonst bliebe der Stapel dort stehen,
+  // nachdem er hier abgehakt wurde.
+  revalidatePath("/heute");
 }

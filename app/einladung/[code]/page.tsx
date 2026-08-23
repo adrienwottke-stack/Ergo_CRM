@@ -174,6 +174,28 @@ export default async function EinladungPage({
               />
             </div>
 
+            {/* Freiwillig, und der Satz darunter sagt genau wofuer. Ohne
+                Nummer kann die Fuehrungskraft nur schreiben - und ein Anruf
+                ist im Zweifel das, was jemanden im Geschaeft haelt. */}
+            <div>
+              <label htmlFor="phone" className={label}>
+                Handynummer <span className="font-normal text-slate-400">(freiwillig)</span>
+              </label>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                inputMode="tel"
+                maxLength={30}
+                autoComplete="tel"
+                className={input}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Damit {invite.leader.name.split(" ")[0]} dich anrufen kann, wenn es
+                hakt. Sonst niemand.
+              </p>
+            </div>
+
             <div>
               <label htmlFor="password" className={label}>Passwort (mindestens 8 Zeichen)</label>
               <input
