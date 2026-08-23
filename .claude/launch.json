@@ -7,13 +7,6 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": true
-    },
-    {
-      "name": "storno",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["C:\\Users\\adrie\\Desktop\\Business\\ERGO TOOLS\\storno\\serve.js"],
-      "port": 4173,
-      "autoPort": true
     }
   ]
 }

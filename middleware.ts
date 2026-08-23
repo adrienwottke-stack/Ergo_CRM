@@ -24,15 +24,15 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Login, die Einladungsseite (wer eingeladen wird, hat noch kein Konto), das
-  // bewusst oeffentliche Storno-Spiel, Next-Assets und statische Dateien
-  // bleiben erreichbar. Alles andere verlangt ein persoenliches Konto.
+  // Login, die Einladungsseite (wer eingeladen wird, hat noch kein Konto),
+  // Next-Assets und statische Dateien bleiben erreichbar. Alles andere
+  // verlangt ein persoenliches Konto.
   //
   // Dazu alles, was zur Installation gehoert: /start entscheidet selbst, wohin
   // es geht, /offline liefert der Service Worker aus, und Manifest, sw.js und
   // die Symbole muss der Browser abrufen koennen, BEVOR jemand ein Konto hat -
   // sonst gibt es auf der Einladungsseite gar nichts zu installieren.
   matcher: [
-    "/((?!login|einladung|storno|start|offline|manifest\\.webmanifest|sw\\.js|icon-|apple-touch-icon\\.png|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)",
+    "/((?!login|einladung|start|offline|manifest\\.webmanifest|sw\\.js|icon-|apple-touch-icon\\.png|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)",
   ],
 };
