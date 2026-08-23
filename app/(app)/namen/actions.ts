@@ -6,7 +6,6 @@ import { requireUser, requireUserPerson } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { isContactRating, isListKind } from "@/lib/namelist";
-import { DEFAULT_GUIDES, isGuideKey } from "@/lib/guides";
 import type { ListKind } from "@/lib/generated/prisma/enums";
 
 function text(formData: FormData, field: string): string | null {
@@ -17,7 +16,6 @@ function text(formData: FormData, field: string): string | null {
 function refreshNameViews() {
   revalidatePath("/namen");
   revalidatePath("/heute");
-  revalidatePath("/contacts");
   revalidatePath("/leaderboard");
 }
 
@@ -172,45 +170,3 @@ export async function removeFromList(formData: FormData) {
 // Die vier Gespraechsergebnisse liegen jetzt in
 // app/(app)/contacts/results.ts – sie sind nicht namenslisten-spezifisch,
 // die Heute-Liste benutzt dieselben.
-
-// --- Leitfaeden -------------------------------------------------------------
-
-export async function saveGuide(formData: FormData) {
-  const user = await requireUser();
-  const keyRaw = text(formData, "key");
-  const body = (formData.get("body") as string | null)?.trim();
-  if (!keyRaw || !isGuideKey(keyRaw)) throw new Error("Leitfaden nicht gefunden.");
-  if (!body) throw new Error("Der Leitfaden darf nicht leer sein.");
-
-  const title = text(formData, "title") ?? DEFAULT_GUIDES[keyRaw].title;
-
-  await prisma.guide.upsert({
-    where: { ownerId_key: { ownerId: user.id, key: keyRaw } },
-    create: { ownerId: user.id, key: keyRaw, title, body },
-    update: { title, body },
-  });
-  revalidatePath("/namen");
-}
-
-// Zuruecksetzen loescht die persoenliche Zeile – danach gilt wieder der
-// Standardtext aus dem Code.
-export async function resetGuide(formData: FormData) {
-  const user = await requireUser();
-  const keyRaw = text(formData, "key");
-  if (!keyRaw || !isGuideKey(keyRaw)) throw new Error("Leitfaden nicht gefunden.");
-
-  await prisma.guide.deleteMany({ where: { ownerId: user.id, key: keyRaw } });
-  revalidatePath("/namen");
-}
-
-// --- Einsteiger-Modus -------------------------------------------------------
-
-export async function setBeginnerMode(formData: FormData) {
-  const user = await requireUser();
-  const on = text(formData, "on") === "1";
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { beginnerMode: on },
-  });
-  revalidatePath("/", "layout");
-}

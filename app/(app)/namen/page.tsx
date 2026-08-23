@@ -37,27 +37,21 @@ export default async function NamenPage({
   const kind: ListKind = liste && isListKind(liste) ? liste : "RECRUITING";
 
   const guideKey = guideKeyForList[kind];
-  const [contacts, customGuide] = await Promise.all([
-    prisma.contact.findMany({
-      where: { ...eigene(user.id).kontakte, listKinds: { has: kind } },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        rating: true,
-        listKinds: true,
-        stage: true,
-        outcome: true,
-        lostReason: true,
-        appointmentAt: true,
-      },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.guide.findUnique({
-      where: { ownerId_key: { ownerId: user.id, key: guideKey } },
-      select: { title: true, body: true },
-    }),
-  ]);
+  const contacts = await prisma.contact.findMany({
+    where: { ...eigene(user.id).kontakte, listKinds: { has: kind } },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      rating: true,
+      listKinds: true,
+      stage: true,
+      outcome: true,
+      lostReason: true,
+      appointmentAt: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
 
   // Bewusst in Eingabe-Reihenfolge, nicht nach Naehe: beim Einstufen wuerden
   // sonst die Zeilen unter dem Finger wegspringen. Sortiert wird im Durchlauf,
@@ -75,12 +69,7 @@ export default async function NamenPage({
       : null,
   }));
 
-  // Wer selbst geschrieben hat, ist kein Geruest mehr – der Hinweis auf
-  // fehlenden Wortlaut verschwindet dann.
-  const standard = DEFAULT_GUIDES[guideKey];
-  const guide = customGuide
-    ? { ...standard, ...customGuide, isCustom: true, isDraft: false }
-    : { ...standard, isCustom: false };
+  const guide = DEFAULT_GUIDES[guideKey];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -112,13 +101,7 @@ export default async function NamenPage({
 
       <NameList entries={entries} kind={kind} />
 
-      <GuidePanel
-        guideKey={guideKey}
-        title={guide.title}
-        body={guide.body}
-        isCustom={guide.isCustom}
-        isDraft={guide.isDraft}
-      />
+      <GuidePanel title={guide.title} body={guide.body} kind={kind} />
     </div>
   );
 }

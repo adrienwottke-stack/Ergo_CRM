@@ -43,11 +43,12 @@ export type SignalEingabe = {
   abschluesseGesamt: number;
   tageDabei: number | null;
 
-  /** Stufe 2 – nur wenn der Berater seine Pipeline sichtbar macht. */
+  /** Stufe 2 – nur wenn der Berater seinen Trichter sichtbar macht. */
   pipelineSichtbar: boolean;
   kontakteInAkquise: number;
   ueberfaelligeSchritte: number;
-  kundenOhneEmpfehlung: number;
+  /** Gehaltene Termine, nach denen nie nach Empfehlungen gefragt wurde. */
+  termineOhneEmpfehlung: number;
 };
 
 export function signaleFuer(e: SignalEingabe): Signal[] {
@@ -123,10 +124,10 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
       });
     }
 
-    if (e.kundenOhneEmpfehlung > 0) {
+    if (e.termineOhneEmpfehlung > 0) {
       signale.push({
         schluessel: "empfehlungen",
-        titel: `${e.kundenOhneEmpfehlung} Kunden ohne Empfehlungsfrage`,
+        titel: `${e.termineOhneEmpfehlung} gehaltene Termine ohne Empfehlungsfrage`,
         schritt: "Der billigste ungenutzte Hebel. Frage einüben.",
         schwere: "gelb",
       });

@@ -27,14 +27,12 @@ export default function DeleteContactButton({
   contactId,
   contactName,
   activityCount,
-  dealCount,
   referralCount = 0,
   variant = "button",
 }: {
   contactId: string;
   contactName: string;
   activityCount: number;
-  dealCount: number;
   referralCount?: number;
   /** "button" steht neben "Bearbeiten", "link" passt in eine Tabellenzeile. */
   variant?: "button" | "link";
@@ -46,7 +44,6 @@ export default function DeleteContactButton({
   const mitgeloescht = [
     activityCount > 0 &&
       `${activityCount} ${activityCount === 1 ? "Aktivität" : "Aktivitäten"}`,
-    dealCount > 0 && `${dealCount} ${dealCount === 1 ? "Vorgang" : "Vorgänge"}`,
   ].filter(Boolean) as string[];
 
   return (

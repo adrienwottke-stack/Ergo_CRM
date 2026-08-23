@@ -19,7 +19,7 @@ export default async function EditContactPage({
   const contact = await prisma.contact.findFirst({
     where: { id, ...eigene(user.id).kontakte },
     include: {
-      _count: { select: { activities: true, deals: true, referrals: true } },
+      _count: { select: { activities: true, referrals: true } },
     },
   });
 
@@ -49,14 +49,13 @@ export default async function EditContactPage({
         <p className={kicker}>Gefahrenzone</p>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <p className="max-w-sm text-sm text-slate-600">
-            Kontakt mitsamt Aktivitäten und Vorgängen entfernen. Nicht
-            rückgängig zu machen.
+            Kontakt mitsamt Aktivitäten entfernen. Nicht rückgängig zu
+            machen.
           </p>
           <DeleteContactButton
             contactId={contact.id}
             contactName={contact.name}
             activityCount={contact._count.activities}
-            dealCount={contact._count.deals}
             referralCount={contact._count.referrals}
           />
         </div>

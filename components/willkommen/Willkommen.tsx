@@ -23,7 +23,6 @@ import EinwandTest from "@/components/willkommen/EinwandTest";
 import BriefAkt from "@/components/willkommen/BriefAkt";
 import NamenSprint from "@/components/willkommen/NamenSprint";
 import Einstufung from "@/components/willkommen/Einstufung";
-import FotoAkt from "@/components/willkommen/FotoAkt";
 import RanglisteMoment from "@/components/willkommen/RanglisteMoment";
 import Ankunft from "@/components/willkommen/Ankunft";
 import { FuehrungsKarten, EinladenAkt } from "@/components/willkommen/FuehrungsAkte";
@@ -170,7 +169,6 @@ export default function Willkommen({
           />
         )}
         {akt === "einstufung" && <Einstufung onDone={weiter} />}
-        {akt === "foto" && <FotoAkt onDone={weiter} />}
         {akt === "rangliste" && <RanglisteMoment onDone={weiter} />}
         {akt === "ankunft" && (
           <Ankunft

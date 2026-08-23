@@ -10,36 +10,20 @@ import {
   utcToBerlinLocalInput,
 } from "@/lib/dates";
 import type { ActivityType } from "@/lib/generated/prisma/enums";
-import StageBadge, { DealStageBadge } from "@/components/StageBadge";
+import StageBadge from "@/components/StageBadge";
 import NextStepBadge, { formatDue } from "@/components/NextStepBadge";
 import ContactActions from "@/components/ContactActions";
 import DeleteContactButton from "@/components/DeleteContactButton";
-import DealActions, { CreateDealButton } from "@/components/DealActions";
 import type { ContactLite } from "@/components/ContactActionDialog";
-import type { DealLite } from "@/components/DealActionDialog";
+import { contactStageHints, lostReasonLabels } from "@/lib/pipeline";
+import { activityTypeLabels } from "@/lib/labels";
 import {
-  contactStageHints,
-  dealLineLabels,
-  formatEuro,
-  lostReasonLabels,
-} from "@/lib/pipeline";
-import { activityTypeLabels, allActivityTypes } from "@/lib/labels";
-import { ArrowLeftIcon, CalendarCheckIcon,
+  ArrowLeftIcon,
+  CalendarCheckIcon,
   ClipboardIcon,
   PhoneIcon,
-  PlusIcon } from "@/components/icons";
-import {
-  btnPrimary,
-  btnSecondary,
-  card,
-  input,
-  kicker,
-  label,
-  pageTitle,
-  sectionTitle,
-} from "@/components/ui";
-import NoteTemplates from "@/components/NoteTemplates";
-import { createActivity, deleteActivity } from "../actions";
+} from "@/components/icons";
+import { btnSecondary, card, kicker, pageTitle, sectionTitle } from "@/components/ui";
 
 const dateTimeFormat = new Intl.DateTimeFormat("de-DE", {
   dateStyle: "medium",
@@ -84,7 +68,6 @@ export default async function ContactDetailPage({
     where: { id, ...eigene(user.id).kontakte },
     include: {
       activities: { orderBy: { date: "desc" } },
-      deals: { orderBy: { createdAt: "desc" } },
       referredBy: { select: { id: true, name: true } },
       referrals: {
         select: { id: true, name: true, stage: true, outcome: true },
@@ -108,22 +91,18 @@ export default async function ContactDetailPage({
       ? utcToBerlinLocalInput(contact.appointmentAt)
       : null,
     hasStep: contact.nextStepType !== null,
+    referralsAsked: contact.referralsAskedAt !== null,
   };
-
-  const openDeals = contact.deals.filter((deal) => deal.outcome === "OFFEN");
-  const wonUnits = contact.deals
-    .filter((deal) => deal.outcome === "GEWONNEN")
-    .reduce((sum, deal) => sum + (deal.units ?? 0), 0);
 
   return (
     <div className="space-y-8">
       <div>
         <Link
-          href="/pipeline"
+          href="/heute"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
         >
           <ArrowLeftIcon className="h-4 w-4" />
-          Zur Pipeline
+          Zurück zu Heute
         </Link>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -149,7 +128,6 @@ export default async function ContactDetailPage({
               contactId={contact.id}
               contactName={contact.name}
               activityCount={contact.activities.length}
-              dealCount={contact.deals.length}
               referralCount={contact.referrals.length}
             />
           </div>
@@ -179,9 +157,9 @@ export default async function ContactDetailPage({
                 {contact.lostReason ? ` · ${lostReasonLabels[contact.lostReason]}` : ""}
                 {contact.lostAt ? ` am ${dateFormat.format(contact.lostAt)}` : ""}
               </p>
-            ) : contact.stage === "IN_BERATUNG" && openDeals.length > 0 ? (
+            ) : contact.stage === "ABSCHLUSS" ? (
               <p className="mt-2 text-sm text-slate-500">
-                Liegt am Vorgang – siehe unten.
+                Schleife durchlaufen – abgeschlossen.
               </p>
             ) : (
               <p className="mt-2 text-sm font-medium text-red-700">
@@ -198,11 +176,9 @@ export default async function ContactDetailPage({
         </div>
       </section>
 
+      {/* Was vor einem Anruf zaehlt - mehr nicht. Alles Weitere stand hier
+          frueher, weil es das Feld gab, nicht weil es jemand braucht. */}
       <div className={`${card} grid gap-x-8 gap-y-5 p-6 sm:grid-cols-2 sm:p-8`}>
-        <div className="sm:col-span-2">
-          <p className={kicker}>Beruf</p>
-          <p className="mt-1 text-sm text-slate-900">{contact.job ?? "–"}</p>
-        </div>
         <div>
           <p className={kicker}>Telefon</p>
           <p className="mt-1 text-sm text-slate-900">
@@ -219,46 +195,31 @@ export default async function ContactDetailPage({
           </p>
         </div>
         <div>
-          <p className={kicker}>E-Mail</p>
-          <p className="mt-1 text-sm text-slate-900">
-            {contact.email ? (
+          <p className={kicker}>Beruf</p>
+          <p className="mt-1 text-sm text-slate-900">{contact.job ?? "–"}</p>
+        </div>
+        {contact.appointmentAt && (
+          <div>
+            <p className={kicker}>Termin</p>
+            <p className="mt-1 text-sm text-slate-900">
+              {formatDue(contact.appointmentAt, hasTimeOfDay(contact.appointmentAt))}
+            </p>
+          </div>
+        )}
+        {/* Nur noch Bestand: neu erfasst wird keine E-Mail mehr. */}
+        {contact.email && (
+          <div>
+            <p className={kicker}>E-Mail</p>
+            <p className="mt-1 text-sm text-slate-900">
               <a
                 href={`mailto:${contact.email}`}
                 className="font-medium text-navy-600 hover:underline"
               >
                 {contact.email}
               </a>
-            ) : (
-              "–"
-            )}
-          </p>
-        </div>
-        <div>
-          <p className={kicker}>Termin</p>
-          <p className="mt-1 text-sm text-slate-900">
-            {contact.appointmentAt
-              ? formatDue(contact.appointmentAt, hasTimeOfDay(contact.appointmentAt))
-              : "–"}
-          </p>
-        </div>
-        <div>
-          <p className={kicker}>Checkup fällig</p>
-          <p className="mt-1 text-sm text-slate-900">
-            {contact.checkupDueAt ? dateFormat.format(contact.checkupDueAt) : "–"}
-          </p>
-        </div>
-        {wonUnits > 0 && (
-          <div>
-            <p className={kicker}>Einheiten gewonnen</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">{wonUnits}</p>
+            </p>
           </div>
         )}
-        <div>
-          <p className={kicker}>Zuletzt aktualisiert</p>
-          <p className="mt-1 text-sm text-slate-900">
-            {dateTimeFormat.format(contact.updatedAt)}
-          </p>
-        </div>
         {contact.note && (
           <div className="sm:col-span-2">
             <p className={kicker}>Notiz</p>
@@ -269,96 +230,15 @@ export default async function ContactDetailPage({
         )}
       </div>
 
-      {/* Vorgaenge */}
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className={sectionTitle}>
-            Vorgänge{" "}
-            <span className="font-normal text-slate-400">({contact.deals.length})</span>
-          </h2>
-          <CreateDealButton
-            contactId={contact.id}
-            contactName={contact.name}
-            className={btnPrimary}
-          >
-            <PlusIcon className="h-4 w-4" />
-            Vorgang anlegen
-          </CreateDealButton>
-        </div>
-
-        {contact.deals.length === 0 ? (
-          <div className={`${card} px-6 py-10 text-center`}>
-            <p className="text-sm font-medium text-slate-900">Noch kein Vorgang</p>
-            <p className="mt-1 text-sm text-slate-500">
-              Nach dem gehaltenen Termin legst du je erkanntem Bedarf einen Vorgang an.
-            </p>
-          </div>
-        ) : (
-          <ul className="grid gap-3 lg:grid-cols-2">
-            {contact.deals.map((deal) => {
-              const dealLite: DealLite = {
-                id: deal.id,
-                contactId: deal.contactId,
-                contactName: contact.name,
-                line: deal.line,
-                title: deal.title,
-                stage: deal.stage,
-                outcome: deal.outcome,
-                hasStep: deal.nextStepType !== null,
-                monthlyPremiumInput:
-                  deal.monthlyPremiumCents != null
-                    ? (deal.monthlyPremiumCents / 100).toFixed(2).replace(".", ",")
-                    : "",
-                units: deal.units,
-              };
-              return (
-                <li key={deal.id} className={`${card} p-4`}>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {dealLineLabels[deal.line]}
-                      </p>
-                      {deal.title && (
-                        <p className="text-xs text-slate-500">{deal.title}</p>
-                      )}
-                    </div>
-                    <DealStageBadge stage={deal.stage} outcome={deal.outcome} />
-                  </div>
-
-                  <p className="mt-2 text-sm text-slate-700">
-                    <span className="font-semibold">{deal.units ?? 0} Einheiten</span>
-                    {deal.monthlyPremiumCents != null && (
-                      <span className="text-slate-500">
-                        {" "}
-                        · {formatEuro(deal.monthlyPremiumCents)} / Monat
-                      </span>
-                    )}
-                  </p>
-
-                  {deal.nextStepType && deal.nextStepAt && (
-                    <div className="mt-2">
-                      <NextStepBadge
-                        type={deal.nextStepType}
-                        at={deal.nextStepAt}
-                        state={dueState(deal.nextStepAt, today)}
-                      />
-                    </div>
-                  )}
-                  {deal.outcome === "VERLOREN" && deal.lostReason && (
-                    <p className="mt-2 text-xs text-slate-500">
-                      Verloren: {lostReasonLabels[deal.lostReason]}
-                    </p>
-                  )}
-
-                  <div className="mt-3 border-t border-slate-100 pt-3">
-                    <DealActions deal={dealLite} />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+      {/* Die Empfehlungsfrage ist der Motor - fehlt sie nach einem gehaltenen
+          Termin, steht das hier und nicht in einer Auswertung. */}
+      {contact.stage !== "NEU" &&
+        contact.stage !== "KONTAKTIERT" &&
+        contact.referralsAskedAt === null && (
+          <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Nach diesem Termin wurde noch nicht nach Empfehlungen gefragt.
+          </p>
         )}
-      </section>
 
       {/* Empfehlungsbaum */}
       {(contact.referredBy || contact.referrals.length > 0) && (
@@ -398,65 +278,21 @@ export default async function ContactDetailPage({
         </section>
       )}
 
-      {/* Aktivitaeten */}
+      {/* Vorgeschichte: entsteht aus den Ergebnis-Knoepfen, nicht aus einem
+          Formular. Hier wird nur gelesen. */}
       <div className="space-y-5">
         <h2 className={sectionTitle}>
-          Aktivitäten{" "}
+          Vorgeschichte{" "}
           <span className="font-normal text-slate-400">
             ({contact.activities.length})
           </span>
         </h2>
 
-        <form action={createActivity} className={`${card} space-y-5 p-6 sm:p-8`}>
-          <input type="hidden" name="contactId" value={contact.id} />
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div>
-              <label htmlFor="type" className={label}>
-                Typ
-              </label>
-              <select id="type" name="type" className={input}>
-                {allActivityTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {activityTypeLabels[type]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="date" className={label}>
-                Datum (leer = jetzt)
-              </label>
-              <input id="date" name="date" type="datetime-local" className={input} />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="text" className={label}>
-              Was ist passiert? *
-            </label>
-            <textarea
-              id="text"
-              name="text"
-              rows={3}
-              required
-              placeholder="z. B. Telefonat: Interesse an Beratungstermin, meldet sich nächste Woche"
-              className={input}
-            />
-            <NoteTemplates targetInputId="text" />
-          </div>
-          <div className="flex justify-end border-t border-slate-100 pt-5">
-            <button type="submit" className={btnPrimary}>
-              Aktivität speichern
-            </button>
-          </div>
-        </form>
-
         {contact.activities.length === 0 ? (
           <div className={`${card} px-6 py-12 text-center`}>
-            <p className="text-sm font-medium text-slate-900">
-              Noch keine Aktivitäten
-            </p>
+            <p className="text-sm font-medium text-slate-900">Noch nichts passiert</p>
             <p className="mt-1 text-sm text-slate-500">
-              Halte hier Anrufe, Termine und E-Mails fest.
+              Jeder Anruf und jeder Termin landet hier automatisch.
             </p>
           </div>
         ) : (
@@ -479,22 +315,9 @@ export default async function ContactDetailPage({
                     <span className="text-[13px] font-semibold text-slate-900">
                       {activityTypeLabels[activity.type]}
                     </span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-slate-400">
-                        {dateTimeFormat.format(activity.date)}
-                      </span>
-                      <form action={deleteActivity}>
-                        <input type="hidden" name="activityId" value={activity.id} />
-                        <input type="hidden" name="contactId" value={contact.id} />
-                        <button
-                          type="submit"
-                          className="text-xs font-medium text-red-600 transition hover:text-red-800 hover:underline"
-                          aria-label={`Aktivität vom ${dateTimeFormat.format(activity.date)} löschen`}
-                        >
-                          Löschen
-                        </button>
-                      </form>
-                    </div>
+                    <span className="text-xs text-slate-400">
+                      {dateTimeFormat.format(activity.date)}
+                    </span>
                   </div>
                   <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
                     {activity.text}

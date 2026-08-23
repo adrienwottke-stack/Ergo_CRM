@@ -1,19 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type {
-  ContactStage,
-  DealStage,
-  NextStepType,
-} from "@/lib/generated/prisma/enums";
+import type { ContactStage, NextStepType } from "@/lib/generated/prisma/enums";
 import {
   ALL_NEXT_STEP_TYPES,
   CONTACT_PLAYBOOK,
-  DEAL_PLAYBOOK,
   type PlaybookEntry,
   nextStepLabels,
 } from "@/lib/pipeline";
-import { addDays, addMonths, berlinDayOf } from "@/lib/dates";
+import { addDays, berlinDayOf } from "@/lib/dates";
 import { input, label } from "@/components/ui";
 
 export type StepDefaults = {
@@ -34,9 +29,7 @@ function fromEntry(
     const [date, time] = appointmentLocal.split("T");
     return { type: entry.type, date: date ?? "", time: time ?? "", note: entry.note };
   }
-  const due = entry.months
-    ? addMonths(new Date(), entry.months)
-    : addDays(new Date(), entry.days ?? 0);
+  const due = addDays(new Date(), entry.days ?? 0);
   return { type: entry.type, date: berlinDayOf(due), time: "", note: entry.note };
 }
 
@@ -45,10 +38,6 @@ export function contactStepDefaults(
   appointmentLocal: string | null
 ): StepDefaults {
   return fromEntry(CONTACT_PLAYBOOK[stage], appointmentLocal);
-}
-
-export function dealStepDefaults(stage: DealStage): StepDefaults {
-  return fromEntry(DEAL_PLAYBOOK[stage], null);
 }
 
 // Pflichtblock beim Phasenwechsel: ohne nächsten Schritt bleibt ein Kontakt

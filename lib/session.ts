@@ -1,10 +1,9 @@
 // Diese Datei bleibt Prisma-frei, damit sie in der Edge-Middleware laeuft.
 
 export const authCookieName = "ergo_crm_session";
-export const reportCookieName = "ergo_crm_report_auth";
 
-// Gilt fuer beide Zugaenge. Liegt hier statt in einer "use server"-Datei, weil
-// die nur asynchrone Funktionen ausfuehren darf.
+// Liegt hier statt in einer "use server"-Datei, weil die nur asynchrone
+// Funktionen ausfuehren darf.
 export const sessionCookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,
@@ -61,14 +60,4 @@ export async function sessionUserId(token?: string): Promise<string | null> {
   return signature === (await hmac(`${userId}.${expiresAt}`))
     ? userId
     : null;
-}
-
-export async function reportTokenValue(): Promise<string> {
-  const data = new TextEncoder().encode(
-    `ergo-crm-report:${process.env.REPORT_PASSWORD ?? ""}`
-  );
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
 }

@@ -15,19 +15,7 @@ import { prisma } from "@/lib/prisma";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import type { FeatureState } from "@/lib/generated/prisma/enums";
 
-// Drei Stimmen je Kopf auf dem Wunschzettel. Wer alles gut findet, sagt nichts
-// aus. Steht hier und nicht in der Aktionsdatei: "use server"-Module duerfen
-// nur async Funktionen exportieren.
-export const WUNSCH_STIMMEN = 3;
-
-export type ArenaKey =
-  | "puls"
-  | "zweikampf"
-  | "kommentator"
-  | "bestmarke"
-  | "duell"
-  | "sprint"
-  | "werkstatt";
+export type ArenaKey = "puls" | "zweikampf" | "bestmarke" | "sprint";
 
 // Eine Abfrage je Anfrage, danach beantwortet der Cache alle weiteren Fragen.
 export const featureStates = cache(async (): Promise<Map<string, FeatureState>> => {

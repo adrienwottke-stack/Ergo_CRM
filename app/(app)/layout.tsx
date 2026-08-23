@@ -3,12 +3,9 @@ import { requireOnboardedUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Wordmark } from "@/components/Logo";
 import NavLinks from "@/components/NavLinks";
-import CommandPalette from "@/components/CommandPalette";
 import UndoBar from "@/components/UndoBar";
 import InstallationMelder from "@/components/InstallationMelder";
 import { LogoutIcon } from "@/components/icons";
-import { searchContacts } from "@/app/(app)/contacts/actions";
-import { setBeginnerMode } from "@/app/(app)/namen/actions";
 
 export default async function AppLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   // Wer den Start noch nie gesehen hat, wird von hier einmalig nach
@@ -20,35 +17,20 @@ export default async function AppLayout({ children }: Readonly<{ children: React
   const gefuehrte = await prisma.user.count({
     where: { leaderId: user.id, deactivatedAt: null },
   });
-  // Einsteiger sehen drei Einträge statt zehn – plus "Mannschaft", sobald
-  // jemand unter ihnen hängt: wer führt, braucht die Übersicht ab dem ersten
-  // Tag. Nichts ist gesperrt, nur ausgeblendet – ein Tipp auf "Alles anzeigen"
-  // holt das volle CRM zurück.
-  const links = user.beginnerMode
-    ? [
-        { href: "/namen", label: "Namen" },
-        { href: "/heute", label: "Heute" },
-        ...(gefuehrte > 0 ? [{ href: "/mannschaft", label: "Mannschaft" }] : []),
-        { href: "/arena", label: "Wettbewerb" },
-      ]
-    : [
-        { href: "/namen", label: "Namen" },
-        { href: "/heute", label: "Heute" },
-        { href: "/pipeline", label: "Pipeline" },
-        { href: "/vorgaenge", label: "Vorgänge" },
-        { href: "/contacts", label: "Kontakte" },
-        { href: "/focus", label: "Fokus" },
-        { href: "/dashboard", label: "Dashboard" },
-        { href: "/trichter", label: "Trichter" },
-        ...(gefuehrte > 0 ? [{ href: "/mannschaft", label: "Mannschaft" }] : []),
-        // Einladen kann jeder - Werben ist der Kern des Berufs. Einsteiger
-        // sehen den Punkt nicht: in der ersten Woche laedt ihre Fuehrungskraft.
-        { href: "/einladen", label: "Einladen" },
-        { href: "/arena", label: "Wettbewerb" },
-        ...(user.role === "ADMIN"
-          ? [{ href: "/team", label: "Team" }, { href: "/report", label: "Bericht" }]
-          : []),
-      ];
+  // Eine Navigation fuer alle. Der frueher noetige Einsteiger-Modus war ein
+  // Pflaster auf zu vielen Bildschirmen - nach dem Rueckbau bleibt eine Leiste,
+  // die niemand mehr ausduennen muss. "Einladen" kann jeder: Werben ist der
+  // Kern des Berufs, nicht die Kuer.
+  const links = [
+    { href: "/namen", label: "Namen" },
+    { href: "/heute", label: "Heute" },
+    { href: "/kalender", label: "Kalender" },
+    { href: "/trichter", label: "Trichter" },
+    ...(gefuehrte > 0 ? [{ href: "/mannschaft", label: "Mannschaft" }] : []),
+    { href: "/einladen", label: "Einladen" },
+    { href: "/arena", label: "Wettbewerb" },
+    ...(user.role === "ADMIN" ? [{ href: "/team", label: "Team" }] : []),
+  ];
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -57,7 +39,6 @@ export default async function AppLayout({ children }: Readonly<{ children: React
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <Wordmark sub="Beraterbereich" />
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <CommandPalette searchAction={searchContacts} />
             <form action={logout}>
               {/* Am Handy nur das Symbol – der Text sprengt sonst die Kopfzeile. */}
               <button
@@ -71,24 +52,10 @@ export default async function AppLayout({ children }: Readonly<{ children: React
             </form>
           </div>
         </div>
-        {/* Navigation ueber die volle Breite: neben der Wortmarke wird es fuer
-            zehn Eintraege zu eng, dann scrollt die Leiste unnoetig. Der aktive
-            Unterstrich liegt direkt auf der Haarlinie der Kopfzeile. */}
+        {/* Navigation ueber die volle Breite, der aktive Unterstrich liegt
+            direkt auf der Haarlinie der Kopfzeile. */}
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 sm:px-6">
-          <div className="min-w-0 flex-1">
-            <NavLinks links={links} />
-          </div>
-          <form action={setBeginnerMode} className="shrink-0">
-            <input type="hidden" name="on" value={user.beginnerMode ? "0" : "1"} />
-            <button
-              type="submit"
-              className={`min-h-11 whitespace-nowrap px-2 text-xs font-medium text-slate-400 transition hover:text-slate-700 ${
-                user.beginnerMode ? "" : "hidden sm:inline-flex sm:items-center"
-              }`}
-            >
-              {user.beginnerMode ? "Alles anzeigen" : "Einfache Ansicht"}
-            </button>
-          </form>
+          <NavLinks links={links} />
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">{children}</main>

@@ -16,13 +16,18 @@ export async function urteilen(featureKey: string, urteil: string) {
   const person = await requireUserPerson(user.id);
   if (!erlaubt.includes(urteil as Urteil)) return;
 
-  // Eine Stimme je Person und Baustein, jederzeit aenderbar.
-  await prisma.featureVote.upsert({
-    where: { featureKey_personId: { featureKey, personId: person.id } },
-    create: { featureKey, personId: person.id, urteil: urteil as Urteil },
-    update: { urteil: urteil as Urteil },
-  });
+  // Eine Stimme je Person und Baustein, einmalig. `create` statt `upsert`:
+  // wer schon gestimmt hat, sieht die Frage gar nicht mehr - ein zweiter
+  // Aufruf ist entweder ein Doppelklick oder ein Nachbau von aussen. Beides
+  // laeuft still ins Leere, statt die erste Stimme zu ueberschreiben.
+  try {
+    await prisma.featureVote.create({
+      data: { featureKey, personId: person.id, urteil: urteil as Urteil },
+    });
+  } catch {
+    return;
+  }
 
+  revalidatePath("/arena");
   revalidatePath("/werkstatt");
-  revalidatePath("/leaderboard");
 }

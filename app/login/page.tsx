@@ -66,11 +66,6 @@ export default async function LoginPage({
               {isFirstSetup ? "Admin-Konto erstellen" : "Anmelden"}
             </button>
           </form>
-          {!isFirstSetup && (
-            <p className="mt-4 text-center text-xs text-slate-500">
-              Für den separaten Berichtszugang genügt das Berichts-Passwort.
-            </p>
-          )}
         </div>
 
         <p className="mt-4 text-center text-xs text-slate-400">

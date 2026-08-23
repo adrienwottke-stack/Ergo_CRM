@@ -79,6 +79,11 @@ export const listKindHints: Record<ListKind, string> = {
 
 export const NAME_TARGET = 20;
 
+// Nachfuell-Alarm: unter so vielen offenen Namen laeuft der Trichter leer.
+// Fuenf ist bewusst niedrig - der Alarm soll selten kommen und dann ernst
+// genommen werden. Ein Hinweis, der jeden Tag dasteht, ist Tapete.
+export const NACHFUELL_SCHWELLE = 5;
+
 export function targetPercent(count: number, target = NAME_TARGET): number {
   if (target <= 0) return 100;
   return Math.min(100, Math.round((count / target) * 100));
@@ -98,12 +103,6 @@ export function sectionOf(contact: {
   if (contact.stage === "NEU" || contact.stage === "KONTAKTIERT") return "offen";
   return "geschafft";
 }
-
-export const sectionLabels: Record<NameSection, string> = {
-  offen: "Offen",
-  geschafft: "Geschafft",
-  raus: "Raus",
-};
 
 // Sortierung innerhalb eines Abschnitts: A vor B vor C, Namen ohne Einstufung
 // zuletzt – die will man ohnehin erst noch einordnen.

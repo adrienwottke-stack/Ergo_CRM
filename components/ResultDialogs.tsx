@@ -132,6 +132,114 @@ export function AppointmentDialog({
   );
 }
 
+// Der gehaltene Termin: Ergebnis UND Empfehlungen auf einem Bildschirm.
+//
+// Die Empfehlungsfrage steht hier und nicht als Frist drei Tage spaeter, weil
+// sie sonst umgangen wird - genau das war sie vorher. Sie kostet trotzdem
+// keinen zusaetzlichen Tipp: das Antippen des Ergebnisses speichert beides.
+export function AppointmentHeldDialog({
+  open,
+  name,
+  pending,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  name: string;
+  pending: boolean;
+  onClose: () => void;
+  onSave: (result: string, empfehlungen: { name: string; phone: string }[]) => void;
+}) {
+  const [zeilen, setZeilen] = useState([
+    { name: "", phone: "" },
+    { name: "", phone: "" },
+    { name: "", phone: "" },
+  ]);
+
+  const setzeZeile = (index: number, feld: "name" | "phone", wert: string) =>
+    setZeilen((alt) =>
+      alt.map((zeile, i) => (i === index ? { ...zeile, [feld]: wert } : zeile))
+    );
+
+  const speichern = (result: string) =>
+    onSave(
+      result,
+      zeilen.filter((zeile) => zeile.name.trim().length > 0)
+    );
+
+  const ergebnisse = [
+    { wert: "abschluss", text: "Abschluss", stil: "bg-emerald-600 text-white hover:bg-emerald-700" },
+    { wert: "offen", text: "Noch offen", stil: "bg-navy-900 text-white hover:bg-navy-950" },
+    {
+      wert: "kein_abschluss",
+      text: "Kein Abschluss",
+      stil: "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
+    },
+  ];
+
+  return (
+    <Modal open={open} onClose={onClose} title="Termin gehalten" subtitle={name}>
+      <div className="space-y-5">
+        <div>
+          <p className="mb-2 text-[13px] font-medium text-slate-600">
+            Wen hat {name} dir empfohlen?
+          </p>
+          <div className="space-y-2">
+            {zeilen.map((zeile, index) => (
+              <div key={index} className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={zeile.name}
+                  onChange={(event) => setzeZeile(index, "name", event.target.value)}
+                  placeholder={`Name ${index + 1}`}
+                  className={`${input} mt-0`}
+                />
+                <input
+                  type="tel"
+                  value={zeile.phone}
+                  onChange={(event) => setzeZeile(index, "phone", event.target.value)}
+                  placeholder="Nummer"
+                  className={`${input} mt-0`}
+                />
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setZeilen((alt) => [...alt, { name: "", phone: "" }])}
+            className="mt-2 min-h-11 text-sm font-medium text-navy-600 hover:underline"
+          >
+            + weitere Zeile
+          </button>
+          <p className="mt-1 text-xs text-slate-500">
+            Jeder Name landet mit Erstanruf für heute auf deiner Liste. Auch
+            keine Empfehlung ist eine Antwort — die Frage gilt dann als gestellt.
+          </p>
+        </div>
+
+        <div className="border-t border-slate-100 pt-4">
+          <p className="mb-2 text-[13px] font-medium text-slate-600">
+            Und? Was kam raus?
+          </p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {ergebnisse.map((ergebnis) => (
+              <button
+                key={ergebnis.wert}
+                type="button"
+                disabled={pending}
+                onClick={() => speichern(ergebnis.wert)}
+                className={`inline-flex min-h-12 items-center justify-center rounded-xl px-3 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 ${ergebnis.stil}`}
+              >
+                {ergebnis.text}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // Ein Tipp genuegt: die Auswahl selbst ist schon die Bestaetigung.
 export function ChoiceDialog({
   open,

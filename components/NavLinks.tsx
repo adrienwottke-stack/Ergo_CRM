@@ -7,9 +7,8 @@ export interface NavLink {
   href: string;
   label: string;
   exact?: boolean;
-  // Weitere Pfade, die zu diesem Punkt gehoeren. "Pipeline" bleibt markiert,
-  // waehrend man in den Unterreitern Vorgaenge oder Kontakte steht – sonst
-  // faellt die Markierung weg und man weiss nicht mehr, wo man ist.
+  // Weitere Pfade, die zu diesem Punkt gehoeren – sonst faellt die Markierung
+  // auf Unterseiten weg und man weiss nicht mehr, wo man ist.
   match?: string[];
 }
 

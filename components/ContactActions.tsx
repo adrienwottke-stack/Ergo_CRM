@@ -60,18 +60,13 @@ export default function ContactActions({
           </button>
         )}
 
-        {!lost && contact.stage === "KUNDE" && (
+        {/* Ab dem gehaltenen Termin ist die Empfehlungsfrage faellig - nicht
+            erst nach einem Abschluss. */}
+        {!lost && !contact.referralsAsked && contact.stage !== "NEU" && (
           <button type="button" onClick={() => openWith("referral")} className={variants.stage}>
             Empfehlungen
           </button>
         )}
-
-        {!lost &&
-          (contact.stage === "EMPFEHLUNG_ERFRAGT" || contact.stage === "BESTAND") && (
-            <button type="button" onClick={() => openWith("checkup")} className={variants.stage}>
-              Checkup planen
-            </button>
-          )}
 
         {!compact && !lost && contact.hasStep && (
           <form action={snoozeContactStep}>

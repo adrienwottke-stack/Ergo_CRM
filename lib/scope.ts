@@ -30,7 +30,7 @@ export type Sichtbarkeit = {
   beraterIds: string[];
   /** Filter fuer Contact. Auch verschachtelbar: `contact: { is: sicht.kontakte }`. */
   kontakte: { ownerId: { in: string[] } };
-  /** Filter fuer alles, was ueber einen Kontakt haengt: Deal, Activity, StageEvent. */
+  /** Filter fuer alles, was ueber einen Kontakt haengt: Activity, StageEvent. */
   ueberKontakt: { contact: { is: { ownerId: { in: string[] } } } };
 };
 

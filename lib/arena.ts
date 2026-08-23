@@ -1,8 +1,7 @@
 // Rechenkern der Arena (docs/wettbewerb-plan.md).
 //
 // Alles hier ist Auswertung ueber DailyLog - es gibt bewusst keinen zweiten
-// Punktespeicher, der auseinanderlaufen kann. Eingefroren wird nur, was ein
-// Ergebnis ist: Duell-Staende beim Abpfiff.
+// Punktespeicher, der auseinanderlaufen kann.
 
 import { prisma } from "@/lib/prisma";
 import {
@@ -22,8 +21,6 @@ import type { QuotaType } from "@/lib/generated/prisma/enums";
 // "use server"-Datei ausschliesslich async Funktionen exportieren darf -
 // Konstanten daneben brechen den Produktionsbau (und nur den: tsc und eslint
 // pruefen diese Next-Regel nicht).
-export const MAX_DUELLE = 2;
-export const ANNAHME_STUNDEN = 24;
 export const SPRINT_MINUTEN = 25;
 
 export type ArenaZeile = {
@@ -156,77 +153,6 @@ export async function ladeBestmarke(personId: string): Promise<number | null> {
 
   if (jeWoche.size === 0) return null;
   return Math.max(...jeWoche.values());
-}
-
-// --- Duell-Stand ------------------------------------------------------------
-
-// Waehrend das Duell laeuft, wird live gerechnet. Beim Abpfiff wandert das
-// Ergebnis in die Spalten challengerScore/opponentScore und wird nie wieder
-// angefasst - ein Nachtrag darf kein Ergebnis kippen.
-export async function duellStand(duel: {
-  challengerId: string;
-  opponentId: string;
-  metric: QuotaType | null;
-  startDay: Date;
-  endDay: Date;
-  challengerScore: number | null;
-  opponentScore: number | null;
-}): Promise<{ links: number; rechts: number }> {
-  if (duel.challengerScore !== null && duel.opponentScore !== null) {
-    return { links: duel.challengerScore, rechts: duel.opponentScore };
-  }
-
-  const logs = await prisma.dailyLog.findMany({
-    where: {
-      personId: { in: [duel.challengerId, duel.opponentId] },
-      date: { gte: duel.startDay, lte: duel.endDay },
-      ...(duel.metric ? { type: duel.metric } : {}),
-    },
-    select: { personId: true, type: true, count: true },
-  });
-
-  let links = 0;
-  let rechts = 0;
-  for (const log of logs) {
-    // Auf eine Art gefordert: Stueckzahl. Auf Gesamtpunkte: gewichtet.
-    const wert = duel.metric ? log.count : log.count * quotaTypePoints[log.type];
-    if (log.personId === duel.challengerId) links += wert;
-    else rechts += wert;
-  }
-  return { links, rechts };
-}
-
-// Abpfiff ohne Cron: wer die Arena als Erster nach Ablauf oeffnet, schliesst
-// die faelligen Duelle ab. Ein naechtlicher Lauf, der einmal ausfaellt,
-// verschluckt einen ganzen Spieltag - das hier kann nicht ausfallen.
-//
-// Bewusst eine gewoehnliche Funktion und keine Server-Action: sie wird nur
-// beim Rendern aufgerufen und soll kein von aussen aufrufbarer Endpunkt sein.
-export async function duelleAbschliessen() {
-  const heute = dayToUtcDate(berlinToday());
-  const verfallsgrenze = new Date(Date.now() - ANNAHME_STUNDEN * 3_600_000);
-
-  await prisma.duel.updateMany({
-    where: { status: "OFFEN", createdAt: { lt: verfallsgrenze } },
-    data: { status: "VERFALLEN", decidedAt: new Date() },
-  });
-
-  const faellig = await prisma.duel.findMany({
-    where: { status: "LAEUFT", endDay: { lt: heute } },
-  });
-
-  for (const duel of faellig) {
-    const stand = await duellStand(duel);
-    await prisma.duel.update({
-      where: { id: duel.id },
-      data: {
-        status: "ENTSCHIEDEN",
-        challengerScore: stand.links,
-        opponentScore: stand.rechts,
-        decidedAt: new Date(),
-      },
-    });
-  }
 }
 
 // --- Sprint -----------------------------------------------------------------

@@ -1,20 +1,9 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import {
-  authCookieName,
-  reportCookieName,
-  reportTokenValue,
-  sessionUserId,
-} from "@/lib/session";
+import { authCookieName, sessionUserId } from "@/lib/session";
 
-export {
-  authCookieName,
-  reportCookieName,
-  reportTokenValue,
-  sessionCookieOptions,
-  sessionUserId,
-} from "@/lib/session";
+export { authCookieName, sessionCookieOptions, sessionUserId } from "@/lib/session";
 export { createSession } from "@/lib/session";
 
 function toBase64(bytes: Uint8Array): string {
@@ -73,7 +62,7 @@ export async function requireOnboardedUser() {
 
 export async function requireAdmin() {
   const user = await requireUser();
-  if (user.role !== "ADMIN") redirect("/dashboard");
+  if (user.role !== "ADMIN") redirect("/heute");
   return user;
 }
 
@@ -81,22 +70,4 @@ export async function requireUserPerson(userId: string) {
   const person = await prisma.person.findUnique({ where: { userId } });
   if (!person) throw new Error("Dem Benutzerkonto fehlt ein Teamprofil.");
   return person;
-}
-
-export async function hasReportAccess(): Promise<boolean> {
-  const store = await cookies();
-  const userId = await sessionUserId(store.get(authCookieName)?.value);
-  if (userId) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-    if (user?.role === "ADMIN") return true;
-  }
-  const reportToken = store.get(reportCookieName)?.value;
-  return !!reportToken && reportToken === (await reportTokenValue());
-}
-
-export async function requireReportAccess() {
-  if (!(await hasReportAccess())) redirect("/login");
 }

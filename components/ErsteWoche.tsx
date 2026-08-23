@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { NAME_TARGET } from "@/lib/namelist";
+import { starterpassMissionen } from "@/lib/starterpass";
 import { abrechnungGesehen, briefGelesen } from "@/app/(app)/heute/actions";
 import { card, kicker } from "@/components/ui";
 import type { User } from "@/lib/generated/prisma/client";
@@ -12,12 +12,10 @@ import type { User } from "@/lib/generated/prisma/client";
 // Vier Bausteine, jeder mit eigener Bedingung, alle koennen fehlen:
 //   1. Der Brief kommt zurueck  - 14 Tage dabei, eine Woche Stille
 //   2. Wiedereinstieg           - zwei Wochen Stille (ohne Brief)
-//   3. Der Starterpass          - 7 Tage nach dem Start, 5 Missionen
+//   3. Der Starterpass          - 7 Tage nach dem Start, siehe lib/starterpass
 //   4. Das 30-Tage-Versprechen  - Countdown, an Tag 30 die Abrechnung
 
 const TAG_MS = 24 * 60 * 60 * 1000;
-
-type Mission = { titel: string; stand: string; fertig: boolean };
 
 export default async function ErsteWoche({ user }: { user: User }) {
   const person = await prisma.person.findUnique({
@@ -30,7 +28,7 @@ export default async function ErsteWoche({ user }: { user: User }) {
   const tageSeitStart = Math.floor((Date.now() - seit.getTime()) / TAG_MS);
   const startwoche = user.onboardingDoneAt !== null && tageSeitStart <= 7;
 
-  const [namen, logsSeit, guide, herkunft, letzterLog, pledgeTermine] =
+  const [namen, logsSeit, empfehlungGefragt, herkunft, letzterLog, pledgeTermine] =
     await Promise.all([
       prisma.contact.count({
         where: { ownerId: user.id, listKinds: { isEmpty: false } },
@@ -40,7 +38,9 @@ export default async function ErsteWoche({ user }: { user: User }) {
         where: { personId: person.id, date: { gte: seit } },
         _sum: { count: true },
       }),
-      prisma.guide.findFirst({ where: { ownerId: user.id }, select: { id: true } }),
+      prisma.contact.count({
+        where: { ownerId: user.id, referralsAskedAt: { not: null } },
+      }),
       user.herkunftId
         ? prisma.invite.findUnique({
             where: { id: user.herkunftId },
@@ -99,33 +99,13 @@ export default async function ErsteWoche({ user }: { user: User }) {
     pledgeTage >= 30 &&
     user.pledgeShownAt === null;
 
-  const missionen: Mission[] = [
-    {
-      titel: `${NAME_TARGET} Namen auf der Liste`,
-      stand: `${Math.min(namen, NAME_TARGET)} von ${NAME_TARGET}`,
-      fertig: namen >= NAME_TARGET,
-    },
-    {
-      titel: "5 Anrufe gemacht",
-      stand: `${Math.min(summe("CALL"), 5)} von 5`,
-      fertig: summe("CALL") >= 5,
-    },
-    {
-      titel: "Ersten Termin vereinbart",
-      stand: summe("APPOINTMENT_SET") > 0 ? "geschafft" : "offen",
-      fertig: summe("APPOINTMENT_SET") > 0,
-    },
-    {
-      titel: "Leitfaden zu deinem gemacht",
-      stand: guide ? "geschafft" : "offen",
-      fertig: guide !== null,
-    },
-    {
-      titel: "Ersten Termin gehalten",
-      stand: summe("APPOINTMENT_HELD") > 0 ? "geschafft" : "offen",
-      fertig: summe("APPOINTMENT_HELD") > 0,
-    },
-  ];
+  const missionen = starterpassMissionen({
+    namen,
+    anrufe: summe("CALL"),
+    termineVereinbart: summe("APPOINTMENT_SET"),
+    termineGehalten: summe("APPOINTMENT_HELD"),
+    empfehlungGefragt: empfehlungGefragt > 0,
+  });
   const geschafft = missionen.filter((mission) => mission.fertig).length;
 
   if (!briefFaellig && !wiedereinstieg && !startwoche && !pledgeLaeuft && !abrechnungFaellig) {

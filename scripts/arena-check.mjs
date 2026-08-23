@@ -25,11 +25,10 @@ async function eine(sql) {
 const tabellen = await eine(
   `SELECT table_name FROM information_schema.tables
     WHERE table_schema = 'public'
-      AND table_name IN ('Feature','FeatureVote','FeatureUse','Wunsch','WunschVote','Duel','Sprint','SprintTeilnahme')
+      AND table_name IN ('Feature','FeatureVote','FeatureUse','Sprint','SprintTeilnahme')
     ORDER BY table_name`
 );
 const features = await eine(`SELECT "key", "titel", "state" FROM "Feature" ORDER BY "key"`);
-const wuensche = await eine(`SELECT count(*)::int AS n FROM "Wunsch"`);
 const personen = await eine(
   `SELECT p."name", (p."userId" IS NOT NULL) AS mit_konto,
           u."onboardingDoneAt" IS NOT NULL AS onboarding_fertig,
@@ -37,25 +36,28 @@ const personen = await eine(
      FROM "Person" p LEFT JOIN "User" u ON u."id" = p."userId"
     ORDER BY p."name"`
 );
-const duelle = await eine(`SELECT "status", count(*)::int AS n FROM "Duel" GROUP BY 1`);
+const stimmen = await eine(
+  `SELECT f."titel", count(v.*)::int AS n
+     FROM "Feature" f LEFT JOIN "FeatureVote" v ON v."featureKey" = f."key"
+    GROUP BY f."titel" ORDER BY f."titel"`
+);
 
 await client.end();
 
 const haken = (ok) => (ok ? "ok  " : "FEHLT");
 
 console.log("\n=== ARENA-STARTPROBE ===\n");
-console.log(`${haken(tabellen.length === 8)} Tabellen: ${tabellen.length} von 8`);
-console.log(`${haken(features.length >= 7)} Bausteine: ${features.length}`);
+console.log(`${haken(tabellen.length === 5)} Tabellen: ${tabellen.length} von 5`);
+console.log(`${haken(features.length >= 4)} Bausteine: ${features.length}`);
 for (const f of features) console.log(`       ${f.key.padEnd(13)} ${f.state}`);
-console.log(`${haken(wuensche[0].n > 0)} Wunschzettel: ${wuensche[0].n} Eintraege`);
 console.log(`${haken(personen.length >= 2)} Koepfe im Wettbewerb: ${personen.length}`);
 for (const p of personen) {
   console.log(
     `       ${p.name.padEnd(20)} Konto ${p.mit_konto ? "ja " : "nein"}  Willkommen ${p.onboarding_fertig ? "fertig" : "offen "}  App ${p.installiert ? "ja" : "nein"}`
   );
 }
-console.log(`     Duelle: ${duelle.map((d) => `${d.n}x ${d.status}`).join(", ") || "noch keine"}`);
+console.log(`     Stimmen: ${stimmen.map((s) => `${s.titel} ${s.n}`).join(", ") || "noch keine"}`);
 if (personen.length < 2) {
-  console.log("\n     Hinweis: Duelle, Puls und Abstimmung brauchen mehr als einen Kopf.");
+  console.log("\n     Hinweis: Puls und Sprint brauchen mehr als einen Kopf.");
 }
 console.log("");

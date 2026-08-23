@@ -1,10 +1,11 @@
 // Service Worker der Ergo-CRM-App (docs/willkommen-plan.md, Abschnitt 7.4).
 //
-// Zwei Aufgaben, mehr nicht:
+// Drei Aufgaben, mehr nicht:
 //   1. Chrome bietet das Installieren erst an, wenn ein Service Worker
 //      registriert ist, der bei Netzausfall eine Antwort liefert. Ohne diese
 //      Datei gibt es auf Android keinen Installieren-Knopf.
 //   2. Eine ehrliche "Kein Netz"-Seite statt des Dino-Spiels.
+//   3. Meldungen anzeigen und beim Antippen an die richtige Stelle springen.
 //
 // WICHTIG: Zwischengespeichert werden ausschliesslich unveraenderliche
 // Dateien. Niemals HTML, niemals Antworten von Server-Actions. Das sind
@@ -104,5 +105,52 @@ self.addEventListener("fetch", (event) => {
         return antwort;
       });
     })
+  );
+});
+
+// --- Meldungen ---------------------------------------------------------------
+// Die Nutzlast kommt aus lib/push.ts und traegt immer ein Ziel mit. Eine
+// Meldung ohne Ziel waere eine Nachricht ohne naechsten Schritt.
+
+self.addEventListener("push", (event) => {
+  let meldung = {};
+  try {
+    meldung = event.data ? event.data.json() : {};
+  } catch {
+    meldung = {};
+  }
+
+  const titel = meldung.titel || "Ergo CRM";
+  event.waitUntil(
+    self.registration.showNotification(titel, {
+      body: meldung.text || "",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      // Gleiche Kennung ersetzt eine offene Meldung, statt zu stapeln: drei
+      // Erinnerungen uebereinander liest niemand, die dritte weckt nur Aerger.
+      tag: meldung.kennung || "ergo-crm",
+      renotify: Boolean(meldung.kennung),
+      data: { url: meldung.url || "/heute" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const ziel = (event.notification.data && event.notification.data.url) || "/heute";
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((fenster) => {
+        // Laeuft die App schon, dort hinspringen statt ein zweites Fenster
+        // aufzumachen - auf dem Handy waere das ein zweiter App-Eintrag.
+        for (const client of fenster) {
+          if (new URL(client.url).origin === self.location.origin) {
+            return client.focus().then(() => client.navigate(ziel));
+          }
+        }
+        return self.clients.openWindow(ziel);
+      })
   );
 });

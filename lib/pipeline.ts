@@ -1,54 +1,40 @@
-// Fachlogik der Pipeline: Phasen, Playbook (welcher Schritt folgt auf welche
-// Phase) und die Umrechnung von Beitrag in interne Einheiten.
-// Diese Datei ist die einzige Quelle fuer Reihenfolge, Beschriftung und Farbe.
+// Fachlogik der Schleife: Phasen und Playbook (welcher Schritt folgt auf
+// welche Phase). Diese Datei ist die einzige Quelle fuer Reihenfolge,
+// Beschriftung und Farbe.
 
 import {
   ContactStage,
-  DealLine,
-  DealStage,
   LostReason,
   NextStepType,
-  Outcome,
 } from "@/lib/generated/prisma/enums";
-import { addDays, addMonths } from "@/lib/dates";
+import { addDays } from "@/lib/dates";
 
 // --- Phasen -----------------------------------------------------------------
 
+// Die fuenf Stufen der Schleife, in genau dieser Reihenfolge. Der Index ist
+// Fachlogik: "weiter als" heisst hoehere Zahl.
 export const CONTACT_STAGES: ContactStage[] = [
   "NEU",
   "KONTAKTIERT",
   "TERMIN_VEREINBART",
-  "IN_BERATUNG",
-  "KUNDE",
-  "EMPFEHLUNG_ERFRAGT",
-  "CHECKUP_GEPLANT",
-  "BESTAND",
+  "TERMIN_GEHALTEN",
+  "ABSCHLUSS",
 ];
 
-// Akquise = Weg zum ersten Abschluss, Betreuung = alles danach.
-export const ACQUISITION_STAGES: ContactStage[] = CONTACT_STAGES.slice(0, 4);
-export const CARE_STAGES: ContactStage[] = CONTACT_STAGES.slice(4);
-
 export const contactStageLabels: Record<ContactStage, string> = {
-  NEU: "Neu",
+  NEU: "Name",
   KONTAKTIERT: "Kontaktiert",
   TERMIN_VEREINBART: "Termin vereinbart",
-  IN_BERATUNG: "In Beratung",
-  KUNDE: "Kunde",
-  EMPFEHLUNG_ERFRAGT: "Empfehlung erfragt",
-  CHECKUP_GEPLANT: "Checkup geplant",
-  BESTAND: "Bestand",
+  TERMIN_GEHALTEN: "Termin gehalten",
+  ABSCHLUSS: "Abschluss",
 };
 
 export const contactStageHints: Record<ContactStage, string> = {
-  NEU: "Nummer gezogen, noch kein Kontakt",
+  NEU: "Steht auf der Liste, noch nicht angerufen",
   KONTAKTIERT: "Erreicht, noch kein Termin",
   TERMIN_VEREINBART: "Termindatum steht",
-  IN_BERATUNG: "Termin gehalten, Vorgaenge laufen",
-  KUNDE: "Mindestens ein Abschluss",
-  EMPFEHLUNG_ERFRAGT: "Empfehlungsfrage erledigt",
-  CHECKUP_GEPLANT: "Checkup-Termin steht",
-  BESTAND: "Betreut, ruhend bis zum naechsten Checkup",
+  TERMIN_GEHALTEN: "Termin gehalten, Ergebnis offen",
+  ABSCHLUSS: "Die Schleife ist einmal durch",
 };
 
 export type StagePalette = {
@@ -121,48 +107,8 @@ export const contactStagePalette: Record<ContactStage, StagePalette> = {
   NEU: slatePalette,
   KONTAKTIERT: amberPalette,
   TERMIN_VEREINBART: tealPalette,
-  IN_BERATUNG: navyPalette,
-  KUNDE: emeraldPalette,
-  EMPFEHLUNG_ERFRAGT: navyPalette,
-  CHECKUP_GEPLANT: tealPalette,
-  BESTAND: slatePalette,
-};
-
-export const DEAL_STAGES: DealStage[] = ["BEDARF", "ANGEBOT", "ANTRAG", "GEWONNEN"];
-
-export const dealStageLabels: Record<DealStage, string> = {
-  BEDARF: "Bedarf erkannt",
-  ANGEBOT: "Angebot raus",
-  ANTRAG: "Antrag gestellt",
-  GEWONNEN: "Abgeschlossen",
-};
-
-export const dealStagePalette: Record<DealStage, StagePalette> = {
-  BEDARF: contactStagePalette.NEU,
-  ANGEBOT: contactStagePalette.KONTAKTIERT,
-  ANTRAG: contactStagePalette.TERMIN_VEREINBART,
-  GEWONNEN: contactStagePalette.KUNDE,
-};
-
-export const dealLineLabels: Record<DealLine, string> = {
-  PAV: "Private Altersvorsorge",
-  BU: "BU / Grundfaehigkeit",
-  UNBEKANNT: "Unbekannt (Altbestand)",
-};
-
-export const dealLineShortLabels: Record<DealLine, string> = {
-  PAV: "PAV",
-  BU: "BU",
-  UNBEKANNT: "?",
-};
-
-// Nur diese Sparten sind neu anlegbar; UNBEKANNT stammt aus der Migration.
-export const SELECTABLE_DEAL_LINES: DealLine[] = ["PAV", "BU"];
-
-export const outcomeLabels: Record<Outcome, string> = {
-  OFFEN: "Offen",
-  GEWONNEN: "Gewonnen",
-  VERLOREN: "Verloren",
+  TERMIN_GEHALTEN: navyPalette,
+  ABSCHLUSS: emeraldPalette,
 };
 
 export const lostReasonLabels: Record<LostReason, string> = {
@@ -190,24 +136,16 @@ export const ALL_LOST_REASONS: LostReason[] = [
 export const nextStepLabels: Record<NextStepType, string> = {
   ANRUF: "Anrufen",
   TERMIN: "Termin durchfuehren",
-  TERMIN_VORBEREITEN: "Termin vorbereiten",
-  ANGEBOT_ERSTELLEN: "Angebot erstellen",
   NACHFASSEN: "Nachfassen",
-  ANTRAG_EINREICHEN: "Antrag einreichen / Police pruefen",
   EMPFEHLUNG_ERFRAGEN: "Empfehlungen erfragen",
-  CHECKUP_TERMINIEREN: "Checkup terminieren",
   SONSTIGES: "Sonstiges",
 };
 
 export const ALL_NEXT_STEP_TYPES: NextStepType[] = [
   "ANRUF",
   "TERMIN",
-  "TERMIN_VORBEREITEN",
-  "ANGEBOT_ERSTELLEN",
   "NACHFASSEN",
-  "ANTRAG_EINREICHEN",
   "EMPFEHLUNG_ERFRAGEN",
-  "CHECKUP_TERMINIEREN",
   "SONSTIGES",
 ];
 
@@ -218,7 +156,6 @@ export const ALL_NEXT_STEP_TYPES: NextStepType[] = [
 export type PlaybookEntry = {
   type: NextStepType;
   days?: number;
-  months?: number;
   useAppointment?: boolean;
   note: string;
 };
@@ -232,36 +169,13 @@ export const CONTACT_PLAYBOOK: Record<ContactStage, PlaybookEntry | null> = {
     days: 0,
     note: "Termin durchfuehren",
   },
-  // In Beratung fuehrt der Vorgang den Schritt, nicht der Kontakt.
-  IN_BERATUNG: null,
-  KUNDE: { type: "EMPFEHLUNG_ERFRAGEN", days: 3, note: "Empfehlungen erfragen" },
-  EMPFEHLUNG_ERFRAGT: {
-    type: "CHECKUP_TERMINIEREN",
-    days: 7,
-    note: "Checkup terminieren",
-  },
-  CHECKUP_GEPLANT: {
-    type: "TERMIN",
-    useAppointment: true,
-    days: 0,
-    note: "Checkup durchfuehren",
-  },
-  BESTAND: {
-    type: "CHECKUP_TERMINIEREN",
-    months: 6,
-    note: "Naechster Checkup",
-  },
+  // Nach dem gehaltenen Termin steht das Ergebnis aus: Abschluss oder Absage.
+  // Die Empfehlungsfrage haengt NICHT hier - sie wird direkt beim Erfassen des
+  // gehaltenen Termins gestellt, nicht als Frist drei Tage spaeter.
+  TERMIN_GEHALTEN: { type: "NACHFASSEN", days: 2, note: "Ergebnis holen" },
+  // Die Schleife ist durch; ein weiterer Schritt waere Bestandsbetreuung.
+  ABSCHLUSS: null,
 };
-
-export const DEAL_PLAYBOOK: Record<DealStage, PlaybookEntry | null> = {
-  BEDARF: { type: "ANGEBOT_ERSTELLEN", days: 2, note: "Angebot erstellen" },
-  ANGEBOT: { type: "NACHFASSEN", days: 3, note: "Nachfassen, Entscheidung holen" },
-  ANTRAG: { type: "ANTRAG_EINREICHEN", days: 14, note: "Policierung pruefen" },
-  // Ab hier uebernimmt der Kontakt (Empfehlung, Checkup).
-  GEWONNEN: null,
-};
-
-export const CHECKUP_INTERVAL_MONTHS = 6;
 
 // Faelligkeit aus einem Playbook-Eintrag.
 export function playbookDueDate(
@@ -270,43 +184,7 @@ export function playbookDueDate(
   appointmentAt?: Date | null
 ): Date {
   if (entry.useAppointment && appointmentAt) return appointmentAt;
-  if (entry.months) return addMonths(from, entry.months);
   return addDays(from, entry.days ?? 0);
-}
-
-// --- Einheiten --------------------------------------------------------------
-// Vertriebswaehrung: 100 EUR Monatsbeitrag = 82 Einheiten.
-// unitFactorPermille (1000 = 1,0) haelt spaetere Laufzeitfaktoren offen.
-
-export const UNITS_PER_EURO = 0.82;
-export const POINTS_DEAL_WON = 5;
-
-export function calcUnits(
-  monthlyPremiumCents: number | null | undefined,
-  unitFactorPermille = 1000
-): number | null {
-  if (monthlyPremiumCents == null) return null;
-  const euro = monthlyPremiumCents / 100;
-  return Math.round((euro * UNITS_PER_EURO * unitFactorPermille) / 1000);
-}
-
-// "84,50" oder "84.50" -> 8450
-export function euroToCents(value: string): number | null {
-  const normalized = value.trim().replace(/\./g, "").replace(",", ".");
-  if (!normalized) return null;
-  const parsed = Number(normalized);
-  if (!isFinite(parsed) || parsed < 0) return null;
-  return Math.round(parsed * 100);
-}
-
-const euroFormat = new Intl.NumberFormat("de-DE", {
-  style: "currency",
-  currency: "EUR",
-});
-
-export function formatEuro(cents: number | null | undefined): string {
-  if (cents == null) return "–";
-  return euroFormat.format(cents / 100);
 }
 
 // --- Hilfen -----------------------------------------------------------------
@@ -315,24 +193,10 @@ export function contactStageIndex(stage: ContactStage): number {
   return CONTACT_STAGES.indexOf(stage);
 }
 
-export function isAtOrAfter(stage: ContactStage, reference: ContactStage): boolean {
-  return contactStageIndex(stage) >= contactStageIndex(reference);
-}
-
 export const ALL_CONTACT_STAGES = Object.values(ContactStage) as ContactStage[];
-export const ALL_DEAL_STAGES = Object.values(DealStage) as DealStage[];
-export const ALL_DEAL_LINES = Object.values(DealLine) as DealLine[];
 
 export function isContactStage(value: string): value is ContactStage {
   return (ALL_CONTACT_STAGES as string[]).includes(value);
-}
-
-export function isDealStage(value: string): value is DealStage {
-  return (ALL_DEAL_STAGES as string[]).includes(value);
-}
-
-export function isDealLine(value: string): value is DealLine {
-  return (ALL_DEAL_LINES as string[]).includes(value);
 }
 
 export function isNextStepType(value: string): value is NextStepType {

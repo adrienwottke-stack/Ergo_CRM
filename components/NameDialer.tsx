@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { recordCallResult } from "@/app/(app)/contacts/results";
 import { ratingHints, ratingLabels, ratingPalette } from "@/lib/namelist";
-import { countPlaceholders } from "@/lib/guides";
 import GuideBody from "@/components/GuideBody";
+import Einwandhilfe from "@/components/Einwandhilfe";
 import {
   AppointmentDialog,
   ChoiceDialog,
@@ -59,13 +59,11 @@ export default function NameDialer({
   kind,
   guideTitle,
   guideBody,
-  guideIsDraft,
 }: {
   queue: DialerEntry[];
   kind: ListKind;
   guideTitle: string;
   guideBody: string;
-  guideIsDraft: boolean;
 }) {
   // Eingefroren: nach jedem Ergebnis laedt der Server die Liste neu, der
   // erledigte Name faellt heraus – ohne diese Kopie wuerde der Durchlauf
@@ -191,7 +189,6 @@ export default function NameDialer({
 
   const palette = current.rating ? ratingPalette[current.rating] : null;
   const percent = Math.round((index / items.length) * 100);
-  const placeholders = countPlaceholders(guideBody);
 
   return (
     <div className="space-y-4">
@@ -293,22 +290,15 @@ export default function NameDialer({
               )}
               {guideTitle}
             </span>
-            {guideIsDraft && !showGuide && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
-                Gerüst
-              </span>
-            )}
           </button>
           {showGuide && (
-            <div className="border-t border-slate-100 px-3.5 py-3">
+            <div className="space-y-4 border-t border-slate-100 px-3.5 py-3">
               <GuideBody body={guideBody} />
-              {guideIsDraft && placeholders > 0 && (
-                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  Nur ein Gerüst: die {placeholders} Stellen in [eckigen
-                  Klammern] gehören durch deinen eigenen Wortlaut ersetzt –
-                  auf der Namensliste unter „Leitfaden bearbeiten“.
-                </p>
-              )}
+              {/* Die Einwaende gehoeren genau hierhin: mitten ins Gespraech,
+                  nicht in einen Test von vor zwei Wochen. */}
+              <div className="border-t border-slate-100 pt-3">
+                <Einwandhilfe kind={kind} />
+              </div>
             </div>
           )}
         </div>

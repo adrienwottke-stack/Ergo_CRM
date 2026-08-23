@@ -31,5 +31,4 @@ export async function quickLog(type: string, count: number) {
 
   revalidatePath("/log");
   revalidatePath("/leaderboard");
-  revalidatePath("/report");
 }

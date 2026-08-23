@@ -11,16 +11,15 @@ import {
   utcToBerlinLocalInput,
   type DueState,
 } from "@/lib/dates";
-import { dealLineShortLabels, formatEuro } from "@/lib/pipeline";
+import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
 import StageBadge from "@/components/StageBadge";
 import NextStepBadge from "@/components/NextStepBadge";
 import QuickRowActions from "@/components/QuickRowActions";
-import DealActions from "@/components/DealActions";
 import type { ContactLite } from "@/components/ContactActionDialog";
-import type { DealLite } from "@/components/DealActionDialog";
 import ErsteWoche from "@/components/ErsteWoche";
-import { btnPrimary, card, pageTitle } from "@/components/ui";
-import { CheckIcon, TargetIcon } from "@/components/icons";
+import Meldungen from "@/components/Meldungen";
+import { card, pageTitle } from "@/components/ui";
+import { CheckIcon, PhoneIcon, SparkIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +35,7 @@ export default async function HeutePage() {
   const today = berlinToday();
   const horizon = addDays(dayToUtcDate(today), 8);
 
-  const [contacts, deals, stepless] = await Promise.all([
+  const [contacts, orphans, offeneNamen] = await Promise.all([
     prisma.contact.findMany({
       where: {
         ...sicht.kontakte,
@@ -54,45 +53,35 @@ export default async function HeutePage() {
         },
       },
     }),
-    prisma.deal.findMany({
-      where: {
-        ...sicht.ueberKontakt,
-        outcome: "OFFEN",
-        nextStepType: { not: null },
-        nextStepAt: { lt: horizon },
-      },
-      orderBy: { nextStepAt: "asc" },
-      include: { contact: { select: { id: true, name: true, phone: true } } },
-    }),
+    // Ohne naechsten Schritt: faellt sonst durchs Raster. Wer die Schleife
+    // durch hat, ist kein Versaeumnis.
     prisma.contact.findMany({
       where: {
         ...sicht.kontakte,
         nextStepType: null,
         outcome: { not: "VERLOREN" },
+        stage: { not: "ABSCHLUSS" },
       },
       orderBy: { updatedAt: "asc" },
-      include: { deals: { where: { outcome: "OFFEN" }, select: { id: true } } },
+    }),
+    // Nachschub-Stand: was noch zu arbeiten ist, nicht was je gesammelt wurde.
+    prisma.contact.count({
+      where: {
+        ...sicht.kontakte,
+        listKinds: { isEmpty: false },
+        outcome: "OFFEN",
+        stage: { in: ["NEU", "KONTAKTIERT"] },
+      },
     }),
   ]);
 
-  type Row =
-    | { kind: "contact"; at: Date; due: DueState; data: (typeof contacts)[number] }
-    | { kind: "deal"; at: Date; due: DueState; data: (typeof deals)[number] };
+  type Row = { at: Date; due: DueState; data: (typeof contacts)[number] };
 
-  const rows: Row[] = [
-    ...contacts.map((data) => ({
-      kind: "contact" as const,
-      at: data.nextStepAt!,
-      due: dueState(data.nextStepAt!, today),
-      data,
-    })),
-    ...deals.map((data) => ({
-      kind: "deal" as const,
-      at: data.nextStepAt!,
-      due: dueState(data.nextStepAt!, today),
-      data,
-    })),
-  ].sort((a, b) => a.at.getTime() - b.at.getTime());
+  const rows: Row[] = contacts.map((data) => ({
+    at: data.nextStepAt!,
+    due: dueState(data.nextStepAt!, today),
+    data,
+  }));
 
   const groups: { key: DueState; title: string; hint: string; rows: Row[] }[] = [
     {
@@ -115,32 +104,93 @@ export default async function HeutePage() {
     },
   ];
 
-  // In Beratung liegt der Schritt am Vorgang – das ist kein Versäumnis.
-  const orphans = stepless.filter(
-    (contact) => !(contact.stage === "IN_BERATUNG" && contact.deals.length > 0)
-  );
-
-  const openCount = groups[0]!.rows.length + groups[1]!.rows.length;
+  // Das Tagespensum: was JETZT dran ist, nach Art getrennt. Ueberfaellig und
+  // heute zaehlen zusammen - ein Anruf von gestern ist heute ein Anruf.
+  const jetzt = [...groups[0]!.rows, ...groups[1]!.rows];
+  const anrufeHeute = jetzt.filter(
+    (row) => row.data.nextStepType === "ANRUF"
+  ).length;
+  const termineHeute = jetzt.filter(
+    (row) => row.data.nextStepType === "TERMIN"
+  ).length;
+  const sonstigeHeute = jetzt.length - anrufeHeute - termineHeute;
+  const openCount = jetzt.length;
+  const nachfuellen = offeneNamen < NACHFUELL_SCHWELLE;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className={pageTitle}>Heute</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {openCount === 0
-              ? "Nichts offen – alles abgearbeitet."
-              : `${openCount} ${openCount === 1 ? "Schritt" : "Schritte"} offen (überfällig und heute).`}
-          </p>
-        </div>
-        {/* Der Fokus-Modus arbeitet dieselbe Liste ab, nur ohne Klicken
-            zwischendurch. Deshalb steht er hier als Aktion und nicht als
-            eigener Punkt in der Kopfzeile. */}
-        <Link href="/focus" className={btnPrimary}>
-          <TargetIcon className="h-4 w-4" />
-          Fokus starten
-        </Link>
+      <div>
+        <h1 className={pageTitle}>Heute</h1>
       </div>
+
+      {/* Beim Oeffnen steht da, was heute zu tun ist - als Zahl, nicht als
+          Liste, aus der man erst auswaehlen muss. */}
+      <div className={`${card} p-5 sm:p-6`}>
+        {openCount === 0 ? (
+          <p className="text-base font-semibold text-slate-900">
+            Nichts offen – alles abgearbeitet.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-3xl font-bold tracking-[-0.02em] tabular-nums text-navy-900">
+                {anrufeHeute > 0 ? anrufeHeute : openCount}
+              </span>
+              <span className="text-base font-semibold text-slate-900">
+                {anrufeHeute > 0
+                  ? `${anrufeHeute === 1 ? "Anruf" : "Anrufe"} heute`
+                  : `${openCount === 1 ? "Schritt" : "Schritte"} heute`}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">
+              {[
+                termineHeute > 0 &&
+                  `${termineHeute} ${termineHeute === 1 ? "Termin" : "Termine"}`,
+                sonstigeHeute > 0 && `${sonstigeHeute} weitere Schritte`,
+                groups[0]!.rows.length > 0 &&
+                  `${groups[0]!.rows.length} davon überfällig`,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "Der Reihe nach von oben."}
+            </p>
+          </>
+        )}
+
+        {/* Nachfuell-Alarm: ohne Namen kein Anruf, egal wie voll der Tag ist. */}
+        {nachfuellen && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 px-4 py-3">
+            <p className="text-sm text-amber-900">
+              <span className="font-semibold">
+                {offeneNamen === 0
+                  ? "Keine offenen Namen mehr."
+                  : `Nur noch ${offeneNamen} offene Namen.`}
+              </span>{" "}
+              Ohne Nachschub steht die Schleife still.
+            </p>
+            <Link
+              href="/namen/sammeln"
+              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-amber-900 px-4 text-sm font-semibold text-white transition hover:bg-amber-950"
+            >
+              <SparkIcon className="h-4 w-4" />
+              Namen sammeln
+            </Link>
+          </div>
+        )}
+
+        {openCount > 0 && !nachfuellen && (
+          <Link
+            href="/namen"
+            className="mt-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
+          >
+            <PhoneIcon className="h-4 w-4" />
+            Lieber am Stück telefonieren? Durchlauf über die Namensliste
+          </Link>
+        )}
+      </div>
+
+      {/* Fragt nur, wenn noch nicht zugestimmt wurde - und erklaert wofuer,
+          bevor der Browser fragt. */}
+      <Meldungen vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""} />
 
       {/* Startwoche, Brief, Versprechen, Wiedereinstieg - meldet sich nur,
           wenn einer dieser Momente wirklich ansteht. */}
@@ -155,11 +205,11 @@ export default async function HeutePage() {
             Keine offenen Schritte
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            Neue Kontakte legst du unter{" "}
-            <Link href="/contacts/new" className="font-medium text-navy-600 hover:underline">
-              Neuer Kontakt
-            </Link>{" "}
-            an.
+            Neue Namen sammelst du in der{" "}
+            <Link href="/namen" className="font-medium text-navy-600 hover:underline">
+              Namensliste
+            </Link>
+            .
           </p>
           {/* Der Willkommens-Ablauf bleibt aufrufbar - zum Vorfuehren am
               Launch-Tag und fuer alle, die ihn weggeklickt haben. */}
@@ -187,129 +237,69 @@ export default async function HeutePage() {
 
               <ul className="space-y-3">
                 {group.rows.map((row) => {
-                  if (row.kind === "contact") {
-                    const contact = row.data;
-                    const lite: ContactLite = {
-                      id: contact.id,
-                      name: contact.name,
-                      phone: contact.phone,
-                      stage: contact.stage,
-                      outcome: contact.outcome,
-                      appointmentLocal: contact.appointmentAt
-                        ? utcToBerlinLocalInput(contact.appointmentAt)
-                        : null,
-                      hasStep: true,
-                    };
-                    return (
-                      <li key={`c-${contact.id}`} className={`${card} p-4`}>
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <Link
-                            href={`/contacts/${contact.id}`}
-                            className="text-sm font-semibold text-slate-900 hover:text-navy-700"
-                          >
-                            {contact.name}
-                          </Link>
-                          <StageBadge stage={contact.stage} outcome={contact.outcome} />
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <NextStepBadge
-                            type={contact.nextStepType!}
-                            at={contact.nextStepAt!}
-                            state={row.due}
-                            withTime={hasTimeOfDay(contact.nextStepAt!)}
-                          />
-                          {contact.nextStepNote && (
-                            <span className="text-xs text-slate-500">
-                              {contact.nextStepNote}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Vorgeschichte in der Zeile statt im Profil. */}
-                        {(contact.activities[0] || contact.note) && (
-                          <div className="mt-2 space-y-0.5 border-l-2 border-slate-100 pl-2.5">
-                            {contact.activities[0] && (
-                              <p className="line-clamp-2 text-xs text-slate-500">
-                                <span className="text-slate-400">
-                                  Zuletzt {kurzDatum.format(contact.activities[0].date)}:
-                                </span>{" "}
-                                {contact.activities[0].text}
-                              </p>
-                            )}
-                            {contact.note && (
-                              <p className="line-clamp-2 text-xs text-amber-800">
-                                {contact.note}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        <div className="mt-3 border-t border-slate-100 pt-3">
-                          <QuickRowActions
-                            contact={lite}
-                            istAnruf={contact.nextStepType === "ANRUF"}
-                          />
-                        </div>
-                      </li>
-                    );
-                  }
-
-                  const deal = row.data;
-                  const lite: DealLite = {
-                    id: deal.id,
-                    contactId: deal.contactId,
-                    contactName: deal.contact.name,
-                    line: deal.line,
-                    title: deal.title,
-                    stage: deal.stage,
-                    outcome: deal.outcome,
+                  const contact = row.data;
+                  const lite: ContactLite = {
+                    id: contact.id,
+                    name: contact.name,
+                    phone: contact.phone,
+                    stage: contact.stage,
+                    outcome: contact.outcome,
+                    appointmentLocal: contact.appointmentAt
+                      ? utcToBerlinLocalInput(contact.appointmentAt)
+                      : null,
                     hasStep: true,
-                    monthlyPremiumInput:
-                      deal.monthlyPremiumCents != null
-                        ? (deal.monthlyPremiumCents / 100).toFixed(2).replace(".", ",")
-                        : "",
-                    units: deal.units,
+                    referralsAsked: contact.referralsAskedAt !== null,
                   };
                   return (
-                    <li key={`d-${deal.id}`} className={`${card} p-4`}>
+                    <li key={contact.id} className={`${card} p-4`}>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <Link
-                          href={`/contacts/${deal.contactId}`}
+                          href={`/contacts/${contact.id}`}
                           className="text-sm font-semibold text-slate-900 hover:text-navy-700"
                         >
-                          {deal.contact.name}
+                          {contact.name}
                         </Link>
-                        <span className="inline-flex items-center rounded-full bg-navy-50 px-2.5 py-1 text-xs font-medium text-navy-700 ring-1 ring-inset ring-navy-600/15">
-                          Vorgang {dealLineShortLabels[deal.line]}
-                          {deal.units ? ` · ${deal.units} Einh.` : ""}
-                        </span>
+                        <StageBadge stage={contact.stage} outcome={contact.outcome} />
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <NextStepBadge
-                          type={deal.nextStepType!}
-                          at={deal.nextStepAt!}
+                          type={contact.nextStepType!}
+                          at={contact.nextStepAt!}
                           state={row.due}
-                          withTime={hasTimeOfDay(deal.nextStepAt!)}
+                          withTime={hasTimeOfDay(contact.nextStepAt!)}
                         />
-                        {deal.nextStepNote && (
-                          <span className="text-xs text-slate-500">{deal.nextStepNote}</span>
-                        )}
-                        {deal.monthlyPremiumCents != null && (
+                        {contact.nextStepNote && (
                           <span className="text-xs text-slate-500">
-                            {formatEuro(deal.monthlyPremiumCents)} / Monat
+                            {contact.nextStepNote}
                           </span>
                         )}
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
-                        {deal.contact.phone && (
-                          <a
-                            href={`tel:${deal.contact.phone}`}
-                            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-[13px] font-medium text-emerald-700 transition hover:bg-emerald-100"
-                          >
-                            Anrufen
-                          </a>
-                        )}
-                        <DealActions deal={lite} />
+
+                      {/* Vorgeschichte in der Zeile statt im Profil. */}
+                      {(contact.activities[0] || contact.note) && (
+                        <div className="mt-2 space-y-0.5 border-l-2 border-slate-100 pl-2.5">
+                          {contact.activities[0] && (
+                            <p className="line-clamp-2 text-xs text-slate-500">
+                              <span className="text-slate-400">
+                                Zuletzt {kurzDatum.format(contact.activities[0].date)}:
+                              </span>{" "}
+                              {contact.activities[0].text}
+                            </p>
+                          )}
+                          {contact.note && (
+                            <p className="line-clamp-2 text-xs text-amber-800">
+                              {contact.note}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="mt-3 border-t border-slate-100 pt-3">
+                        <QuickRowActions
+                          contact={lite}
+                          istAnruf={contact.nextStepType === "ANRUF"}
+                          istTermin={contact.nextStepType === "TERMIN"}
+                        />
                       </div>
                     </li>
                   );
@@ -354,6 +344,7 @@ export default async function HeutePage() {
                         ? utcToBerlinLocalInput(contact.appointmentAt)
                         : null,
                       hasStep: false,
+                      referralsAsked: contact.referralsAskedAt !== null,
                     }}
                     // Ohne Schritt, aber noch in der Akquise: dann ist der
                     // naechste Griff ohnehin das Telefon.
@@ -367,11 +358,8 @@ export default async function HeutePage() {
           </ul>
           {orphans.length > 25 && (
             <p className="text-xs text-slate-500">
-              … und {orphans.length - 25} weitere. Über{" "}
-              <Link href="/pipeline" className="font-medium text-navy-600 hover:underline">
-                Pipeline
-              </Link>{" "}
-              nacharbeiten.
+              … und {orphans.length - 25} weitere. Die Liste rückt nach, sobald
+              die ersten einen Schritt haben.
             </p>
           )}
         </section>

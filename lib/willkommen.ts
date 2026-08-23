@@ -4,7 +4,10 @@
 // am Launch-Tag noch dreimal umgeschrieben, und dann soll niemand in JSX
 // zwischen divs suchen muessen. Keine KI, keine Zufaelle: Regie.
 
-import type { ListKind } from "@/lib/generated/prisma/enums";
+import { EINWAENDE } from "@/lib/guides";
+
+export { EINWAENDE };
+export type { Einwand } from "@/lib/guides";
 
 // Wer spricht, wenn kein Einladender am Konto haengt (Admin, Altkonten).
 export const FALLBACK_ABSENDER = "Paul Ehlert";
@@ -22,7 +25,6 @@ export const AKTE = [
   "brief",
   "sprint",
   "einstufung",
-  "foto",
   "rangliste",
   "ankunft",
 ] as const;
@@ -130,100 +132,8 @@ export function rechne(namen: number, anrufeProTag: number): Hochrechnung {
 
 // --- Akt 3: Der Einwand-Test --------------------------------------------------
 // Die eigentliche Angst an Tag 1 ist nicht die Bedienung, sondern der erste
-// Anruf. Der Inhalt kommt aus den Leitfaeden (lib/guides.ts) - hier wird er
-// spielbar gemacht, nicht neu erfunden.
-
-export type Einwand = {
-  satz: string;
-  optionen: { text: string; richtig: boolean }[];
-  /** Warum die richtige Antwort die richtige ist - eine Zeile. */
-  begruendung: string;
-};
-
-export const EINWAENDE: Record<ListKind, Einwand[]> = {
-  VERKAUF: [
-    {
-      satz: "„Da hab ich kein Geld für.“",
-      optionen: [
-        { text: "„Okay, meld dich, wenn sich das ändert.“", richtig: false },
-        {
-          text: "„Genau darum geht's — aus wenig Geld mehr machen. Deshalb reden wir ja.“",
-          richtig: true,
-        },
-        { text: "„Es kostet doch erstmal gar nichts!“", richtig: false },
-      ],
-      begruendung:
-        "Der Einwand IST dein Aufhänger: wer wenig hat, braucht das Thema am dringendsten.",
-    },
-    {
-      satz: "„Ich investier schon — Trade Republic.“",
-      optionen: [
-        { text: "„Oh. Na dann brauchst du ja nichts.“", richtig: false },
-        {
-          text: "„Mega! Und hast du dabei schon mal an Steuern und Gebühren gedacht? Genau da setz ich an.“",
-          richtig: true,
-        },
-        { text: "„Verkauf das lieber und komm zu uns.“", richtig: false },
-      ],
-      begruendung:
-        "Weg C im Leitfaden: nie gegen das Depot reden — die Lücke zeigen, die es lässt.",
-    },
-    {
-      satz: "„Termin? Ich hab grad echt keine Zeit.“",
-      optionen: [
-        { text: "„Wann hättest du denn mal Zeit?“", richtig: false },
-        { text: "„Dauert auch ganz kurz, versprochen!“", richtig: false },
-        {
-          text: "„Unter der Woche oder am Wochenende — was passt dir besser?“",
-          richtig: true,
-        },
-      ],
-      begruendung:
-        "Alternativtechnik: zwei Optionen, beide führen zum Ja. Das Ob steht nie zur Debatte, nur das Wann.",
-    },
-  ],
-  RECRUITING: [
-    {
-      satz: "„Ist das nicht so ein Schneeballsystem?“",
-      optionen: [
-        { text: "„Nein! Wie kommst du denn darauf?“", richtig: false },
-        {
-          text: "„Berechtigte Frage. Schau's dir einmal an und urteile selbst — genau dafür ist der Infoabend da.“",
-          richtig: true,
-        },
-        { text: "„Das sagen nur Leute, die es nicht verstanden haben.“", richtig: false },
-      ],
-      begruendung:
-        "Nicht verteidigen, einladen. Wer selbst geprüft hat, glaubt sich — dir muss er nichts glauben.",
-    },
-    {
-      satz: "„Ich hab null Ahnung von Finanzen.“",
-      optionen: [
-        { text: "„Macht nichts, verkaufen kann jeder.“", richtig: false },
-        {
-          text: "„Hatte am Anfang keiner von uns. Genau dafür ist die Ausbildung da — neben Job oder Studium.“",
-          richtig: true,
-        },
-        { text: "„Dann wird's Zeit, dass du's lernst.“", richtig: false },
-      ],
-      begruendung:
-        "Der Einwand ist eine Sorge, kein Nein. Die Antwort nimmt sie ernst und räumt sie aus.",
-    },
-    {
-      satz: "„Neben Job und Uni hab ich keine Zeit.“",
-      optionen: [
-        { text: "„Zeit hat man nie, Zeit nimmt man sich!“", richtig: false },
-        {
-          text: "„Läuft nebenbei, du bestimmst das Tempo. Schau's dir einmal an — unter der Woche oder am Wochenende?“",
-          richtig: true,
-        },
-        { text: "„Okay, dann vielleicht später mal.“", richtig: false },
-      ],
-      begruendung:
-        "Sorge ernst nehmen und trotzdem die Alternativtechnik ans Ende — die Terminfrage bleibt offen für das Wann, nicht das Ob.",
-    },
-  ],
-};
+// Anruf. Der Inhalt liegt bei den Leitfaeden (lib/guides.ts) - hier wird er
+// nur spielbar gemacht. Dieselben Einwaende stehen spaeter im Durchlauf.
 
 export const einwandAbschluss =
   "Das steht alles im Leitfaden — direkt neben deiner Namensliste. Du musst nichts auswendig können.";

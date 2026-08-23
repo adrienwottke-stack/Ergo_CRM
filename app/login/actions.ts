@@ -8,8 +8,6 @@ import {
   createSession,
   hashPassword,
   newPasswordSalt,
-  reportCookieName,
-  reportTokenValue,
 } from "@/lib/auth";
 import { pfadUnter } from "@/lib/struktur";
 
@@ -68,19 +66,12 @@ async function bootstrapAdmin(formData: FormData, password: string) {
 
   const cookieStore = await cookies();
   cookieStore.set(authCookieName, await createSession(admin.id), cookieOptions);
-  redirect("/dashboard");
+  redirect("/heute");
 }
 
 export async function login(formData: FormData) {
   const password = text(formData, "password");
   if (!password) redirect("/login?error=1");
-
-  // Der Bericht kann weiterhin ohne eigenes CRM-Konto aufgerufen werden.
-  if (process.env.REPORT_PASSWORD && password === process.env.REPORT_PASSWORD) {
-    const cookieStore = await cookies();
-    cookieStore.set(reportCookieName, await reportTokenValue(), cookieOptions);
-    redirect("/report");
-  }
 
   const userCount = await prisma.user.count();
   if (userCount === 0) {
@@ -96,12 +87,11 @@ export async function login(formData: FormData) {
 
   const cookieStore = await cookies();
   cookieStore.set(authCookieName, await createSession(user.id), cookieOptions);
-  redirect("/dashboard");
+  redirect("/heute");
 }
 
 export async function logout() {
   const cookieStore = await cookies();
   cookieStore.delete(authCookieName);
-  cookieStore.delete(reportCookieName);
   redirect("/login");
 }

@@ -1,24 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  authCookieName,
-  reportCookieName,
-  reportTokenValue,
-  sessionUserId,
-} from "./lib/session";
+import { authCookieName, sessionUserId } from "./lib/session";
 
 export async function middleware(request: NextRequest) {
   const session = await sessionUserId(
     request.cookies.get(authCookieName)?.value
   );
   if (session) return NextResponse.next();
-
-  // Der Berichts-Zugang kann weiterhin getrennt an Vorgesetzte vergeben werden.
-  if (request.nextUrl.pathname === "/report") {
-    const reportToken = request.cookies.get(reportCookieName)?.value;
-    if (reportToken && reportToken === (await reportTokenValue())) {
-      return NextResponse.next();
-    }
-  }
 
   return NextResponse.redirect(new URL("/login", request.url));
 }
@@ -32,7 +19,10 @@ export const config = {
   // es geht, /offline liefert der Service Worker aus, und Manifest, sw.js und
   // die Symbole muss der Browser abrufen koennen, BEVOR jemand ein Konto hat -
   // sonst gibt es auf der Einladungsseite gar nichts zu installieren.
+  //
+  // /api/cron laeuft ohne Sitzung: der Auftrag kommt von Vercel, nicht aus
+  // einem Browser. Geschuetzt ist er ueber CRON_SECRET, nicht ueber ein Cookie.
   matcher: [
-    "/((?!login|einladung|start|offline|manifest\\.webmanifest|sw\\.js|icon-|apple-touch-icon\\.png|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)",
+    "/((?!login|einladung|start|offline|api/cron|manifest\\.webmanifest|sw\\.js|icon-|apple-touch-icon\\.png|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)",
   ],
 };

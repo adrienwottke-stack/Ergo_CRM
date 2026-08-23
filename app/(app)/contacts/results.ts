@@ -16,6 +16,8 @@ import { requireUser, requireUserPerson } from "@/lib/auth";
 import { offenerUndoEintrag, undoAusfuehren, withUndo } from "@/lib/undo";
 import { addDays, berlinToday, dayToUtcDate } from "@/lib/dates";
 import { isLostReason } from "@/lib/pipeline";
+import { empfehlungenAnlegen, empfehlungenAusFormular } from "@/lib/empfehlungen";
+import { meldeNebenbei } from "@/lib/push";
 import { createActivity, quickLogCall } from "@/app/(app)/contacts/actions";
 import { markContactLost, setContactStage } from "@/app/(app)/pipeline/actions";
 
@@ -43,9 +45,6 @@ function text(formData: FormData, field: string): string | null {
 function refreshViews(contactId: string) {
   revalidatePath("/heute");
   revalidatePath("/namen");
-  revalidatePath("/pipeline");
-  revalidatePath("/contacts");
-  revalidatePath("/dashboard");
   revalidatePath("/leaderboard");
   revalidatePath(`/contacts/${contactId}`);
 }
@@ -57,6 +56,142 @@ async function loadOwnContact(userId: string, contactId: string) {
   });
   if (!contact) throw new Error("Kontakt nicht gefunden.");
   return contact;
+}
+
+// --- Der gehaltene Termin ---------------------------------------------------
+//
+// Der wichtigste Erfassungsmoment der ganzen Schleife, und der einzige, an dem
+// bewusst mehr als ein Ergebnis abgefragt wird: Was kam raus - UND wen hat er
+// dir empfohlen. Die zweite Frage steht auf demselben Bildschirm, weil sie
+// sonst umgangen wird. Als Playbook-Vorschlag drei Tage spaeter war sie es.
+//
+// Bezahlt wird das mit null zusaetzlichen Tipps: das Antippen des Ergebnisses
+// speichert beides.
+
+export type AppointmentResult = "abschluss" | "offen" | "kein_abschluss";
+
+const APPOINTMENT_LABELS: Record<AppointmentResult, string> = {
+  abschluss: "Abschluss",
+  offen: "Termin gehalten, Ergebnis offen",
+  kein_abschluss: "Termin gehalten, kein Abschluss",
+};
+
+export async function recordAppointmentResult(formData: FormData) {
+  const user = await requireUser();
+  const person = await requireUserPerson(user.id);
+  const contactId = text(formData, "contactId");
+  const resultRaw = text(formData, "result");
+  if (!contactId || !resultRaw) throw new Error("Ergebnis fehlt.");
+
+  const result = resultRaw as AppointmentResult;
+  if (!(result in APPOINTMENT_LABELS)) throw new Error("Unbekanntes Ergebnis.");
+
+  const contact = await loadOwnContact(user.id, contactId);
+  const empfehlungen = empfehlungenAusFormular(formData);
+
+  await withUndo(
+    {
+      userId: user.id,
+      personId: person.id,
+      contactId,
+      label: `${APPOINTMENT_LABELS[result]}: ${contact.name}`,
+    },
+    async () => {
+      // Der Termin selbst laeuft ueber setContactStage: dort haengen der
+      // Punkt fuer den gehaltenen Termin, der fuer den Abschluss und die
+      // Phasenhistorie. Kein zweiter Weg in die Datenbank.
+      const meeting = new FormData();
+      meeting.set("contactId", contactId);
+      meeting.set("type", "MEETING");
+      meeting.set("text", APPOINTMENT_LABELS[result]);
+      await createActivity(meeting);
+
+      const stage = new FormData();
+      stage.set("contactId", contactId);
+      stage.set("stage", result === "abschluss" ? "ABSCHLUSS" : "TERMIN_GEHALTEN");
+      await setContactStage(stage);
+
+      if (result === "kein_abschluss") {
+        const lost = new FormData();
+        lost.set("contactId", contactId);
+        lost.set("lostReason", "KEIN_BEDARF");
+        await markContactLost(lost);
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await empfehlungenAnlegen(tx, {
+          userId: user.id,
+          personId: person.id,
+          contactId,
+          contactName: contact.name,
+          entries: empfehlungen,
+        });
+      });
+    }
+  );
+
+  // Ein Abschluss ist das seltenste Ereignis im Netzwerk - und das einzige,
+  // fuer das es sich lohnt, alle anderen zu stoeren. Der Rest der Rangliste
+  // erfaehrt es beim naechsten Aufruf von selbst.
+  if (result === "abschluss") {
+    const andere = await prisma.user.findMany({
+      where: { id: { not: user.id }, deactivatedAt: null },
+      select: { id: true },
+    });
+    meldeNebenbei(
+      andere.map((konto) => konto.id),
+      {
+        titel: `${user.name} hat abgeschlossen.`,
+        text: "Steht in der Rangliste. Wo stehst du?",
+        url: "/arena",
+        kennung: "abschluss",
+      }
+    );
+  }
+
+  refreshViews(contactId);
+}
+
+/**
+ * Der Termin ist geplatzt. Der Kontakt bleibt in "Termin vereinbart" und
+ * bekommt einen Anruf in zwei Tagen - ein geplatzter Termin ist kein
+ * verlorener Mensch. Bewusst OHNE Punkt: die Fruehwarnung der Fuehrungskraft
+ * lebt genau von der Luecke zwischen vereinbart und gehalten.
+ */
+export async function recordAppointmentMissed(formData: FormData) {
+  const user = await requireUser();
+  const person = await requireUserPerson(user.id);
+  const contactId = text(formData, "contactId");
+  if (!contactId) throw new Error("Kontakt-ID fehlt.");
+  const contact = await loadOwnContact(user.id, contactId);
+
+  await withUndo(
+    {
+      userId: user.id,
+      personId: person.id,
+      contactId,
+      label: `Termin geplatzt: ${contact.name}`,
+    },
+    async () => {
+      const note = new FormData();
+      note.set("contactId", contactId);
+      note.set("type", "MEETING");
+      note.set("text", "Termin geplatzt");
+      await createActivity(note);
+
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: {
+          appointmentAt: null,
+          nextStepType: "ANRUF",
+          nextStepAt: addDays(dayToUtcDate(berlinToday()), 2),
+          nextStepNote: "Neuen Termin holen",
+        },
+      });
+    }
+  );
+
+  refreshViews(contactId);
 }
 
 export async function recordCallResult(formData: FormData) {
@@ -222,9 +357,6 @@ export async function undoLast(formData: FormData) {
 
   revalidatePath("/heute");
   revalidatePath("/namen");
-  revalidatePath("/pipeline");
-  revalidatePath("/contacts");
-  revalidatePath("/dashboard");
   revalidatePath("/leaderboard");
   return label;
 }

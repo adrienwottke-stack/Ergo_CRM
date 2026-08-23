@@ -7,16 +7,20 @@ import { LogoutIcon } from "@/components/icons";
 export default async function TeamLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   // Auch hier die Willkommens-Weiche - sonst umgeht /leaderboard den Start.
   const user = await requireOnboardedUser();
-  // Arena und Rangliste stehen bewusst nebeneinander: welche der beiden Ansichten
-  // bleibt, entscheidet die Werkstatt und nicht wir (docs/wettbewerb-plan.md,
-  // Abschnitt 14).
+  // Die Werkstatt ist Produktarbeit und steht deshalb nur beim Admin: der
+  // Partner soll Termine machen, nicht Software verwalten. Seine Rueckmeldung
+  // gibt er nebenbei in der Arena.
   const links = [
     { href: "/log", label: "Meine Aktivitäten" },
     { href: "/arena", label: "Arena" },
     { href: "/leaderboard", label: "Rangliste" },
-    { href: "/werkstatt", label: "Werkstatt" },
-    { href: "/dashboard", label: "CRM" },
-    ...(user.role === "ADMIN" ? [{ href: "/team", label: "Team" }] : []),
+    { href: "/heute", label: "CRM" },
+    ...(user.role === "ADMIN"
+      ? [
+          { href: "/team", label: "Team" },
+          { href: "/werkstatt", label: "Werkstatt" },
+        ]
+      : []),
   ];
   return (
     <div className="flex min-h-dvh flex-col">

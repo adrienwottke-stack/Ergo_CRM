@@ -54,17 +54,6 @@ export async function briefSpeichern(text: string) {
   });
 }
 
-// --- Das Foto -----------------------------------------------------------------
-// Kommt als kleine, clientseitig verkleinerte JPEG-Data-URL (~10 KB). Die
-// Grenze hier ist die zweite Verteidigungslinie, nicht die erste.
-export async function fotoSpeichern(dataUrl: string) {
-  const user = await requireUser();
-  if (!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(dataUrl)) return;
-  if (dataUrl.length > 120_000) return;
-  await prisma.user.update({ where: { id: user.id }, data: { photoDataUrl: dataUrl } });
-  revalidatePath("/leaderboard");
-}
-
 // --- Das 30-Tage-Versprechen ---------------------------------------------------
 export async function versprechenSetzen(termine: number) {
   const user = await requireUser();
@@ -211,10 +200,6 @@ export async function willkommenAbschliessen() {
     where: { id: user.id },
     data: {
       ...(user.onboardingDoneAt ? {} : { onboardingDoneAt: new Date() }),
-      // Der Start endet in der einfachen Ansicht: drei Eintraege statt zehn.
-      // Nur beim ersten Durchlauf - wer sich spaeter alles eingeblendet hat
-      // und den Ablauf nochmal ansieht, verliert das nicht wieder.
-      ...(user.onboardingDoneAt ? {} : { beginnerMode: true }),
     },
   });
   revalidatePath("/", "layout");

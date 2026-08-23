@@ -1,12 +1,19 @@
 import { prisma } from "@/lib/prisma";
-import { requireUser, requireUserPerson } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, shiftDay } from "@/lib/dates";
-import { WUNSCH_STIMMEN, merkeNutzung } from "@/lib/features";
-import Taugt from "@/components/Taugt";
-import { card, input, kicker, pageTitle, sectionTitle, td, th } from "@/components/ui";
-import { schalten, wunschAnlegen, wunschStimme } from "./actions";
+import { card, kicker, pageTitle, td, th } from "@/components/ui";
+import { schalten } from "./actions";
 
 export const dynamic = "force-dynamic";
+
+// Der Pruefstand. Bewusst nur fuer den Admin: die Abstimmung selbst laeuft
+// unauffaellig in der Arena ("Taugt das?", eine Stimme je Kopf, danach weg).
+// Die Auswertung ist Produktarbeit und gehoert nicht in den Alltag eines
+// Partners - der soll Termine machen, nicht Software verwalten.
+//
+// Was hier zusammenkommt, sind zwei getrennte Fragen an jeden Baustein:
+// Was sagen die Leute? Und - unabhaengig davon - benutzt ihn ueberhaupt jemand?
+// Nutzung schlaegt Stimmen: was keiner anfasst, kann noch so gut gefallen.
 
 const standTexte: Record<string, string> = {
   TEST: "Test",
@@ -22,34 +29,24 @@ const standStile: Record<string, string> = {
   ABGERISSEN: "bg-slate-100 text-slate-500 ring-slate-400/20",
 };
 
-// Nutzung schlaegt Stimmen: darunter fliegt ein Baustein nach drei Wochen raus.
+// Darunter fliegt ein Baustein nach drei Wochen raus.
 const ABRISS_KOEPFE = 3;
 
 export default async function WerkstattPage() {
-  const user = await requireUser();
-  const person = await requireUserPerson(user.id);
-  await merkeNutzung("werkstatt", person.id);
+  await requireAdmin();
 
   const sieben = dayToUtcDate(shiftDay(berlinToday(), -7));
 
-  const [features, nutzung, koepfe, wuensche, meineWunschStimmen] = await Promise.all([
+  const [features, nutzung, koepfe] = await Promise.all([
     prisma.feature.findMany({
       orderBy: { titel: "asc" },
-      include: { votes: { select: { urteil: true, personId: true } } },
+      include: { votes: { select: { urteil: true } } },
     }),
     prisma.featureUse.findMany({
       where: { day: { gte: sieben } },
       select: { featureKey: true, personId: true },
     }),
     prisma.person.count(),
-    prisma.wunsch.findMany({
-      where: { stand: "OFFEN" },
-      include: { _count: { select: { votes: true } } },
-    }),
-    prisma.wunschVote.findMany({
-      where: { personId: person.id },
-      select: { wunschId: true },
-    }),
   ]);
 
   const kopfZahl = new Map<string, Set<string>>();
@@ -62,81 +59,34 @@ export default async function WerkstattPage() {
     set.add(zeile.personId);
   }
 
-  const gestimmt = new Set(meineWunschStimmen.map((v) => v.wunschId));
-  const restStimmen = Math.max(0, WUNSCH_STIMMEN - meineWunschStimmen.length);
-
-  const lebend = features.filter((f) => f.state !== "ABGERISSEN");
-  const friedhof = features.filter((f) => f.state === "ABGERISSEN");
-
-  // Ein Satz zur Lage - dieselbe Stimme wie in der Rangliste, nur ueber
-  // Funktionen statt ueber Menschen.
-  const bester = [...lebend]
-    .map((f) => ({
-      titel: f.titel,
-      stark: f.votes.filter((v) => v.urteil === "STARK").length,
-    }))
-    .sort((a, b) => b.stark - a.stark)[0];
-  // Vom Abstieg reden ergibt erst Sinn, wenn ueberhaupt genug Koepfe da sind,
-  // um die Schwelle zu reissen - und nie ueber den Fuehrenden selbst. Sonst
-  // steht bei zwei Koepfen "Der Kommentator fuehrt - Der Kommentator steht
-  // auf Abstieg" da (Live-Fund vom 20.08.).
-  const abstieg =
-    koepfe >= ABRISS_KOEPFE
-      ? lebend.find(
-          (f) =>
-            f.state === "TEST" &&
-            f.titel !== bester?.titel &&
-            (kopfZahl.get(f.key)?.size ?? 0) < ABRISS_KOEPFE
-        )
-      : undefined;
-
-  const sortierteWuensche = [...wuensche].sort(
-    (a, b) => b._count.votes - a._count.votes || a.titel.localeCompare(b.titel)
-  );
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h1 className={pageTitle}>Werkstatt</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Was bleibt, entscheidet ihr. Jeder Baustein steht zur Abstimmung — und
-          was keiner benutzt, fliegt nach drei Wochen raus.
+          Nur für dich. Was die Leute über jeden Baustein gesagt haben — und
+          davon getrennt, wie viele ihn in den letzten sieben Tagen überhaupt
+          benutzt haben.
         </p>
-        {bester && bester.stark > 0 && (
-          <p className="mt-3 text-sm text-slate-700">
-            <span className="font-medium">{bester.titel}</span> führt
-            {abstieg ? (
-              <>
-                {" "}
-                — <span className="font-medium">{abstieg.titel}</span> steht auf
-                Abstieg.
-              </>
-            ) : (
-              "."
-            )}
-          </p>
-        )}
       </div>
 
       <div className={`${card} overflow-x-auto`}>
-        <table className="w-full min-w-[680px] text-left text-sm">
+        <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="border-b border-slate-200/80 bg-slate-50/60">
             <tr>
               <th className={th}>Baustein</th>
               <th className={th}>Stimmen</th>
               <th className={`${th} text-right`}>Benutzt von</th>
               <th className={th}>Stand</th>
-              <th className={th}>Dein Urteil</th>
+              <th className={th}>Schalter</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {lebend.map((feature) => {
+            {features.map((feature) => {
               const stark = feature.votes.filter((v) => v.urteil === "STARK").length;
               const gehtSo = feature.votes.filter((v) => v.urteil === "GEHT_SO").length;
               const weg = feature.votes.filter((v) => v.urteil === "WEG_DAMIT").length;
               const benutzt = kopfZahl.get(feature.key)?.size ?? 0;
-              const meine =
-                feature.votes.find((v) => v.personId === person.id)?.urteil ?? null;
               return (
                 <tr key={feature.key} className="align-top">
                   <td className={`${td} font-medium text-slate-900`}>
@@ -160,6 +110,9 @@ export default async function WerkstattPage() {
                         {stark} stark · {gehtSo} geht so · {weg} weg
                       </span>
                     )}
+                    <span className="mt-0.5 block text-xs text-slate-400">
+                      {feature.votes.length} von {koepfe} haben geantwortet
+                    </span>
                   </td>
                   <td className={`${td} text-right tabular-nums`}>
                     {/* Warnfarbe erst, wenn die Schwelle ueberhaupt reissbar ist -
@@ -183,40 +136,34 @@ export default async function WerkstattPage() {
                     </span>
                   </td>
                   <td className={td}>
-                    <Taugt featureKey={feature.key} stimme={meine} kompakt />
-                    {user.role === "ADMIN" && (
-                      <details className="mt-2">
-                        <summary className="cursor-pointer text-[11px] text-slate-400">
-                          Schalter
-                        </summary>
-                        <form action={schalten} className="mt-2 space-y-2">
-                          <input type="hidden" name="key" value={feature.key} />
-                          <select
-                            name="state"
-                            defaultValue={feature.state}
-                            className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs"
-                          >
-                            {Object.entries(standTexte).map(([wert, text]) => (
-                              <option key={wert} value={wert}>
-                                {text}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            name="grund"
-                            defaultValue={feature.grund ?? ""}
-                            placeholder="Bleibt drin, weil …"
-                            className="min-h-9 w-full rounded-lg border border-slate-300 px-2 text-xs"
-                          />
-                          <button
-                            type="submit"
-                            className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                          >
-                            Übernehmen
-                          </button>
-                        </form>
-                      </details>
-                    )}
+                    <form action={schalten} className="space-y-2">
+                      <input type="hidden" name="key" value={feature.key} />
+                      <select
+                        name="state"
+                        defaultValue={feature.state}
+                        aria-label={`Stand von ${feature.titel}`}
+                        className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs"
+                      >
+                        {Object.entries(standTexte).map(([wert, text]) => (
+                          <option key={wert} value={wert}>
+                            {text}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        name="grund"
+                        defaultValue={feature.grund ?? ""}
+                        placeholder="Bleibt drin, weil …"
+                        aria-label={`Grund für ${feature.titel}`}
+                        className="min-h-9 w-full rounded-lg border border-slate-300 px-2 text-xs"
+                      />
+                      <button
+                        type="submit"
+                        className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Übernehmen
+                      </button>
+                    </form>
                   </td>
                 </tr>
               );
@@ -225,96 +172,11 @@ export default async function WerkstattPage() {
         </table>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className={sectionTitle}>Wunschzettel</h2>
-          <span className={kicker}>
-            {restStimmen} von {WUNSCH_STIMMEN} Stimmen frei
-          </span>
-        </div>
-        <p className="text-sm text-slate-500">
-          Was als Nächstes gebaut wird. Drei Stimmen pro Kopf — nochmal tippen
-          nimmt sie zurück. Neue Wünsche in die Gruppe schreiben.
-        </p>
-        <ul className={`${card} divide-y divide-slate-100`}>
-          {sortierteWuensche.map((wunsch) => {
-            const dabei = gestimmt.has(wunsch.id);
-            return (
-              <li
-                key={wunsch.id}
-                className="flex items-center justify-between gap-4 px-5 py-3 text-sm"
-              >
-                <span className="min-w-0">
-                  <span className="text-slate-800">{wunsch.titel}</span>
-                  {wunsch.beschreibung && (
-                    <span className="mt-0.5 block max-w-xl text-xs leading-relaxed text-slate-500">
-                      {wunsch.beschreibung}
-                    </span>
-                  )}
-                </span>
-                <form action={wunschStimme} className="flex shrink-0 items-center gap-3">
-                  <input type="hidden" name="wunschId" value={wunsch.id} />
-                  <span className="w-6 text-right tabular-nums text-slate-500">
-                    {wunsch._count.votes}
-                  </span>
-                  <button
-                    type="submit"
-                    disabled={!dabei && restStimmen === 0}
-                    className={`min-h-9 rounded-full px-3 text-xs font-semibold transition disabled:opacity-40 ${
-                      dabei
-                        ? "bg-navy-800 text-white"
-                        : "border border-slate-300 text-slate-600 hover:border-navy-300 hover:text-navy-700"
-                    }`}
-                  >
-                    {dabei ? "Dabei" : "Will ich"}
-                  </button>
-                </form>
-              </li>
-            );
-          })}
-        </ul>
-
-        {user.role === "ADMIN" && (
-          <form action={wunschAnlegen} className="flex gap-2">
-            <input
-              name="titel"
-              placeholder="Neuer Wunsch aus der Gruppe …"
-              className={`${input} mt-0`}
-            />
-            <button
-              type="submit"
-              className="min-h-11 shrink-0 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Eintragen
-            </button>
-          </form>
-        )}
-      </div>
-
-      {friedhof.length > 0 && (
-        <div className="space-y-3">
-          <h2 className={sectionTitle}>Friedhof</h2>
-          <ul className={`${card} divide-y divide-slate-100`}>
-            {friedhof.map((feature) => (
-              <li
-                key={feature.key}
-                className="flex items-center justify-between gap-4 px-5 py-3 text-sm text-slate-500"
-              >
-                <span>{feature.titel}</span>
-                <span className="tabular-nums">
-                  {feature.votes.filter((v) => v.urteil === "STARK").length} von{" "}
-                  {koepfe} fanden es gut
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <p className="text-xs text-slate-500">
+      <p className={kicker}>
         Gezählt wird, von wie vielen Köpfen ein Baustein benutzt wurde — nie, von
         wem. Was von weniger als {ABRISS_KOEPFE} Personen benutzt wird, steht nach
-        drei Wochen zur Abschaltung.
+        drei Wochen zur Abschaltung. Gestimmt wird einmal je Kopf; danach
+        verschwindet die Frage aus der Arena.
       </p>
     </div>
   );

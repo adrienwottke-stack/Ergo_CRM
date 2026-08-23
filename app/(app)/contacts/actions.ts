@@ -6,19 +6,13 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
 import { isActivityType } from "@/lib/labels";
-import {
-  CONTACT_PLAYBOOK,
-  isContactStage,
-  isNextStepType,
-  playbookDueDate,
-} from "@/lib/pipeline";
+import { CONTACT_PLAYBOOK, playbookDueDate } from "@/lib/pipeline";
 import {
   addDays,
   berlinDayOf,
   berlinLocalToUtc,
   berlinToday,
   dayToUtcDate,
-  isValidDay,
 } from "@/lib/dates";
 import type { ContactStage, NextStepType } from "@/lib/generated/prisma/enums";
 
@@ -27,63 +21,27 @@ function optional(formData: FormData, field: string) {
   return value || null;
 }
 
+// Das Formular kennt vier Felder: Name, Nummer, Beruf, Notiz. Phase, Termin
+// und naechster Schritt kommen NICHT von hier - sie entstehen aus dem
+// Gespraechsergebnis, wo das Playbook sie setzt. Ein Formular, das die Phase
+// mitschickt, wuerde sie bei jedem Speichern ueberschreiben.
 function contactDataFromForm(formData: FormData) {
   const name = (formData.get("name") as string | null)?.trim();
   if (!name) throw new Error("Name ist ein Pflichtfeld.");
 
-  const stageRaw = (formData.get("stage") as string | null) ?? "NEU";
-  const stage: ContactStage = isContactStage(stageRaw) ? stageRaw : "NEU";
-
-  const appointmentRaw = optional(formData, "appointmentAt");
-  const appointmentAt = appointmentRaw ? berlinLocalToUtc(appointmentRaw) : null;
-
-  const stepTypeRaw = optional(formData, "nextStepType");
-  const stepDay = optional(formData, "nextStepDate");
-  let nextStepType: NextStepType | null =
-    stepTypeRaw && isNextStepType(stepTypeRaw) ? stepTypeRaw : null;
-  let nextStepAt: Date | null =
-    stepDay && isValidDay(stepDay) ? dayToUtcDate(stepDay) : null;
-  let nextStepNote = optional(formData, "nextStepNote");
-
-  // Ohne eigene Angabe schlaegt das Playbook den Schritt zur Phase vor.
-  if (!nextStepType) {
-    const entry = CONTACT_PLAYBOOK[stage];
-    if (entry) {
-      nextStepType = entry.type;
-      const due = playbookDueDate(entry, new Date(), appointmentAt);
-      nextStepAt =
-        entry.useAppointment && appointmentAt ? due : dayToUtcDate(berlinDayOf(due));
-      nextStepNote = nextStepNote ?? entry.note;
-    }
-  } else if (!nextStepAt) {
-    nextStepAt = dayToUtcDate(berlinToday());
-  }
-
   return {
     name,
-    stage,
     phone: optional(formData, "phone"),
-    email: optional(formData, "email"),
     job: optional(formData, "job"),
-    source: optional(formData, "source"),
     note: optional(formData, "note"),
-    appointmentAt,
-    nextStepType,
-    nextStepAt,
-    nextStepNote,
   };
 }
 
 function refreshContactViews(contactId?: string) {
-  revalidatePath("/contacts");
   revalidatePath("/namen");
   revalidatePath("/heute");
-  revalidatePath("/pipeline");
-  revalidatePath("/vorgaenge");
-  revalidatePath("/dashboard");
   revalidatePath("/trichter");
   revalidatePath("/leaderboard");
-  revalidatePath("/report");
   if (contactId) revalidatePath(`/contacts/${contactId}`);
 }
 
@@ -121,7 +79,10 @@ export async function createContact(formData: FormData) {
   const person = await requireUserPerson(user.id);
   const data = contactDataFromForm(formData);
   const date = dayToUtcDate(berlinToday());
-  const appointmentSet = data.stage === "TERMIN_VEREINBART";
+
+  // Jeder neue Kontakt startet als Name mit Erstanruf fuer heute - das ist der
+  // Playbook-Eintrag zu NEU, hier nur direkt ausgeschrieben.
+  const entry = CONTACT_PLAYBOOK.NEU!;
 
   // Ein Formular darf genau einen Kontakt erzeugen. Der zweite Klick landet
   // beim bereits angelegten Kontakt statt bei einer Dublette.
@@ -142,20 +103,17 @@ export async function createContact(formData: FormData) {
           ...data,
           formToken,
           ownerId: user.id,
-          outcome: data.stage === "KUNDE" ? "GEWONNEN" : "OFFEN",
-          appointmentLoggedAt: appointmentSet ? new Date() : null,
+          stage: "NEU",
+          nextStepType: entry.type,
+          nextStepAt: dayToUtcDate(berlinDayOf(playbookDueDate(entry, new Date()))),
+          nextStepNote: entry.note,
         },
       });
       await tx.stageEvent.create({
-        data: { contactId: created.id, toStage: data.stage, userId: user.id },
+        data: { contactId: created.id, toStage: "NEU", userId: user.id },
       });
-      await tx.dailyLog.createMany({
-        data: [
-          { personId: person.id, type: "NUMBERS_PULLED", count: 1, date },
-          ...(appointmentSet
-            ? [{ personId: person.id, type: "APPOINTMENT_SET" as const, count: 1, date }]
-            : []),
-        ],
+      await tx.dailyLog.create({
+        data: { personId: person.id, type: "NUMBERS_PULLED", count: 1, date },
       });
       return created;
     });
@@ -174,49 +132,17 @@ export async function createContact(formData: FormData) {
 
 export async function updateContact(formData: FormData) {
   const user = await requireUser();
-  const person = await requireUserPerson(user.id);
   const contactId = (formData.get("contactId") as string | null)?.trim();
   if (!contactId) throw new Error("Kontakt-ID fehlt.");
   const data = contactDataFromForm(formData);
-  const current = await prisma.contact.findFirst({
+
+  // Nur die vier Stammfelder. Phase, Ausgang, Termin und naechster Schritt
+  // bleiben unberuehrt - die haengen am Gespraechsverlauf, nicht am Formular.
+  const { count } = await prisma.contact.updateMany({
     where: { id: contactId, ...eigene(user.id).kontakte },
-    select: { appointmentLoggedAt: true, stage: true },
+    data,
   });
-  if (!current) throw new Error("Kontakt nicht gefunden.");
-
-  const appointmentSet =
-    data.stage === "TERMIN_VEREINBART" && !current.appointmentLoggedAt;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.contact.update({
-      where: { id: contactId },
-      data: {
-        ...data,
-        ...(data.stage === "KUNDE" ? { outcome: "GEWONNEN" as const } : {}),
-        ...(appointmentSet ? { appointmentLoggedAt: new Date() } : {}),
-      },
-    });
-    if (current.stage !== data.stage) {
-      await tx.stageEvent.create({
-        data: {
-          contactId,
-          fromStage: current.stage,
-          toStage: data.stage,
-          userId: user.id,
-        },
-      });
-    }
-    if (appointmentSet) {
-      await tx.dailyLog.create({
-        data: {
-          personId: person.id,
-          type: "APPOINTMENT_SET",
-          count: 1,
-          date: dayToUtcDate(berlinToday()),
-        },
-      });
-    }
-  });
+  if (count === 0) throw new Error("Kontakt nicht gefunden.");
 
   refreshContactViews(contactId);
   redirect(`/contacts/${contactId}`);
@@ -225,7 +151,7 @@ export async function updateContact(formData: FormData) {
 /**
  * Loescht einen Kontakt endgueltig.
  *
- * Was per Cascade mitgeht: Aktivitaeten, Vorgaenge, Phasenwechsel – und mit den
+ * Was per Cascade mitgeht: Aktivitaeten, Phasenwechsel – und mit den
  * Aktivitaeten auch die daraus entstandenen Anruf-Punkte. Was bewusst stehen
  * bleibt: empfohlene Kontakte (nur die Verknuepfung faellt weg) und die Punkte
  * ohne Kontaktbezug (Nummer gezogen, Termin vereinbart, Abschluss) – die haengen
@@ -249,9 +175,12 @@ export async function deleteContact(formData: FormData) {
   await prisma.undoEntry.deleteMany({ where: { userId: user.id, contactId } });
 
   refreshContactViews(contactId);
-  redirect("/contacts");
+  redirect("/namen");
 }
 
+// Legt eine Aktivitaet an. Kein eigenes Formular mehr: aufgerufen wird das aus
+// den Ergebnis-Knoepfen (contacts/results.ts), die Anruf- und Terminergebnisse
+// in zwei Tipps festhalten.
 export async function createActivity(formData: FormData) {
   const user = await requireUser();
   const person = await requireUserPerson(user.id);
@@ -290,21 +219,8 @@ export async function createActivity(formData: FormData) {
   refreshContactViews(contactId);
 }
 
-export async function deleteActivity(formData: FormData) {
-  const user = await requireUser();
-  const activityId = (formData.get("activityId") as string | null)?.trim();
-  const contactId = (formData.get("contactId") as string | null)?.trim();
-  if (!activityId || !contactId) throw new Error("Aktivität oder Kontakt-ID fehlt.");
-
-  await prisma.activity.deleteMany({
-    where: { id: activityId, contactId, ...eigene(user.id).ueberKontakt },
-  });
-  // Automatisch aus Anrufen erzeugte Ranglistenpunkte werden per Cascade mit gelöscht.
-  refreshContactViews(contactId);
-}
-
-// Ein-Klick-Anruf aus Fokus-Modus und Board: loggt den Anruf, hebt neue
-// Kontakte auf "Kontaktiert" und setzt die naechste Wiedervorlage.
+// Ein-Klick-Anruf aus dem Durchlauf und der Heute-Liste: loggt den Anruf, hebt
+// neue Kontakte auf "Kontaktiert" und setzt die naechste Wiedervorlage.
 export async function quickLogCall(formData: FormData) {
   const user = await requireUser();
   const person = await requireUserPerson(user.id);
@@ -368,75 +284,4 @@ export async function quickLogCall(formData: FormData) {
   });
 
   refreshContactViews(contactId);
-}
-
-export async function bulkImportContacts(
-  contactsData: Array<{
-    name: string;
-    phone?: string;
-    email?: string;
-    source?: string;
-    note?: string;
-  }>
-) {
-  const user = await requireUser();
-  const person = await requireUserPerson(user.id);
-  const todayDate = dayToUtcDate(berlinToday());
-
-  let importedCount = 0;
-  for (const c of contactsData) {
-    if (!c.name?.trim()) continue;
-
-    await prisma.$transaction(async (tx) => {
-      const created = await tx.contact.create({
-        data: {
-          name: c.name.trim(),
-          phone: c.phone?.trim() || null,
-          email: c.email?.trim() || null,
-          source: c.source?.trim() || "CSV Import",
-          note: c.note?.trim() || null,
-          stage: "NEU",
-          ownerId: user.id,
-          // Frisch importierte Nummern gehoeren sofort in die Heute-Liste.
-          nextStepType: "ANRUF",
-          nextStepAt: todayDate,
-          nextStepNote: "Erstanruf",
-        },
-      });
-      await tx.stageEvent.create({
-        data: { contactId: created.id, toStage: "NEU", userId: user.id },
-      });
-      await tx.dailyLog.create({
-        data: { personId: person.id, type: "NUMBERS_PULLED", count: 1, date: todayDate },
-      });
-    });
-
-    importedCount++;
-  }
-
-  refreshContactViews();
-  return { success: true, count: importedCount };
-}
-
-export async function searchContacts(query: string) {
-  const user = await requireUser();
-  const trimmed = query.trim();
-  if (!trimmed) return [];
-
-  const contacts = await prisma.contact.findMany({
-    where: {
-      ...eigene(user.id).kontakte,
-      OR: [
-        { name: { contains: trimmed, mode: "insensitive" } },
-        { phone: { contains: trimmed, mode: "insensitive" } },
-        { email: { contains: trimmed, mode: "insensitive" } },
-        { job: { contains: trimmed, mode: "insensitive" } },
-        { note: { contains: trimmed, mode: "insensitive" } },
-      ],
-    },
-    take: 8,
-    select: { id: true, name: true, phone: true, email: true, stage: true },
-  });
-
-  return contacts;
 }

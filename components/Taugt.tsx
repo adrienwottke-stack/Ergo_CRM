@@ -3,13 +3,13 @@
 // Die Rueckmeldung an jedem Baustein (docs/wettbewerb-plan.md, Abschnitt 14.1).
 //
 // Drei Woerter, ein Tipp, kein Freitext. Wer tippen muss, tippt nicht - und
-// Freitext hiesse Moderation, dauerhaft. Nach der Stimme verschwindet die
-// Frage: sie ist kein Dauermoebel, sondern eine Frage.
+// Freitext hiesse Moderation, dauerhaft.
 //
-// Bewusst useState statt useOptimistic: der "aendern"-Griff braucht einen
-// Zustand, der auch AUSSERHALB einer laufenden Transition gesetzt werden darf.
-// Ein useOptimistic-Setter ausserhalb einer Transition wird von React sofort
-// verworfen - der Knopf sah aus wie tot (im Live-Test am 20.08. bestaetigt).
+// Einmal je Kopf und Baustein: nach der Stimme verschwindet die Frage
+// rueckstandslos. Sie ist kein Dauermoebel, sondern eine Frage - und eine
+// beantwortete Frage, die stehen bleibt, ist wieder eine Zeile Oberflaeche,
+// die den Partner keinen Termin naeher bringt. Ausgewertet wird sie auf dem
+// Pruefstand, nicht hier.
 
 import { useState, useTransition } from "react";
 import { urteilen } from "@/app/(team)/werkstatt/urteilAction";
@@ -22,44 +22,27 @@ const antworten = [
 
 export default function Taugt({
   featureKey,
-  stimme,
+  schonGestimmt,
   kompakt = false,
 }: {
   featureKey: string;
-  stimme: string | null;
+  /** Vom Server: liegt fuer diesen Kopf schon eine Stimme vor? */
+  schonGestimmt: boolean;
   kompakt?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
-  // Lokal getroffene Wahl. Faellt nach dem Server-Refresh mit `stimme`
-  // zusammen; bis dahin traegt sie die Anzeige.
-  const [wahl, setWahl] = useState<string | null>(null);
-  const [offen, setOffen] = useState(false);
+  // Sofort weg, ohne auf den Server-Refresh zu warten. Einmal abgegeben gibt
+  // es keinen Weg zurueck - deshalb genuegt ein Schalter in eine Richtung.
+  const [abgegeben, setAbgegeben] = useState(false);
 
-  const anzeige = offen ? null : (wahl ?? stimme);
+  if (schonGestimmt || abgegeben) return null;
 
   const waehle = (wert: string) => {
-    setWahl(wert);
-    setOffen(false);
+    setAbgegeben(true);
     startTransition(async () => {
       await urteilen(featureKey, wert);
     });
   };
-
-  if (anzeige) {
-    return (
-      <p className="text-[11px] text-slate-400">
-        Dein Urteil: {antworten.find((a) => a.wert === anzeige)?.text}
-        {" · "}
-        <button
-          type="button"
-          onClick={() => setOffen(true)}
-          className="underline transition hover:text-slate-600"
-        >
-          ändern
-        </button>
-      </p>
-    );
-  }
 
   return (
     <div

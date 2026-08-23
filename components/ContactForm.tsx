@@ -1,17 +1,15 @@
 import { connection } from "next/server";
 import type { Contact } from "@/lib/generated/prisma/client";
-import {
-  ALL_NEXT_STEP_TYPES,
-  CONTACT_STAGES,
-  contactStageLabels,
-  nextStepLabels,
-} from "@/lib/pipeline";
-import { utcToBerlinLocalInput } from "@/lib/dates";
 import { card, input, label } from "@/components/ui";
 import JobField from "@/components/JobField";
-import NoteTemplates from "@/components/NoteTemplates";
 import SubmitButton from "@/components/SubmitButton";
 
+// Vier Felder, mehr nicht: Name, Nummer, Beruf, Notiz.
+//
+// Phase, Termin und naechster Schritt standen hier frueher als Auswahlfelder.
+// Sie gehoeren nicht in ein Formular, sondern an das Ergebnis eines Gesprächs -
+// dort setzt das Playbook sie von selbst. Wer sie hier tippt, pflegt Daten;
+// wer sie aus dem Gespraech heraus setzt, arbeitet.
 export default async function ContactForm({
   action,
   contact,
@@ -35,22 +33,22 @@ export default async function ContactForm({
     <form action={action} className={`${card} space-y-5 p-6 sm:p-8`}>
       {contact && <input type="hidden" name="contactId" value={contact.id} />}
       {formToken && <input type="hidden" name="formToken" value={formToken} />}
-      <div>
-        <label htmlFor="name" className={label}>
-          Name *
-        </label>
-        <input
-          id="name"
-          name="name"
-          type="text"
-          required
-          placeholder="Vor- und Nachname"
-          defaultValue={contact?.name ?? ""}
-          className={input}
-        />
-      </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <label htmlFor="name" className={label}>
+            Name *
+          </label>
+          <input
+            id="name"
+            name="name"
+            type="text"
+            required
+            defaultValue={contact?.name ?? ""}
+            className={input}
+          />
+        </div>
+
         <div>
           <label htmlFor="phone" className={label}>
             Telefon
@@ -59,136 +57,12 @@ export default async function ContactForm({
             id="phone"
             name="phone"
             type="tel"
-            placeholder="+49 …"
             defaultValue={contact?.phone ?? ""}
             className={input}
           />
         </div>
-        <div>
-          <label htmlFor="email" className={label}>
-            E-Mail
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            placeholder="name@beispiel.de"
-            defaultValue={contact?.email ?? ""}
-            className={input}
-          />
-        </div>
-      </div>
 
-      <JobField defaultValue={contact?.job} />
-
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <label htmlFor="source" className={label}>
-            Quelle
-          </label>
-          <input
-            id="source"
-            name="source"
-            type="text"
-            placeholder="z. B. Empfehlung, Messe, Bestandskunde"
-            defaultValue={contact?.source ?? ""}
-            className={input}
-          />
-        </div>
-        <div>
-          <label htmlFor="stage" className={label}>
-            Phase
-          </label>
-          <select
-            id="stage"
-            name="stage"
-            defaultValue={contact?.stage ?? "NEU"}
-            className={input}
-          >
-            {CONTACT_STAGES.map((stage) => (
-              <option key={stage} value={stage}>
-                {contactStageLabels[stage]}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <label htmlFor="appointmentAt" className={label}>
-            Termin
-          </label>
-          <input
-            id="appointmentAt"
-            name="appointmentAt"
-            type="datetime-local"
-            defaultValue={
-              contact?.appointmentAt
-                ? utcToBerlinLocalInput(contact.appointmentAt)
-                : ""
-            }
-            className={input}
-          />
-          <p className="mt-1.5 text-xs text-slate-500">
-            Pflicht für die Phasen „Termin vereinbart“ und „Checkup geplant“.
-          </p>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-        <p className="text-[13px] font-semibold text-slate-900">Nächster Schritt</p>
-        <p className="mt-0.5 text-xs text-slate-500">
-          Leer lassen: dann setzt das Playbook den passenden Schritt zur Phase.
-        </p>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="nextStepType" className={label}>
-              Was ist zu tun?
-            </label>
-            <select
-              id="nextStepType"
-              name="nextStepType"
-              defaultValue={contact?.nextStepType ?? ""}
-              className={input}
-            >
-              <option value="">Aus dem Playbook übernehmen</option>
-              {ALL_NEXT_STEP_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {nextStepLabels[type]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="nextStepDate" className={label}>
-              Fällig am
-            </label>
-            <input
-              id="nextStepDate"
-              name="nextStepDate"
-              type="date"
-              defaultValue={
-                contact?.nextStepAt
-                  ? contact.nextStepAt.toISOString().slice(0, 10)
-                  : ""
-              }
-              className={input}
-            />
-          </div>
-        </div>
-        <div className="mt-4">
-          <label htmlFor="nextStepNote" className={label}>
-            Notiz zum Schritt
-          </label>
-          <input
-            id="nextStepNote"
-            name="nextStepNote"
-            type="text"
-            defaultValue={contact?.nextStepNote ?? ""}
-            className={input}
-          />
-        </div>
+        <JobField defaultValue={contact?.job} />
       </div>
 
       <div>
@@ -199,11 +73,10 @@ export default async function ContactForm({
           id="note"
           name="note"
           rows={4}
-          placeholder="Gesprächsnotizen, Besonderheiten, nächste Schritte …"
+          placeholder="Was du über ihn weißt – Familie, Situation, Aufhänger"
           defaultValue={contact?.note ?? ""}
           className={input}
         />
-        <NoteTemplates targetInputId="note" />
       </div>
 
       <div className="flex justify-end border-t border-slate-100 pt-5">

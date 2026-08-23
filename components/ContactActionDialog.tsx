@@ -16,7 +16,6 @@ import {
   addReferrals,
   completeContactStep,
   markContactLost,
-  scheduleCheckup,
   setContactStage,
 } from "@/app/(app)/pipeline/actions";
 
@@ -28,14 +27,11 @@ export type ContactLite = {
   outcome: Outcome;
   appointmentLocal: string | null;
   hasStep: boolean;
+  /** Wurde nach diesem Termin schon nach Empfehlungen gefragt? */
+  referralsAsked: boolean;
 };
 
-export type ActionMode = "stage" | "complete" | "lost" | "referral" | "checkup";
-
-const STAGES_NEEDING_APPOINTMENT: ContactStage[] = [
-  "TERMIN_VEREINBART",
-  "CHECKUP_GEPLANT",
-];
+export type ActionMode = "stage" | "complete" | "lost" | "referral";
 
 export default function ContactActionDialog({
   open,
@@ -102,7 +98,7 @@ export default function ContactActionDialog({
   );
 
   if (mode === "stage") {
-    const needsAppointment = STAGES_NEEDING_APPOINTMENT.includes(stage);
+    const needsAppointment = stage === "TERMIN_VEREINBART";
     return (
       <Modal open={open} onClose={onClose} title="Phase ändern" subtitle={contact.name}>
         <form onSubmit={submit(setContactStage)}>
@@ -147,11 +143,6 @@ export default function ContactActionDialog({
           <div className="mt-4">
             <NextStepFields
               defaults={contactStepDefaults(stage, needsAppointment ? appointment : null)}
-              hint={
-                stage === "IN_BERATUNG"
-                  ? "In der Beratung führt der Vorgang den nächsten Schritt."
-                  : undefined
-              }
             />
           </div>
           {errorBox}
@@ -236,79 +227,50 @@ export default function ContactActionDialog({
     );
   }
 
-  if (mode === "referral") {
-    return (
-      <Modal
-        open={open}
-        onClose={onClose}
-        title="Empfehlungen erfassen"
-        subtitle={contact.name}
-      >
-        <form onSubmit={submit(addReferrals)}>
-          <input type="hidden" name="contactId" value={contact.id} />
-          <p className="text-sm text-slate-600">
-            Jeder Name wird ein neuer Kontakt in „Neu“ mit Erstanruf für heute –
-            verknüpft mit {contact.name}.
-          </p>
-          <div className="mt-4 space-y-3">
-            {Array.from({ length: referralRows }, (_, index) => (
-              <div key={index} className="grid grid-cols-2 gap-3">
-                <input
-                  name="referralName"
-                  type="text"
-                  placeholder={`Name ${index + 1}`}
-                  className={input}
-                />
-                <input
-                  name="referralPhone"
-                  type="tel"
-                  placeholder="Telefon"
-                  className={input}
-                />
-              </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setReferralRows((rows) => rows + 1)}
-            className="mt-3 min-h-11 text-sm font-medium text-navy-600 hover:underline"
-          >
-            + weitere Zeile
-          </button>
-          <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-            Auch ohne Namen speichern: die Frage gilt dann als gestellt und der
-            Kontakt rückt auf „Empfehlung erfragt“.
-          </p>
-          {errorBox}
-          {footer("Speichern")}
-        </form>
-      </Modal>
-    );
-  }
-
   return (
-    <Modal open={open} onClose={onClose} title="Checkup planen" subtitle={contact.name}>
-      <form onSubmit={submit(scheduleCheckup)}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Empfehlungen erfassen"
+      subtitle={contact.name}
+    >
+      <form onSubmit={submit(addReferrals)}>
         <input type="hidden" name="contactId" value={contact.id} />
-        <div>
-          <label htmlFor="checkupAt" className={label}>
-            Termin (Datum und Uhrzeit) *
-          </label>
-          <input
-            id="checkupAt"
-            name="appointmentAt"
-            type="datetime-local"
-            required
-            defaultValue={contact.appointmentLocal ?? ""}
-            className={input}
-          />
-          <p className="mt-1.5 text-xs text-slate-500">
-            Der Kontakt rückt auf „Checkup geplant“, der Termin wird zum
-            nächsten Schritt.
-          </p>
+        <p className="text-sm text-slate-600">
+          Jeder Name wird ein neuer Kontakt in „Neu“ mit Erstanruf für heute –
+          verknüpft mit {contact.name}.
+        </p>
+        <div className="mt-4 space-y-3">
+          {Array.from({ length: referralRows }, (_, index) => (
+            <div key={index} className="grid grid-cols-2 gap-3">
+              <input
+                name="referralName"
+                type="text"
+                placeholder={`Name ${index + 1}`}
+                className={input}
+              />
+              <input
+                name="referralPhone"
+                type="tel"
+                placeholder="Telefon"
+                className={input}
+              />
+            </div>
+          ))}
         </div>
+        <button
+          type="button"
+          onClick={() => setReferralRows((rows) => rows + 1)}
+          className="mt-3 min-h-11 text-sm font-medium text-navy-600 hover:underline"
+        >
+          + weitere Zeile
+        </button>
+        <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          Auch ohne Namen speichern: die Frage gilt dann als gestellt und der
+          Kontakt rückt auf „Empfehlung erfragt“.
+        </p>
         {errorBox}
-        {footer("Checkup speichern")}
+        {footer("Speichern")}
       </form>
     </Modal>
   );

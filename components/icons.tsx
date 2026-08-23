@@ -47,24 +47,6 @@ export function CheckIcon({ className }: { className?: string }) {
   );
 }
 
-export function TargetIcon({ className }: { className?: string }) {
-  return (
-    <svg {...iconProps(className)}>
-      <circle cx="12" cy="12" r="8" />
-      <circle cx="12" cy="12" r="3.5" />
-    </svg>
-  );
-}
-
-export function LayersIcon({ className }: { className?: string }) {
-  return (
-    <svg {...iconProps(className)}>
-      <path d="m12 3 9 5-9 5-9-5 9-5" />
-      <path d="m3 13 9 5 9-5" />
-    </svg>
-  );
-}
-
 export function HashIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>
@@ -78,15 +60,6 @@ export function CalendarCheckIcon({ className }: { className?: string }) {
     <svg {...iconProps(className)}>
       <rect x="3" y="5" width="18" height="16" rx="2" />
       <path d="M8 3v4M16 3v4M3 10h18M9 15.5l2 2 4-4" />
-    </svg>
-  );
-}
-
-export function UsersIcon({ className }: { className?: string }) {
-  return (
-    <svg {...iconProps(className)}>
-      <circle cx="9" cy="8" r="3.25" />
-      <path d="M3.5 19.5c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5M15.5 5.4a3.25 3.25 0 1 1 .6 6M17.5 15.2c1.8.5 3.1 1.8 3.6 4.3" />
     </svg>
   );
 }
@@ -116,6 +89,14 @@ export function ChevronDownIcon({ className }: { className?: string }) {
   );
 }
 
+export function SparkIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M12 3.5 13.6 9 19 10.5 13.6 12 12 17.5 10.4 12 5 10.5 10.4 9 12 3.5ZM18 16.5l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6.6-1.9Z" />
+    </svg>
+  );
+}
+
 export function PlusIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>
@@ -141,18 +122,10 @@ export function FlameIcon({ className }: { className?: string }) {
   );
 }
 
-export function PrinterIcon({ className }: { className?: string }) {
-  return (
-    <svg {...iconProps(className)}>
-      <path d="M7 8V3.5h10V8M7 17H4.5a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1H17M7 14.5h10v6H7v-6Z" />
-    </svg>
-  );
-}
-
 export function BellIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>
-      <path d="M18 10a6 6 0 1 0-12 0c0 4-1.5 5.5-2.5 6.5h17c-1-1-2.5-2.5-2.5-6.5M10 20a2.2 2.2 0 0 0 4 0" />
+      <path d="M18 8.5a6 6 0 1 0-12 0c0 5-2 6.5-2 6.5h16s-2-1.5-2-6.5ZM13.7 19a2 2 0 0 1-3.4 0" />
     </svg>
   );
 }
@@ -184,15 +157,6 @@ export function TrashIcon({ className }: { className?: string }) {
   );
 }
 
-export function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg {...iconProps(className)}>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-4.35-4.35" />
-    </svg>
-  );
-}
-
 export function XIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>
@@ -217,23 +181,6 @@ export function ArrowLeftIcon({ className }: { className?: string }) {
   );
 }
 
-export function ArrowUpRightIcon({ className }: { className?: string }) {
-  return (
-    <svg {...iconProps(className)}>
-      <path d="M7 17 17 7M8.5 7H17v8.5" />
-    </svg>
-  );
-}
-
-export function MailIcon({ className }: { className?: string }) {
-  return (
-    <svg {...iconProps(className)}>
-      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
-      <path d="m4.5 7.5 7.5 5.5 7.5-5.5" />
-    </svg>
-  );
-}
-
 export function PhoneOffIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>
@@ -243,21 +190,3 @@ export function PhoneOffIcon({ className }: { className?: string }) {
   );
 }
 
-export function VoicemailIcon({ className }: { className?: string }) {
-  return (
-    <svg {...iconProps(className)}>
-      <circle cx="6.5" cy="12" r="3" />
-      <circle cx="17.5" cy="12" r="3" />
-      <path d="M6.5 15h11" />
-    </svg>
-  );
-}
-
-export function UploadIcon({ className }: { className?: string }) {
-  return (
-    <svg {...iconProps(className)}>
-      <path d="M12 15V4M7.5 8 12 3.5 16.5 8" />
-      <path d="M4.5 15.5V19a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3.5" />
-    </svg>
-  );
-}

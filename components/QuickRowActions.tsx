@@ -6,14 +6,17 @@
 // Freitext -> speichern. Der haeufigste Fall des Tages (nicht erreicht) kostete
 // drei Tipps und vierzehn Anschlaege. Jetzt ist er ein Tipp.
 //
-// Zwei Modi, weil nicht jeder faellige Schritt ein Anruf ist:
-//   Anruf-Schritt  -> die vier Gespraechsergebnisse
+// Drei Modi, weil nicht jeder faellige Schritt ein Anruf ist:
+//   Anruf-Schritt   -> die vier Gespraechsergebnisse
+//   Termin-Schritt  -> gehalten (mit Empfehlungsfrage) oder geplatzt
 //   anderer Schritt -> Erledigt plus Verschiebe-Chips
 // Alles Seltenere liegt hinter "…".
 
 import { useState } from "react";
 import {
   completeStepQuick,
+  recordAppointmentMissed,
+  recordAppointmentResult,
   recordCallResult,
   snoozeStepQuick,
 } from "@/app/(app)/contacts/results";
@@ -23,6 +26,7 @@ import ContactActionDialog, {
 } from "@/components/ContactActionDialog";
 import {
   AppointmentDialog,
+  AppointmentHeldDialog,
   ChoiceDialog,
   LATER_CHIPS,
   LOST_CHIPS,
@@ -58,14 +62,19 @@ const SNOOZE_CHIPS = [
 export default function QuickRowActions({
   contact,
   istAnruf,
+  istTermin = false,
 }: {
   contact: ContactLite;
   /** Anruf-Schritt? Dann die vier Ergebnisse statt "Erledigt". */
   istAnruf: boolean;
+  /** Termin-Schritt? Dann gehalten/geplatzt statt "Erledigt". */
+  istTermin?: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<null | "appointment" | "later" | "lost">(null);
+  const [dialog, setDialog] = useState<
+    null | "appointment" | "later" | "lost" | "gehalten"
+  >(null);
   const [mehr, setMehr] = useState<ActionMode | null>(null);
 
   const senden = async (
@@ -137,7 +146,28 @@ export default function QuickRowActions({
           </>
         )}
 
-        {!verloren && !istAnruf && contact.hasStep && (
+        {!verloren && !istAnruf && istTermin && (
+          <>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setDialog("gehalten")}
+              className={stil.erfolg}
+            >
+              <CheckIcon className="h-4 w-4" /> Gehalten
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => senden(recordAppointmentMissed, {})}
+              className={stil.weich}
+            >
+              <XIcon className="h-4 w-4" /> Geplatzt
+            </button>
+          </>
+        )}
+
+        {!verloren && !istAnruf && !istTermin && contact.hasStep && (
           <>
             <button
               type="button"
@@ -184,6 +214,37 @@ export default function QuickRowActions({
         onSave={(when) =>
           senden(recordCallResult, { result: "appointment", appointmentAt: when })
         }
+      />
+
+      <AppointmentHeldDialog
+        open={dialog === "gehalten"}
+        name={contact.name}
+        pending={pending}
+        onClose={() => setDialog(null)}
+        onSave={(result, empfehlungen) => {
+          // Die Empfehlungszeilen gehen als Wiederholungsfelder mit - dieselbe
+          // Form, die auch der Empfehlungs-Dialog benutzt.
+          const data = new FormData();
+          data.set("contactId", contact.id);
+          data.set("result", result);
+          for (const zeile of empfehlungen) {
+            data.append("referralName", zeile.name);
+            data.append("referralPhone", zeile.phone);
+          }
+          setPending(true);
+          setFehler(null);
+          void (async () => {
+            try {
+              await recordAppointmentResult(data);
+              undoMoeglich();
+              setDialog(null);
+            } catch (err) {
+              setFehler(err instanceof Error ? err.message : "Das hat nicht geklappt.");
+            } finally {
+              setPending(false);
+            }
+          })();
+        }}
       />
 
       <ChoiceDialog

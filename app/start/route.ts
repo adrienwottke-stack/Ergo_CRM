@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
   const ziel = (pfad: string) => NextResponse.redirect(new URL(pfad, request.url));
 
   const user = await currentUser();
-  if (user) return ziel(user.beginnerMode ? "/namen" : "/heute");
+  // Wer angemeldet ist, landet auf der Arbeitsliste: dort steht, was heute
+  // dran ist.
+  if (user) return ziel("/heute");
 
   const code = normalisiereCode(request.nextUrl.searchParams.get("e") ?? "");
   if (code) {

@@ -29,8 +29,7 @@ export default async function AnrufenPage({
     stufe && isContactRating(stufe) ? stufe : null;
 
   const guideKey = guideKeyForList[kind];
-  const [contacts, customGuide] = await Promise.all([
-    prisma.contact.findMany({
+  const contacts = await prisma.contact.findMany({
       where: {
         ...eigene(user.id).kontakte,
         listKinds: { has: kind },
@@ -54,12 +53,7 @@ export default async function AnrufenPage({
           select: { id: true, text: true, date: true },
         },
       },
-    }),
-    prisma.guide.findUnique({
-      where: { ownerId_key: { ownerId: user.id, key: guideKey } },
-      select: { title: true, body: true },
-    }),
-  ]);
+  });
 
   // Hier zaehlt die Reihenfolge: enger Kreis zuerst.
   const queue: DialerEntry[] = contacts
@@ -74,10 +68,7 @@ export default async function AnrufenPage({
     }))
     .sort(compareByRating);
 
-  const standard = DEFAULT_GUIDES[guideKey];
-  const guide = customGuide
-    ? { ...standard, ...customGuide, isDraft: false }
-    : standard;
+  const guide = DEFAULT_GUIDES[guideKey];
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
@@ -104,7 +95,6 @@ export default async function AnrufenPage({
         kind={kind}
         guideTitle={guide.title}
         guideBody={guide.body}
-        guideIsDraft={guide.isDraft}
       />
     </div>
   );

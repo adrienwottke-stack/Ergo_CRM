@@ -12,6 +12,7 @@ import {
   signaleFuer,
   type Signal,
 } from "@/lib/signale";
+import { starterpassStand } from "@/lib/starterpass";
 import { card, kicker, pageTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,9 @@ export const dynamic = "force-dynamic";
 // Wie weit zurueck "letzte Aktivitaet" ueberhaupt gesucht wird. Alles davor
 // heisst ohnehin nur noch "lange nichts" - und begrenzt die Abfrage.
 const RUECKBLICK_TAGE = 60;
+// So lange gilt jemand als "frisch gestartet" - danach ist der Starterpass
+// kein Fortschritt mehr, sondern ein Vorwurf.
+const STARTERPASS_TAGE = 30;
 const TAG_MS = 24 * 60 * 60 * 1000;
 
 const datumKurz = new Intl.DateTimeFormat("de-DE", {
@@ -88,13 +92,15 @@ export default async function MannschaftPage() {
     berater,
     personen,
     zaehler,
-    offeneVorgaenge,
-    gewonneneVorgaenge,
+    abschluesse,
     aktivitaeten,
     phasen,
     ueberfaelligeKontakte,
-    ueberfaelligeVorgaenge,
-    kundenOhneEmpfehlung,
+    termineOhneEmpfehlung,
+    naechsteSchritte,
+    namenJeBerater,
+    empfehlungJeBerater,
+    zaehlerGesamt,
   ] = await Promise.all([
     prisma.user.findMany({
       where: { id: { in: sicht.beraterIds } },
@@ -120,13 +126,11 @@ export default async function MannschaftPage() {
       where: { date: { gte: zaehlerAb }, person: { userId: { in: sicht.beraterIds } } },
       _sum: { count: true },
     }),
-    prisma.deal.findMany({
-      where: { ...sicht.ueberKontakt, outcome: "OFFEN" },
-      select: { units: true, contact: { select: { ownerId: true } } },
-    }),
-    prisma.deal.findMany({
-      where: { ...sicht.ueberKontakt, outcome: "GEWONNEN" },
-      select: { units: true, wonLoggedAt: true, contact: { select: { ownerId: true } } },
+    // Abschluesse seit jeher: Grundlage fuer "dabei, aber noch nie abgeschlossen".
+    prisma.dailyLog.groupBy({
+      by: ["personId"],
+      where: { type: "DEAL_WON", person: { userId: { in: sicht.beraterIds } } },
+      _sum: { count: true },
     }),
     prisma.activity.findMany({
       where: { ...sicht.ueberKontakt, date: { gte: rueckblick } },
@@ -148,24 +152,42 @@ export default async function MannschaftPage() {
       },
       _count: { _all: true },
     }),
-    prisma.deal.findMany({
-      where: {
-        ...sicht.ueberKontakt,
-        outcome: "OFFEN",
-        nextStepType: { not: null },
-        nextStepAt: { lt: heuteStart },
-      },
-      select: { contact: { select: { ownerId: true } } },
-    }),
+    // Nach JEDEM gehaltenen Termin ist die Empfehlungsfrage fällig – nicht
+    // erst nach einem Abschluss. Wer sie nie stellt, verschenkt den Motor.
     prisma.contact.groupBy({
       by: ["ownerId"],
       where: {
         ...sicht.kontakte,
-        outcome: { not: "VERLOREN" },
-        stage: "KUNDE",
+        stage: { in: ["TERMIN_GEHALTEN", "ABSCHLUSS"] },
+        referralsAskedAt: null,
         updatedAt: { lt: dreissigTage },
       },
       _count: { _all: true },
+    }),
+    // Der naechste Schritt je Berater: die frueheste offene Faelligkeit. Damit
+    // steht in der Uebersicht nicht nur, was war, sondern was ansteht.
+    prisma.contact.groupBy({
+      by: ["ownerId"],
+      where: { ...sicht.kontakte, outcome: "OFFEN", nextStepAt: { not: null } },
+      _min: { nextStepAt: true },
+    }),
+    // --- Starterpass des Neuen ---------------------------------------------
+    // Bewusst ohne Zeitfenster: der Pass wird nur bei frisch Gestarteten
+    // angezeigt, und fuer die ist "insgesamt" dasselbe wie "seit dem Start".
+    prisma.contact.groupBy({
+      by: ["ownerId"],
+      where: { ...sicht.kontakte, listKinds: { isEmpty: false } },
+      _count: { _all: true },
+    }),
+    prisma.contact.groupBy({
+      by: ["ownerId"],
+      where: { ...sicht.kontakte, referralsAskedAt: { not: null } },
+      _count: { _all: true },
+    }),
+    prisma.dailyLog.groupBy({
+      by: ["personId", "type"],
+      where: { person: { userId: { in: sicht.beraterIds } } },
+      _sum: { count: true },
     }),
   ]);
 
@@ -182,14 +204,19 @@ export default async function MannschaftPage() {
     vereinbart14: number;
     gehalten14: number;
     gehaltenMonat: number;
-    offeneEinheiten: number;
     abschluesseMonat: number;
-    einheitenMonat: number;
     abschluesseGesamt: number;
     letzteAktivitaet: Date | null;
+    naechsterSchritt: Date | null;
     inAkquise: number;
     ueberfaellig: number;
-    kundenOhneEmpfehlung: number;
+    termineOhneEmpfehlung: number;
+    /** Fuer den Starterpass des Neuen. */
+    namenGesamt: number;
+    anrufeGesamt: number;
+    vereinbartGesamt: number;
+    gehaltenGesamt: number;
+    empfehlungGefragt: boolean;
   };
   const leer = (): Werte => ({
     anrufeWoche: 0,
@@ -198,14 +225,18 @@ export default async function MannschaftPage() {
     vereinbart14: 0,
     gehalten14: 0,
     gehaltenMonat: 0,
-    offeneEinheiten: 0,
     abschluesseMonat: 0,
-    einheitenMonat: 0,
     abschluesseGesamt: 0,
     letzteAktivitaet: null,
+    naechsterSchritt: null,
     inAkquise: 0,
     ueberfaellig: 0,
-    kundenOhneEmpfehlung: 0,
+    termineOhneEmpfehlung: 0,
+    namenGesamt: 0,
+    anrufeGesamt: 0,
+    vereinbartGesamt: 0,
+    gehaltenGesamt: 0,
+    empfehlungGefragt: false,
   });
   const werte = new Map<string, Werte>(berater.map((person) => [person.id, leer()]));
   const fuer = (ownerId: string | null) => (ownerId ? werte.get(ownerId) : undefined);
@@ -229,21 +260,12 @@ export default async function MannschaftPage() {
       if (in14) eintrag.gehalten14 += summe;
       if (imMonat) eintrag.gehaltenMonat += summe;
     }
+    if (zeile.type === "DEAL_WON" && imMonat) eintrag.abschluesseMonat += summe;
   }
 
-  for (const vorgang of offeneVorgaenge) {
-    const eintrag = fuer(vorgang.contact.ownerId);
-    if (eintrag) eintrag.offeneEinheiten += vorgang.units ?? 0;
-  }
-
-  for (const vorgang of gewonneneVorgaenge) {
-    const eintrag = fuer(vorgang.contact.ownerId);
-    if (!eintrag) continue;
-    eintrag.abschluesseGesamt += 1;
-    if (vorgang.wonLoggedAt && vorgang.wonLoggedAt >= monatsStart) {
-      eintrag.abschluesseMonat += 1;
-      eintrag.einheitenMonat += vorgang.units ?? 0;
-    }
+  for (const zeile of abschluesse) {
+    const eintrag = fuer(userIdVonPerson.get(zeile.personId) ?? null);
+    if (eintrag) eintrag.abschluesseGesamt += zeile._sum.count ?? 0;
   }
 
   // Absteigend sortiert, der erste Treffer je Konto ist damit der juengste.
@@ -263,14 +285,34 @@ export default async function MannschaftPage() {
     const eintrag = fuer(zeile.ownerId);
     if (eintrag) eintrag.ueberfaellig += zeile._count._all;
   }
-  for (const vorgang of ueberfaelligeVorgaenge) {
-    const eintrag = fuer(vorgang.contact.ownerId);
-    if (eintrag) eintrag.ueberfaellig += 1;
+
+  for (const zeile of termineOhneEmpfehlung) {
+    const eintrag = fuer(zeile.ownerId);
+    if (eintrag) eintrag.termineOhneEmpfehlung = zeile._count._all ?? 0;
   }
 
-  for (const zeile of kundenOhneEmpfehlung) {
+  for (const zeile of naechsteSchritte) {
     const eintrag = fuer(zeile.ownerId);
-    if (eintrag) eintrag.kundenOhneEmpfehlung = zeile._count._all;
+    if (eintrag) eintrag.naechsterSchritt = zeile._min.nextStepAt;
+  }
+
+  for (const zeile of namenJeBerater) {
+    const eintrag = fuer(zeile.ownerId);
+    if (eintrag) eintrag.namenGesamt = zeile._count._all ?? 0;
+  }
+
+  for (const zeile of empfehlungJeBerater) {
+    const eintrag = fuer(zeile.ownerId);
+    if (eintrag) eintrag.empfehlungGefragt = (zeile._count._all ?? 0) > 0;
+  }
+
+  for (const zeile of zaehlerGesamt) {
+    const eintrag = fuer(userIdVonPerson.get(zeile.personId) ?? null);
+    if (!eintrag) continue;
+    const summe = zeile._sum.count ?? 0;
+    if (zeile.type === "CALL") eintrag.anrufeGesamt += summe;
+    if (zeile.type === "APPOINTMENT_SET") eintrag.vereinbartGesamt += summe;
+    if (zeile.type === "APPOINTMENT_HELD") eintrag.gehaltenGesamt += summe;
   }
 
   const zeilen = berater.map((person) => {
@@ -287,9 +329,32 @@ export default async function MannschaftPage() {
       pipelineSichtbar,
       kontakteInAkquise: w.inAkquise,
       ueberfaelligeSchritte: w.ueberfaellig,
-      kundenOhneEmpfehlung: w.kundenOhneEmpfehlung,
+      termineOhneEmpfehlung: w.termineOhneEmpfehlung,
     });
-    return { person, w, pipelineSichtbar, signale, ampel: ampelVon(signale) };
+    // Der Starterpass steht nur bei frisch Gestarteten und nur, solange er
+    // nicht durch ist. Danach waere er eine Zeile, die nichts mehr sagt.
+    const tageSeitStart = person.onboardingDoneAt
+      ? tageSeit(person.onboardingDoneAt)
+      : null;
+    const pass =
+      tageSeitStart !== null && tageSeitStart <= STARTERPASS_TAGE
+        ? starterpassStand({
+            namen: w.namenGesamt,
+            anrufe: w.anrufeGesamt,
+            termineVereinbart: w.vereinbartGesamt,
+            termineGehalten: w.gehaltenGesamt,
+            empfehlungGefragt: w.empfehlungGefragt,
+          })
+        : null;
+
+    return {
+      person,
+      w,
+      pipelineSichtbar,
+      signale,
+      ampel: ampelVon(signale),
+      pass: pass && pass.geschafft < pass.gesamt ? pass : null,
+    };
   });
 
   const brauchtDich = zeilen.filter((zeile) => zeile.ampel === "rot").length;
@@ -323,7 +388,7 @@ export default async function MannschaftPage() {
       )}
 
       <ul className="space-y-3">
-        {zeilen.map(({ person, w, pipelineSichtbar, signale, ampel }) => (
+        {zeilen.map(({ person, w, pipelineSichtbar, signale, ampel, pass }) => (
           <li key={person.id} className={`${card} p-4 sm:p-5`}>
             <div
               className="flex flex-wrap items-baseline gap-x-3 gap-y-1"
@@ -366,8 +431,12 @@ export default async function MannschaftPage() {
               )}
               <span className="ml-auto text-xs text-slate-500">
                 {w.letzteAktivitaet
-                  ? `zuletzt aktiv ${datumKurz.format(w.letzteAktivitaet)}`
-                  : `seit über ${RUECKBLICK_TAGE} Tagen keine Aktivität`}
+                  ? `zuletzt ${datumKurz.format(w.letzteAktivitaet)}`
+                  : `seit über ${RUECKBLICK_TAGE} Tagen nichts`}
+                {" · "}
+                {w.naechsterSchritt
+                  ? `nächster ${datumKurz.format(w.naechsterSchritt)}`
+                  : "nichts geplant"}
               </span>
             </div>
 
@@ -375,9 +444,7 @@ export default async function MannschaftPage() {
               <Kennzahl wert={w.anrufeWoche} bezeichnung="Anrufe (Woche)" />
               <Kennzahl wert={w.vereinbartWoche} bezeichnung="Termine vereinbart" />
               <Kennzahl wert={w.gehaltenWoche} bezeichnung="Termine gehalten" />
-              <Kennzahl wert={w.offeneEinheiten} bezeichnung="Einheiten offen" />
               <Kennzahl wert={w.abschluesseMonat} bezeichnung="Abschlüsse (Monat)" betont />
-              <Kennzahl wert={w.einheitenMonat} bezeichnung="Einheiten (Monat)" betont />
               {pipelineSichtbar && (
                 <>
                   <Kennzahl wert={w.inAkquise} bezeichnung="in Akquise" />
@@ -385,6 +452,24 @@ export default async function MannschaftPage() {
                 </>
               )}
             </div>
+
+            {/* Der Sponsor sieht denselben Stand wie der Neue selbst auf
+                /heute - sonst redet er über Zahlen, die der andere nicht
+                kennt. */}
+            {pass && (
+              <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
+                <span className="text-xs font-medium text-slate-500">Starterpass</span>
+                <span aria-hidden className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                  <span
+                    className="block h-full rounded-full bg-navy-600"
+                    style={{ width: `${(pass.geschafft / pass.gesamt) * 100}%` }}
+                  />
+                </span>
+                <span className="text-xs font-semibold tabular-nums text-slate-700">
+                  {pass.geschafft} von {pass.gesamt}
+                </span>
+              </div>
+            )}
 
             {signale.length > 0 && (
               <ul className="mt-4 space-y-2 border-t border-slate-100 pt-3">
@@ -396,7 +481,7 @@ export default async function MannschaftPage() {
 
             {!pipelineSichtbar && (
               <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-400">
-                {person.name} zeigt nur Zahlen, keine Pipeline. Signale zu Bestand,
+                {person.name} zeigt nur Zahlen, keinen Trichter. Signale zu Nachschub,
                 Fristen und Empfehlungen bleiben deshalb aus.
               </p>
             )}

@@ -1,9 +1,15 @@
-// Gespraechsleitfaeden fuer die Namensliste.
+// Gespraechsleitfaeden und Einwandbehandlung.
 //
-// Die Standardtexte stehen hier im Code. Wer sie in der App bearbeitet, bekommt
-// eine persoenliche Kopie in der Guide-Tabelle; alle anderen sehen weiter den
-// Standard. Vorteil gegenueber einem Seeding: Wird ein Standardtext hier
-// verbessert, erreicht das sofort jeden, der nichts eigenes gespeichert hat.
+// Die Texte stehen im Code, nicht in der Datenbank, und sind nicht
+// ueberschreibbar. Der Wert steckt im guten Standardtext, nicht in der
+// Moeglichkeit ihn zu aendern: eine Verbesserung hier erreicht sofort jeden.
+// Ein Editor waere Pflegearbeit fuer den Partner - und ein selbst ausgedachter
+// Leitfaden hilft ihm weniger als ein guter, der einfach dasteht.
+//
+// Die Einwaende stehen ebenfalls hier und nicht im Willkommens-Ablauf: sie
+// sind Verkaufsinhalt, kein Onboarding-Spiel. Der Test an Tag 1 bedient sich
+// aus dieser Datei - und derselbe Inhalt steht spaeter im Durchlauf, wo er
+// gebraucht wird (docs/audit-kernmodell.md, 10.8).
 //
 // Format: bewusst einfach, damit es im Textfeld bearbeitbar bleibt.
 //   "# Ueberschrift"   – Abschnitt
@@ -87,34 +93,53 @@ Damit steht die Terminfrage nie zur Debatte, nur noch das Wann.
 - EFA können: Einwände souverän parieren, vorbereitet sein.
 - Termin legen! Das ist das einzige Ziel des Calls. Nicht ohne Termin auflegen.`;
 
-// Geruest, kein fertiger Leitfaden: die Struktur steht, der Wortlaut in den
-// Klammern gehoert ersetzt. Ein ausgedachter Gespraechseinstieg waere
-// schlimmer als eine ehrliche Luecke.
-const RECRUITING_ERSTKONTAKT = `# Vorbereitung
-Lächeln, aufrecht stehen, Namen der Person parat. Ziel ist der Termin, nicht das Erklären am Telefon.
+// Der Recruiting-Leitfaden im Wortlaut, gebaut wie der TVB: kurz, ein Ziel,
+// Alternativtechnik am Ende. Die Stellen in [eckigen Klammern] bleiben offen -
+// sie werden je Gespraech gefuellt, nicht einmalig ersetzt.
+const RECRUITING_ERSTKONTAKT = `Ca. 3 Minuten · Ziel: Termin legen · Ton: locker & ehrlich
 
-# Einstieg
-> Hallo [Name], hier ist [dein Name]. Hast du kurz zwei Minuten?
+# 01 · Vorbereitung
+Lächeln, aufrecht stehen, den Namen parat. Ziel ist der Termin — nicht das Erklären am Telefon.
+Vorher kurz überlegen: Was macht die Person gerade? Was hat sie zuletzt erzählt? Ein einziger konkreter Aufhänger reicht.
 
-# Aufhänger
-[Warum rufst du gerade diese Person an? Ein Satz, ehrlich und konkret — gemeinsame Vergangenheit, ihre berufliche Situation, eine Bemerkung von neulich.]
+# 02 · Einstieg
+Locker rein, dann die Erlaubnis holen.
+> „Hey [Name], hier ist [dein Name]! Wie läuft's bei dir gerade?“
+Kurz zuhören, echtes Interesse — dann:
+> „Ich hab einen Grund, warum ich anrufe. Hast du zwei Minuten?“
 
-# Überleitung zum Beruf
-[Was machst du jetzt, in einem Satz? Kein Fachchinesisch, keine Produkte.]
+# 03 · Der Aufhänger
+Warum genau diese Person. Ehrlich und konkret, nie „ich hab da was für dich“.
+> „Ich hab beruflich was Neues angefangen und bau gerade ein Team auf. Und beim Überlegen, wen ich dazuholen würde, warst du einer der Ersten, an die ich gedacht hab.“
+> „Weil du [konkreter Grund: gut mit Leuten kannst / ehrgeizig bist / eh was Eigenes suchst].“
+Das ist der stärkste Satz des Gesprächs. Er muss stimmen.
 
-# Terminfrage
+# 04 · Was du machst — in einem Satz
+Kein Fachchinesisch, keine Produkte, keine Zahlen.
+> „Ich berate Leute in Finanzthemen — Vorsorge, Anlage, Steuern. Und ich bilde Leute aus, die das auch machen wollen. Nebenbei oder voll, das entscheidet jeder selbst.“
+Nicht weiter erklären. Wer am Telefon erklärt, verliert den Termin.
+
+# 05 · Die Frage
+> „Ich weiß nicht, ob das was für dich ist — das findet man in einem Gespräch raus. Schau's dir einmal an und urteil selbst.“
 Alternativtechnik: zwei Optionen statt Ja/Nein.
-> Ich zeig dir das am besten mal in Ruhe. Passt's dir besser unter der Woche oder am Wochenende?
+> „Passt's dir besser unter der Woche oder am Wochenende?“
+Damit steht das Ob nie zur Debatte, nur noch das Wann.
 
-# Einwände
-"Keine Zeit" → [deine Antwort]
-"Kein Interesse" → [deine Antwort]
-"Schick mir was per Mail" → [deine Antwort]
-"Was ist das denn genau?" → [deine Antwort, kurz halten, dann zurück zur Terminfrage]
+# 06 · Ablauf ansagen
+Klarheit nimmt Druck raus.
+> „Das dauert ungefähr eine Stunde. Ich zeig dir, was ich mache und wie der Einstieg aussieht. Danach entscheidest du selbst — und wenn's nichts für dich ist, ist das auch völlig okay.“
 
-# Abschluss
+# 07 · Abschluss
 Termin wiederholen, Ort und Uhrzeit bestätigen, bedanken.
-> Dann bis [Tag] um [Uhrzeit]. Ich freu mich!`;
+> „Dann bis [Tag] um [Uhrzeit] bei [Ort]. Ich freu mich — bis dann!“
+
+# 08 · Wichtige Punkte
+- Ca. 3 Minuten. Es geht nur um den Termin.
+- Erst Mensch, dann Thema. Der Aufhänger muss ehrlich sein.
+- Nichts am Telefon erklären. Jede erklärte Frage kostet einen Termin.
+- Kein Druck: „Du entscheidest danach selbst“ gehört in jedes Gespräch.
+- Einwände kommen — sie stehen unten. Ruhig bleiben, Sorge ernst nehmen, zurück zur Terminfrage.
+- Termin legen! Nicht ohne Termin auflegen.`;
 
 export const DEFAULT_GUIDES: Record<GuideKey, GuideText> = {
   VERKAUF_TVB: {
@@ -127,17 +152,110 @@ export const DEFAULT_GUIDES: Record<GuideKey, GuideText> = {
     key: "RECRUITING_ERSTKONTAKT",
     title: "Recruiting · Erstkontakt",
     body: RECRUITING_ERSTKONTAKT,
-    isDraft: true,
+    isDraft: false,
   },
 };
 
-export const ALL_GUIDE_KEYS: GuideKey[] = [
-  "VERKAUF_TVB",
-  "RECRUITING_ERSTKONTAKT",
-];
+// --- Einwandbehandlung -------------------------------------------------------
+// Die drei Saetze, die jeder garantiert hoert. Sie stehen an zwei Stellen:
+// im Willkommens-Test an Tag 1 (als Quiz) und im Durchlauf am Kontakt (als
+// Antwort zum Nachschlagen). Eine Quelle, zwei Verwendungen.
 
-export function isGuideKey(value: string): value is GuideKey {
-  return (ALL_GUIDE_KEYS as string[]).includes(value);
+export type Einwand = {
+  satz: string;
+  optionen: { text: string; richtig: boolean }[];
+  /** Warum die richtige Antwort die richtige ist - eine Zeile. */
+  begruendung: string;
+};
+
+export const EINWAENDE: Record<ListKind, Einwand[]> = {
+  VERKAUF: [
+    {
+      satz: "„Da hab ich kein Geld für.“",
+      optionen: [
+        { text: "„Okay, meld dich, wenn sich das ändert.“", richtig: false },
+        {
+          text: "„Genau darum geht's — aus wenig Geld mehr machen. Deshalb reden wir ja.“",
+          richtig: true,
+        },
+        { text: "„Es kostet doch erstmal gar nichts!“", richtig: false },
+      ],
+      begruendung:
+        "Der Einwand IST dein Aufhänger: wer wenig hat, braucht das Thema am dringendsten.",
+    },
+    {
+      satz: "„Ich investier schon — Trade Republic.“",
+      optionen: [
+        { text: "„Oh. Na dann brauchst du ja nichts.“", richtig: false },
+        {
+          text: "„Mega! Und hast du dabei schon mal an Steuern und Gebühren gedacht? Genau da setz ich an.“",
+          richtig: true,
+        },
+        { text: "„Verkauf das lieber und komm zu uns.“", richtig: false },
+      ],
+      begruendung:
+        "Weg C im Leitfaden: nie gegen das Depot reden — die Lücke zeigen, die es lässt.",
+    },
+    {
+      satz: "„Termin? Ich hab grad echt keine Zeit.“",
+      optionen: [
+        { text: "„Wann hättest du denn mal Zeit?“", richtig: false },
+        { text: "„Dauert auch ganz kurz, versprochen!“", richtig: false },
+        {
+          text: "„Unter der Woche oder am Wochenende — was passt dir besser?“",
+          richtig: true,
+        },
+      ],
+      begruendung:
+        "Alternativtechnik: zwei Optionen, beide führen zum Ja. Das Ob steht nie zur Debatte, nur das Wann.",
+    },
+  ],
+  RECRUITING: [
+    {
+      satz: "„Ist das nicht so ein Schneeballsystem?“",
+      optionen: [
+        { text: "„Nein! Wie kommst du denn darauf?“", richtig: false },
+        {
+          text: "„Berechtigte Frage. Schau's dir einmal an und urteile selbst — genau dafür ist der Infoabend da.“",
+          richtig: true,
+        },
+        { text: "„Das sagen nur Leute, die es nicht verstanden haben.“", richtig: false },
+      ],
+      begruendung:
+        "Nicht verteidigen, einladen. Wer selbst geprüft hat, glaubt sich — dir muss er nichts glauben.",
+    },
+    {
+      satz: "„Ich hab null Ahnung von Finanzen.“",
+      optionen: [
+        { text: "„Macht nichts, verkaufen kann jeder.“", richtig: false },
+        {
+          text: "„Hatte am Anfang keiner von uns. Genau dafür ist die Ausbildung da — neben Job oder Studium.“",
+          richtig: true,
+        },
+        { text: "„Dann wird's Zeit, dass du's lernst.“", richtig: false },
+      ],
+      begruendung:
+        "Der Einwand ist eine Sorge, kein Nein. Die Antwort nimmt sie ernst und räumt sie aus.",
+    },
+    {
+      satz: "„Neben Job und Uni hab ich keine Zeit.“",
+      optionen: [
+        { text: "„Zeit hat man nie, Zeit nimmt man sich!“", richtig: false },
+        {
+          text: "„Läuft nebenbei, du bestimmst das Tempo. Schau's dir einmal an — unter der Woche oder am Wochenende?“",
+          richtig: true,
+        },
+        { text: "„Okay, dann vielleicht später mal.“", richtig: false },
+      ],
+      begruendung:
+        "Sorge ernst nehmen und trotzdem die Alternativtechnik ans Ende — die Terminfrage bleibt offen für das Wann, nicht das Ob.",
+    },
+  ],
+};
+
+// Nur die richtige Antwort - das braucht man mitten im Gespraech.
+export function antwortAuf(einwand: Einwand): string {
+  return einwand.optionen.find((option) => option.richtig)?.text ?? "";
 }
 
 // --- Anzeige ----------------------------------------------------------------
@@ -170,10 +288,4 @@ export function parseGuide(body: string): GuideBlock[] {
       }
       return { kind: "text" as const, text: line.trim() };
     });
-}
-
-// Offene Stellen wie [dein Name]. Beim Geruest ein Hinweis, dass der eigene
-// Wortlaut fehlt; beim fertigen Leitfaden nur Einsetzstellen je Gespraech.
-export function countPlaceholders(body: string): number {
-  return body.match(/\[[^\]]+\]/g)?.length ?? 0;
 }

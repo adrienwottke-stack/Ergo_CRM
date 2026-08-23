@@ -8,19 +8,18 @@ datasource db {
 }
 
 // --- Pipeline ---------------------------------------------------------------
-// Der Kontakt traegt die Beziehungsphase (Akquise -> Kunde -> Betreuung),
-// der Vorgang (Deal) die einzelne Sparte. Der Ausgang liegt getrennt von der
-// Phase, damit sichtbar bleibt, WO ein Kontakt verloren gegangen ist.
+// Der Kontakt traegt die Phase der Schleife (Name -> kontaktiert -> Termin ->
+// gehalten -> Ergebnis). Der Ausgang liegt getrennt von der Phase, damit
+// sichtbar bleibt, WO ein Kontakt verloren gegangen ist.
 
+// Die fuenf Stufen der Schleife. Mehr gibt es nicht: was danach kaeme, waere
+// Bestandsbetreuung - und die hat ein Partner in Stufe 1 nicht.
 enum ContactStage {
-  NEU
-  KONTAKTIERT
+  NEU // ein Name, mehr noch nicht
+  KONTAKTIERT // erreicht, kein Termin
   TERMIN_VEREINBART
-  IN_BERATUNG
-  KUNDE
-  EMPFEHLUNG_ERFRAGT
-  CHECKUP_GEPLANT
-  BESTAND
+  TERMIN_GEHALTEN
+  ABSCHLUSS // das Ergebnis. Bewusst nicht "KUNDE": ein geworbener Partner ist keiner
 }
 
 enum Outcome {
@@ -40,29 +39,14 @@ enum LostReason {
   SONSTIGES
 }
 
+// Was die Schleife an Schritten kennt. Mehr Auswahl heisst nicht mehr
+// Genauigkeit, sondern eine Entscheidung mehr vor jedem Speichern.
 enum NextStepType {
   ANRUF
   TERMIN
-  TERMIN_VORBEREITEN
-  ANGEBOT_ERSTELLEN
   NACHFASSEN
-  ANTRAG_EINREICHEN
   EMPFEHLUNG_ERFRAGEN
-  CHECKUP_TERMINIEREN
   SONSTIGES
-}
-
-enum DealStage {
-  BEDARF
-  ANGEBOT
-  ANTRAG
-  GEWONNEN
-}
-
-enum DealLine {
-  PAV
-  BU
-  UNBEKANNT // nur fuer Platzhalter-Vorgaenge aus der Alt-Datenmigration
 }
 
 enum ActivityType {
@@ -102,7 +86,7 @@ enum ListKind {
 }
 
 model Contact {
-  id     String @id @default(cuid())
+  id     String  @id @default(cuid())
   name   String
   phone  String?
   email  String?
@@ -124,18 +108,24 @@ model Contact {
   rating    ContactRating?
   listKinds ListKind[]
 
-  // Genau ein offener naechster Schritt je Kontakt. In IN_BERATUNG liegt der
-  // Schritt stattdessen am Vorgang, damit keine doppelten Fristen entstehen.
+  // Genau ein offener naechster Schritt je Kontakt.
   nextStepType NextStepType?
   nextStepAt   DateTime?
   nextStepNote String?
 
   appointmentAt DateTime? // naechster Termin, mit Uhrzeit
-  checkupDueAt  DateTime? // faellig ab (Bestandskunden)
 
-  // Zeitstempel gegen doppelte Wettbewerbspunkte
+  // Wann nach Empfehlungen gefragt wurde. Bewusst ein Zeitstempel und keine
+  // Phase: die Frage gehoert an JEDEN gehaltenen Termin, nicht an das Ende des
+  // Trichters. Als Phase waere sie nur einmal je Kontakt moeglich gewesen -
+  // und erst nach einem Abschluss.
+  referralsAskedAt DateTime?
+
+  // Zeitstempel gegen doppelte Wettbewerbspunkte: Termin vereinbart, Termin
+  // gehalten, Abschluss - jeder Punkt faellt genau einmal je Kontakt.
   appointmentLoggedAt     DateTime?
   appointmentHeldLoggedAt DateTime?
+  wonLoggedAt             DateTime?
 
   // Ein Formular = ein Kontakt. Jedes gerenderte Anlege-Formular bringt einen
   // eigenen Schluessel mit; der eindeutige Index laesst den zweiten Klick
@@ -154,7 +144,6 @@ model Contact {
   referrals    Contact[] @relation("Empfehlung")
 
   activities  Activity[]
-  deals       Deal[]
   stageEvents StageEvent[]
 
   @@index([ownerId, updatedAt])
@@ -164,49 +153,11 @@ model Contact {
   @@index([referredById])
 }
 
-model Deal {
-  id        String  @id @default(cuid())
-  contactId String
-  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-
-  line  DealLine
-  title String?
-
-  stage      DealStage   @default(BEDARF)
-  outcome    Outcome     @default(OFFEN)
-  lostReason LostReason?
-
-  // Wert in internen Einheiten. 100 EUR Monatsbeitrag = 82 Einheiten,
-  // unitFactorPermille (1000 = 1,0) haelt spaetere Laufzeitfaktoren offen.
-  monthlyPremiumCents Int?
-  unitFactorPermille  Int     @default(1000)
-  units               Int?
-  unitsManual         Boolean @default(false)
-
-  closedAt    DateTime?
-  wonLoggedAt DateTime?
-
-  nextStepType NextStepType?
-  nextStepAt   DateTime?
-  nextStepNote String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  stageEvents StageEvent[]
-
-  @@index([contactId])
-  @@index([stage, outcome])
-  @@index([nextStepAt])
-}
-
-// Phasenhistorie: Grundlage fuer Uebergangsquoten und Durchlaufzeiten.
+// Phasenhistorie: Grundlage fuer die Kennzahlen der Schleife.
 model StageEvent {
   id        String   @id @default(cuid())
   contactId String?
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  dealId    String?
-  deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
   fromStage String?
   toStage   String
   at        DateTime @default(now())
@@ -214,23 +165,16 @@ model StageEvent {
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([contactId, at])
-  @@index([dealId, at])
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
+  id           String   @id @default(cuid())
+  email        String   @unique
   name         String
   passwordSalt String
   passwordHash String
-  role         UserRole     @default(MEMBER)
-  // Einsteiger sehen nur Namensliste, Heute und Wettbewerb. Nichts wird
-  // gesperrt, nur ausgeblendet - jederzeit selbst umschaltbar.
-  // Voreinstellung an: wer neu dazukommt, soll drei Eintraege sehen und
-  // nicht zehn. Wer mehr will, holt es sich mit einem Tipp auf "Alles
-  // anzeigen".
-  beginnerMode Boolean      @default(true)
-  createdAt    DateTime     @default(now())
+  role         UserRole @default(MEMBER)
+  createdAt    DateTime @default(now())
 
   // Erster Start vom Startbildschirm aus. NULL = arbeitet noch im Browser-Tab.
   // Einmal gesetzt, danach nie wieder angefasst: damit steht in der Mannschaft,
@@ -256,9 +200,8 @@ model User {
   recruitedBy   User?   @relation("Werbung", fields: [recruitedById], references: [id], onDelete: SetNull)
   recruited     User[]  @relation("Werbung")
 
-  startedAt   DateTime? // Eintritt: Grundlage fuer "neu" und die 90-Tage-Sicht
-  careerLevel String?
-  visibility  TeamVisibility @default(PIPELINE)
+  startedAt  DateTime? // Eintritt: Grundlage fuer "neu" und die 90-Tage-Sicht
+  visibility TeamVisibility @default(PIPELINE)
 
   // Ausgetretene bleiben im Baum, damit die Historie stimmt, zaehlen aber in
   // keiner laufenden Auswertung mehr mit.
@@ -272,7 +215,7 @@ model User {
   onboardingStartedAt DateTime?
   // Messen statt hoffen: je Akt ein Zeitstempel ("chat": "...", "sprint": ...).
   // Ohne das laesst sich nie sagen, WO die Leute aussteigen.
-  onboardingSteps Json?
+  onboardingSteps     Json?
 
   // Die Weiche vom Start: Kunden gewinnen (VERKAUF) oder Team aufbauen
   // (RECRUITING). Steuert Leitfaden, Einwaende und die Liste des Sprints.
@@ -282,18 +225,14 @@ model User {
   // genau einmal zurueck - in dem Moment, in dem er hinschmeissen will
   // (14 Tage dabei, eine Woche Stille). whyShownAt haelt fest, dass der
   // Moment verbraucht ist.
-  whyLetter   String?
-  whyShownAt  DateTime?
+  whyLetter  String?
+  whyShownAt DateTime?
 
   // Das 30-Tage-Versprechen: selbst gesetztes Terminziel. Steht ab dann jeden
   // Tag auf /heute, an Tag 30 kommt die Abrechnung (pledgeShownAt = gesehen).
   pledgeTarget  Int?
   pledgeSetAt   DateTime?
   pledgeShownAt DateTime?
-
-  // Kleines Selfie fuer die Rangliste, als komprimierte Data-URL (~10 KB).
-  // Bewusst kein Datei-Speicher: ein Feld, keine neue Infrastruktur.
-  photoDataUrl String?
 
   // Aus welcher Einladung dieses Konto entstand. Ersetzt fuer Mehrfach-Codes
   // (QR am Infoabend) die alte 1:1-Rueckverknuepfung Invite.usedById.
@@ -303,10 +242,13 @@ model User {
   contacts    Contact[]
   person      Person?
   stageEvents StageEvent[]
-  guides      Guide[]
   undoEntries UndoEntry[]
-  invites     Invite[] @relation("Einladender")
-  invite      Invite?  @relation("Eingeloest")
+  pushAbos    PushAbo[]
+
+  nachrichtenGesendet Nachricht[] @relation("NachrichtVon")
+  nachrichtenErhalten Nachricht[] @relation("NachrichtAn")
+  invites             Invite[]    @relation("Einladender")
+  invite              Invite?     @relation("Eingeloest")
 
   @@index([leaderId])
   @@index([path])
@@ -357,6 +299,54 @@ model Invite {
   @@index([leaderId, createdAt])
 }
 
+// Kurznachrichten zwischen Partnern (docs/audit-kernmodell.md, 10.6).
+//
+// Bis hierhin sahen sich Partner ausschliesslich als Zeile mit einer Zahl.
+// "Das Team soll sich im Tool spueren" war damit nicht eingeloest.
+//
+// Bewusst KEIN Chat: kein Verlauf, keine Gruppen, keine Anhaenge. Eine
+// Nachricht ist eine Reaktion auf etwas, das gerade passiert ist - meistens
+// ein Ergebnis in der Rangliste. Wer sich lange unterhalten will, hat WhatsApp.
+// Ein Postfach, das gepflegt werden muss, waere wieder Arbeit.
+model Nachricht {
+  id    String @id @default(cuid())
+  vonId String
+  von   User   @relation("NachrichtVon", fields: [vonId], references: [id], onDelete: Cascade)
+  anId  String
+  an    User   @relation("NachrichtAn", fields: [anId], references: [id], onDelete: Cascade)
+  text  String
+
+  createdAt DateTime  @default(now())
+  gelesenAt DateTime?
+
+  @@index([anId, createdAt])
+}
+
+// Ein Push-Abo je Geraet (docs/audit-kernmodell.md, 10.4).
+//
+// Alles Erinnernde im Werkzeug war bis hierhin Holschuld: Fruehwarn-Ampel,
+// Puls, Versprechen, Wiedereinstieg - alles wurde erst sichtbar, wenn jemand
+// die Seite oeffnet. Genau die Leute, die ein Signal ausloesen, oeffnen sie
+// nicht.
+//
+// Ein Konto kann mehrere Abos haben (Handy und Rechner). Der Endpunkt ist
+// eindeutig: derselbe Browser erneuert ihn, statt einen zweiten anzulegen.
+model PushAbo {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  createdAt        DateTime  @default(now())
+  // Wann zuletzt erfolgreich zugestellt wurde. Ein Abo, das der Browser
+  // abgeraeumt hat, meldet 404/410 - dann fliegt die Zeile raus.
+  letzteZustellung DateTime?
+
+  @@index([userId])
+}
+
 // Rueckgaengig fuer Ein-Tipp-Aktionen. Ohne das darf keine Schnellaktion
 // gebaut werden: ein Fehlgriff waere sonst eine Aufraeumaktion aus sechs
 // Schritten, und der Wettbewerbspunkt bliebe stehen.
@@ -375,21 +365,6 @@ model UndoEntry {
   undoneAt  DateTime?
 
   @@index([userId, createdAt])
-}
-
-// Persoenlich ueberschriebener Gespraechsleitfaden. Fehlt die Zeile, gilt der
-// Standardtext aus lib/guides.ts - so erreichen Verbesserungen am Standard
-// jeden, der nichts eigenes gespeichert hat.
-model Guide {
-  id        String   @id @default(cuid())
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  key       String
-  title     String
-  body      String
-  updatedAt DateTime @updatedAt
-
-  @@unique([ownerId, key])
 }
 
 model Activity {
@@ -430,11 +405,8 @@ model Person {
   lastRank   Int?
   lastRankAt DateTime?
 
-  votes           FeatureVote[]
-  wuensche        WunschVote[]
-  duelleGefordert Duel[]            @relation("Fordert")
-  duelleErhalten  Duel[]            @relation("Gefordert")
-  sprints         SprintTeilnahme[]
+  votes   FeatureVote[]
+  sprints SprintTeilnahme[]
 }
 
 model DailyLog {
@@ -451,13 +423,12 @@ model DailyLog {
   @@index([personId, date])
 }
 
-// --- Arena: Werkstatt, Duelle, Sprints --------------------------------------
+// --- Arena: Schalter, Sprints -----------------------------------------------
 // docs/wettbewerb-plan.md, Abschnitte 7 und 14.
 //
-// Grundregel dieses Blocks: JEDER neue Baustein bekommt einen Schluessel, einen
-// Schalter und eine Zaehlstelle. Ohne das laesst sich nach drei Wochen nicht
-// sagen, was bleiben soll - und genau darum geht es beim Kurs "alles rein,
-// dann abstimmen lassen".
+// Jeder Arena-Baustein hat einen Schluessel, einen Schalter und eine
+// Zaehlstelle. So laesst sich ein Baustein abschalten, ohne Code anzufassen,
+// und die Nutzung steht in Summe ueber Koepfe da.
 
 enum FeatureState {
   TEST // laeuft, wird noch beurteilt
@@ -467,17 +438,16 @@ enum FeatureState {
 }
 
 model Feature {
-  key   String       @id // "duell", "sprint", "puls"
-  titel String
+  key          String       @id // "duell", "sprint", "puls"
+  titel        String
   // Ein konkreter Satz mit Beispiel. Wer nicht versteht, worueber er
   // abstimmt, stimmt nicht ab.
   beschreibung String?
-  state FeatureState @default(TEST)
-  // "Bleibt drin, weil ..." - steht sichtbar in der Werkstatt, wenn gegen die
-  // Stimmen entschieden wurde. Eine Abstimmung ohne Folgen wird nicht mehr
-  // benutzt, eine bindende wird zur Fessel.
-  grund String?
-  seit  DateTime     @default(now())
+  state        FeatureState @default(TEST)
+  // "Bleibt drin, weil ..." - die Begruendung zum Schalterstand. Steht neben
+  // den Stimmen, wenn gegen sie entschieden wurde.
+  grund        String?
+  seit         DateTime     @default(now())
 
   votes FeatureVote[]
 }
@@ -488,6 +458,9 @@ enum Urteil {
   WEG_DAMIT
 }
 
+// Eine Stimme je Kopf und Baustein, einmalig: nach der Abgabe verschwindet die
+// Frage aus der Arena. Ausgewertet wird ausschliesslich in Summe, auf dem
+// Pruefstand - der Baustein soll beurteilt werden, nicht der Mensch.
 model FeatureVote {
   id         String   @id @default(cuid())
   featureKey String
@@ -513,60 +486,6 @@ model FeatureUse {
 
   @@id([featureKey, personId, day])
   @@index([featureKey, day])
-}
-
-model Wunsch {
-  id           String  @id @default(cuid())
-  titel        String
-  beschreibung String?
-  stand        String  @default("OFFEN") // OFFEN | GEBAUT | VERWORFEN
-  createdAt DateTime     @default(now())
-  votes     WunschVote[]
-}
-
-model WunschVote {
-  id        String   @id @default(cuid())
-  wunschId  String
-  wunsch    Wunsch   @relation(fields: [wunschId], references: [id], onDelete: Cascade)
-  personId  String
-  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-
-  @@unique([wunschId, personId])
-  @@index([personId])
-}
-
-enum DuelStatus {
-  OFFEN // Forderung steht, 24 Stunden
-  LAEUFT
-  ENTSCHIEDEN
-  ABGELEHNT
-  VERFALLEN
-}
-
-model Duel {
-  id           String @id @default(cuid())
-  challengerId String
-  challenger   Person @relation("Fordert", fields: [challengerId], references: [id], onDelete: Cascade)
-  opponentId   String
-  opponent     Person @relation("Gefordert", fields: [opponentId], references: [id], onDelete: Cascade)
-
-  metric   QuotaType? // NULL = Gesamtpunkte
-  startDay DateTime
-  endDay   DateTime
-  status   DuelStatus @default(OFFEN)
-
-  // Beim Abpfiff eingefroren: ein Nachtrag darf kein Ergebnis mehr kippen.
-  challengerScore Int?
-  opponentScore   Int?
-
-  acceptedAt DateTime?
-  decidedAt  DateTime?
-  createdAt  DateTime  @default(now())
-
-  @@index([challengerId, status])
-  @@index([opponentId, status])
-  @@index([status, endDay])
 }
 
 // Gemeinsamer Block: 25 Minuten, alle gleichzeitig. Gezaehlt wird ueber

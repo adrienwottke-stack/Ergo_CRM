@@ -9,6 +9,7 @@ import {
   setRating,
 } from "@/app/(app)/namen/actions";
 import {
+  NACHFUELL_SCHWELLE,
   NAME_TARGET,
   RATINGS,
   nextRating,
@@ -18,7 +19,7 @@ import {
   targetPercent,
 } from "@/lib/namelist";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
-import { CheckIcon, PhoneIcon, PlusIcon, XIcon } from "@/components/icons";
+import { CheckIcon, PhoneIcon, PlusIcon, SparkIcon, XIcon } from "@/components/icons";
 import { card, filterPill, input } from "@/components/ui";
 
 export type NameEntry = {
@@ -128,8 +129,34 @@ export default function NameList({
     });
   };
 
+  // Nachfuell-Alarm: nicht die Gesamtzahl zaehlt, sondern was noch zu
+  // arbeiten ist. Zwanzig Namen, von denen achtzehn erledigt sind, sind ein
+  // leerer Trichter.
+  const nachfuellen = total > 0 && open.length < NACHFUELL_SCHWELLE;
+
   return (
     <div className="space-y-5">
+      {nachfuellen && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">
+            {open.length === 0
+              ? "Deine Liste ist leer gearbeitet."
+              : `Nur noch ${open.length} ${open.length === 1 ? "offener Name" : "offene Namen"}.`}
+          </p>
+          <p className="mt-1 text-sm text-amber-800">
+            Ohne Nachschub steht die Schleife still. Zehn Fragen, und du hast
+            wieder welche.
+          </p>
+          <Link
+            href={`/namen/sammeln?liste=${kind}`}
+            className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-amber-900 px-4 text-sm font-semibold text-white transition hover:bg-amber-950"
+          >
+            <SparkIcon className="h-4 w-4" />
+            Namen sammeln
+          </Link>
+        </div>
+      )}
+
       {/* Fortschritt zum Ziel. 20 ist ein Ziel, keine Grenze – der Balken
           bleibt bei 100 %, weitere Namen sind willkommen. */}
       <div className={`${card} space-y-2 p-4`}>
@@ -190,6 +217,15 @@ export default function NameList({
           </button>
         </div>
         {hint && <p className="text-xs font-medium text-amber-700">{hint}</p>}
+        {/* Der gefuehrte Weg fuer alle, denen nach sechs Namen nichts mehr
+            einfaellt - und das sind fast alle. */}
+        <Link
+          href={`/namen/sammeln?liste=${kind}`}
+          className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
+        >
+          <SparkIcon className="h-4 w-4" />
+          Fällt dir keiner mehr ein? Sammeln starten
+        </Link>
       </div>
 
       {open.length > 0 && (
@@ -264,6 +300,13 @@ export default function NameList({
             anrufen kommt danach. Wer beim Sammeln über Details nachdenkt,
             kommt nicht auf {NAME_TARGET}.
           </p>
+          <Link
+            href={`/namen/sammeln?liste=${kind}`}
+            className="mt-5 inline-flex min-h-14 items-center gap-2 rounded-xl bg-navy-900 px-6 text-base font-semibold text-white transition hover:bg-navy-950"
+          >
+            <SparkIcon className="h-5 w-5" />
+            Geführt sammeln
+          </Link>
         </div>
       )}
 

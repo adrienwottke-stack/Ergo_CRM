@@ -45,7 +45,6 @@ export async function logDaily(formData: FormData) {
 
   revalidatePath("/log");
   revalidatePath("/leaderboard");
-  revalidatePath("/report");
   redirect("/log");
 }
 
@@ -68,5 +67,4 @@ export async function deleteLog(formData: FormData) {
 
   revalidatePath("/log");
   revalidatePath("/leaderboard");
-  revalidatePath("/report");
 }
