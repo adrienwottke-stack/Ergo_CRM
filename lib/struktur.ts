@@ -111,9 +111,17 @@ export async function umhaengen(
       where: { id: userId },
       data: { leaderId: neueLeaderId },
     }),
+    // Der Cast auf int ist Pflicht, nicht Kosmetik.
+    //
+    // Ohne ihn kommt die Startposition als text an, und Postgres waehlt dann
+    // NICHT substring(text, int), sondern die POSIX-Variante
+    // substring(text, pattern) - eine Regex-Suche nach "52". Die findet
+    // nichts, liefert NULL, und aus `neu || NULL` wird NULL. Ergebnis war ein
+    // Verstoss gegen die NOT-NULL-Regel auf "path": das Umhaengen brach mit
+    // einem 500er ab, und zwar lautlos fuer den Nutzer.
     prisma.$executeRaw`
       UPDATE "User"
-      SET "path" = ${neu} || substring("path", ${alt.length + 1})
+      SET "path" = ${neu} || substring("path", ${alt.length + 1}::int)
       WHERE "path" LIKE ${`${alt}%`}
     `,
   ]);
