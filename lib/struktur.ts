@@ -67,19 +67,20 @@ export async function direkteKonten(userId: string): Promise<string[]> {
   return [userId, ...konten.map((konto) => konto.id)];
 }
 
-export type UmhaengenFehler =
-  | "unbekannt"
-  | "sich_selbst"
-  | "eigener_ast"
-  | null;
+export type UmhaengenFehler = "unbekannt" | "sich_selbst" | null;
 
 /**
  * Haengt ein Konto unter eine neue Fuehrungskraft und schreibt die Pfade des
  * gesamten Astes mit. Beides zusammen oder gar nicht.
  *
- * Der teure Teil ist das Nachziehen der Nachfahren. Prisma kann in updateMany
- * nicht auf dem alten Spaltenwert rechnen, deshalb ein einzelnes SQL: den alten
- * Praefix abschneiden, den neuen davorsetzen. Eine Anweisung fuer den ganzen Ast.
+ * Der Sonderfall ist "jemanden UEBER sich einhaengen": die gewaehlte
+ * Fuehrungskraft haengt heute selbst unter diesem Konto. Ein Zug reicht dafuer
+ * nicht - unmittelbar umgehaengt entstuende ein Kreis, aus dem keine Abfrage
+ * mehr herausfindet. Frueher wies die Funktion das ab, und die Reihenfolge war
+ * Handarbeit am Bildschirm: erst den Neuen auf Wurzel setzen, dann sich selbst
+ * darunter. Wer sie verwechselte, sah nur eine Fehlermeldung - und wer selbst
+ * die Wurzel war, hatte ueberhaupt niemanden zur Auswahl. Jetzt legt die
+ * Struktur die Reihenfolge selbst.
  */
 export async function umhaengen(
   userId: string,
@@ -89,9 +90,51 @@ export async function umhaengen(
 
   const ich = await prisma.user.findUnique({
     where: { id: userId },
-    select: { path: true },
+    select: { path: true, leaderId: true },
   });
   if (!ich) return "unbekannt";
+
+  if (neueLeaderId) {
+    const leader = await prisma.user.findUnique({
+      where: { id: neueLeaderId },
+      select: { path: true },
+    });
+    if (!leader) return "unbekannt";
+
+    // Der Neue haengt unter mir: er rueckt zuerst mitsamt seinem eigenen Ast
+    // an meine Stelle - danach bin ich nicht mehr sein Vorfahr, und der
+    // zweite Zug ist ein ganz gewoehnliches Umhaengen. Beide Zuege schreiben
+    // jeweils ihren ganzen Ast mit.
+    if (liegtImAst(leader.path, ich.path)) {
+      await verschieben(neueLeaderId, ich.leaderId);
+      await verschieben(userId, neueLeaderId);
+      return null;
+    }
+  }
+
+  await verschieben(userId, neueLeaderId);
+  return null;
+}
+
+/**
+ * Der Schreibvorgang selbst, ohne Pruefung - die hat `umhaengen` schon
+ * gemacht. Liest die Pfade absichtlich frisch: beim Einhaengen ueber sich
+ * laeuft die Funktion zweimal, und der zweite Lauf haette sonst den Pfad von
+ * vor dem ersten in der Hand.
+ *
+ * Der teure Teil ist das Nachziehen der Nachfahren. Prisma kann in updateMany
+ * nicht auf dem alten Spaltenwert rechnen, deshalb ein einzelnes SQL: den alten
+ * Praefix abschneiden, den neuen davorsetzen. Eine Anweisung fuer den ganzen Ast.
+ */
+async function verschieben(
+  userId: string,
+  neueLeaderId: string | null
+): Promise<void> {
+  const ich = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { path: true },
+  });
+  if (!ich) return;
 
   let leaderPath: string | null = null;
   if (neueLeaderId) {
@@ -99,11 +142,7 @@ export async function umhaengen(
       where: { id: neueLeaderId },
       select: { path: true },
     });
-    if (!leader) return "unbekannt";
-    // Jemanden unter seinen eigenen Nachfahren einzuhaengen wuerde den Ast vom
-    // Baum abtrennen und einen Kreis erzeugen, aus dem keine Abfrage mehr
-    // herausfindet.
-    if (liegtImAst(leader.path, ich.path)) return "eigener_ast";
+    if (!leader) return;
     leaderPath = leader.path;
   }
 
@@ -114,7 +153,7 @@ export async function umhaengen(
       where: { id: userId },
       data: { leaderId: neueLeaderId },
     });
-    return null;
+    return;
   }
 
   await prisma.$transaction([
@@ -136,5 +175,4 @@ export async function umhaengen(
       WHERE "path" LIKE ${`${alt}%`}
     `,
   ]);
-  return null;
 }

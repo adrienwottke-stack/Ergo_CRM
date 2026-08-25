@@ -19,8 +19,6 @@ const fehlertexte: Record<string, string> = {
   invalid: "Die Angabe konnte nicht gelesen werden.",
   sich_selbst_konto: "Das eigene Konto lässt sich hier nicht ändern.",
   sich_selbst: "Ein Berater kann nicht seine eigene Führungskraft sein.",
-  eigener_ast:
-    "Das würde einen Kreis erzeugen: die gewählte Führungskraft hängt selbst unter diesem Berater.",
   unbekannt: "Konto nicht gefunden.",
   platzhalter:
     "Das ist ein Platzhalter ohne Zugangsdaten – da gibt es kein Passwort zurückzusetzen. Wer hier hinein soll, bekommt eine Einladung.",
@@ -251,16 +249,16 @@ export default async function TeamPage({
             Einrückung zeigt die Ebene. Umhängen schreibt den ganzen Ast mit.
           </p>
           {/* Der haeufigste Griff, der nicht selbsterklaerend ist: jemanden
-              UEBER sich einhaengen. Die Reihenfolge ist Pflicht - anders herum
-              entstuende ein Kreis, und das Umhaengen wird abgewiesen. */}
+              UEBER sich einhaengen. Die Reihenfolge macht lib/struktur.ts
+              inzwischen selbst - hier steht nur noch, was dabei passiert. */}
           <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
             <span className="font-medium text-slate-800">
               Jemanden über dir einhängen
             </span>{" "}
-            (deine eigene Führungskraft): erst einladen, dann hier bei ihr{" "}
-            <span className="font-medium">„keine (Wurzel)“</span> setzen — und
-            erst danach dich selbst unter sie hängen. In dieser Reihenfolge,
-            sonst entsteht ein Kreis.
+            (deine eigene Führungskraft): in deiner Zeile auswählen und{" "}
+            <span className="font-medium">„Setzen“</span>. Hängt sie heute unter
+            dir, rückt sie mitsamt ihrem Ast zuerst an deine Stelle — du und
+            deine Leute hängen danach darunter.
           </p>
         </div>
         <table className="mt-4 w-full min-w-190 text-left text-sm">
@@ -278,12 +276,12 @@ export default async function TeamPage({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {users.map((user) => {
-              // Kandidaten: alle ausser dem Berater selbst und allem, was unter
-              // ihm haengt - sonst entstuende ein Kreis.
-              const kandidaten = users.filter(
-                (kandidat) =>
-                  kandidat.id !== user.id && !liegtImAst(kandidat.path, user.path)
-              );
+              // Kandidaten: alle ausser dem Berater selbst. Eigene Nachfahren
+              // stehen bewusst mit drin - das ist der Fall "jemanden ueber sich
+              // einhaengen", den lib/struktur.ts in zwei Zuegen aufloest. Blieben
+              // sie draussen, haette die Wurzel des Baumes ueberhaupt keine
+              // Auswahl: unter ihr haengen ja alle.
+              const kandidaten = users.filter((kandidat) => kandidat.id !== user.id);
               return (
                 <tr key={user.id} className="transition hover:bg-navy-50/40">
                   <td className={`${td} font-medium text-slate-900`}>
@@ -314,7 +312,13 @@ export default async function TeamPage({
                       >
                         <option value="">— keine (Wurzel)</option>
                         {kandidaten.map((kandidat) => (
-                          <option key={kandidat.id} value={kandidat.id}>{kandidat.name}</option>
+                          <option key={kandidat.id} value={kandidat.id}>
+                            {kandidat.name}
+                            {/* Wer heute darunter haengt, rueckt beim Setzen
+                                erst hoch. Das gehoert vor die Wahl, nicht
+                                danach in eine Meldung. */}
+                            {liegtImAst(kandidat.path, user.path) ? " (rückt dafür über ihn)" : ""}
+                          </option>
                         ))}
                       </select>
                       <button
