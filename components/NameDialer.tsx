@@ -235,7 +235,7 @@ export default function NameDialer({
           onClick={() => {
             calledRef.current = true;
           }}
-          className="flex min-h-16 items-center justify-center gap-3 rounded-xl bg-emerald-600 text-xl font-semibold tracking-tight tabular-nums text-white transition hover:bg-emerald-700 active:scale-[0.99]"
+          className="flex min-h-16 items-center justify-center gap-3 rounded-xl bg-fest-erfolg text-xl font-semibold tracking-tight tabular-nums text-white transition hover:bg-fest-erfolg-stark active:scale-[0.99]"
         >
           <PhoneIcon className="h-6 w-6" />
           {current.phone}
@@ -325,7 +325,7 @@ export default function NameDialer({
             type="button"
             disabled={pending}
             onClick={() => setDialog("appointment")}
-            className={`${bigButton} bg-emerald-600 text-white hover:bg-emerald-700`}
+            className={`${bigButton} bg-fest-erfolg text-white hover:bg-fest-erfolg-stark`}
           >
             <CalendarCheckIcon className="h-5 w-5" /> Termin
           </button>

@@ -29,7 +29,7 @@ function LoeschKnopf() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-5 text-sm font-medium text-white transition hover:bg-red-700 active:scale-[0.99] disabled:opacity-60"
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-fest-gefahr px-5 text-sm font-medium text-white transition hover:bg-fest-gefahr-stark active:scale-[0.99] disabled:opacity-60"
     >
       {pending ? "Löscht …" : "Endgültig löschen"}
     </button>

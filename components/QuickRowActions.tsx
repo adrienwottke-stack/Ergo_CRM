@@ -47,7 +47,7 @@ const knopf =
 const stil = {
   call: `${knopf} bg-emerald-50 text-emerald-700 hover:bg-emerald-100`,
   primaer: `${knopf} bg-akzent text-white hover:bg-akzent-stark`,
-  erfolg: `${knopf} bg-emerald-600 text-white hover:bg-emerald-700`,
+  erfolg: `${knopf} bg-fest-erfolg text-white hover:bg-fest-erfolg-stark`,
   neutral: `${knopf} border border-slate-300 bg-surface text-slate-700 hover:bg-slate-50`,
   weich: `${knopf} bg-slate-100 text-slate-600 hover:bg-slate-200`,
   warm: `${knopf} bg-amber-100 text-amber-900 hover:bg-amber-200`,

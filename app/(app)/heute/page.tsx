@@ -327,7 +327,7 @@ export default async function HeutePage() {
             </p>
             <Link
               href="/namen/sammeln"
-              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-amber-900 px-4 text-sm font-semibold text-white transition hover:bg-amber-950"
+              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-fest-warnung px-4 text-sm font-semibold text-white transition hover:bg-fest-warnung-stark"
             >
               <SparkIcon className="h-4 w-4" />
               Namen sammeln

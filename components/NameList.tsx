@@ -153,7 +153,7 @@ export default function NameList({
           </p>
           <Link
             href={`/namen/sammeln?liste=${kind}`}
-            className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-amber-900 px-4 text-sm font-semibold text-white transition hover:bg-amber-950"
+            className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-fest-warnung px-4 text-sm font-semibold text-white transition hover:bg-fest-warnung-stark"
           >
             <SparkIcon className="h-4 w-4" />
             Namen sammeln
@@ -247,7 +247,7 @@ export default function NameList({
           {callable > 0 ? (
             <Link
               href={`/namen/anrufen?liste=${kind}`}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-base font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.99]"
+              className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-fest-erfolg text-base font-semibold text-white transition hover:bg-fest-erfolg-stark active:scale-[0.99]"
             >
               <PhoneIcon className="h-5 w-5" />
               Durchlauf starten · {callable} {callable === 1 ? "Name" : "Namen"}

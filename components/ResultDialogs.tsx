@@ -168,7 +168,7 @@ export function AppointmentHeldDialog({
     );
 
   const ergebnisse = [
-    { wert: "abschluss", text: "Abschluss", stil: "bg-emerald-600 text-white hover:bg-emerald-700" },
+    { wert: "abschluss", text: "Abschluss", stil: "bg-fest-erfolg text-white hover:bg-fest-erfolg-stark" },
     { wert: "offen", text: "Noch offen", stil: "bg-akzent text-white hover:bg-akzent-stark" },
     {
       wert: "kein_abschluss",

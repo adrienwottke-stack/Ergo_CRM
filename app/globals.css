@@ -75,6 +75,23 @@
   /* Akzent: Hauptknopf und alles, was fuehrt */
   --color-akzent: #12233c;
   --color-akzent-stark: #0a1628;
+
+  /* ---- Gefuellte Ton-Knoepfe ----
+     "Anrufen" (gruen), "Loeschen" (rot), "Namen sammeln" (gelb).
+
+     Warum eigene Tokens und nicht einfach bg-emerald-600: diese Flaechen
+     tragen weisse Schrift. Die Rampe kippt im Dunkelmodus ins Helle, damit
+     aus emerald-600 ein helles Mintgruen wird - und weiss darauf ist nicht
+     mehr lesbar. Diese Werte bleiben in beiden Ansichten dunkel genug fuer
+     weisse Schrift (gemessen: 5,3 bis 6,0 zu 1).
+     Die Variante "-stark" ist der Zustand unter dem Zeiger: hell wird sie
+     dunkler, dunkel wird sie heller - in beiden Faellen also deutlicher. */
+  --color-fest-erfolg: #059669;
+  --color-fest-erfolg-stark: #047857;
+  --color-fest-gefahr: #dc2626;
+  --color-fest-gefahr-stark: #b91c1c;
+  --color-fest-warnung: #78350f;
+  --color-fest-warnung-stark: #451a03;
 }
 
 /* ---- Tiefe ----
@@ -204,6 +221,15 @@
   /* Der Hauptknopf wird heller statt dunkler - sonst verschwindet er. */
   --color-akzent: #2f6bb0;
   --color-akzent-stark: #3d7cc4;
+
+  /* Gefuellte Ton-Knoepfe: satt und dunkel genug fuer weisse Schrift, aber
+     heller als die Karte dahinter - sonst verschwaende der Knopf im Grund. */
+  --color-fest-erfolg: #0e7a53;
+  --color-fest-erfolg-stark: #12915f;
+  --color-fest-gefahr: #b33636;
+  --color-fest-gefahr-stark: #c94444;
+  --color-fest-warnung: #8a5a12;
+  --color-fest-warnung-stark: #a06c18;
 
   /* Im Dunkeln traegt ein blauer Schatten nicht mehr, hier zaehlt Schwarz. */
   --schatten-karte: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.24);
