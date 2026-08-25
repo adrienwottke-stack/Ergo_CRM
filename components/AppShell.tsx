@@ -1,5 +1,4 @@
 import { logout } from "@/app/login/actions";
-import { prisma } from "@/lib/prisma";
 import { Wordmark } from "@/components/Logo";
 import NavLinks, { type NavLink } from "@/components/NavLinks";
 import UndoBar from "@/components/UndoBar";
@@ -22,19 +21,19 @@ import type { User } from "@/lib/generated/prisma/client";
 // Wettbewerbs zusammengehoert (Arena, Rangliste, eigene Aktivitaeten), verlinkt
 // sich auf den Seiten selbst - eine Ebene tiefer, wo es hingehoert.
 
-export async function navigationFuer(user: User): Promise<NavLink[]> {
-  // "Mannschaft" taucht nur auf, wenn wirklich jemand unter dir haengt:
-  // Fuehrungskraft ist eine Position im Baum, keine Rolle, die man vergibt.
-  const gefuehrte = await prisma.user.count({
-    where: { leaderId: user.id, deactivatedAt: null },
-  });
-
+export function navigationFuer(user: User): NavLink[] {
   return [
     { href: "/namen", label: "Namen" },
     { href: "/heute", label: "Heute" },
     { href: "/kalender", label: "Kalender" },
     { href: "/trichter", label: "Trichter" },
-    ...(gefuehrte > 0 ? [{ href: "/mannschaft", label: "Mannschaft" }] : []),
+    // "Mannschaft" steht bei jedem, auch bei dem, der noch niemanden fuehrt.
+    // Vorher hing der Punkt daran, ob schon jemand unter einem haengt - damit
+    // blieb der Weg genau dem verborgen, der ihn zuerst braucht: Wer seine
+    // Struktur eintragen will, fand die Seite dafuer erst, wenn die Struktur
+    // schon stand. Die Seite faengt den leeren Fall selbst ab und zeigt dann
+    // das Aufnehmen statt einer leeren Liste.
+    { href: "/mannschaft", label: "Mannschaft" },
     // "Einladen" kann jeder: Werben ist der Kern des Berufs, nicht die Kuer.
     { href: "/einladen", label: "Einladen" },
     // Ein Punkt fuer den ganzen Wettbewerb. Rangliste und eigene Aktivitaeten
@@ -53,7 +52,7 @@ export default async function AppShell({
   user: User;
   children: React.ReactNode;
 }) {
-  const links = await navigationFuer(user);
+  const links = navigationFuer(user);
 
   return (
     <div className="flex min-h-dvh flex-col">
