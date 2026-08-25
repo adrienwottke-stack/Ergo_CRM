@@ -5,8 +5,10 @@ import type { QuotaType } from "@/lib/generated/prisma/enums";
 import { manualQuotaTypes, quotaTypeLabels } from "@/lib/labels";
 import { berlinDayOf, berlinToday, dayDisplayFormat, dayToUtcDate } from "@/lib/dates";
 import { streakDays } from "@/lib/stats";
+import { offeneMeilensteine } from "@/lib/meilensteine";
 import QuickCounter from "@/components/QuickCounter";
 import WettbewerbNav from "@/components/WettbewerbNav";
+import MeilensteinMelden from "@/components/MeilensteinMelden";
 import { CalendarCheckIcon, ChevronRightIcon, FlameIcon, HashIcon, PhoneIcon } from "@/components/icons";
 import { btnPrimary, card, input, label, pageTitle, sectionTitle, columnNarrow } from "@/components/ui";
 import { deleteLog, logDaily } from "./actions";
@@ -34,7 +36,7 @@ export default async function LogPage() {
   const today = berlinToday();
   const todayDate = dayToUtcDate(today);
 
-  const [todaySums, recentLogs, loggedDates] = await Promise.all([
+  const [todaySums, recentLogs, loggedDates, gemeldet] = await Promise.all([
     prisma.dailyLog.groupBy({
       by: ["type"],
       where: { personId: person.id, date: todayDate },
@@ -50,10 +52,20 @@ export default async function LogPage() {
       select: { date: true },
       distinct: ["date"],
     }),
+    // Was heute schon gemeldet ist. Eine Abfrage im selben Promise.all -
+    // damit steht der Knopf ohne zweiten Gang zum Server da.
+    prisma.feedEintrag.findMany({
+      where: { personId: person.id, tag: todayDate },
+      select: { schluessel: true },
+    }),
   ]);
 
   const todayByType = new Map(
     todaySums.map((entry) => [entry.type, entry._sum.count ?? 0])
+  );
+  const offen = offeneMeilensteine(
+    todayByType,
+    new Set(gemeldet.map((eintrag) => eintrag.schluessel))
   );
   const streak = streakDays(
     new Set(loggedDates.map((entry) => berlinDayOf(entry.date))),
@@ -85,6 +97,17 @@ export default async function LogPage() {
           <QuickCounter key={type} type={type} label={quotaTypeLabels[type]} count={todayByType.get(type) ?? 0} action={quickLog} />
         ))}
       </div>
+
+      {/* Steht nur da, wenn wirklich etwas erreicht ist - nie als leerer
+          Platzhalter. Die Arbeitsflaeche bleibt, was sie ist: drei Zaehler
+          und Ruhe. */}
+      {offen.map((meilenstein) => (
+        <MeilensteinMelden
+          key={meilenstein.schluessel}
+          schluessel={meilenstein.schluessel}
+          text={meilenstein.text}
+        />
+      ))}
 
       <form action={logDaily} className={`${card} space-y-5 p-6 sm:p-8`}>
         <h2 className={sectionTitle}>Zusätzlich manuell loggen</h2>

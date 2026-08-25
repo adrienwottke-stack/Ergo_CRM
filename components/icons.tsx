@@ -181,6 +181,16 @@ export function ArrowLeftIcon({ className }: { className?: string }) {
   );
 }
 
+export function MegafonIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className} aria-hidden>
+      <path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1Z" strokeLinejoin="round" />
+      <path d="M14 8.5a4 4 0 0 1 0 7" strokeLinecap="round" />
+      <path d="M17 5.5a8 8 0 0 1 0 13" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function PhoneOffIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>

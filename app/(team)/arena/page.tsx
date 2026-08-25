@@ -16,12 +16,14 @@ import {
 import { abstandInHandlungen, eigenerHinweis, punkteText } from "@/lib/kommentator";
 import { merkeNutzung, schalter } from "@/lib/features";
 import { merkeAnwesenheit } from "@/lib/anwesenheit";
+import { ladeFeed } from "@/lib/feed";
 import { stufeVon } from "@/lib/stufen";
 import ArenaTakt from "@/components/ArenaTakt";
 import WettbewerbNav from "@/components/WettbewerbNav";
 import SprintUhr from "@/components/SprintUhr";
 import NachrichtSenden from "@/components/NachrichtSenden";
 import Postfach from "@/components/Postfach";
+import Feed from "@/components/Feed";
 import { FlameIcon, TrophyIcon } from "@/components/icons";
 import { btnPrimary, btnSecondary, card, kicker, pageTitle, sectionTitle } from "@/components/ui";
 import { sprintStarten } from "./actions";
@@ -63,8 +65,16 @@ export default async function ArenaPage() {
     "feed"
   );
 
-  const [zeilen, puls, bestmarke, sprint, nachrichten, konten, gesamtpunkte] =
-    await Promise.all([
+  const [
+    zeilen,
+    puls,
+    bestmarke,
+    sprint,
+    nachrichten,
+    konten,
+    gesamtpunkte,
+    feed,
+  ] = await Promise.all([
     ladeRangliste(wochenStart),
     ladePuls(),
     ladeBestmarke(person.id),
@@ -95,6 +105,7 @@ export default async function ArenaPage() {
     }),
     // Punkte ueber die gesamte Zeit - Grundlage der Stufe.
     ladeGesamtpunkte(person.id),
+    ladeFeed(person.id),
   ]);
 
   const stufe = stufeVon(gesamtpunkte);
@@ -114,6 +125,7 @@ export default async function ArenaPage() {
   if (an.zweikampf) gesehen.push(merkeNutzung("zweikampf", person.id));
   if (an.bestmarke) gesehen.push(merkeNutzung("bestmarke", person.id));
   if (an.stufen) gesehen.push(merkeNutzung("stufen", person.id));
+  if (an.feed && feed.length > 0) gesehen.push(merkeNutzung("feed", person.id));
   await Promise.all(gesehen);
 
   // --- eigene Lage ---------------------------------------------------------
@@ -197,6 +209,9 @@ export default async function ArenaPage() {
           ungelesen={ungelesen}
         />
       )}
+
+      {/* --- Was heute geschafft wurde ------------------------------------- */}
+      {an.feed && <Feed zeilen={feed} meinePersonId={person.id} />}
 
       {/* --- Sprint: das Ereignis, das ab zwei Koepfen funktioniert --------- */}
       {an.sprint && (
