@@ -332,6 +332,17 @@ model Invite {
   fuerId String? @unique
   fuer   User?   @relation("Platzhalter", fields: [fuerId], references: [id], onDelete: Cascade)
 
+  // Der Platzhalter ist MIT dieser Einladung entstanden ("Person aufnehmen"
+  // mit gesetztem Haken). Dann ist die Einladung der einzige Grund, aus dem
+  // der Knoten ueberhaupt im Baum steht - und Zuruecknehmen nimmt ihn mit.
+  // Ohne das bleibt nach jeder zurueckgenommenen Einladung ein Kasten "noch
+  // nicht eingeladen" im Organigramm stehen, den niemand mehr wegbekommt.
+  //
+  // Wer die Struktur zuerst eintraegt und Tage spaeter einlaedt, faellt
+  // ausdruecklich NICHT darunter: dort ist der Knoten aelter als jede
+  // Einladung und bleibt beim Zuruecknehmen stehen.
+  platzhalterAngelegt Boolean @default(false)
+
   // Notausgang aus der Installations-Schleuse: normalerweise erscheint das
   // Anmeldeformular erst, wenn die Seite vom Startbildschirm laeuft. Laesst
   // sich ein Geraet partout nicht dazu bewegen, gibt der Einladende diese eine

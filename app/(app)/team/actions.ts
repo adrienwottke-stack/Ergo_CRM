@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { umhaengen } from "@/lib/struktur";
 import { ablaufDatum, neuerCode } from "@/lib/einladung";
+import { einladungZurueck } from "@/lib/einladung-ruecknahme";
 import { neuerResetCode, resetAblauf } from "@/lib/passwort";
 
 function value(formData: FormData, key: string) {
@@ -37,13 +38,18 @@ export async function einladungErzeugen(formData: FormData) {
 
 // Nur noch nicht eingeloeste Einladungen lassen sich zuruecknehmen - eine
 // verbrauchte zu loeschen wuerde die Herkunft des Kontos verwischen.
+//
+// Ein Platzhalter, der mit dieser Einladung entstanden ist, geht mit: siehe
+// lib/einladung-ruecknahme.ts.
 export async function einladungZuruecknehmen(formData: FormData) {
   await requireAdmin();
   const inviteId = value(formData, "inviteId");
   if (inviteId) {
-    await prisma.invite.deleteMany({ where: { id: inviteId, usedCount: 0 } });
+    await einladungZurueck(inviteId);
   }
   revalidatePath("/team");
+  revalidatePath("/einladen");
+  revalidatePath("/mannschaft");
   redirect("/team?revoked=1");
 }
 

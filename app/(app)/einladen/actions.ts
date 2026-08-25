@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { ablaufDatum, neuerCode } from "@/lib/einladung";
+import { einladungZurueck } from "@/lib/einladung-ruecknahme";
 
 // Einladen kann JEDER, nicht nur der Admin: im Strukturvertrieb ist Werben
 // der Kern des Berufs, und wer einlaedt, wird damit Fuehrungskraft. Der Neue
@@ -55,14 +56,18 @@ export async function einladungFuerMich(formData: FormData): Promise<NeueEinladu
 }
 
 // Nur eigene, noch unbenutzte Einladungen lassen sich zuruecknehmen.
+//
+// Zurueckgenommen wird dabei auch der Platz in der Struktur, wenn der
+// Platzhalter mit genau dieser Einladung entstanden ist - sonst bliebe im
+// Organigramm ein Kasten "noch nicht eingeladen" stehen. Die Bedingungen
+// stehen in lib/einladung-ruecknahme.ts.
 export async function eigeneEinladungZuruecknehmen(formData: FormData) {
   const user = await requireUser();
   const inviteId = text(formData, "inviteId");
   if (inviteId) {
-    await prisma.invite.deleteMany({
-      where: { id: inviteId, leaderId: user.id, usedCount: 0 },
-    });
+    await einladungZurueck(inviteId, user.id);
   }
   revalidatePath("/einladen");
   revalidatePath("/team");
+  revalidatePath("/mannschaft");
 }

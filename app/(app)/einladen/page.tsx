@@ -29,6 +29,8 @@ export default async function EinladenPage() {
         maxUses: true,
         usedCount: true,
         expiresAt: true,
+        platzhalterAngelegt: true,
+        fuerId: true,
         usedBy: { select: { name: true } },
       },
     }),
@@ -83,6 +85,15 @@ export default async function EinladenPage() {
                       {invite.greeting && (
                         <p className="mt-1 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs italic text-slate-600">
                           „{invite.greeting}“
+                        </p>
+                      )}
+                      {/* Die Person steht schon im Organigramm. Dass sie beim
+                          Zuruecknehmen mit verschwindet, gehoert vor den Klick
+                          und nicht danach. */}
+                      {invite.fuerId && invite.platzhalterAngelegt && (
+                        <p className="mt-1 text-xs text-slate-400">
+                          Steht in deiner Struktur — Zurücknehmen entfernt den
+                          Platz wieder.
                         </p>
                       )}
                     </div>

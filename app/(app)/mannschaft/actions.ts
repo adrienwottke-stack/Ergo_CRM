@@ -197,6 +197,10 @@ export async function personAufnehmen(formData: FormData) {
 
     // Die Einladung zeigt auf den Knoten: beim Einloesen entsteht KEIN
     // zweites Konto, sondern dieser hier bekommt Zugangsdaten.
+    //
+    // platzhalterAngelegt haelt fest, dass der Knoten mit dieser Einladung
+    // entstanden ist. Nur so kann "Zurücknehmen" spaeter beides zuruecknehmen
+    // statt einen Kasten "noch nicht eingeladen" stehen zu lassen.
     const code = neuerCode();
     await tx.invite.create({
       data: {
@@ -204,6 +208,7 @@ export async function personAufnehmen(formData: FormData) {
         leaderId: user.id,
         fuerId: neu.id,
         note: name,
+        platzhalterAngelegt: true,
         expiresAt: ablaufDatum(),
       },
     });
@@ -232,7 +237,7 @@ export async function einladungFuerPlatzhalter(formData: FormData) {
 
   const ziel = await prisma.user.findUnique({
     where: { id: fuerId },
-    select: { name: true, passwordHash: true },
+    select: { name: true, passwordHash: true, platzhalterEinladung: { select: { platzhalterAngelegt: true } } },
   });
   if (!ziel) return { fehler: "Person nicht gefunden." };
   // Wer schon ein Konto hat, braucht keine Einladung mehr - und bekommt ueber
@@ -241,13 +246,24 @@ export async function einladungFuerPlatzhalter(formData: FormData) {
   if (ziel.passwordHash) return { fehler: `${ziel.name} ist längst dabei.` };
 
   const code = neuerCode();
+  // Ein neuer Link aendert nichts daran, WIE der Knoten entstanden ist: war er
+  // von Anfang an nur der Traeger einer Einladung, bleibt er das auch nach dem
+  // dritten Link - und faellt beim Zuruecknehmen mit.
+  const angelegt = ziel.platzhalterEinladung?.platzhalterAngelegt ?? false;
   // Die alte Einladung weicht: ein Platzhalter hat hoechstens eine offene
   // (eindeutiger Index auf Invite.fuerId). Zwei Codes auf denselben Knoten
   // waeren zwei Wege in dasselbe Konto.
   await prisma.$transaction([
     prisma.invite.deleteMany({ where: { fuerId } }),
     prisma.invite.create({
-      data: { code, leaderId: user.id, fuerId, note: ziel.name, expiresAt: ablaufDatum() },
+      data: {
+        code,
+        leaderId: user.id,
+        fuerId,
+        note: ziel.name,
+        platzhalterAngelegt: angelegt,
+        expiresAt: ablaufDatum(),
+      },
     }),
   ]);
 
