@@ -19,7 +19,8 @@ import {
 } from "@/lib/namelist";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
 import { CheckIcon, PhoneIcon, PlusIcon, SparkIcon, XIcon } from "@/components/icons";
-import { card, input } from "@/components/ui";
+import { card, chip, input } from "@/components/ui";
+import { liegtLabel } from "@/lib/liegenbleiber";
 
 export type NameEntry = {
   id: string;
@@ -30,6 +31,8 @@ export type NameEntry = {
   section: "offen" | "geschafft" | "raus";
   lostLabel: string | null;
   appointmentLabel: string | null;
+  /** Tage ohne Fortschritt, sobald die Schwelle gerissen ist - sonst null. */
+  liegtTage: number | null;
 };
 
 // Optimistische Aenderungen: 20 Namen hintereinander eintippen darf nicht auf
@@ -51,6 +54,8 @@ function applyPatch(entries: NameEntry[], patch: Patch): NameEntry[] {
         section: "offen",
         lostLabel: null,
         appointmentLabel: null,
+        // Gerade eingetippt - der liegt noch nicht.
+        liegtTage: null,
       },
     ];
   }
@@ -82,6 +87,7 @@ export default function NameList({
   const total = optimistic.length;
   const percent = targetPercent(total);
   const callable = open.filter((entry) => entry.phone).length;
+  const liegen = open.filter((entry) => entry.liegtTage !== null).length;
   // Ueber die ganze offene Liste, nicht nur die gefilterte Sicht: der Nachtrag
   // arbeitet ohnehin alle ab.
   const ohneNummer = open.filter((entry) => !entry.phone).length;
@@ -273,6 +279,20 @@ export default function NameList({
             </Link>
           )}
 
+          {/* Zaehlt, was die Plaketten unten einzeln zeigen. Ohne diese Zeile
+              muesste man zwanzig Namen absuchen, um zu merken, dass sechs
+              davon liegen. */}
+          {liegen > 0 && (
+            <p className="text-sm font-semibold text-red-700">
+              {liegen === 1
+                ? "Ein Name liegt seit Tagen."
+                : `${liegen} Namen liegen seit Tagen.`}{" "}
+              <span className="font-normal text-slate-500">
+                Anrufen oder von der Liste nehmen.
+              </span>
+            </p>
+          )}
+
           <ul className="space-y-2">
             {open.map((entry) => (
               <NameRow
@@ -432,9 +452,19 @@ function NameRow({
       </button>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-900">
-          {entry.name}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-semibold text-slate-900">
+            {entry.name}
+          </p>
+          {/* Die Plakette statt einer Umsortierung: die Liste bleibt in
+              Eingabe-Reihenfolge, damit beim Einstufen keine Zeile unter dem
+              Finger wegspringt. */}
+          {entry.liegtTage !== null && (
+            <span className={`${chip("gefahr")} shrink-0`}>
+              {liegtLabel(entry.liegtTage)}
+            </span>
+          )}
+        </div>
         {editingPhone ? (
           <input
             type="tel"

@@ -32,6 +32,7 @@ import {
   isLostReason,
   lostReasonLabels,
 } from "@/lib/pipeline";
+import { liegtFilter, tageLiegt } from "@/lib/liegenbleiber";
 import type { NextStepType, TeamVisibility } from "@/lib/generated/prisma/enums";
 
 const TAG_MS = 24 * 60 * 60 * 1000;
@@ -444,7 +445,6 @@ export type Aufriss = {
 export async function aufriss(beraterIds: string[]): Promise<Aufriss> {
   if (beraterIds.length === 0) return { termine: [], liegt: [] };
   const jetzt = new Date();
-  const liegtAb = new Date(jetzt.getTime() - LIEGT_AB_TAGEN * TAG_MS);
 
   const [termine, liegen] = await Promise.all([
     prisma.contact.findMany({
@@ -458,16 +458,23 @@ export async function aufriss(beraterIds: string[]): Promise<Aufriss> {
       take: 20,
       select: { id: true, name: true, ownerId: true, stage: true, appointmentAt: true },
     }),
+    // Derselbe Filter, den der Berater auf /heute sieht - nur mit der
+    // groesseren Schwelle. Vorher stand hier `nextStepType: { not: null }`,
+    // und damit fehlte der Fuehrungskraft ausgerechnet der Fall, um den es
+    // geht: der gezogene Name, den nie jemand angefasst hat. Der hat keinen
+    // naechsten Schritt - deshalb war er unsichtbar.
     prisma.contact.findMany({
-      where: {
-        ownerId: { in: beraterIds },
-        outcome: "OFFEN",
-        nextStepType: { not: null },
-        nextStepAt: { lt: liegtAb },
-      },
-      orderBy: { nextStepAt: "asc" },
+      where: { ownerId: { in: beraterIds }, ...liegtFilter(LIEGT_AB_TAGEN) },
+      orderBy: { lastProgressAt: "asc" },
       take: 20,
-      select: { id: true, name: true, ownerId: true, stage: true, nextStepAt: true },
+      select: {
+        id: true,
+        name: true,
+        ownerId: true,
+        stage: true,
+        nextStepAt: true,
+        lastProgressAt: true,
+      },
     }),
   ]);
 
@@ -485,10 +492,10 @@ export async function aufriss(beraterIds: string[]): Promise<Aufriss> {
       beraterId: kontakt.ownerId!,
       name: nurVorname(kontakt.name),
       phase: contactStageLabels[kontakt.stage],
-      wann: kontakt.nextStepAt,
-      tageOffen: kontakt.nextStepAt
-        ? Math.floor((jetzt.getTime() - kontakt.nextStepAt.getTime()) / TAG_MS)
-        : null,
+      // Der Anker, nicht nextStepAt: ein Name ohne Schritt hat gar keinen,
+      // und bei einem mit altem Schritt zaehlt der spaetere von beiden.
+      wann: kontakt.nextStepAt ?? kontakt.lastProgressAt,
+      tageOffen: tageLiegt(kontakt, jetzt),
     })),
   };
 }

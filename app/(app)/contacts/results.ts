@@ -18,6 +18,7 @@ import { addDays, berlinToday, dayToUtcDate } from "@/lib/dates";
 import { isLostReason } from "@/lib/pipeline";
 import { empfehlungenAnlegen, empfehlungenAusFormular } from "@/lib/empfehlungen";
 import { meldeNebenbei } from "@/lib/push";
+import { fortschrittJetzt } from "@/lib/liegenbleiber";
 import { createActivity, quickLogCall } from "@/app/(app)/contacts/actions";
 import { markContactLost, setContactStage } from "@/app/(app)/pipeline/actions";
 
@@ -295,6 +296,10 @@ export async function snoozeStepQuick(formData: FormData) {
       data: {
         nextStepAt: addDays(dayToUtcDate(berlinToday()), days),
         nextStepType: contact.nextStepType ?? "ANRUF",
+        // Wer verschiebt, hat sich gekuemmert - der Liegenbleiber-Alarm
+        // schweigt bis zur neuen Frist. Ohne das waere "auf morgen legen"
+        // ein Knopf, der die Meldung NICHT wegbekommt.
+        ...fortschrittJetzt(),
       },
     });
   });

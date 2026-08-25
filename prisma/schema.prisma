@@ -170,6 +170,13 @@ model Contact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Letzter echter Fortschritt an diesem Menschen: Anlage, Vermerk,
+  // Phasenwechsel, bewusstes Vertagen. Ausdruecklich NICHT updatedAt - eine
+  // nachgetragene Nummer oder eine umgehaengte Liste bumpt updatedAt, ohne
+  // dass der Mensch etwas gehoert hat. Genau daran wuerde der Liegenbleiber-
+  // Alarm verstummen (siehe lib/liegenbleiber.ts).
+  lastProgressAt DateTime @default(now())
+
   ownerId String?
   owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
@@ -182,6 +189,7 @@ model Contact {
 
   @@index([ownerId, updatedAt])
   @@index([ownerId, nextStepAt])
+  @@index([ownerId, lastProgressAt])
   @@index([ownerId, stage, outcome])
   @@index([ownerId, rating])
   @@index([referredById])

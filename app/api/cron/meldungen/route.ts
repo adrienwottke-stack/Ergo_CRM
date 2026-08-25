@@ -4,6 +4,12 @@ import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { SCHWELLEN } from "@/lib/signale";
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
 import { pushEingerichtet, sendeMeldung } from "@/lib/push";
+import {
+  liegtFilter,
+  liegtLabel,
+  liegtSelect,
+  tageLiegt,
+} from "@/lib/liegenbleiber";
 import { ABGESCHLOSSENE_STAENDE, AUDIO_AUFBEWAHRUNG_TAGE } from "@/lib/rueckmeldung";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +78,8 @@ export async function GET(request: NextRequest) {
   const heuteStart = dayToUtcDate(heute);
   const stilleGrenze = new Date(Date.now() - SCHWELLEN.stilleTage * TAG_MS);
 
-  const [konten, faellig, offeneNamen, aktivHeute, termineHeute] = await Promise.all([
+  const [konten, faellig, offeneNamen, aktivHeute, termineHeute, liegende] =
+    await Promise.all([
     prisma.user.findMany({
       // Platzhalter fallen hier gar nicht erst herein: sie haben kein
       // Push-Abo, koennen also nichts empfangen, und sie sollen auch nicht
@@ -130,6 +137,15 @@ export async function GET(request: NextRequest) {
       orderBy: { appointmentAt: "asc" },
       select: { ownerId: true, name: true, appointmentAt: true },
     }),
+    // Die liegen gebliebenen Namen. Bis hierhin war das der blinde Fleck des
+    // ganzen Laufs: ein selbst gezogener Name bekommt keine Frist, zaehlte
+    // also nicht in `faellig` - und eine VOLLE Namensliste liess die Meldung
+    // unten sogar ganz ausfallen. Zwanzig unberuehrte Namen galten als
+    // "alles gut".
+    prisma.contact.findMany({
+      where: liegtFilter(),
+      select: { ...liegtSelect, ownerId: true },
+    }),
   ]);
 
   const personen = await prisma.person.findMany({
@@ -173,6 +189,18 @@ export async function GET(request: NextRequest) {
     termineJe.set(termin.ownerId, liste);
   }
 
+  // Liegenbleiber je Konto, der aelteste zuerst. Sortiert wird ueber den
+  // Anker und nicht ueber lastProgressAt allein - sonst stuende ein Kontakt
+  // mit alter Wiedervorlage vor einem, der laenger wirklich nichts gehoert hat.
+  const liegtJe = new Map<string, { name: string; tage: number }[]>();
+  for (const kontakt of liegende) {
+    if (!kontakt.ownerId) continue;
+    const liste = liegtJe.get(kontakt.ownerId) ?? [];
+    liste.push({ name: kontakt.name, tage: tageLiegt(kontakt) });
+    liegtJe.set(kontakt.ownerId, liste);
+  }
+  for (const liste of liegtJe.values()) liste.sort((a, b) => b.tage - a.tage);
+
   const uhrzeit = new Intl.DateTimeFormat("de-DE", {
     hour: "2-digit",
     minute: "2-digit",
@@ -181,15 +209,21 @@ export async function GET(request: NextRequest) {
 
   // --- 1. An den Berater: was heute wartet ---------------------------------
   const anBerater: string[] = [];
+  let anLiegen = 0;
   for (const konto of konten) {
     const termine = termineJe.get(konto.id) ?? [];
     const anzahl = faelligJe.get(konto.id) ?? 0;
     const namen = namenJe.get(konto.id) ?? 0;
+    const liegen = liegtJe.get(konto.id) ?? [];
 
     // Ein Termin ist eine feste Verabredung mit einem Menschen. Die Erinnerung
     // geht deshalb auch an den, der heute schon fleissig war - anders als das
     // Tagespensum, das sich mit der Arbeit selbst erledigt.
-    if (termine.length === 0) {
+    //
+    // Ein Liegenbleiber piekst genauso durch wie ein Termin: er ist der
+    // Grund, aus dem dieser Lauf ueberhaupt etwas taugt. Ohne die zweite
+    // Bedingung schwiege der Cron ausgerechnet bei voller Namensliste.
+    if (termine.length === 0 && liegen.length === 0) {
       if (heuteAktiv.has(konto.id)) continue;
       if (anzahl === 0 && namen >= NACHFUELL_SCHWELLE) continue;
     }
@@ -211,6 +245,24 @@ export async function GET(request: NextRequest) {
         url: "/kalender",
         kennung: "tagespensum",
       };
+    } else if (liegen.length > 0) {
+      // Ein Name schlaegt eine Zahl. "3 Schritte heute" liest sich an Tag 1
+      // wie an Tag 21; "Marco liegt seit 6 Tagen" nicht.
+      const aeltester = liegen[0]!;
+      const weitere = liegen.length - 1;
+      meldung = {
+        titel:
+          weitere === 0
+            ? `${aeltester.name} ${liegtLabel(aeltester.tage)}`
+            : `${aeltester.name} und ${weitere} weitere liegen`,
+        text:
+          weitere === 0
+            ? "Seit dem letzten Schritt nichts passiert. Anrufen oder von der Liste nehmen."
+            : `Der älteste ${liegtLabel(aeltester.tage)}. Der Reihe nach von oben.`,
+        url: "/heute",
+        kennung: "tagespensum",
+      };
+      anLiegen += 1;
     } else if (anzahl > 0) {
       meldung = {
         titel: `${anzahl} ${anzahl === 1 ? "Schritt" : "Schritte"} heute`,
@@ -320,6 +372,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     berater: anBerater.length,
+    liegenbleiber: anLiegen,
     fuehrung: anFuehrung,
     aufnahmenGeloescht,
   });

@@ -26,6 +26,7 @@ import {
   rueckmeldungAnEmpfehlungsgeber,
 } from "@/lib/empfehlungen";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { fortschrittJetzt } from "@/lib/liegenbleiber";
 
 // --- gemeinsame Bausteine ---------------------------------------------------
 
@@ -176,6 +177,8 @@ export async function setContactStage(formData: FormData) {
         ...(heldAppointmentPoint ? { appointmentHeldLoggedAt: new Date() } : {}),
         ...(wonPoint ? { wonLoggedAt: new Date() } : {}),
         ...stepData(step),
+        // Ein Phasenwechsel ist der deutlichste Fortschritt, den es gibt.
+        ...fortschrittJetzt(),
       },
     });
 
@@ -245,7 +248,7 @@ export async function completeContactStep(formData: FormData) {
     }
     await tx.contact.update({
       where: { id: contactId },
-      data: stepData(step),
+      data: { ...stepData(step), ...fortschrittJetzt() },
     });
   });
 
@@ -265,6 +268,10 @@ export async function snoozeContactStep(formData: FormData) {
     data: {
       nextStepAt: addDays(base, days),
       nextStepType: contact.nextStepType ?? "ANRUF",
+      // Bewusst vertagen IST eine Entscheidung, keine Versaeumnis. Ohne diese
+      // Zeile bliebe der Liegenbleiber-Alarm stehen, obwohl der Partner sich
+      // gerade gekuemmert hat - und genau daran schaltet man Meldungen ab.
+      ...fortschrittJetzt(),
     },
   });
 
@@ -306,6 +313,8 @@ export async function markContactLost(formData: FormData) {
         lostReason: reasonRaw,
         lostAt: new Date(),
         ...stepData(step),
+        // Raus ist auch eine Entscheidung.
+        ...fortschrittJetzt(),
       },
     });
     await recordStageEvent(tx, {
@@ -333,6 +342,8 @@ export async function reopenContact(formData: FormData) {
       lostReason: null,
       lostAt: null,
       ...stepData(step),
+      // Zurueckgeholt: die Uhr laeuft von hier an neu, nicht von damals.
+      ...fortschrittJetzt(),
     },
   });
 

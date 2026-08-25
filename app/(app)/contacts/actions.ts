@@ -14,6 +14,7 @@ import {
   berlinToday,
   dayToUtcDate,
 } from "@/lib/dates";
+import { fortschritt } from "@/lib/liegenbleiber";
 import type { ContactStage, NextStepType } from "@/lib/generated/prisma/enums";
 
 function optional(formData: FormData, field: string) {
@@ -214,6 +215,10 @@ export async function createActivity(formData: FormData) {
         },
       });
     }
+    // Ein Vermerk IST der Fortschritt. Mit dem Datum des Vermerks und nicht
+    // mit jetzt: ein nachgetragenes Gespraech von vorgestern hat vorgestern
+    // stattgefunden, und der Liegenbleiber-Alarm soll das auch so rechnen.
+    await fortschritt(tx, contactId, activityDate);
   });
 
   refreshContactViews(contactId);
@@ -260,7 +265,11 @@ export async function quickLogCall(formData: FormData) {
       nextStepAt?: Date | null;
       nextStepType?: NextStepType | null;
       nextStepNote?: string | null;
-    } = {};
+      lastProgressAt?: Date;
+      // Ein Anruf zaehlt immer als Fortschritt - auch wenn sonst nichts am
+      // Kontakt umspringt, weil er schon KONTAKTIERT war und keine
+      // Wiedervorlage gesetzt wurde. Deshalb ist das Objekt nie mehr leer.
+    } = { lastProgressAt: now };
     if (contact.stage === "NEU") {
       updateData.stage = "KONTAKTIERT";
       await tx.stageEvent.create({

@@ -10,6 +10,7 @@ import {
   sectionOf,
 } from "@/lib/namelist";
 import { DEFAULT_GUIDES, guideKeyForList } from "@/lib/guides";
+import { liegtSeit } from "@/lib/liegenbleiber";
 import { lostReasonLabels } from "@/lib/pipeline";
 import NameList, { type NameEntry } from "@/components/NameList";
 import GuidePanel from "@/components/GuidePanel";
@@ -49,6 +50,11 @@ export default async function NamenPage({
       outcome: true,
       lostReason: true,
       appointmentAt: true,
+      // Fuer die Liegenbleiber-Plakette. Bis hierhin lud diese Seite gar kein
+      // Datum - man sah zwanzig Namen und keinem davon an, dass die Haelfte
+      // seit Wochen nichts gehoert hat.
+      lastProgressAt: true,
+      nextStepAt: true,
     },
     orderBy: { createdAt: "asc" },
   });
@@ -64,6 +70,7 @@ export default async function NamenPage({
     listKinds: contact.listKinds,
     section: sectionOf(contact),
     lostLabel: contact.lostReason ? lostReasonLabels[contact.lostReason] : null,
+    liegtTage: liegtSeit(contact),
     appointmentLabel: contact.appointmentAt
       ? appointmentFormat.format(contact.appointmentAt)
       : null,

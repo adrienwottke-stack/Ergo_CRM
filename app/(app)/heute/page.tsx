@@ -14,6 +14,7 @@ import {
   type DueState,
 } from "@/lib/dates";
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
+import { liegtLabel, liegtSeit } from "@/lib/liegenbleiber";
 import { herkunftAusQuelle } from "@/lib/empfehlungen";
 import { faelligeAufgaben, fuehrungsSchritt, mannschaftsLage } from "@/lib/fuehrung";
 import FuehrungsAufgabe from "@/components/FuehrungsAufgabe";
@@ -25,7 +26,7 @@ import ErsteWoche from "@/components/ErsteWoche";
 import Meldungen from "@/components/Meldungen";
 import Postfach from "@/components/Postfach";
 import NummerHinterlegen from "@/components/NummerHinterlegen";
-import { card, flaeche } from "@/components/ui";
+import { card, chip, flaeche } from "@/components/ui";
 import SeitenKopf from "@/components/SeitenKopf";
 import LeerZustand from "@/components/LeerZustand";
 import ZahlHoch from "@/components/ZahlHoch";
@@ -96,7 +97,10 @@ export default async function HeutePage() {
         outcome: { not: "VERLOREN" },
         stage: { not: "ABSCHLUSS" },
       },
-      orderBy: { updatedAt: "asc" },
+      // Die aeltesten zuerst - und ab jetzt nach echtem Fortschritt sortiert,
+      // nicht nach updatedAt. Eine nachgetragene Nummer hat einen Namen
+      // bisher an das Ende der Liste geschoben, als waere etwas passiert.
+      orderBy: { lastProgressAt: "asc" },
     }),
     // Nachschub-Stand: was noch zu arbeiten ist, nicht was je gesammelt wurde.
     prisma.contact.count({
@@ -198,6 +202,19 @@ export default async function HeutePage() {
   const sonstigeHeute = jetzt.length - anrufeHeute - termineHeute;
   const openCount = jetzt.length;
   const nachfuellen = offeneNamen < NACHFUELL_SCHWELLE;
+
+  // Liegenbleiber ueber beide Listen: die mit Schritt (ueberfaellig und nie
+  // angefasst) und die ohne. Der Balken nennt den aeltesten und zaehlt den
+  // Rest - er wiederholt die Liste NICHT, die Plaketten unten tun das schon.
+  const liegen = [
+    ...rows.map((row) => ({ kontakt: row.data, tage: liegtSeit(row.data) })),
+    ...orphans.map((kontakt) => ({ kontakt, tage: liegtSeit(kontakt) })),
+  ]
+    .filter((eintrag): eintrag is { kontakt: typeof eintrag.kontakt; tage: number } =>
+      eintrag.tage !== null
+    )
+    .sort((a, b) => b.tage - a.tage);
+  const aeltester = liegen[0];
 
   return (
     <div className="space-y-6">
@@ -313,6 +330,34 @@ export default async function HeutePage() {
           </>
         )}
 
+        {/* Liegenbleiber: der Name, der zu lange nichts gehoert hat. Steht
+            ueber dem Nachfuell-Alarm, weil ein liegender Name der teurere
+            Fehler ist - Nachschub holen kann man morgen, einen kalt
+            gewordenen Namen nicht zurueckholen. */}
+        {aeltester && (
+          <div
+            className={`${flaeche("gefahr")} mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
+          >
+            <p className="text-sm text-red-900">
+              <span className="font-semibold">
+                {aeltester.kontakt.name} {liegtLabel(aeltester.tage)}.
+              </span>{" "}
+              {liegen.length === 1
+                ? "Anrufen oder von der Liste nehmen."
+                : `Und ${liegen.length - 1} ${
+                    liegen.length === 2 ? "weiterer" : "weitere"
+                  }. Der älteste zuerst.`}
+            </p>
+            <Link
+              href={`/contacts/${aeltester.kontakt.id}`}
+              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-fest-gefahr px-4 text-sm font-semibold text-white transition hover:bg-fest-gefahr-stark"
+            >
+              <PhoneIcon className="h-4 w-4" />
+              {aeltester.kontakt.name.split(" ")[0]} anrufen
+            </Link>
+          </div>
+        )}
+
         {/* Nachfuell-Alarm: ohne Namen kein Anruf, egal wie voll der Tag ist. */}
         {nachfuellen && (
           <div
@@ -405,6 +450,7 @@ export default async function HeutePage() {
                 ))}
                 {group.rows.map((row, i) => {
                   const contact = row.data;
+                  const liegtSeitTagen = liegtSeit(contact);
                   const lite: ContactLite = {
                     id: contact.id,
                     name: contact.name,
@@ -436,7 +482,18 @@ export default async function HeutePage() {
                         >
                           {contact.name}
                         </Link>
-                        <StageBadge stage={contact.stage} outcome={contact.outcome} />
+                        <div className="flex items-center gap-2">
+                          {/* Die Faelligkeit sagt "ueberfaellig", aber nicht
+                              seit wann. Genau darin liegt der Unterschied
+                              zwischen gestern vergessen und vor drei Wochen
+                              aufgegeben. */}
+                          {liegtSeitTagen !== null && (
+                            <span className={chip("gefahr")}>
+                              {liegtLabel(liegtSeitTagen)}
+                            </span>
+                          )}
+                          <StageBadge stage={contact.stage} outcome={contact.outcome} />
+                        </div>
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <NextStepBadge
@@ -520,7 +577,14 @@ export default async function HeutePage() {
                   >
                     {contact.name}
                   </Link>
-                  <StageBadge stage={contact.stage} outcome={contact.outcome} />
+                  <div className="flex items-center gap-2">
+                    {liegtSeit(contact) !== null && (
+                      <span className={chip("gefahr")}>
+                        {liegtLabel(liegtSeit(contact)!)}
+                      </span>
+                    )}
+                    <StageBadge stage={contact.stage} outcome={contact.outcome} />
+                  </div>
                 </div>
                 <div className="mt-3 border-t border-slate-100 pt-3">
                   <QuickRowActions
