@@ -172,3 +172,19 @@ export async function einladungEinloesen(formData: FormData) {
   // an deren Ende die ersten Namen in der Liste stehen.
   redirect("/willkommen");
 }
+
+// Auf diesem Handy war schon jemand anders angemeldet.
+//
+// Ohne diesen Weg fuellt der Eingeladene sein Formular in einer fremden
+// Sitzung aus - und wer schon ein eigenes Konto hat, kommt gar nicht erst an
+// die Anmeldung heran, weil die App ihn wortlos in das fremde Konto traegt.
+// Die Einladungsseite bietet deshalb den Ausstieg an, bevor sie irgendetwas
+// anderes anbietet.
+export async function abmeldenFuerEinladung(formData: FormData) {
+  const code = normalisiereCode(text(formData, "code"));
+  const cookieStore = await cookies();
+  // Leeres Cookie mit denselben Optionen statt delete(): nur mit gleichem
+  // Pfad und secure-Flag raeumt der Browser es zuverlaessig weg.
+  cookieStore.set(authCookieName, "", { ...sessionCookieOptions, maxAge: 0 });
+  redirect(code ? `/einladung/${encodeURIComponent(code)}` : "/login");
+}

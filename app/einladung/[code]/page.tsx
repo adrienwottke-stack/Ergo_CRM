@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { currentUser } from "@/lib/auth";
 import { normalisiereCode, statusVon } from "@/lib/einladung";
 import { NAMENSFENSTER_TAGE } from "@/lib/einblick";
-import { btnPrimary, card, input, label, pageTitle } from "@/components/ui";
+import { btnPrimary, btnSecondary, card, input, label, pageTitle } from "@/components/ui";
 import Schleuse from "@/components/schleuse/Schleuse";
 import QrCode from "@/components/schleuse/QrCode";
-import { einladungEinloesen } from "./actions";
+import { abmeldenFuerEinladung, einladungEinloesen } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -73,10 +74,11 @@ export default async function EinladungPage({
   const [{ code: codeRaw }, { error }] = await Promise.all([params, searchParams]);
   const code = normalisiereCode(decodeURIComponent(codeRaw));
 
-  const [invite, kopfzeilen] = await Promise.all([
+  const [invite, kopfzeilen, angemeldet] = await Promise.all([
     prisma.invite.findUnique({
       where: { code },
       select: {
+        id: true,
         usedCount: true,
         maxUses: true,
         expiresAt: true,
@@ -86,6 +88,9 @@ export default async function EinladungPage({
       },
     }),
     headers(),
+    // Wer sitzt gerade in diesem Browser? Auf einem Handy, auf dem schon
+    // einmal jemand anders angemeldet war, ist das nicht der Eingeladene.
+    currentUser(),
   ]);
 
   if (!invite) {
@@ -120,6 +125,17 @@ export default async function EinladungPage({
   const herkunft = `${kopfzeilen.get("x-forwarded-proto") ?? "http"}://${kopfzeilen.get("host") ?? ""}`;
   const link = `${herkunft}/einladung/${encodeURIComponent(code)}`;
 
+  // Fremde Sitzung auf diesem Geraet.
+  //
+  // Der Fall aus der Praxis: die Fuehrungskraft hat sich auf dem Handy des
+  // Neuen einmal kurz angemeldet, um etwas zu zeigen - und das Cookie blieb.
+  // Wer jetzt eine Einladung scannt, darf NICHT stillschweigend in fremden
+  // Daten weiterarbeiten. Erst raus aus der alten Sitzung, dann weiter.
+  //
+  // Die eigene Einladung ist ausgenommen: wer aus genau diesem Code entstanden
+  // ist, soll die Seite wieder verlassen koennen, ohne hinausgeworfen zu werden.
+  const fremdeSitzung = angemeldet && angemeldet.herkunftId !== invite.id;
+
   // Alles ab hier liegt hinter der Installations-Schleuse: das Formular
   // erscheint erst, wenn die Seite vom Startbildschirm laeuft (Akt 0).
   return (
@@ -128,6 +144,28 @@ export default async function EinladungPage({
       link={link}
       qr={<QrCode text={link} />}
     >
+      {fremdeSitzung ? (
+        <div className="mx-auto flex min-h-screen max-w-md items-center px-4 py-10">
+          <div className={`${card} w-full space-y-5 p-6 text-center sm:p-8`}>
+            <h1 className={pageTitle}>Hier ist noch jemand angemeldet</h1>
+            <p className="text-sm text-slate-600">
+              Auf diesem Handy läuft gerade das Konto von{" "}
+              <strong className="font-medium text-slate-800">{angemeldet.name}</strong>.
+              Deine Einladung führt in deinen eigenen Zugang – dafür muss dieses
+              Konto zuerst raus.
+            </p>
+            <form action={abmeldenFuerEinladung} className="space-y-3">
+              <input type="hidden" name="code" value={code} />
+              <button type="submit" className={`${btnPrimary} w-full justify-center`}>
+                Abmelden und weitermachen
+              </button>
+            </form>
+            <a href="/heute" className={`${btnSecondary} w-full justify-center`}>
+              Weiter als {angemeldet.name.split(" ")[0]}
+            </a>
+          </div>
+        </div>
+      ) : (
       <div className="mx-auto flex min-h-screen max-w-md items-center px-4 py-10">
         <div className="w-full">
           <div className="mb-6 text-center">
@@ -226,8 +264,18 @@ export default async function EinladungPage({
               E-Mail-Adressen bleiben immer bei dir.
             </p>
           </form>
+
+          {/* Nicht jeder Eingeladene ist neu: wer sein Konto schon hat und nur
+              wieder hereinkommt, braucht die Anmeldung, kein zweites Konto. */}
+          <p className="mt-6 text-center text-sm text-slate-500">
+            Du hast schon einen Zugang?{" "}
+            <a href="/login" className="font-medium text-navy-700 hover:underline">
+              Hier anmelden
+            </a>
+          </p>
         </div>
       </div>
+      )}
     </Schleuse>
   );
 }

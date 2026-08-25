@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { normalisiereCode } from "@/lib/einladung";
+import { authCookieName, sessionCookieOptions } from "@/lib/session";
+import { normalisiereCode, statusVon } from "@/lib/einladung";
 
 export const dynamic = "force-dynamic";
 
@@ -20,21 +21,44 @@ export async function GET(request: NextRequest) {
   const ziel = (pfad: string) => NextResponse.redirect(new URL(pfad, request.url));
 
   const user = await currentUser();
+
+  const code = normalisiereCode(request.nextUrl.searchParams.get("e") ?? "");
+  const invite = code
+    ? await prisma.invite.findUnique({
+        where: { code },
+        select: { id: true, usedCount: true, maxUses: true, expiresAt: true },
+      })
+    : null;
+
+  // Eine OFFENE Einladung schlaegt eine fremde Sitzung.
+  //
+  // Der Fall aus der Praxis: auf dem Handy war schon einmal jemand anders
+  // angemeldet - die Fuehrungskraft, die kurz etwas gezeigt hat. Stand die
+  // Sitzung hier vorn, kam der Eingeladene mit seinem frischen Code nie bei
+  // sich an, sondern jedes Mal in fremden Daten. Deshalb faellt hier die
+  // Sitzung, nicht die Einladung: wer einen gueltigen Code mitbringt, will ein
+  // eigenes Konto, nicht das des Vorbesitzers.
+  //
+  // Die eigene Einladung ist ausgenommen (herkunftId): sonst wuerfe ein
+  // Mehrfach-Code - der bleibt offen - seinen eigenen Angekommenen bei jedem
+  // App-Start wieder hinaus.
+  if (invite && statusVon(invite) === "offen" && user?.herkunftId !== invite.id) {
+    const antwort = ziel(`/einladung/${encodeURIComponent(code)}`);
+    // Nicht delete(): das Cookie traegt Pfad und secure-Flag aus
+    // sessionCookieOptions, und nur mit denselben Angaben raeumt der Browser
+    // es zuverlaessig weg.
+    antwort.cookies.set(authCookieName, "", { ...sessionCookieOptions, maxAge: 0 });
+    return antwort;
+  }
+
   // Wer angemeldet ist, landet auf der Arbeitsliste: dort steht, was heute
   // dran ist.
   if (user) return ziel("/heute");
 
-  const code = normalisiereCode(request.nextUrl.searchParams.get("e") ?? "");
-  if (code) {
-    const invite = await prisma.invite.findUnique({
-      where: { code },
-      select: { usedById: true, expiresAt: true },
-    });
-    // Auch eine verbrauchte oder abgelaufene Einladung geht zurueck auf die
-    // Einladungsseite: die erklaert in einem Satz, was los ist, und verlinkt
-    // die Anmeldung. Besser als ein Anmeldefenster ohne Zusammenhang.
-    if (invite) return ziel(`/einladung/${encodeURIComponent(code)}`);
-  }
+  // Auch eine verbrauchte oder abgelaufene Einladung geht zurueck auf die
+  // Einladungsseite: die erklaert in einem Satz, was los ist, und verlinkt
+  // die Anmeldung. Besser als ein Anmeldefenster ohne Zusammenhang.
+  if (invite) return ziel(`/einladung/${encodeURIComponent(code)}`);
 
   return ziel("/login");
 }
