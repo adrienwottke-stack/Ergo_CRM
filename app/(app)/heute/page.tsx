@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { merkeAnwesenheit } from "@/lib/anwesenheit";
 import { eigene } from "@/lib/scope";
 import {
   addDays,
@@ -22,7 +24,11 @@ import ErsteWoche from "@/components/ErsteWoche";
 import Meldungen from "@/components/Meldungen";
 import Postfach from "@/components/Postfach";
 import NummerHinterlegen from "@/components/NummerHinterlegen";
-import { card, pageTitle } from "@/components/ui";
+import { card, flaeche } from "@/components/ui";
+import SeitenKopf from "@/components/SeitenKopf";
+import LeerZustand from "@/components/LeerZustand";
+import ZahlHoch from "@/components/ZahlHoch";
+import { KennzahlKachel } from "@/components/Kennzahl";
 import { CheckIcon, ChevronRightIcon, PhoneIcon, SparkIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +41,18 @@ const kurzDatum = new Intl.DateTimeFormat("de-DE", {
 
 export default async function HeutePage() {
   const user = await requireUser();
+
+  // Die App war heute offen - das ist einen Punkt wert (lib/anwesenheit.ts).
+  //
+  // Hier und nicht in login(): das Sitzungs-Cookie lebt 30 Tage, eine echte
+  // Anmeldung passiert ein paar Mal im Jahr. "Einloggen" heisst in Wahrheit
+  // "die App aufmachen", und dort landen alle Wege - nach der Anmeldung, vom
+  // Startbildschirm und jeden Morgen.
+  //
+  // In after(): der Rueckruf laeuft NACH der ausgelieferten Antwort. Kostet
+  // den Nutzer keine Millisekunde und kann die Seite nicht mehr kippen.
+  after(() => merkeAnwesenheit(user.id));
+
   const sicht = eigene(user.id);
   const today = berlinToday();
   const horizon = addDays(dayToUtcDate(today), 8);
@@ -172,9 +190,7 @@ export default async function HeutePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className={pageTitle}>Heute</h1>
-      </div>
+      <SeitenKopf kicker="Beraterbereich" titel="Heute" />
 
       {/* Was jemand geschrieben hat, steht vor der Arbeit - es dauert zehn
           Sekunden und ist der Grund, warum sich das Werkzeug nach Mannschaft
@@ -204,9 +220,14 @@ export default async function HeutePage() {
       {brauchenDich.length > 0 && (
         <Link
           href="/mannschaft"
-          className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50/70 p-4 transition hover:bg-red-50 sm:p-5"
+          className={`${flaeche("gefahr")} flex items-start gap-3 p-4 transition hover:schatten-hoch sm:p-5`}
         >
-          <span aria-hidden className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" />
+          {/* Der einzige Punkt der Anwendung, der pulst. Wer wartet, wartet
+              nicht still. */}
+          <span
+            aria-hidden
+            className="mt-1.5 h-2.5 w-2.5 shrink-0 animate-halo rounded-full bg-red-500"
+          />
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-slate-900">
               {brauchenDich.length === 1
@@ -238,33 +259,54 @@ export default async function HeutePage() {
           </p>
         ) : (
           <>
+            {/* Die Tagesleistung ist der Grund, warum jemand die Seite
+                oeffnet. Sie darf gross sein und beim Ankommen kurz
+                hochzaehlen - danach steht sie still. */}
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="text-3xl font-bold tracking-[-0.02em] tabular-nums text-navy-900">
-                {anrufeHeute > 0 ? anrufeHeute : openCount}
-              </span>
+              <ZahlHoch
+                wert={anrufeHeute > 0 ? anrufeHeute : openCount}
+                className="text-4xl font-bold tracking-[-0.02em] tabular-nums text-navy-700"
+              />
               <span className="text-base font-semibold text-slate-900">
                 {anrufeHeute > 0
                   ? `${anrufeHeute === 1 ? "Anruf" : "Anrufe"} heute`
                   : `${openCount === 1 ? "Schritt" : "Schritte"} heute`}
               </span>
             </div>
-            <p className="mt-1 text-sm text-slate-500">
-              {[
-                termineHeute > 0 &&
-                  `${termineHeute} ${termineHeute === 1 ? "Termin" : "Termine"}`,
-                sonstigeHeute > 0 && `${sonstigeHeute} weitere Schritte`,
-                groups[0]!.rows.length > 0 &&
-                  `${groups[0]!.rows.length} davon überfällig`,
-              ]
-                .filter(Boolean)
-                .join(" · ") || "Der Reihe nach von oben."}
-            </p>
+
+            {/* Vorher eine Zeile mit Mittelpunkten ("3 Termine · 2 weitere ·
+                4 ueberfaellig"). Als Kacheln sieht man die Verteilung, statt
+                sie zu lesen. */}
+            {termineHeute + sonstigeHeute + groups[0]!.rows.length > 0 ? (
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <KennzahlKachel
+                  wert={termineHeute}
+                  bezeichnung={termineHeute === 1 ? "Termin" : "Termine"}
+                  ton={termineHeute > 0 ? "info" : "neutral"}
+                />
+                <KennzahlKachel
+                  wert={sonstigeHeute}
+                  bezeichnung="weitere Schritte"
+                />
+                <KennzahlKachel
+                  wert={groups[0]!.rows.length}
+                  bezeichnung="überfällig"
+                  ton={groups[0]!.rows.length > 0 ? "gefahr" : "neutral"}
+                />
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-slate-500">
+                Der Reihe nach von oben.
+              </p>
+            )}
           </>
         )}
 
         {/* Nachfuell-Alarm: ohne Namen kein Anruf, egal wie voll der Tag ist. */}
         {nachfuellen && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 px-4 py-3">
+          <div
+            className={`${flaeche("warnung")} mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
+          >
             <p className="text-sm text-amber-900">
               <span className="font-semibold">
                 {offeneNamen === 0

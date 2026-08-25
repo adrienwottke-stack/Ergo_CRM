@@ -532,6 +532,10 @@ model Person {
 
   votes   FeatureVote[]
   sprints SprintTeilnahme[]
+
+  anwesenheit   Anwesenheit[]
+  feedEintraege FeedEintrag[]
+  reaktionen    FeedReaktion[] @relation("Reagiert")
 }
 
 model DailyLog {
@@ -638,4 +642,69 @@ model SprintTeilnahme {
   joinedAt DateTime @default(now())
 
   @@unique([sprintId, personId])
+}
+
+// --- Die Schleife: Anwesenheit und Feed -------------------------------------
+
+// Der Tag, an dem die App offen war. Mehr steht hier nicht.
+//
+// Bewusst KEIN neuer QuotaType: lib/fuehrung.ts liest den letzten DailyLog je
+// Kopf OHNE Typfilter und macht daraus "letzte Aktivitaet" - daran haengt das
+// Stille-Signal. Ein taeglicher Anwesenheits-Eintrag haette es fuer jeden
+// stillgelegt, der die App oeffnet. Ausfuehrlich in lib/anwesenheit.ts.
+//
+// Der zusammengesetzte Primaerschluessel IST die Tageskappe. Eine Kappe im
+// Code koennte falsch stehen, dieser Schluessel nicht.
+model Anwesenheit {
+  personId  String
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  day       DateTime // Berliner Kalendertag als UTC-Mitternacht, wie DailyLog.date
+  createdAt DateTime @default(now())
+
+  @@id([personId, day])
+  @@index([day])
+}
+
+// Was jemand von sich aus meldet.
+//
+// Ein Eintrag entsteht NIE von selbst, sondern nur, wenn jemand auf "Ans
+// Netzwerk melden" tippt. Das ist der Unterschied zwischen einer Beobachtung
+// und einer Ansage - und es loest den Leitsatz ohne eine einzige Regel ein:
+// gemeldet wird ausschliesslich Erreichtes, ein Pranger kann gar nicht
+// entstehen.
+//
+// text wird beim Anlegen eingefroren statt bei der Anzeige gerechnet -
+// dieselbe Entscheidung wie bei LeadershipTask.signal: eine Kopie, keine
+// Referenz. Die Zahl dahinter bewegt sich weiter, die Meldung bleibt stehen.
+model FeedEintrag {
+  id         String   @id @default(cuid())
+  personId   String
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  schluessel String // welcher Meilenstein, siehe lib/meilensteine.ts
+  tag        DateTime // Berliner Kalendertag
+  text       String
+  createdAt  DateTime @default(now())
+
+  reaktionen FeedReaktion[]
+
+  // Die Spam-Bremse als Regel in der Datenbank statt als Zaehler im Code:
+  // je Kopf, Meilenstein und Tag genau eine Meldung. Ein Lesen-dann-Schreiben
+  // haette einen Wettlauf dazwischen.
+  @@unique([personId, schluessel, tag])
+  @@index([createdAt])
+}
+
+// Antworten ohne Tippen - dieselben vier Saetze wie SCHNELLTEXTE.
+// Eine Reaktion je Kopf und Eintrag, dieselbe Regel wie bei FeatureVote.
+model FeedReaktion {
+  id        String      @id @default(cuid())
+  eintragId String
+  eintrag   FeedEintrag @relation(fields: [eintragId], references: [id], onDelete: Cascade)
+  personId  String
+  person    Person      @relation("Reagiert", fields: [personId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime    @default(now())
+
+  @@unique([eintragId, personId])
+  @@index([eintragId])
 }

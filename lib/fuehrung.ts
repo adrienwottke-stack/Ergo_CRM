@@ -62,7 +62,19 @@ export type Werte = {
   vereinbartGesamt: number;
   gehaltenGesamt: number;
   empfehlungGefragt: boolean;
-  /** Wettbewerbspunkte dieser Woche - Grundlage fuer den Ast-Vergleich. */
+  /**
+   * Wettbewerbspunkte dieser Woche - Grundlage fuer den Ast-Vergleich.
+   *
+   * ABSICHTLICHE ABWEICHUNG VON DER ARENA: hier zaehlt ausschliesslich
+   * gearbeitete Leistung. Der Anwesenheits-Punkt (lib/anwesenheit.ts) fliesst
+   * NICHT ein. Die Mannschaftssicht existiert, um Arbeit sichtbar zu machen -
+   * ein Punkt fuers Aufmachen wuerde genau das verschleiern, und zwar
+   * ausgerechnet bei dem, der taeglich reinschaut und nicht mehr arbeitet.
+   *
+   * Es gibt damit zwei Punktbegriffe: Arena-Punkte (mit Anwesenheit) und
+   * Fuehrungs-Punkte (ohne). Das ist bewusst und gehoert so kommentiert -
+   * sonst "repariert" es jemand in drei Monaten.
+   */
   punkteWoche: number;
 };
 
@@ -317,6 +329,14 @@ export async function mannschaftsLage(betrachter: {
     // haengt (Activity). Wer seine gehaltenen Termine ueber /log nachtraegt,
     // stand damit als still da, obwohl er gearbeitet hat - und bekam eine rote
     // Ampel fuer Fleiss. Eine falsche rote Ampel kostet mehr als eine fehlende.
+    //
+    // ACHTUNG, hier haengt das Stille-Signal dran: dieser groupBy laeuft
+    // bewusst OHNE Typfilter. Genau deshalb liegt die Anwesenheit in einer
+    // eigenen Tabelle und nicht als sechster QuotaType im DailyLog - ein
+    // taeglicher Anwesenheits-Eintrag haette "letzte Aktivitaet" jeden Tag
+    // frisch gesetzt und die Stille fuer jeden stillgelegt, der die App
+    // oeffnet. Wer hier je einen Anwesenheits-Typ einbaut, schaltet das
+    // wichtigste Signal der Mannschaftssicht ab.
     prisma.dailyLog.groupBy({
       by: ["personId"],
       where: { person: { userId: { in: sicht.beraterIds } } },

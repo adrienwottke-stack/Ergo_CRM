@@ -14,6 +14,7 @@ import {
   startOfWeek,
 } from "@/lib/dates";
 import { emptyQuotaCounts, quotaTypePoints } from "@/lib/labels";
+import { ANWESENHEITS_PUNKT, anwesenheitGesamt, anwesenheitJePerson } from "@/lib/anwesenheit";
 import { streakDays } from "@/lib/stats";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
 
@@ -30,6 +31,8 @@ export type ArenaZeile = {
   punkte: number;
   ausCrm: number; // Punkte, die aus einer echten CRM-Aktivitaet entstanden sind
   serie: number;
+  /** Tage, an denen die App offen war. Ein Punkt je Tag. */
+  anwesend: number;
 };
 
 // --- Spieltag ---------------------------------------------------------------
@@ -50,7 +53,7 @@ export function stundenBis(ziel: Date, jetzt = new Date()): number {
 
 export async function ladeRangliste(start: Date): Promise<ArenaZeile[]> {
   const heute = berlinToday();
-  const [logs, personen, serienLogs] = await Promise.all([
+  const [logs, personen, serienLogs, anwesenheit] = await Promise.all([
     prisma.dailyLog.findMany({
       where: { date: { gte: start } },
       select: { personId: true, type: true, count: true, activityId: true },
@@ -60,6 +63,9 @@ export async function ladeRangliste(start: Date): Promise<ArenaZeile[]> {
       where: { date: { gte: dayToUtcDate(shiftDay(heute, -60)) } },
       select: { personId: true, date: true },
     }),
+    // Die Anwesenheitstage im selben Fenster. Eigene Tabelle, nicht DailyLog -
+    // siehe lib/anwesenheit.ts.
+    anwesenheitJePerson(start),
   ]);
 
   const nameById = new Map(personen.map((p) => [p.id, p.name]));
@@ -75,24 +81,44 @@ export async function ladeRangliste(start: Date): Promise<ArenaZeile[]> {
   }
 
   const zeilen = new Map<string, ArenaZeile>();
-  for (const log of logs) {
-    if (log.count === 0) continue;
-    let zeile = zeilen.get(log.personId);
+  const zeileFuer = (personId: string): ArenaZeile => {
+    let zeile = zeilen.get(personId);
     if (!zeile) {
       zeile = {
-        personId: log.personId,
-        name: nameById.get(log.personId) ?? "Unbekannt",
+        personId,
+        name: nameById.get(personId) ?? "Unbekannt",
         byType: emptyQuotaCounts(),
         punkte: 0,
         ausCrm: 0,
         serie: 0,
+        anwesend: 0,
       };
-      zeilen.set(log.personId, zeile);
+      zeilen.set(personId, zeile);
     }
+    return zeile;
+  };
+
+  for (const log of logs) {
+    if (log.count === 0) continue;
+    const zeile = zeileFuer(log.personId);
     const punkte = log.count * quotaTypePoints[log.type];
     zeile.byType[log.type] += log.count;
     zeile.punkte += punkte;
     if (log.activityId) zeile.ausCrm += punkte;
+  }
+
+  // Wer nur da war, steht ab jetzt mit einem Punkt in der Tabelle. Das weicht
+  // den Grundsatz "wer nichts loggt, taucht nicht auf" bewusst auf - sonst
+  // waere der Anwesenheits-Punkt sinnlos. Die Zeile sieht aus wie jede andere:
+  // ein Vermerk "nur anwesend" waere genau der Pranger, den der Leitsatz
+  // verbietet.
+  //
+  // ausCrm bleibt unberuehrt. Anwesenheit hat keine activityId und senkt den
+  // CRM-Anteil damit ehrlich.
+  for (const [personId, tage] of anwesenheit) {
+    const zeile = zeileFuer(personId);
+    zeile.anwesend = tage;
+    zeile.punkte += tage * ANWESENHEITS_PUNKT;
   }
 
   for (const zeile of zeilen.values()) {
@@ -188,12 +214,15 @@ export async function sprintStand(
 // Gerechnet, nicht gespeichert - wie überall hier. Bei den Datenmengen dieses
 // Netzwerks ist das eine Abfrage, keine Last.
 export async function ladeGesamtpunkte(personId: string): Promise<number> {
-  const logs = await prisma.dailyLog.findMany({
-    where: { personId },
-    select: { type: true, count: true },
-  });
+  const [logs, tage] = await Promise.all([
+    prisma.dailyLog.findMany({
+      where: { personId },
+      select: { type: true, count: true },
+    }),
+    anwesenheitGesamt(personId),
+  ]);
 
-  let punkte = 0;
+  let punkte = tage * ANWESENHEITS_PUNKT;
   for (const log of logs) punkte += log.count * quotaTypePoints[log.type];
   return punkte;
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { berlinToday, startOfWeek } from "@/lib/dates";
@@ -6,6 +7,7 @@ import {
   SPRINT_MINUTEN,
   abpfiffDieserWoche,
   ladeBestmarke,
+  ladeGesamtpunkte,
   ladePuls,
   ladeRangliste,
   sprintStand,
@@ -13,6 +15,8 @@ import {
 } from "@/lib/arena";
 import { abstandInHandlungen, eigenerHinweis, punkteText } from "@/lib/kommentator";
 import { merkeNutzung, schalter } from "@/lib/features";
+import { merkeAnwesenheit } from "@/lib/anwesenheit";
+import { stufeVon } from "@/lib/stufen";
 import ArenaTakt from "@/components/ArenaTakt";
 import WettbewerbNav from "@/components/WettbewerbNav";
 import SprintUhr from "@/components/SprintUhr";
@@ -41,14 +45,25 @@ export default async function ArenaPage() {
   const user = await requireUser();
   const person = await requireUserPerson(user.id);
 
+  // Auch wer die Arena angeheftet hat und /heute nie sieht, war da.
+  // Der Upsert ist idempotent, der 30-Sekunden-Takt macht ihn nicht teurer.
+  after(() => merkeAnwesenheit(user.id));
+
   const heute = berlinToday();
   const wochenStart = startOfWeek(heute);
   const abpfiff = abpfiffDieserWoche(heute);
   const stunden = stundenBis(abpfiff);
 
-  const an = await schalter("puls", "zweikampf", "bestmarke", "sprint");
+  const an = await schalter(
+    "puls",
+    "zweikampf",
+    "bestmarke",
+    "sprint",
+    "stufen",
+    "feed"
+  );
 
-  const [zeilen, puls, bestmarke, sprint, nachrichten, konten] =
+  const [zeilen, puls, bestmarke, sprint, nachrichten, konten, gesamtpunkte] =
     await Promise.all([
     ladeRangliste(wochenStart),
     ladePuls(),
@@ -78,7 +93,11 @@ export default async function ArenaPage() {
       where: { userId: { not: null } },
       select: { id: true, userId: true },
     }),
+    // Punkte ueber die gesamte Zeit - Grundlage der Stufe.
+    ladeGesamtpunkte(person.id),
   ]);
+
+  const stufe = stufeVon(gesamtpunkte);
 
   const kontoVonPerson = new Map(
     konten.filter((eintrag) => eintrag.userId).map((e) => [e.id, e.userId!])
@@ -94,6 +113,7 @@ export default async function ArenaPage() {
   if (an.puls) gesehen.push(merkeNutzung("puls", person.id));
   if (an.zweikampf) gesehen.push(merkeNutzung("zweikampf", person.id));
   if (an.bestmarke) gesehen.push(merkeNutzung("bestmarke", person.id));
+  if (an.stufen) gesehen.push(merkeNutzung("stufen", person.id));
   await Promise.all(gesehen);
 
   // --- eigene Lage ---------------------------------------------------------
@@ -144,6 +164,25 @@ export default async function ArenaPage() {
         </div>
         {hinweis && (
           <p className="mt-2 text-sm font-medium text-navy-700">{hinweis}</p>
+        )}
+
+        {/* Der Rang, der nicht faellt. Die Tabelle darunter faengt jeden
+            Montag bei null an - das hier nicht. */}
+        {an.stufen && (
+          <p className="mt-2 text-sm text-slate-500">
+            <Link href="/spiel" className="font-semibold text-slate-900 hover:text-navy-700">
+              {stufe.stufe.name}
+            </Link>
+            {stufe.naechste ? (
+              <>
+                {" "}— noch{" "}
+                <span className="tabular-nums">{stufe.bisNaechste}</span> bis{" "}
+                {stufe.naechste.name}.
+              </>
+            ) : (
+              " — höchste Stufe."
+            )}
+          </p>
         )}
       </div>
 
