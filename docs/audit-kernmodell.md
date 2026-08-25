@@ -142,6 +142,16 @@ breiter als der Zweck: sieben Bausteine für aktuell eine Handvoll Köpfe.
 
 **Gruppe: 8 Bleibt · 6 Unklar · 1 Raus**
 
+> **Nachtrag 25.08.2026 zu 5.14.** Es gibt seit heute wieder einen Weg, Kritik
+> loszuwerden: das Megafon in der Kopfzeile
+> (`docs/rueckmeldung-plan.md`). Das Urteil oben bleibt davon unberührt und
+> gilt weiter — was hier raus ist, kommt nicht zurück. Der Unterschied ist die
+> Richtung: 5.14 war ein **öffentliches Gremium** (Liste, Stimmen, Friedhof) und
+> kostete jeden Partner Aufmerksamkeit; das Megafon ist ein **privater Rückkanal
+> an eine Person** und kostet nur den etwas, der von sich aus etwas sagen will.
+> Keine Abstimmung, keine öffentliche Liste, keine Roadmap im Produkt. Für
+> Abschaltungen gilt unverändert 5.15: Nutzung schlägt Meinung.
+
 ---
 
 ## 6. Struktur und Führung — Ebene 3
