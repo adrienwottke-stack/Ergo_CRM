@@ -325,15 +325,29 @@ model User {
   pushAbos        PushAbo[]
   passwortResets  PasswortReset[]
   avvZustimmungen AvvAcceptance[]
+  rueckmeldungen  Rueckmeldung[]
+
+  // --- Kalender (docs/struktur-plan.md, Abschnitt 7) -------------------------
+  // Der Abo-Schluessel fuer den ICS-Feed. NULL = noch kein Abo erzeugt. Ein
+  // undurchsichtiges Zufallswort und kein signiertes Kuerzel, weil es sich so
+  // zurueckziehen laesst: neuer Schluessel, alter Link tot.
+  feedToken String? @unique
+  // Stehen Kundennamen im Feed? Voreinstellung NEIN. Wer einen Termin aus dem
+  // Handy-Kalender von Hand in einen GETEILTEN TimeTree-Kalender kopiert,
+  // zeigt den Namen sonst allen Mitgliedern. Wer Namen will, schaltet sie frei.
+  feedNamen Boolean @default(false)
+
+  termine         Termin[]
+  kalenderquellen Kalenderquelle[]
 
   fuehrungsAufgaben LeadershipTask[] @relation("Fuehrt")
   betrifftMich      LeadershipTask[] @relation("Betrifft")
 
-  nachrichtenGesendet  Nachricht[] @relation("NachrichtVon")
-  nachrichtenErhalten  Nachricht[] @relation("NachrichtAn")
-  invites              Invite[]    @relation("Einladender")
-  invite               Invite?     @relation("Eingeloest")
-  platzhalterEinladung Invite?     @relation("Platzhalter")
+  nachrichtenGesendet  Nachricht[]    @relation("NachrichtVon")
+  nachrichtenErhalten  Nachricht[]    @relation("NachrichtAn")
+  invites              Invite[]       @relation("Einladender")
+  invite               Invite?        @relation("Eingeloest")
+  platzhalterEinladung Invite?        @relation("Platzhalter")
 
   @@index([leaderId])
   @@index([path])
@@ -819,4 +833,205 @@ model AvvAcceptance {
   // Je Konto und Fassung genau einmal.
   @@unique([userId, avvVersion])
   @@map("avv_acceptances")
+}
+
+// --- Kalender ---------------------------------------------------------------
+// docs/struktur-plan.md, Abschnitt 7.
+//
+// Der Kalender fuehrt DREI Quellen zusammen und ersetzt keine davon:
+//   1. Contact.appointmentAt - der Kundentermin, unveraendert. Daran haengen
+//      Pipeline, Trichter, /heute und der Morgen-Cron; ein Umbau dort waere
+//      grossflaechig und fuer die Ansicht nicht noetig.
+//   2. Termin              - eigene Eintraege OHNE Kontakt.
+//   3. Fremdtermin         - was aus einem angebundenen Kalender hereinkommt.
+
+// Was im Kalender steht, aber kein Kundentermin ist: Schulung, Begleitung,
+// Teammeeting - und vor allem der private Blocker.
+//
+// Der Blocker ist der Grund, aus dem es dieses Modell ueberhaupt gibt. Ohne
+// ihn werden Begleitungen in Zeiten geplant, die laengst belegt sind, und das
+// ist der haeufigste Grund, warum solche Kalender kippen - nicht Technik,
+// sondern Pflegeaufwand. Entschaerft wird es ueber die Genauigkeit: "Mi 14-18
+// belegt" reicht. Deshalb ist ausser dem Zeitraum nichts Pflicht.
+model Termin {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  titel    String
+  art      TerminArt @default(SONSTIGES)
+  von      DateTime
+  bis      DateTime
+  ganztags Boolean   @default(false)
+  ort      String?
+  notiz    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, von])
+}
+
+enum TerminArt {
+  BEGLEITUNG
+  SCHULUNG
+  TEAM
+  BLOCKER // privat, ohne Titel - nur "belegt"
+  SONSTIGES
+}
+
+// Ein angebundener fremder Kalender.
+//
+// Warum nur TIMETREE: das ist der Kalender, den das Team benutzt. Die
+// Aufzaehlung hat trotzdem eine Form, die eine zweite Art vertraegt - ein
+// ICS-Abo waere die naechste, falls jemand Google oder Outlook mitbringt.
+model Kalenderquelle {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String
+  art  QuellArt
+
+  // TimeTree kennt keine Zugangsschluessel mehr - die offizielle
+  // Schnittstelle wurde am 22.12.2023 abgeschaltet. Bleibt die Anmeldung mit
+  // E-Mail und Passwort. Das Passwort liegt deshalb UMKEHRBAR verschluesselt
+  // hier (AES-256-GCM, lib/crypto.ts), nicht gehasht: wir muessen uns damit
+  // anmelden koennen. Wer Datenbank UND KALENDER_SECRET hat, hat das Passwort.
+  // Der Hinweis darauf steht auf der Quellen-Seite, nicht nur hier.
+  zugangUid     String?
+  zugangChiffre String?
+
+  fremdId String? // Kalender-Id beim Anbieter
+  // Die Marke des letzten Abgleichs. Der naechste Lauf holt damit nur
+  // Geaendertes statt jedes Mal alles.
+  seit    String?
+
+  farbe String  @default("slate")
+  aktiv Boolean @default(true)
+
+  letzterLauf   DateTime?
+  letzterFehler String?
+  // Nach drei Fehllaeufen in Folge wird aktiv auf false gesetzt. Ein Dienst,
+  // der uns nicht mehr hereinlaesst, soll nicht bei jedem Seitenaufruf
+  // dagegenlaufen - das ist der Weg in eine Sperre.
+  fehlerZaehler Int       @default(0)
+
+  termine Fremdtermin[]
+
+  @@index([ownerId])
+}
+
+enum QuellArt {
+  TIMETREE
+}
+
+// Ein hereingeholter Termin. Belegung, kein Vorgang: er verlinkt auf nichts,
+// laesst sich hier nicht aendern, und beim naechsten Abgleich gewinnt immer
+// die Quelle.
+model Fremdtermin {
+  id       String         @id @default(cuid())
+  quelleId String
+  quelle   Kalenderquelle @relation(fields: [quelleId], references: [id], onDelete: Cascade)
+
+  // Die Kennung beim Anbieter. Bei Serienterminen haengt der Beginn hinten
+  // dran ("<id>#2026-09-01T08:00:00Z"), damit jeder entfaltete Einzeltermin
+  // eine eigene, stabile Kennung hat.
+  fremdUid String
+
+  titel    String
+  von      DateTime
+  bis      DateTime
+  ganztags Boolean  @default(false)
+  ort      String?
+
+  @@unique([quelleId, fremdUid])
+  @@index([quelleId, von])
+}
+
+// --- Rueckmeldung (docs/rueckmeldung-plan.md) --------------------------------
+//
+// Der private Rueckkanal an den Admin. Bewusst NICHT die geloeschte
+// Wunschliste aus docs/audit-kernmodell.md, 5.14: die war ein oeffentliches
+// Gremium mit Liste, Stimmen und Friedhof und kostete JEDEN Partner
+// Aufmerksamkeit. Das hier kostet nur den, der von sich aus etwas sagen will -
+// wer schweigt, sieht ein Symbol in der Kopfzeile und sonst nichts. Es gibt
+// weiterhin keine Abstimmung, keine oeffentliche Liste, keine Roadmap im
+// Produkt. Der Baustein ersetzt eine WhatsApp-Nachricht, die es ohnehin
+// schon gibt.
+
+// Drei statt fuenf Sterne: ein Daumentipp ohne Zielen. Die drei bilden genau
+// die Toene gefahr / warnung / erfolg aus components/ui.ts ab.
+enum Stimmung {
+  AERGER
+  GEHT_SO
+  GUT
+}
+
+// Wofuer der Absender es haelt. Ueberspringbar - eine Pflichtwahl an dieser
+// Stelle waere die zweite Huerde nach der ersten.
+enum Anliegen {
+  FEHLER
+  LANGSAM
+  FEHLT
+  LOB
+  SONSTIGES
+}
+
+enum RueckmeldungStand {
+  NEU
+  GESEHEN
+  GEPLANT
+  ERLEDIGT
+  VERWORFEN
+}
+
+model Rueckmeldung {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Stufe 1 des Trichters und das einzige Pflichtfeld. Wer nur antippt und den
+  // Dialog zumacht, hat trotzdem etwas gesagt.
+  stimmung Stimmung
+  anliegen Anliegen?
+  text     String?
+
+  // Von welcher Seite aus gesendet wurde. Der Unterschied zwischen
+  // "irgendwas nervt" und "die Mannschaftsliste nervt".
+  seite String?
+
+  stand RueckmeldungStand @default(NEU)
+
+  // Interne Notiz des Admins. Der Absender sieht sie nie.
+  notiz String?
+
+  // Bleibt in dieser Stufe leer. Die Spalte steht trotzdem schon, damit eine
+  // spaetere Transkription kein Schema-Umbau ist - sie braucht einen AVV mit
+  // dem Anbieter und einen Satz in der Datenschutzerklaerung, und beides ist
+  // eine eigene Entscheidung.
+  transkript String?
+
+  createdAt  DateTime  @default(now())
+  erledigtAt DateTime?
+
+  audio RueckmeldungAudio?
+
+  @@index([stand, createdAt])
+  @@index([userId])
+}
+
+// Die Aufnahme liegt bewusst in einer EIGENEN Tabelle statt als Bytes-Spalte
+// neben dem Text. Sonst zoege jede Listenabfrage im Postfach ohne
+// ausdrueckliches select saemtliche Aufnahmen mit - eine eigene Tabelle macht
+// diesen Fehler unmoeglich statt nur unwahrscheinlich.
+model RueckmeldungAudio {
+  rueckmeldungId String       @id
+  rueckmeldung   Rueckmeldung @relation(fields: [rueckmeldungId], references: [id], onDelete: Cascade)
+
+  daten Bytes
+  // "audio/mp4" von Safari, "audio/webm" von Chrome und Firefox.
+  typ   String
+  ms    Int
+  bytes Int
 }

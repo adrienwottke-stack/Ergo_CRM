@@ -79,7 +79,19 @@ In Vercel für **Production** setzen:
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Öffentlicher Web-Push-Schlüssel (optional) |
 | `VAPID_PRIVATE_KEY` | Privater Web-Push-Schlüssel (optional) |
 | `VAPID_SUBJECT` | `mailto:`-Adresse für den Push-Dienst (optional) |
-| `CRON_SECRET` | Schützt `/api/cron/meldungen`; der Lauf steht in `vercel.json` |
+| `CRON_SECRET` | Schützt `/api/cron/meldungen` und `/api/cron/kalender`; die Läufe stehen in `vercel.json` |
+| `KALENDER_SECRET` | Verschlüsselt die Zugangsdaten angebundener Kalender (optional) |
+
+`KALENDER_SECRET` verschlüsselt **umkehrbar** (AES-256-GCM), anders als
+`SESSION_SECRET`: TimeTree hat seine offizielle Schnittstelle am 22.12.2023
+abgeschaltet, und die verbliebene Anmeldung verlangt das Passwort im Klartext.
+Wer Datenbank *und* diesen Schlüssel hat, hat die TimeTree-Passwörter. Ein
+Wechsel des Schlüssels macht alle gespeicherten Zugänge unlesbar. Ohne den Wert
+läuft die App vollständig — nur das Anbinden fremder Kalender ist gesperrt.
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
 
 Ohne die VAPID-Werte läuft die App vollständig — nur ohne Meldungen. Ein
 Schlüsselpaar erzeugt:

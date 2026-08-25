@@ -1,0 +1,153 @@
+import Link from "next/link";
+import { cn, card } from "@/components/ui";
+import { berlinDayOf, dayToUtcDate, shiftDay } from "@/lib/dates";
+import type { KalenderEintrag } from "@/lib/kalender/laden";
+import { CalendarCheckIcon, PhoneIcon } from "@/components/icons";
+import { beschriftung, stilFuer } from "./eintrag-stil";
+
+// Die Liste - was hier vorher die ganze Seite war.
+//
+// Sie bleibt die Voreinstellung am Handy, und zwar aus dem Grund, der im alten
+// Kommentar stand und weiter gilt: die Frage lautet unterwegs nicht "wie sieht
+// der Mai aus", sondern "was steht als Naechstes an". Neu ist nur, dass sie
+// nicht mehr die einzige Antwort ist - und dass fremde Termine mitlaufen.
+
+const tagFormat = new Intl.DateTimeFormat("de-DE", {
+  weekday: "long",
+  day: "2-digit",
+  month: "long",
+  timeZone: "UTC",
+});
+
+const zeitFormat = new Intl.DateTimeFormat("de-DE", {
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "Europe/Berlin",
+});
+
+export function Agenda({
+  eintraege,
+  heute,
+}: {
+  eintraege: KalenderEintrag[];
+  heute: string;
+}) {
+  const tage = new Map<string, KalenderEintrag[]>();
+  for (const eintrag of eintraege) {
+    const tag = berlinDayOf(eintrag.von);
+    const liste = tage.get(tag) ?? [];
+    liste.push(eintrag);
+    tage.set(tag, liste);
+  }
+
+  if (tage.size === 0) {
+    return (
+      <div className={`${card} px-6 py-12 text-center`}>
+        <p className="text-sm font-medium text-slate-900">Nichts eingetragen</p>
+        <p className="mt-1 text-sm text-slate-500">
+          Termine entstehen im Gespräch — der Knopf „Termin“ im{" "}
+          <Link href="/namen" className="font-medium text-navy-600 hover:underline">
+            Durchlauf
+          </Link>{" "}
+          legt sie an. Alles andere — Schulung, Begleitung, ein privater Blocker —
+          trägst du hier selbst ein.
+        </p>
+      </div>
+    );
+  }
+
+  const morgen = shiftDay(heute, 1);
+  const gestern = shiftDay(heute, -1);
+  const tagName = (tag: string) => {
+    if (tag === heute) return "Heute";
+    if (tag === morgen) return "Morgen";
+    if (tag === gestern) return "Gestern";
+    return tagFormat.format(dayToUtcDate(tag));
+  };
+
+  return (
+    <div className="space-y-6">
+      {[...tage.entries()].map(([tag, liste]) => (
+        <section key={tag} className="space-y-2">
+          <h2
+            className={cn(
+              "text-base font-semibold",
+              tag < heute ? "text-slate-400" : "text-slate-900"
+            )}
+          >
+            {tagName(tag)}
+            <span className="ml-2 text-sm font-normal text-slate-400">{liste.length}</span>
+          </h2>
+          <ul className="space-y-2">
+            {liste.map((eintrag) => {
+              const stil = stilFuer(eintrag);
+              return (
+                <li
+                  key={eintrag.id}
+                  className={cn(
+                    `${card} flex items-center gap-3 p-4`,
+                    // Vergangenes bleibt sichtbar, tritt aber zurueck. Dass es
+                    // ueberhaupt sichtbar ist, ist neu: vorher verschwand ein
+                    // gehaltener Termin am naechsten Tag spurlos.
+                    tag < heute && "opacity-60"
+                  )}
+                >
+                  <span className="flex w-14 shrink-0 items-center gap-1.5">
+                    <span className={cn("h-2 w-2 shrink-0 rounded-full", stil.punkt)} />
+                    <span className="text-sm font-semibold tabular-nums text-navy-800">
+                      {eintrag.ganztags ? "—" : zeitFormat.format(eintrag.von)}
+                    </span>
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    {eintrag.kontaktId ? (
+                      <Link
+                        href={`/contacts/${eintrag.kontaktId}`}
+                        className="block truncate text-sm font-semibold text-slate-900 hover:text-navy-700"
+                      >
+                        {eintrag.titel}
+                      </Link>
+                    ) : (
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {beschriftung(eintrag)}
+                      </p>
+                    )}
+                    {(eintrag.zusatz || eintrag.quelleName) && (
+                      <p className="truncate text-xs text-slate-500">
+                        {[eintrag.quelleName && `aus ${eintrag.quelleName}`, eintrag.zusatz]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1">
+                    {eintrag.telefon && (
+                      <a
+                        href={`tel:${eintrag.telefon.replace(/\s/g, "")}`}
+                        aria-label={`${eintrag.titel} anrufen`}
+                        className="flex min-h-11 w-11 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                      >
+                        <PhoneIcon className="h-4 w-4" />
+                      </a>
+                    )}
+                    {eintrag.kontaktId && (
+                      <a
+                        href={`/kalender/${eintrag.kontaktId}.ics`}
+                        aria-label={`Termin mit ${eintrag.titel} in den Kalender übernehmen`}
+                        title="Einzeln in den Kalender des Handys übernehmen"
+                        className="flex min-h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-50 hover:text-navy-700"
+                      >
+                        <CalendarCheckIcon className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}

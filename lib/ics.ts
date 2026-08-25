@@ -101,3 +101,77 @@ export function icsDatei(termine: IcsTermin[], jetzt = new Date()): string {
   zeilen.push("END:VCALENDAR");
   return zeilen.join(ZEILENENDE) + ZEILENENDE;
 }
+
+// --- Abo-Feed ---------------------------------------------------------------
+// docs/struktur-plan.md, Abschnitt 7.2.
+//
+// Der Unterschied zur Datei oben ist nicht der Inhalt, sondern die Zustellung:
+// eine Datei laedt man einmal herunter, einen Feed holt das Telefon von selbst
+// wieder ab. Das ist die einzige Kette, ueber die CRM-Termine ueberhaupt nach
+// TimeTree kommen - TimeTree kann keine ICS-Adresse abonnieren, es zeigt nur,
+// was im Kalender des Handys steht:
+//
+//   CRM-Feed -> Google Kalender / iOS-Abo -> Handy-Kalender -> TimeTree
+//
+// Drei Dinge muss ein Feed anders machen als ein Download:
+//   1. Kein VALARM. Bei einem Abo-Kalender mit vielen Terminen weckt sonst
+//      jeder einzelne - und der Morgen-Cron meldet ohnehin schon.
+//   2. X-WR-CALNAME und REFRESH-INTERVAL, damit der Kalender einen Namen hat
+//      und weiss, wie oft er nachschauen soll.
+//   3. Keine Kundennamen, ausser es ist ausdruecklich freigeschaltet.
+
+export type FeedEintrag = {
+  id: string;
+  /** Was drinsteht, wenn Namen freigeschaltet sind. */
+  titel: string;
+  /** Was drinsteht, wenn nicht. */
+  ersatzTitel: string;
+  von: Date;
+  bis: Date;
+  ganztags?: boolean;
+  ort?: string | null;
+};
+
+/** Datum ohne Uhrzeit: 20260824 - fuer ganztaegige Eintraege. */
+function icsTag(date: Date): string {
+  return date.toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+export function icsFeed(
+  eintraege: FeedEintrag[],
+  optionen: { name: string; namenZeigen: boolean; jetzt?: Date }
+): string {
+  const jetzt = optionen.jetzt ?? new Date();
+  const zeilen: string[] = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Ergo CRM//Termine//DE",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    falte(`X-WR-CALNAME:${maskiere(optionen.name)}`),
+    "X-PUBLISHED-TTL:PT1H",
+    "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+  ];
+
+  for (const eintrag of eintraege) {
+    const titel = optionen.namenZeigen ? eintrag.titel : eintrag.ersatzTitel;
+
+    zeilen.push(
+      "BEGIN:VEVENT",
+      `UID:${eintrag.id}@ergo-crm`,
+      `DTSTAMP:${icsZeit(jetzt)}`,
+      ...(eintrag.ganztags
+        ? [
+            `DTSTART;VALUE=DATE:${icsTag(eintrag.von)}`,
+            `DTEND;VALUE=DATE:${icsTag(eintrag.bis)}`,
+          ]
+        : [`DTSTART:${icsZeit(eintrag.von)}`, `DTEND:${icsZeit(eintrag.bis)}`]),
+      falte(`SUMMARY:${maskiere(titel)}`),
+      ...(eintrag.ort ? [falte(`LOCATION:${maskiere(eintrag.ort)}`)] : []),
+      "END:VEVENT"
+    );
+  }
+
+  zeilen.push("END:VCALENDAR");
+  return zeilen.join(ZEILENENDE) + ZEILENENDE;
+}

@@ -24,7 +24,7 @@ sabotiert — es wird frisiert. Dann stehen schöne Zahlen drin, die nichts wert
 | Tiefe | Zahlen über die **ganze Struktur**, Details nur **eine Ebene tief** |
 | Zugänge | **Einladungslink mit Code**, Selbstregistrierung unterhalb der einladenden Führungskraft |
 | Reichweite | Erst **du + 2–3 Testleute**. Eine Instanz, ein Baum. Mehrmandanten-Fähigkeit ist ausdrücklich kein Ziel dieser Ausbaustufe |
-| Kalender | **Das CRM ist die einzige Wahrheit.** TimeTree lässt sich nicht anbinden (kein ICS-Abo, kein Export) — das CRM schreibt, TimeTree liest. Preis: private Blocker gehören mit rein |
+| Kalender | **Das CRM ist die einzige Wahrheit.** TimeTree hat keine offizielle Schnittstelle mehr (abgeschaltet 22.12.2023) — hinaus geht es über einen ICS-Abo-Link, herein über einen inoffiziellen Weg, der jederzeit brechen darf (siehe Nachtrag in 7.1). Preis: private Blocker gehören mit rein |
 | Provision | **Wird nicht gebaut.** Falsche Zahlen zu Geld sind teurer als kein Feature |
 
 ---
@@ -410,21 +410,49 @@ abonnierte ICS-Adressen typischerweise nur alle paar Stunden. Ein Termin, den du
 einträgst, steht nicht um 10:01 in TimeTree. Für „mein Tag im gewohnten Kalender" reicht
 das, als Arbeitswerkzeug nicht.
 
-**3. Der Rückweg TimeTree → CRM existiert nicht.**
+**3. Der Rückweg TimeTree → CRM existiert nicht — offiziell.**
 Das CRM kann private Blocker nicht kennen. Wer Verfügbarkeit braucht — Begleitung planen,
 später ein Buchungslink —, muss Blocker im CRM pflegen. Stufe 2 unten ist deshalb kein
 Extra, sondern Voraussetzung.
 
+> **Nachtrag (26.08.2026): Der Rückweg ist gebaut — inoffiziell.**
+> Auf ausdrücklichen Wunsch gibt es `lib/kalender/timetree.ts`. Es benutzt die
+> Aufrufe, die die TimeTree-Weboberfläche selbst verwendet (nachgebaut nach
+> [TimeTree-Exporter](https://github.com/eoleedi/TimeTree-Exporter)). Das ist
+> **kein zugesicherter Weg**, sondern ein bewusst eingegangenes Risiko mit
+> Verfallsdatum:
+>
+> - Es kann jederzeit brechen. Deshalb fängt `lib/kalender/abgleich.ts` **jeden**
+>   Fehler ab und schreibt ihn an die Quelle. Der Kalender läuft ohne TimeTree
+>   vollständig weiter — die Quelle ist Beiwerk, nie Fundament.
+> - Das TimeTree-Passwort liegt **umkehrbar** verschlüsselt in der Datenbank
+>   (`lib/crypto.ts`, `KALENDER_SECRET`), nicht gehasht. Anders geht es nicht:
+>   die Anmeldung verlangt es im Klartext.
+> - Es funktioniert nur mit E-Mail und Passwort. Apple-/Google-Anmeldung bei
+>   TimeTree schließt diesen Weg aus.
+>
+> Alle drei Punkte stehen auf `/kalender/quellen` — dort, wo jemand entscheidet,
+> nicht nur hier. **Der Satz aus 7.3 gilt unverändert:** das CRM bleibt die
+> maßgebliche Stelle. Was aus TimeTree hereinkommt, ist Belegung ohne Vorgang,
+> und es geht nie in den Abo-Feed zurück (sonst Echo).
+
 ### 7.2 Ausbaustufen
 
-| Stufe | Inhalt | Aufwand |
+| Stufe | Inhalt | Stand |
 |---|---|---|
-| 1 | Ansicht Tag / Woche / Monat auf vorhandene Daten. Mobil: Tag plus Wochenstreifen | klein |
-| 2 | Eigene Einträge ohne Kontakt (Schulung, Teammeeting, **privater Blocker**) → ein neues Modell | klein |
-| 3 | **ICS-Abo-Link** je Berater, signiert — **ohne Kundennamen** | klein |
-| 4 | Team-Kalender **im CRM**: belegte Slots der Mannschaft ohne Namen → Begleitung planen | mittel |
+| 1 | Ansicht Monat / Woche / Tag / Liste auf vorhandene Daten. Mobil: Liste als Voreinstellung | **gebaut** (26.08.2026) |
+| 2 | Eigene Einträge ohne Kontakt (Schulung, Teammeeting, **privater Blocker**) → Modell `Termin` | **gebaut** |
+| 3 | **ICS-Abo-Link** je Berater — **ohne Kundennamen** | **gebaut** (`/kalender/abo`) |
+| 3b | TimeTree hereinholen, inoffiziell | **gebaut** (`/kalender/quellen`, siehe Nachtrag in 7.1) |
+| 4 | Team-Kalender **im CRM**: belegte Slots der Mannschaft ohne Namen → Begleitung planen | offen, mittel |
 | 5 | Zwei-Wege-Sync mit Google / M365 | **groß, bewusst nicht** |
 | 6 | Buchungslink für Kunden | später |
+
+Zu Stufe 1: das Monatsraster ist doch dabei, entgegen der ursprünglichen Absage. Der
+Einwand („am Handy unlesbar") stimmt weiterhin, aber die Schlussfolgerung war falsch.
+Die Antwort ist nicht, das Gitter wegzulassen, sondern es am Handy nicht zur
+Voreinstellung zu machen. Dort bleibt die Liste; am Schreibtisch ist die Woche die
+Arbeitsfläche.
 
 **Der Feed trägt keine Kundennamen.** Voreinstellung ist „Termin · Beratung" statt „Termin
 Anna Weber" — aus demselben Grund wie Stufe 2 in Abschnitt 3.2, hier aber mit einer

@@ -154,3 +154,36 @@ export const dueLabels: Record<DueState, string> = {
   week: "Diese Woche",
   later: "Später",
 };
+
+// --- Kalenderraster ---------------------------------------------------------
+// Zwei Helfer, die nur die Rasteransichten brauchen. Sie stehen hier und nicht
+// in lib/kalender/, weil sie reine Datumsarithmetik sind - und weil die
+// Zeitzonen-Falle oben schon geloest ist und nicht zweimal geloest werden soll.
+
+/**
+ * Minuten seit Mitternacht Berliner Zeit. Das ist die Y-Achse des Zeitrasters:
+ * ein Termin um 14:30 sitzt bei 870 von 1440.
+ *
+ * Bewusst gegen Europe/Berlin gerechnet und nicht gegen UTC: auf Vercel laeuft
+ * der Server in UTC, und ein Termin um 00:30 Berliner Zeit gehoert im Sommer
+ * sonst in den Vortag.
+ */
+export function berlinMinutesOfDay(date: Date): number {
+  const parts = berlinPartsFormat.formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? "0");
+  return (get("hour") % 24) * 60 + get("minute");
+}
+
+/**
+ * Die Tage eines Monatsgitters, immer von einem Montag bis zu einem Sonntag.
+ *
+ * Sechs Wochen fest und nicht "so viele wie noetig": ein Gitter, das je nach
+ * Monat fuenf oder sechs Zeilen hat, springt beim Blaettern in der Hoehe. Das
+ * faellt staerker auf als die eine leere Zeile im Februar.
+ */
+export function tageImRaster(day: string): string[] {
+  const ersterDesMonats = startOfMonth(day).toISOString().slice(0, 10);
+  const start = mondayOf(ersterDesMonats);
+  return Array.from({ length: 42 }, (_, i) => shiftDay(start, i));
+}
