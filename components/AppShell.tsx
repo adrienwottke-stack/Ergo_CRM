@@ -38,7 +38,11 @@ export function navigationFuer(user: User): NavLink[] {
     { href: "/einladen", label: "Einladen" },
     // Ein Punkt fuer den ganzen Wettbewerb. Rangliste und eigene Aktivitaeten
     // haengen darunter und markieren denselben Punkt mit.
-    { href: "/arena", label: "Wettbewerb", match: ["/leaderboard", "/log", "/spiel"] },
+    {
+      href: "/arena",
+      label: "Wettbewerb",
+      match: ["/leaderboard", "/log", "/einheiten", "/spiel"],
+    },
     ...(user.role === "ADMIN"
       ? [{ href: "/team", label: "Team", match: ["/werkstatt"] }]
       : []),

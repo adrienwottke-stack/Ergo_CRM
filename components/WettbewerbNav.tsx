@@ -15,6 +15,9 @@ const PUNKTE = [
   { href: "/arena", label: "Arena" },
   { href: "/leaderboard", label: "Rangliste" },
   { href: "/log", label: "Meine Aktivitäten" },
+  // Direkt neben den Taetigkeiten, und das mit Absicht: die eine Seite zaehlt,
+  // was man getan hat, die andere, was dabei herausgekommen ist.
+  { href: "/einheiten", label: "Einheiten" },
   { href: "/spiel", label: "Spiel" },
 ];
 

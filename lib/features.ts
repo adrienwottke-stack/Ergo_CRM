@@ -27,7 +27,11 @@ export type ArenaKey =
   | "stufen"
   | "titel"
   | "feed"
-  | "spiel";
+  | "spiel"
+  // Die Zahl, in der der Betrieb rechnet - kein Wettbewerbsbaustein, aber im
+  // selben Bereich und damit derselben Regel unterworfen: kein Baustein ohne
+  // Schluessel, Schalter und Zaehlstelle.
+  | "einheiten";
 
 // Eine Abfrage je Anfrage, danach beantwortet der Cache alle weiteren Fragen.
 export const featureStates = cache(async (): Promise<Map<string, FeatureState>> => {
