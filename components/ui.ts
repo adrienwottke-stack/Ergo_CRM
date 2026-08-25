@@ -20,10 +20,10 @@ export function cn(...teile: Array<string | false | null | undefined>) {
   return teile.filter(Boolean).join(" ");
 }
 
-export const card = "rounded-xl border border-line bg-surface shadow-card";
+export const card = "rounded-xl border border-line bg-surface schatten-karte";
 
 /** Karte, die auf einen Klick wartet: hebt sich unter dem Zeiger leicht an. */
-export const cardInteractive = `${card} transition duration-200 hover:-translate-y-px hover:border-line-strong hover:shadow-lift`;
+export const cardInteractive = `${card} transition duration-200 hover:-translate-y-px hover:border-line-strong hover:schatten-hoch`;
 
 /** Eingesenkte Flaeche - fuer Balken-Rinnen, Segment-Gruppen, Code. */
 export const surfaceSunken = "bg-sunken";
@@ -58,7 +58,7 @@ export const shell = "mx-auto w-full max-w-6xl 2xl:max-w-7xl";
 export const gutter = "px-4 sm:px-6 lg:px-8";
 
 export const btnPrimary =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-akzent px-5 py-2 text-sm font-medium text-white shadow-card transition hover:bg-akzent-stark hover:shadow-lift active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-akzent px-5 py-2 text-sm font-medium text-white schatten-karte transition hover:bg-akzent-stark hover:schatten-hoch active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600";
 
 export const btnSecondary =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600";
@@ -92,7 +92,7 @@ export const td = "px-4 py-3.5 first:pl-5 last:pr-5";
 export const filterPill = (active: boolean) =>
   `inline-flex min-h-9 items-center rounded-full px-3.5 text-sm font-medium transition ${
     active
-      ? "bg-akzent text-white shadow-card"
+      ? "bg-akzent text-white schatten-karte"
       : "border border-line-strong bg-surface text-slate-600 hover:border-slate-400 hover:text-slate-900"
   }`;
 
@@ -115,7 +115,7 @@ const flaechen: Record<Ton, string> = {
 
 /** Getoente Flaeche mit passender Kante. */
 export const flaeche = (ton: Ton = "neutral") =>
-  `rounded-xl border shadow-card ${flaechen[ton]}`;
+  `rounded-xl border schatten-karte ${flaechen[ton]}`;
 
 const chips: Record<Ton, string> = {
   neutral: "bg-slate-100 text-slate-600",

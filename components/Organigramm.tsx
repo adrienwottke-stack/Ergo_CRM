@@ -400,7 +400,7 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
               }}
               draggable={false}
               style={{ left: p.x, top: p.y, width: KASTEN_B, height: KASTEN_H }}
-              className={`absolute flex flex-col justify-center gap-[2px] rounded-[12px] border bg-surface px-[12px] py-[8px] transition hover:border-navy-400 hover:shadow-sm ${
+              className={`absolute flex flex-col justify-center gap-[2px] rounded-[12px] border bg-surface px-[12px] py-[8px] schatten-karte transition duration-200 hover:border-navy-400 hover:schatten-hoch ${
                 k.istDu
                   ? "border-navy-800 ring-1 ring-navy-800/15"
                   : k.platzhalter
@@ -414,7 +414,7 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
                   className={`h-[10px] w-[10px] shrink-0 rounded-full ${
                     k.platzhalter
                       ? "border-2 border-slate-300 bg-surface"
-                      : ampelFarben[k.ampel]
+                      : `${ampelFarben[k.ampel]} ${k.ampel === "rot" ? "animate-halo" : ""}`
                   }`}
                 />
                 <span className="truncate text-[14px] font-semibold text-slate-900">

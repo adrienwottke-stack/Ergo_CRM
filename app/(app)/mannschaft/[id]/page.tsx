@@ -3,7 +3,8 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { astLage, fuehrungsSchritt, type Mannschaftsperson } from "@/lib/fuehrung";
-import { ampelFarben, ampelTexte } from "@/lib/signale";
+import Ampel from "@/components/Ampel";
+import Kennzahl from "@/components/Kennzahl";
 import {
   aufriss,
   letzteSchritte,
@@ -117,27 +118,6 @@ function naechsterText(schritt: NaechsterSchritt): string {
   return `${nextStepLabels[schritt.art]} · ${schritt.kontakt} · ${wann}`;
 }
 
-function Kennzahl({
-  wert,
-  bezeichnung,
-  betont = false,
-}: {
-  wert: number | string;
-  bezeichnung: string;
-  betont?: boolean;
-}) {
-  return (
-    <div className="min-w-18">
-      <p
-        className={`text-lg font-semibold tabular-nums ${betont ? "text-navy-700" : "text-slate-900"}`}
-      >
-        {wert}
-      </p>
-      <p className="text-xs text-slate-500">{bezeichnung}</p>
-    </div>
-  );
-}
-
 /**
  * Ein Tag im Verlauf.
  *
@@ -164,9 +144,11 @@ function VerlaufsTag({
       <ul className="mt-1.5 space-y-1.5">
         {ereignisse.map((ereignis) => (
           <li key={ereignis.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+            {/* Der Ring trennt den Punkt von der Flaeche dahinter - ohne ihn
+                verschwimmen die Farben im Dunkelmodus zu grauen Fusseln. */}
             <span
               aria-hidden
-              className={`h-2 w-2 shrink-0 self-center rounded-full ${ereignisPunkt[ereignis.art]}`}
+              className={`h-2 w-2 shrink-0 self-center rounded-full ring-2 ring-surface ${ereignisPunkt[ereignis.art]}`}
             />
             <span className="w-10 shrink-0 tabular-nums text-xs text-slate-400">
               {uhrzeit.format(ereignis.wann)}
@@ -196,12 +178,8 @@ function AstZeile({ person }: { person: Mannschaftsperson }) {
         href={`/mannschaft/${person.id}`}
         className="-mx-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg px-2 py-2 transition hover:bg-slate-50"
       >
-        <span
-          aria-hidden
-          className={`h-2 w-2 shrink-0 self-center rounded-full ${ampelFarben[person.ampel]}`}
-        />
+        <Ampel ampel={person.ampel} variante="punkt" groesse="klein" className="self-center" />
         <span className="text-sm font-medium text-slate-900">{person.name}</span>
-        <span className="sr-only">{ampelTexte[person.ampel]}</span>
         {person.fuehrt > 0 && (
           <span className="rounded-full bg-navy-50 px-2 py-0.5 text-11 text-navy-700">
             führt {person.fuehrt}
@@ -269,12 +247,11 @@ export default async function PersonPage({
           ← Mannschaft
         </Link>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span
-            aria-hidden
-            className={`h-3 w-3 rounded-full ${ampelFarben[person.ampel]}`}
-          />
+          <Ampel ampel={person.ampel} variante="punkt" groesse="gross" />
           <h1 className={pageTitle}>{person.name}</h1>
-          <span className="sr-only">{ampelTexte[person.ampel]}</span>
+          {/* Der Zustand als Wort direkt hinter dem Namen - das ist die
+              Antwort auf die Frage, mit der man diese Seite oeffnet. */}
+          <Ampel ampel={person.ampel} variante="text" />
           {person.ueber && (
             <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
               über {person.ueber}

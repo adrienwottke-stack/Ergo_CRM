@@ -1,16 +1,53 @@
+// Der Platzhalter, bis eine Seite da ist.
+//
+// Vorher zeigte er einen Titel, drei Kacheln nebeneinander und eine grosse
+// Flaeche - ein Aufbau, den keine der Seiten wirklich hat. Der Sprung beim
+// Laden war dadurch groesser als ohne Platzhalter.
+//
+// Jetzt bildet er nach, was tatsaechlich kommt: Kopfzeile, eine breite Karte,
+// darunter eine Liste. Das passt auf /heute, /mannschaft, /kalender und
+// /trichter gleichermassen.
+//
+// Der Schimmer laeuft nur, wenn Bewegung erlaubt ist - sonst stehen die
+// Flaechen ruhig da (animate-shimmer bringt die Farbe selbst mit, deshalb
+// tragen die Balken zusaetzlich eine eigene Grundfarbe).
+
+function Balken({ className }: { className: string }) {
+  return <div className={`animate-shimmer rounded-lg bg-slate-200 ${className}`} />;
+}
+
 export default function PageSkeleton() {
   return (
-    <div className="animate-pulse space-y-6" aria-hidden>
+    <div className="space-y-6" aria-hidden>
+      {/* Kopf */}
       <div className="space-y-2">
-        <div className="h-8 w-56 rounded-lg bg-slate-200/80" />
-        <div className="h-4 w-72 rounded bg-slate-200/60" />
+        <Balken className="h-3 w-24" />
+        <Balken className="h-8 w-52" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="h-36 rounded-xl bg-slate-200/60" />
-        <div className="h-36 rounded-xl bg-slate-200/60" />
-        <div className="h-36 rounded-xl bg-slate-200/60" />
+
+      {/* Die Karte mit der Tagesleistung */}
+      <div className="rounded-xl border border-line bg-surface p-5 schatten-karte sm:p-6">
+        <Balken className="h-9 w-28" />
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <Balken className="h-14" />
+          <Balken className="h-14" />
+          <Balken className="h-14" />
+        </div>
       </div>
-      <div className="h-72 rounded-xl bg-slate-200/60" />
+
+      {/* Die Liste darunter */}
+      <div className="space-y-3">
+        <Balken className="h-4 w-32" />
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="rounded-xl border border-line bg-surface p-4 schatten-karte"
+          >
+            <Balken className="h-4 w-40" />
+            <Balken className="mt-2.5 h-3 w-64" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

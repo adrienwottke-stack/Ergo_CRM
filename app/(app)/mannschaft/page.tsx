@@ -10,7 +10,10 @@ import {
   type Mannschaftsperson,
 } from "@/lib/fuehrung";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
-import { ampelFarben, ampelTexte, type Signal } from "@/lib/signale";
+import { type Signal } from "@/lib/signale";
+import Ampel from "@/components/Ampel";
+import Kennzahl from "@/components/Kennzahl";
+import Fortschritt from "@/components/Fortschritt";
 import { NAMENSFENSTER_TAGE } from "@/lib/einblick";
 import { SCHNELLTEXTE_FUEHRUNG } from "@/lib/nachrichten";
 import NachrichtSenden from "@/components/NachrichtSenden";
@@ -19,7 +22,7 @@ import { PhoneIcon } from "@/components/icons";
 import Organigramm, { type OrgaKnoten } from "@/components/Organigramm";
 import PersonAufnehmen from "@/components/PersonAufnehmen";
 import { elternIdVon } from "@/lib/struktur";
-import { card, filterPill, kicker, pageTitle } from "@/components/ui";
+import { card, filterPill, flaeche, kicker, pageTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -28,25 +31,6 @@ const datumKurz = new Intl.DateTimeFormat("de-DE", {
   month: "2-digit",
   timeZone: "Europe/Berlin",
 });
-
-function Kennzahl({
-  wert,
-  bezeichnung,
-  betont = false,
-}: {
-  wert: number | string;
-  bezeichnung: string;
-  betont?: boolean;
-}) {
-  return (
-    <div className="min-w-18">
-      <p className={`text-lg font-semibold tabular-nums ${betont ? "text-navy-700" : "text-slate-900"}`}>
-        {wert}
-      </p>
-      <p className="text-xs text-slate-500">{bezeichnung}</p>
-    </div>
-  );
-}
 
 function SignalZeile({ signal }: { signal: Signal }) {
   return (
@@ -303,7 +287,7 @@ export default async function MannschaftPage({
             </span>
           </p>
           <ul className="mt-3 space-y-1.5">
-            {aeste.aeste.map((ast) => {
+            {aeste.aeste.map((ast, i) => {
               const spitze = aeste.aeste[0]?.punkte ?? 0;
               const breite = spitze > 0 ? Math.max(2, (ast.punkte / spitze) * 100) : 2;
               return (
@@ -315,12 +299,15 @@ export default async function MannschaftPage({
                   >
                     {ast.istMeiner ? "Deine Leute" : ast.name}
                   </span>
-                  <span aria-hidden className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                    <span
-                      className={`block h-full rounded-full ${ast.istMeiner ? "bg-navy-700" : "bg-slate-300"}`}
-                      style={{ width: `${breite}%` }}
-                    />
-                  </span>
+                  {/* Die Balken wachsen nacheinander ein - der Vergleich
+                      liest sich dadurch als Rangfolge, nicht als Tabelle. */}
+                  <Fortschritt
+                    anteil={breite / 100}
+                    ton={ast.istMeiner ? "info" : "neutral"}
+                    hoehe="kraeftig"
+                    verzoegerung={i * 60}
+                    className="flex-1"
+                  />
                   <span
                     className={`w-10 shrink-0 text-right text-xs tabular-nums ${
                       ast.istMeiner ? "font-semibold text-slate-900" : "text-slate-500"
@@ -348,12 +335,16 @@ export default async function MannschaftPage({
               return (
                 <li
                   key={person.id}
-                  className={`${card} border-l-4 p-4 sm:p-5 ${
+                  // Diese Karten sind der Grund, warum die Seite existiert:
+                  // getoente Flaeche statt weiss, damit der Blick zuerst hier
+                  // haengenbleibt und nicht in der Struktur darunter.
+                  className={`${flaeche(person.ampel === "rot" ? "gefahr" : "warnung")} border-l-4 p-4 transition duration-200 hover:schatten-hoch sm:p-5 ${
                     person.ampel === "rot" ? "border-l-red-500" : "border-l-amber-400"
                   }`}
                 >
                   <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                     <NameLink person={person} klasse="text-base font-semibold text-slate-900" />
+                    <Ampel ampel={person.ampel} variante="text" />
                     <UeberChip person={person} />
                     <Merkmale person={person} />
                   </div>
@@ -439,10 +430,7 @@ export default async function MannschaftPage({
           <ul className="mt-2.5 divide-y divide-slate-100">
             {lage.ruhend.map((person) => (
               <li key={person.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-2">
-                <span
-                  aria-hidden
-                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${ampelFarben[person.ampel]}`}
-                />
+                <Ampel ampel={person.ampel} variante="punkt" groesse="klein" />
                 <NameLink person={person} klasse="text-sm font-medium text-slate-900" />
                 <UeberChip person={person} />
                 <span className="text-sm text-slate-500">
@@ -531,12 +519,11 @@ export default async function MannschaftPage({
                 >
                   <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                     <span className="flex items-center gap-2">
-                      <span
-                        aria-hidden
-                        className={`h-2.5 w-2.5 rounded-full ${ampelFarben[person.ampel]}`}
-                      />
+                      <Ampel ampel={person.ampel} variante="punkt" />
                       <NameLink person={person} klasse="text-sm font-semibold text-slate-900" />
-                      <span className="sr-only">{ampelTexte[person.ampel]}</span>
+                      {/* Der Zustand steht jetzt als Wort daneben, nicht mehr
+                          nur im sr-only-Text: "braucht dich" muss man sehen. */}
+                      <Ampel ampel={person.ampel} variante="text" />
                     </span>
                     <UeberChip person={person} />
                     <Merkmale person={person} />
@@ -588,12 +575,12 @@ export default async function MannschaftPage({
                   {person.pass && (
                     <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
                       <span className="text-xs font-medium text-slate-500">Starterpass</span>
-                      <span aria-hidden className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                        <span
-                          className="block h-full rounded-full bg-navy-600"
-                          style={{ width: `${(person.pass.geschafft / person.pass.gesamt) * 100}%` }}
-                        />
-                      </span>
+                      <Fortschritt
+                        anteil={person.pass.geschafft / person.pass.gesamt}
+                        ton="info"
+                        className="flex-1"
+                        beschriftung={`Starterpass: ${person.pass.geschafft} von ${person.pass.gesamt}`}
+                      />
                       <span className="text-xs font-semibold tabular-nums text-slate-700">
                         {person.pass.geschafft} von {person.pass.gesamt}
                       </span>

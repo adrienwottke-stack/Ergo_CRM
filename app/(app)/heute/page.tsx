@@ -39,6 +39,16 @@ const kurzDatum = new Intl.DateTimeFormat("de-DE", {
   timeZone: "Europe/Berlin",
 });
 
+// Dringlichkeit als Kante links an der Karte. Vorher hatte jede Zeile
+// denselben grauen Rahmen - ob sie seit einer Woche liegt oder erst naechsten
+// Freitag ansteht, sah gleich aus. Die Kante beantwortet das, bevor man liest.
+const kanteJeFaelligkeit: Record<DueState, string> = {
+  overdue: "border-l-4 border-l-red-400",
+  today: "border-l-4 border-l-navy-400",
+  week: "border-l-4 border-l-slate-200",
+  later: "border-l-4 border-l-slate-200",
+};
+
 export default async function HeutePage() {
   const user = await requireUser();
 
@@ -345,29 +355,32 @@ export default async function HeutePage() {
       <ErsteWoche user={user} />
 
       {rows.length === 0 && orphans.length === 0 && aufgaben.length === 0 ? (
-        <div className={`${card} flex flex-col items-center px-6 py-16 text-center`}>
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-            <CheckIcon className="h-6 w-6" />
-          </span>
-          <p className="mt-4 text-sm font-medium text-slate-900">
-            Keine offenen Schritte
-          </p>
-          <p className="mt-1 text-sm text-slate-500">
-            Neue Namen sammelst du in der{" "}
-            <Link href="/namen" className="font-medium text-navy-600 hover:underline">
-              Namensliste
-            </Link>
-            .
-          </p>
+        <LeerZustand
+          ton="erfolg"
+          symbol={<CheckIcon className="h-6 w-6" />}
+          titel="Keine offenen Schritte"
+          text={
+            <>
+              Neue Namen sammelst du in der{" "}
+              <Link
+                href="/namen"
+                className="font-medium text-navy-600 hover:underline"
+              >
+                Namensliste
+              </Link>
+              .
+            </>
+          }
+        >
           {/* Der Willkommens-Ablauf bleibt aufrufbar - zum Vorfuehren am
               Launch-Tag und fuer alle, die ihn weggeklickt haben. */}
           <Link
             href="/willkommen"
-            className="mt-4 text-xs font-medium text-slate-400 hover:text-navy-700 hover:underline"
+            className="text-xs font-medium text-slate-400 hover:text-navy-700 hover:underline"
           >
             Wie das hier gedacht ist — der Start, nochmal
           </Link>
-        </div>
+        </LeerZustand>
       ) : (
         groups
           .filter((group) => group.rows.length + aufgabenJe[group.key].length > 0)
@@ -389,7 +402,7 @@ export default async function HeutePage() {
                 {aufgabenJe[group.key].map((aufgabe) => (
                   <FuehrungsAufgabe key={aufgabe.id} aufgabe={aufgabe} />
                 ))}
-                {group.rows.map((row) => {
+                {group.rows.map((row, i) => {
                   const contact = row.data;
                   const lite: ContactLite = {
                     id: contact.id,
@@ -404,7 +417,17 @@ export default async function HeutePage() {
                     referralsAsked: contact.referralsAskedAt !== null,
                   };
                   return (
-                    <li key={contact.id} className={`${card} p-4`}>
+                    <li
+                      key={contact.id}
+                      className={`${card} ${kanteJeFaelligkeit[row.due]} animate-rise p-4 transition duration-200 hover:schatten-hoch`}
+                      // Die Zeilen laufen leicht versetzt ein. Nur die ersten
+                      // acht - danach wuerde man auf die Liste warten.
+                      style={
+                        i < 8
+                          ? ({ "--rise-delay": `${i * 40}ms` } as React.CSSProperties)
+                          : undefined
+                      }
+                    >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <Link
                           href={`/contacts/${contact.id}`}
@@ -475,7 +498,10 @@ export default async function HeutePage() {
           </div>
           <ul className="space-y-3">
             {orphans.slice(0, 25).map((contact) => (
-              <li key={contact.id} className={`${card} border-red-200 p-4`}>
+              <li
+                key={contact.id}
+                className={`${card} border-l-4 border-l-amber-400 p-4 transition duration-200 hover:schatten-hoch`}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <Link
                     href={`/contacts/${contact.id}`}

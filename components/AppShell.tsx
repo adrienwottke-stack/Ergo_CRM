@@ -65,7 +65,7 @@ export default async function AppShell({
           dieselbe: ein fester Anker, egal wie der Rest gerade steht.
           Das Polster oben faengt die Statusleiste ab, wenn die App vom
           Startbildschirm laeuft (statusBarStyle black-translucent). */}
-      <header className="buehne sticky top-0 z-20 border-b border-navy-800 bg-navy-950 pt-[env(safe-area-inset-top)] shadow-card">
+      <header className="buehne sticky top-0 z-20 border-b border-navy-800 bg-navy-950 pt-[env(safe-area-inset-top)] schatten-karte">
         <div
           className={`${shell} ${gutter} flex h-14 items-center justify-between gap-4`}
         >

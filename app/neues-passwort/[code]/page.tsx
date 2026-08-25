@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { LogoMark } from "@/components/Logo";
 import { LockIcon } from "@/components/icons";
-import { btnPrimary, input, label } from "@/components/ui";
+import { btnPrimary, card, input, label } from "@/components/ui";
 import { PASSWORT_MIN_ZEICHEN } from "@/lib/passwort";
 import { passwortSetzen } from "./actions";
 
@@ -39,7 +39,7 @@ export default async function NeuesPasswortPage({
   return (
     <main className="flex min-h-dvh items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-sm">
-        <div className="rounded-xl border border-slate-200 bg-surface p-8">
+        <div className={`${card} p-8`}>
           <div className="flex flex-col items-center text-center">
             <LogoMark className="h-12 w-12" />
             <h1 className="mt-4 text-xl font-semibold tracking-[-0.02em] text-slate-900">

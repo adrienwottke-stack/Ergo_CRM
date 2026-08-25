@@ -75,13 +75,33 @@
   /* Akzent: Hauptknopf und alles, was fuehrt */
   --color-akzent: #12233c;
   --color-akzent-stark: #0a1628;
+}
 
-  /* ---- Tiefe ----
-     Navy-getoent, nie schwarz: ein schwarzer Schatten auf hellem Grund wirkt
-     schmutzig, ein leicht blauer wirkt wie Licht. */
-  --shadow-card: 0 1px 2px rgb(16 32 56 / 0.04), 0 1px 3px rgb(16 32 56 / 0.06);
-  --shadow-lift: 0 2px 4px rgb(16 32 56 / 0.05), 0 8px 20px -6px rgb(16 32 56 / 0.14);
-  --shadow-pop: 0 2px 8px rgb(16 32 56 / 0.1), 0 12px 32px -8px rgb(16 32 56 / 0.24);
+/* ---- Tiefe ----
+   Navy-getoent, nie schwarz: ein schwarzer Schatten auf hellem Grund wirkt
+   schmutzig, ein leicht blauer wirkt wie Licht.
+
+   Bewusst NICHT in @theme: Tailwind loest --shadow-* schon beim Bauen auf und
+   schreibt den Wert fest in die Klasse. Der Dunkelmodus koennte ihn danach
+   nicht mehr aendern - die Karten haetten nachts denselben hellen Schatten.
+   Als normale Eigenschaft plus @utility bleibt die Variable zur Laufzeit
+   erhalten und kippt mit. */
+:root {
+  --schatten-karte: 0 1px 2px rgb(16 32 56 / 0.04), 0 1px 3px rgb(16 32 56 / 0.06);
+  --schatten-hoch: 0 2px 4px rgb(16 32 56 / 0.05), 0 8px 20px -6px rgb(16 32 56 / 0.14);
+  --schatten-pop: 0 2px 8px rgb(16 32 56 / 0.1), 0 12px 32px -8px rgb(16 32 56 / 0.24);
+}
+
+@utility schatten-karte {
+  box-shadow: var(--schatten-karte);
+}
+
+@utility schatten-hoch {
+  box-shadow: var(--schatten-hoch);
+}
+
+@utility schatten-pop {
+  box-shadow: var(--schatten-pop);
 }
 
 /* ---------------------------------------------------------------------------
@@ -186,9 +206,9 @@
   --color-akzent-stark: #3d7cc4;
 
   /* Im Dunkeln traegt ein blauer Schatten nicht mehr, hier zaehlt Schwarz. */
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.24);
-  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.3), 0 8px 20px -6px rgb(0 0 0 / 0.5);
-  --shadow-pop: 0 2px 8px rgb(0 0 0 / 0.4), 0 12px 32px -8px rgb(0 0 0 / 0.65);
+  --schatten-karte: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.24);
+  --schatten-hoch: 0 2px 4px rgb(0 0 0 / 0.3), 0 8px 20px -6px rgb(0 0 0 / 0.5);
+  --schatten-pop: 0 2px 8px rgb(0 0 0 / 0.4), 0 12px 32px -8px rgb(0 0 0 / 0.65);
 }
 
 /* Dauerhaft dunkle Flaechen holen sich die Hell-Rampe zurueck: dort ist
