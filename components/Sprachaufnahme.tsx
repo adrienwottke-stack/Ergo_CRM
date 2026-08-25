@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MikrofonIcon, XIcon } from "@/components/icons";
-import { btnSecondary, cn, flaeche } from "@/components/ui";
+import { cn, flaeche } from "@/components/ui";
 import {
   AUDIO_BITRATE,
   AUDIO_FORMATE,
@@ -197,8 +197,8 @@ export default function Sprachaufnahme({
             Nochmal
           </button>
         </div>
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- eine
-            Sprachnachricht an eine Person hat keine Untertitelspur. */}
+        {/* Ohne Untertitelspur: eine Sprachnachricht an eine Person hat
+            keine. */}
         <audio src={hoerprobe} controls className="w-full" />
       </div>
     );

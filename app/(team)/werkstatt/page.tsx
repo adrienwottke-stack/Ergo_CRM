@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, shiftDay } from "@/lib/dates";
-import { card, kicker, pageTitle, td, th } from "@/components/ui";
+import { card, chip, cn, kicker, pageTitle, td, th } from "@/components/ui";
+import { MegafonIcon } from "@/components/icons";
+import { OFFENE_STAENDE } from "@/lib/rueckmeldung";
 import { schalten } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -37,13 +40,14 @@ export default async function WerkstattPage() {
 
   const sieben = dayToUtcDate(shiftDay(berlinToday(), -7));
 
-  const [features, nutzung, koepfe] = await Promise.all([
+  const [features, nutzung, koepfe, offeneMeldungen] = await Promise.all([
     prisma.feature.findMany({ orderBy: { titel: "asc" } }),
     prisma.featureUse.findMany({
       where: { day: { gte: sieben } },
       select: { featureKey: true, personId: true },
     }),
     prisma.person.count(),
+    prisma.rueckmeldung.count({ where: { stand: { in: [...OFFENE_STAENDE] } } }),
   ]);
 
   const kopfZahl = new Map<string, Set<string>>();
@@ -65,6 +69,29 @@ export default async function WerkstattPage() {
           Tagen überhaupt benutzt haben.
         </p>
       </div>
+
+      {/* Der Rueckkanal daneben. Nutzung sagt, WAS keiner anfasst - die
+          Rueckmeldung sagt, WARUM. Das eine ersetzt das andere nicht. */}
+      <Link
+        href="/werkstatt/rueckmeldungen"
+        className={cn(
+          card,
+          "flex items-center gap-3 p-4 transition hover:-translate-y-px hover:border-line-strong hover:schatten-hoch",
+        )}
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-50 text-navy-600">
+          <MegafonIcon className="h-5 w-5" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-slate-900">Rückmeldungen</span>
+          <span className="block text-[13px] text-slate-500">
+            Was die Leute von sich aus melden.
+          </span>
+        </span>
+        <span className={cn(chip(offeneMeldungen > 0 ? "gefahr" : "neutral"), "ml-auto")}>
+          {offeneMeldungen} offen
+        </span>
+      </Link>
 
       <div className={`${card} overflow-x-auto`}>
         <table className="w-full min-w-180 text-left text-sm">

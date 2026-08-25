@@ -4,6 +4,7 @@ import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { SCHWELLEN } from "@/lib/signale";
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
 import { pushEingerichtet, sendeMeldung } from "@/lib/push";
+import { ABGESCHLOSSENE_STAENDE, AUDIO_AUFBEWAHRUNG_TAGE } from "@/lib/rueckmeldung";
 
 export const dynamic = "force-dynamic";
 
@@ -33,8 +34,38 @@ export async function GET(request: NextRequest) {
   if (!geheim || mitgebracht !== `Bearer ${geheim}`) {
     return new NextResponse("Nicht erlaubt.", { status: 401 });
   }
+
+  // --- Aufraeumen ----------------------------------------------------------
+  // Steht VOR der VAPID-Pruefung mit Absicht: ohne Push-Schluessel bricht der
+  // Lauf gleich ab, und die Aufnahmen laegen dann fuer immer da. Loeschen ist
+  // eine Pflicht, Melden nur eine Funktion.
+  //
+  // Nur die Toene verschwinden. Text, Stand und Notiz bleiben stehen - die
+  // kosten nichts und sind das Gedaechtnis, warum etwas so entschieden wurde.
+  const aufbewahrung = new Date(
+    Date.now() - AUDIO_AUFBEWAHRUNG_TAGE * TAG_MS
+  );
+  let aufnahmenGeloescht = 0;
+  try {
+    const weg = await prisma.rueckmeldungAudio.deleteMany({
+      where: {
+        rueckmeldung: {
+          stand: { in: [...ABGESCHLOSSENE_STAENDE] },
+          erledigtAt: { lt: aufbewahrung },
+        },
+      },
+    });
+    aufnahmenGeloescht = weg.count;
+  } catch {
+    // Das Aufraeumen darf den Anstoss nicht kippen. Faellt es einmal aus,
+    // holt es der Lauf am naechsten Werktag nach.
+  }
+
   if (!pushEingerichtet()) {
-    return NextResponse.json({ uebersprungen: "keine VAPID-Schluessel" });
+    return NextResponse.json({
+      uebersprungen: "keine VAPID-Schluessel",
+      aufnahmenGeloescht,
+    });
   }
 
   const heute = berlinToday();
@@ -290,5 +321,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     berater: anBerater.length,
     fuehrung: anFuehrung,
+    aufnahmenGeloescht,
   });
 }

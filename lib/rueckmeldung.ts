@@ -130,6 +130,17 @@ export function standTon(wert: RueckmeldungStand): Ton {
 /** Was im Postfach standardmaessig oben liegt: alles, was noch Arbeit ist. */
 export const OFFENE_STAENDE: readonly RueckmeldungStand[] = ["NEU", "GESEHEN", "GEPLANT"];
 
+/** Abgeschlossen - ab hier laeuft die Frist fuer die Aufnahme. */
+export const ABGESCHLOSSENE_STAENDE: readonly RueckmeldungStand[] = ["ERLEDIGT", "VERWORFEN"];
+
+/**
+ * So lange bleibt die Aufnahme nach dem Abschluss liegen, dann loescht sie der
+ * taegliche Lauf. Text, Stand und Notiz bleiben - die kosten nichts und sind
+ * das Gedaechtnis. Eine Sprachaufnahme ist ein personenbezogenes Datum und
+ * braucht eine Frist; ausserdem waechst die Datenbank sonst ohne Ende.
+ */
+export const AUDIO_AUFBEWAHRUNG_TAGE = 90;
+
 // --- Schutz gegen Unfug -----------------------------------------------------
 
 /** Hoechstens so viele Meldungen je Kopf und Tag. */
