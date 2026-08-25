@@ -396,10 +396,10 @@ wirken sofort, 4–6 sind der eigentliche Bau. Alles ab 7 macht aus einem Spiel 
 |---|---|
 | Freitext-Kommentare, Chat | Moderation wird unser Problem — dauerhaft. WhatsApp existiert |
 | Öffentliche Schlusslicht-Anzeige, Abstiegs-Pranger | Siehe Leitsatz. Der untere Tabellenteil bleibt sichtbar, aber ohne Zuspitzung |
-| Push-Benachrichtigungen | Braucht Web-Push-Dienst und Einwilligung. Der Puls im Tab reicht |
+| ~~Push-Benachrichtigungen~~ | **Überholt — seit 23.08. gebaut** (`lib/push.ts`, `PushAbo`, Cron). Siehe 16.2 |
 | Euro-Beträge, Provisionsvergleich | Wie im `struktur-plan`: falsche Zahlen zu Geld sind teurer als kein Feature |
 | Wetten mit Einsatz | Glücksspiel-Nähe und arbeitsrechtlich heikel. Duelle gehen um Ehre |
-| Emojis, Konfetti, XP-Balken, Level | Der Ton macht den Spaß. Storno hat gezeigt, dass Emojis hier kindisch wirken |
+| Emojis, Konfetti, XP-Balken | Der Ton macht den Spaß. Storno hat gezeigt, dass Emojis hier kindisch wirken. **Stufen sind seit 25.08. gebaut, ein Balken ausdrücklich nicht** — siehe 16.2 |
 | LLM-Sprüche zur Laufzeit | Kosten, Wartezeit, und ein daneben liegender Witz über einen echten Kollegen |
 | Supabase Realtime | Anon-Key im Browser plus RLS für 30 Sekunden Vorsprung |
 | Automatische Meldung an die Führungskraft („X hat sein Duell verloren") | Macht aus dem Wettbewerb ein Kontrollinstrument. Dafür gibt es `/mannschaft` |
@@ -892,3 +892,86 @@ aber Duelle brauchen zwei, der Puls braucht Publikum und die Werkstatt braucht S
    Commit mit.
 4. **Einladungen verschicken.** Siehe 15.1.
 5. **Sprint ansetzen.** Feste Uhrzeit in der Gruppe, alle gleichzeitig.
+
+---
+
+## 16. Die Schleife (25.08.2026)
+
+Anlass: die Vorführung am Abend. Bis hierhin gab es genau einen Grund, das
+Werkzeug zu öffnen — die eigene Arbeit eintragen. Gesucht war eine Schleife, die
+sich in einer Minute zeigen lässt:
+
+> App öffnen → Punkt und Stufe wachsen → arbeiten → Meilenstein → „Ans Netzwerk
+> melden" → alle sehen es und bekommen eine Meldung → das Spiel geht auf.
+
+### 16.1 Gebaut
+
+| Baustein | Wo | Kern |
+|---|---|---|
+| **Anwesenheits-Punkt** | `lib/anwesenheit.ts`, Tabelle `Anwesenheit` | Ein Punkt je Tag, an dem die App offen war. Geschrieben in `after()` beim Rendern von `/heute` und `/arena` |
+| **Stufen** | `lib/stufen.ts`, `/spiel` | Sechs Ränge aus den Punkten der gesamten Zeit. Nichts gespeichert, alles gerechnet |
+| **Freischaltung** | `lib/freischaltung.ts`, `/spiel` | Storno geht ab Stufe 2 auf. Vierter Reiter im Wettbewerb |
+| **Wochentitel** | `lib/titel.ts`, Arena | Drei Titel als Live-Stand. Ein freier Titel zeigt, was fehlt |
+| **Feed** | `lib/feed.ts`, `lib/meilensteine.ts`, `app/(team)/feedAction.ts` | „Ans Netzwerk melden" auf `/log`, Wand in der Arena, Reaktionen aus den vier `SCHNELLTEXTE` |
+
+Migration `20260825200000_anwesenheit_und_feed`, rein additiv.
+
+### 16.2 Drei Entscheidungen, die dieses Dokument berühren
+
+**Abschnitt 10 stimmte an zwei Stellen nicht mehr.** „Push-Benachrichtigungen"
+steht dort als nicht gebaut — sie sind seit dem 23.08. gebaut (`lib/push.ts`,
+`PushAbo`, Cron). Und „XP-Balken, Level" ist jetzt teilweise überholt: **Stufen
+sind gebaut, ein Balken ausdrücklich nicht.** Der Einwand von damals war der Ton,
+nicht der Rang — deshalb gibt es einen Dienstgrad und einen Satz mit einer Zahl
+(„noch 15 bis Terminjäger"), aber keinen Fortschrittsbalken und kein Konfetti.
+
+**Die Anwesenheit ist bewusst kein sechster `QuotaType`.** `lib/fuehrung.ts`
+liest den letzten `DailyLog` je Kopf **ohne Typfilter** und macht daraus die
+letzte Aktivität; daran hängt das Stille-Signal aus `lib/signale.ts` — laut
+eigenem Kommentar „das wichtigste Signal überhaupt: sie geht der Kündigung
+voraus". Ein täglicher Anwesenheits-Eintrag hätte es für jeden stillgelegt, der
+die App öffnet, und zwar genau dann, wenn es am meisten gebraucht wird: jemand
+taucht täglich auf, arbeitet nicht mehr, und niemand sieht es. Zusätzlich ist
+`QuotaType` das Vokabular des Trichters; „App geöffnet" ist keine Trichterstufe.
+
+Folge davon: es gibt **zwei Punktbegriffe** — Arena-Punkte (mit Anwesenheit) und
+Führungs-Punkte (`Werte.punkteWoche`, ohne). Das ist Absicht und an beiden
+Stellen kommentiert. Die Mannschaftssicht misst Arbeit; ein Punkt fürs Aufmachen
+würde dort genau das verschleiern, wofür die Seite existiert.
+
+**Die Serie bleibt „Tage gearbeitet".** Sie auf „Tage geöffnet" umzustellen wäre
+der bequeme Weg gewesen und hätte die Flamme entwertet.
+
+### 16.3 Schwellen gegen echte Zahlen, nicht gegen Bauchgefühl
+
+`scripts/stufen-probe.mjs` am 25.08.: höchster Kopf **45** Punkte, Median 27.
+Die zuerst gewählten Schwellen (0/50/150/…) hätten bedeutet: alle stehen auf
+Stufe 1, und die Storno-Kachel bleibt für **jeden** zu. Jetzt: 0/25/60/150/350/750.
+
+Dasselbe bei den Titeln: diese Woche hat genau ein Kopf etwas geloggt, insgesamt
+stehen 17 Anrufe in der Datenbank. Eine Bestenliste hätte dreimal „noch niemand"
+gezeigt. Deshalb zeigt ein freier Titel, **was fehlt** — am Anfang sind alle frei,
+und das ist keine leere Seite, sondern eine offene Jagd. Die Mindestmengen
+bleiben trotzdem hoch: sie später zu senken ist billig, sie zu erhöhen nimmt
+jemandem einen Titel weg.
+
+### 16.4 Bewusst offen
+
+- **Vergabe und Einfrieren der Titel.** Heute nur Live-Stände. Das Einfrieren
+  beim Abpfiff braucht eine `Wochentitel`-Tabelle; ein halb gebautes Einfrieren
+  wäre schlimmer als keins. Vor dem ersten echten Abpfiff (Freitag 18 Uhr) fällig.
+- **Die vier teuren Titel:** Frühschicht, Abschlussstark, Aufsteiger,
+  Stehaufmännchen. Die letzten beiden brauchen die Vorwoche und damit die Vergabe.
+- **`ladeBestmarke` zählt die Anwesenheit noch nicht mit.** „Beste Woche" und
+  „aktuell" stehen dadurch auf leicht verschiedenen Skalen. Kosmetisch.
+- **`/leaderboard` rechnet weiter selbst**, statt `ladeRangliste` zu benutzen —
+  die Anwesenheitspunkte fehlen dort. Aufräumarbeit, eigener Commit.
+- **Teilen-Bild für WhatsApp** (Canvas 1080×1350, Technik im Storno-Repo).
+
+### 16.5 Was vor der Vorführung noch passieren muss
+
+**Die VAPID-Schlüssel stehen nicht in Vercel.** `NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
+`VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` sind nur lokal gesetzt. In der Produktion
+tut `pushEingerichtet()` dann schlicht nichts: der Feed funktioniert, die Meldung
+kommt nirgends an. Entweder vorher setzen oder Push lokal zeigen — nicht erst auf
+der Bühne merken.
