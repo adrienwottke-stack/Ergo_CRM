@@ -5,8 +5,9 @@
 // Sie standen zuerst im NameDialer und sind hier herausgezogen, damit die
 // Heute-Liste dieselben benutzt statt eigener. Ein Bedienmuster, eine Stelle.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Modal from "@/components/Modal";
+import EmpfehlungsBlock from "@/components/EmpfehlungsBlock";
 import { btnPrimary, input } from "@/components/ui";
 
 // --- Zeit-Hilfen (lokale Browserzeit = Berliner Zeit des Nutzers) -----------
@@ -137,6 +138,13 @@ export function AppointmentDialog({
 // Die Empfehlungsfrage steht hier und nicht als Frist drei Tage spaeter, weil
 // sie sonst umgangen wird - genau das war sie vorher. Sie kostet trotzdem
 // keinen zusaetzlichen Tipp: das Antippen des Ergebnisses speichert beides.
+//
+// Der Block selbst liegt in components/EmpfehlungsBlock.tsx, weil ihn das
+// Nachtragen am Kontakt genauso braucht. Er bringt echte Formularfelder mit -
+// deshalb steht hier ein <form>, aus dem beim Antippen des Ergebnisses das
+// vollstaendige FormData faellt. Die Ergebnis-Knoepfe bleiben trotzdem
+// type="button": ein Absenden ueber die Eingabetaste waere im Namensfeld ein
+// Fehlgriff mit gespeichertem Ergebnis.
 export function AppointmentHeldDialog({
   open,
   name,
@@ -148,24 +156,17 @@ export function AppointmentHeldDialog({
   name: string;
   pending: boolean;
   onClose: () => void;
-  onSave: (result: string, empfehlungen: { name: string; phone: string }[]) => void;
+  onSave: (formData: FormData) => void;
 }) {
-  const [zeilen, setZeilen] = useState([
-    { name: "", phone: "" },
-    { name: "", phone: "" },
-    { name: "", phone: "" },
-  ]);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const setzeZeile = (index: number, feld: "name" | "phone", wert: string) =>
-    setZeilen((alt) =>
-      alt.map((zeile, i) => (i === index ? { ...zeile, [feld]: wert } : zeile))
-    );
-
-  const speichern = (result: string) =>
-    onSave(
-      result,
-      zeilen.filter((zeile) => zeile.name.trim().length > 0)
-    );
+  const speichern = (result: string) => {
+    const form = formRef.current;
+    if (!form) return;
+    const data = new FormData(form);
+    data.set("result", result);
+    onSave(data);
+  };
 
   const ergebnisse = [
     { wert: "abschluss", text: "Abschluss", stil: "bg-fest-erfolg text-white hover:bg-fest-erfolg-stark" },
@@ -179,63 +180,34 @@ export function AppointmentHeldDialog({
 
   return (
     <Modal open={open} onClose={onClose} title="Termin gehalten" subtitle={name}>
-      <div className="space-y-5">
-        <div>
-          <p className="mb-2 text-13 font-medium text-slate-600">
-            Wen hat {name} dir empfohlen?
-          </p>
-          <div className="space-y-2">
-            {zeilen.map((zeile, index) => (
-              <div key={index} className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  value={zeile.name}
-                  onChange={(event) => setzeZeile(index, "name", event.target.value)}
-                  placeholder={`Name ${index + 1}`}
-                  className={`${input} mt-0`}
-                />
-                <input
-                  type="tel"
-                  value={zeile.phone}
-                  onChange={(event) => setzeZeile(index, "phone", event.target.value)}
-                  placeholder="Nummer"
-                  className={`${input} mt-0`}
-                />
-              </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setZeilen((alt) => [...alt, { name: "", phone: "" }])}
-            className="mt-2 min-h-11 text-sm font-medium text-navy-600 hover:underline"
-          >
-            + weitere Zeile
-          </button>
-          <p className="mt-1 text-xs text-slate-500">
-            Jeder Name landet mit Erstanruf für heute auf deiner Liste. Auch
-            keine Empfehlung ist eine Antwort — die Frage gilt dann als gestellt.
-          </p>
-        </div>
+      <form ref={formRef} onSubmit={(event) => event.preventDefault()}>
+        <div className="space-y-5">
+          <EmpfehlungsBlock geberName={name} />
 
-        <div className="border-t border-slate-100 pt-4">
-          <p className="mb-2 text-13 font-medium text-slate-600">
-            Und? Was kam raus?
-          </p>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {ergebnisse.map((ergebnis) => (
-              <button
-                key={ergebnis.wert}
-                type="button"
-                disabled={pending}
-                onClick={() => speichern(ergebnis.wert)}
-                className={`inline-flex min-h-12 items-center justify-center rounded-xl px-3 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 ${ergebnis.stil}`}
-              >
-                {ergebnis.text}
-              </button>
-            ))}
+          <div className="border-t border-slate-100 pt-4">
+            <p className="mb-2 text-13 font-medium text-slate-600">
+              Und? Was kam raus?
+            </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {ergebnisse.map((ergebnis) => (
+                <button
+                  key={ergebnis.wert}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => speichern(ergebnis.wert)}
+                  className={`inline-flex min-h-12 items-center justify-center rounded-xl px-3 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 ${ergebnis.stil}`}
+                >
+                  {ergebnis.text}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Auch keine Empfehlung ist eine Antwort — die Frage gilt dann als
+              gestellt und steht morgen nicht wieder da.
+            </p>
           </div>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 }

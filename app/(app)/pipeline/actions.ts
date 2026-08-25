@@ -20,7 +20,11 @@ import {
   playbookDueDate,
 } from "@/lib/pipeline";
 import type { ContactStage, NextStepType } from "@/lib/generated/prisma/enums";
-import { empfehlungenAnlegen, empfehlungenAusFormular } from "@/lib/empfehlungen";
+import {
+  empfehlungenAnlegen,
+  empfehlungenAusFormular,
+  rueckmeldungAnEmpfehlungsgeber,
+} from "@/lib/empfehlungen";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
 // --- gemeinsame Bausteine ---------------------------------------------------
@@ -187,6 +191,22 @@ export async function setContactStage(formData: FormData) {
     // Zaehler bleibt 1 = ein Abschluss; die Gewichtung macht die Rangliste
     // ueber quotaTypePoints.
     if (wonPoint) await award(tx, person.id, "DEAL_WON", 1);
+
+    // Der Kreis schliesst sich: wer einen Namen gegeben hat, erfaehrt, was
+    // daraus geworden ist. Genau daran haengt die ZWEITE Empfehlung - ohne
+    // Rueckmeldung hoert der Geber nie wieder etwas von seinem Namen.
+    //
+    // Ausgeloest beim ersten gehaltenen Termin oder Abschluss, nicht schon
+    // beim vereinbarten: ein Termin, der noch platzen kann, ist keine
+    // Nachricht wert.
+    if (contact.referredById && (heldAppointmentPoint || wonPoint)) {
+      await rueckmeldungAnEmpfehlungsgeber(tx, {
+        empfohlenerId: contactId,
+        empfohlenerName: contact.name,
+        referredById: contact.referredById,
+        ereignis: wonPoint ? "ein Abschluss" : "ein gehaltener Termin",
+      });
+    }
   });
 
   refreshPipelineViews(contactId);

@@ -7,12 +7,14 @@ import {
   HashIcon,
   PhoneIcon,
   PlusIcon,
+  SparkIcon,
 } from "@/components/icons";
 import { card, kicker } from "@/components/ui";
 
 const iconStyles: Record<QuotaType, string> = {
   CALL: "bg-navy-50 text-navy-700",
   NUMBERS_PULLED: "bg-navy-50 text-navy-600",
+  REFERRAL: "bg-amber-50 text-amber-700",
   APPOINTMENT_SET: "bg-emerald-50 text-emerald-600",
   APPOINTMENT_HELD: "bg-teal-50 text-teal-700",
   DEAL_WON: "bg-gold-100 text-gold-600",
@@ -22,6 +24,7 @@ function QuotaIcon({ type }: { type: QuotaType }) {
   const className = "h-4.5 w-4.5";
   if (type === "CALL") return <PhoneIcon className={className} />;
   if (type === "NUMBERS_PULLED") return <HashIcon className={className} />;
+  if (type === "REFERRAL") return <SparkIcon className={className} />;
   return <CalendarCheckIcon className={className} />;
 }
 

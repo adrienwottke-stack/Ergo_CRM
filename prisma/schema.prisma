@@ -151,6 +151,16 @@ model Contact {
   appointmentHeldLoggedAt DateTime?
   wonLoggedAt             DateTime?
 
+  // Wann dem Empfehlungsgeber zurueckgemeldet wurde, was aus SEINER
+  // Empfehlung geworden ist. Steht am Empfohlenen und nicht am Geber - derselbe
+  // Grund wie bei appointmentHeldLoggedAt: ein Ereignis, ein Stempel, genau
+  // einmal. Am Geber koennten zehn Empfehlungen haengen, von denen neun noch
+  // offen sind.
+  //
+  // Die Rueckmeldung ist der Grund, aus dem jemand ein ZWEITES Mal empfiehlt.
+  // Ohne sie hoert der Geber nie wieder etwas von dem Namen, den er gegeben hat.
+  referralFeedbackAt DateTime?
+
   // Ein Formular = ein Kontakt. Jedes gerenderte Anlege-Formular bringt einen
   // eigenen Schluessel mit; der eindeutige Index laesst den zweiten Klick
   // auflaufen, statt eine Dublette anzulegen. NULL bleibt erlaubt (Import,
@@ -578,6 +588,13 @@ model Activity {
 enum QuotaType {
   CALL
   NUMBERS_PULLED
+  // Ein Name, den jemand anders genannt hat. Bis hierhin buchte eine
+  // Empfehlung NUMBERS_PULLED und war damit so viel wert wie eine Nummer aus
+  // dem eigenen Handy - im Strukturvertrieb ist sie die wertvollste Zeile
+  // ueberhaupt. Additiv angehaengt, alte Zeilen bleiben stehen: Punkte werden
+  // bei jeder Anzeige nachgeschlagen, eine Rueckmigration wuerde jede
+  // vergangene Rangliste umschreiben.
+  REFERRAL
   APPOINTMENT_SET
   APPOINTMENT_HELD
   DEAL_WON

@@ -10,6 +10,7 @@ import {
   ratingLabels,
 } from "@/lib/namelist";
 import { DEFAULT_GUIDES, guideKeyForList } from "@/lib/guides";
+import { herkunftAusQuelle } from "@/lib/empfehlungen";
 import NameDialer, { type DialerEntry } from "@/components/NameDialer";
 import { pageTitle, columnNarrow } from "@/components/ui";
 import { XIcon } from "@/components/icons";
@@ -46,6 +47,7 @@ export default async function AnrufenPage({
         phone: true,
         rating: true,
         note: true,
+        source: true,
         stage: true,
         activities: {
           orderBy: { date: "desc" },
@@ -63,6 +65,7 @@ export default async function AnrufenPage({
       phone: contact.phone!,
       rating: contact.rating,
       note: contact.note,
+      empfehlungVon: herkunftAusQuelle(contact.source),
       isFirstCall: contact.stage === "NEU",
       lastActivity: contact.activities[0]?.text ?? null,
     }))

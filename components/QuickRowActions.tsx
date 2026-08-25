@@ -221,16 +221,12 @@ export default function QuickRowActions({
         name={contact.name}
         pending={pending}
         onClose={() => setDialog(null)}
-        onSave={(result, empfehlungen) => {
-          // Die Empfehlungszeilen gehen als Wiederholungsfelder mit - dieselbe
-          // Form, die auch der Empfehlungs-Dialog benutzt.
-          const data = new FormData();
+        onSave={(data) => {
+          // Das FormData kommt fertig aus dem Dialog: Ergebnis und
+          // Empfehlungszeilen als Wiederholungsfelder, dieselbe Form, die auch
+          // das Nachtragen am Kontakt benutzt. Hier fehlt nur noch, um WEN es
+          // geht.
           data.set("contactId", contact.id);
-          data.set("result", result);
-          for (const zeile of empfehlungen) {
-            data.append("referralName", zeile.name);
-            data.append("referralPhone", zeile.phone);
-          }
           setPending(true);
           setFehler(null);
           void (async () => {

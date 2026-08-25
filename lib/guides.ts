@@ -20,7 +20,10 @@
 
 import type { ListKind } from "@/lib/generated/prisma/enums";
 
-export type GuideKey = "VERKAUF_TVB" | "RECRUITING_ERSTKONTAKT";
+export type GuideKey =
+  | "VERKAUF_TVB"
+  | "RECRUITING_ERSTKONTAKT"
+  | "EMPFEHLUNG_FRAGEN";
 
 export type GuideText = {
   key: GuideKey;
@@ -141,6 +144,53 @@ Termin wiederholen, Ort und Uhrzeit bestätigen, bedanken.
 - Einwände kommen — sie stehen unten. Ruhig bleiben, Sorge ernst nehmen, zurück zur Terminfrage.
 - Termin legen! Nicht ohne Termin auflegen.`;
 
+// Die Empfehlungsfrage. Kurz gehalten - sie wird nicht vorbereitet gelesen,
+// sondern aufgeklappt, waehrend der Kunde gegenuebersitzt und der Partner
+// merkt, dass ihm die Worte fehlen. Alles, was hier laenger waere als ein
+// Bildschirm, wird in diesem Moment nicht gelesen.
+const EMPFEHLUNG_FRAGEN = `Am Ende JEDES Termins · Ziel: Namen · Ton: selbstverständlich
+
+# 01 · Der Zeitpunkt
+Direkt im Termin, nicht drei Tage später am Telefon. Wer hinterher fragt, fragt einen anderen Menschen: die Stimmung von eben ist weg, und die Frage wirkt nachgeschoben.
+Auch ohne Abschluss fragen. Wer gut beraten wurde, empfiehlt — ob er unterschrieben hat oder nicht.
+
+# 02 · Die Überleitung
+Nicht um Erlaubnis bitten, sondern ankündigen. Eine Frage („Darf ich dich was fragen?“) lädt zum Nein ein.
+> „Eine Sache noch, bevor wir Schluss machen.“
+> „So wie wir zwei uns kennen — du weißt ja, wie ich arbeite.“
+
+# 03 · Die zwei Fragen
+Das sind zwei verschiedene Fragen. Wer nur die erste stellt, baut kein Team.
+
+## Kunden
+> „Wer fällt dir ein, dem das genauso helfen würde wie dir gerade?“
+
+## Partner
+> „Und wer von deinen Leuten will mehr aus seiner Zeit machen — jemand, der ehrgeizig ist und dem sein Job zu klein geworden ist?“
+
+# 04 · „Mir fällt gerade keiner ein“
+Der Satz ist ehrlich gemeint und trotzdem falsch. Niemandem fällt auf Zuruf jemand ein — Schubladen liefern keine Namen, Bilder schon.
+Nicht nach Kategorien fragen, sondern nach Szenen. Eine Frage, dann warten.
+> „Wer saß bei deiner letzten Familienfeier mit am Tisch?“
+> „Mit wem warst du zuletzt essen?“
+> „Wer trainiert mit dir?“
+Nach jedem Namen: aufschreiben und weiterfragen. Ein Name bringt den nächsten.
+
+# 05 · „Ich will niemanden vor den Kopf stoßen“
+Die Sorge ernst nehmen, nicht wegreden.
+> „Verstehe ich. Ich ruf niemanden an, um ihm was zu verkaufen — ich stell mich vor und frag, ob's ihn interessiert. Sagt er nein, war's das, und du hörst nie wieder was davon.“
+
+# 06 · Die Ankündigung
+Der wichtigste Satz nach den Namen. Ein angekündigter Anruf ist ein anderer Anruf.
+> „Sagst du ihm kurz Bescheid, dass ich mich melde? Dann weiß er, wer da anruft.“
+Sagt er ja: den Haken setzen. Der Erstanruf rückt einen Tag nach hinten und er selbst bekommt die Nachfrage auf die Liste.
+
+# 07 · Wichtige Punkte
+- Fragen zählt, nicht ernten. Auch null Namen sind eine Antwort — dann steht die Frage morgen nicht wieder da.
+- Zwei Fragen, nicht eine. Kunde und Partner sind verschiedene Menschen.
+- Nach jedem Namen kurz nachhaken: Was macht er? Woher kennt ihr euch? Ein Satz reicht und ändert den Erstanruf komplett.
+- Nie mit „Kennst du vielleicht jemanden …“ anfangen. Das lädt zum Nein ein.`;
+
 export const DEFAULT_GUIDES: Record<GuideKey, GuideText> = {
   VERKAUF_TVB: {
     key: "VERKAUF_TVB",
@@ -152,6 +202,12 @@ export const DEFAULT_GUIDES: Record<GuideKey, GuideText> = {
     key: "RECRUITING_ERSTKONTAKT",
     title: "Recruiting · Erstkontakt",
     body: RECRUITING_ERSTKONTAKT,
+    isDraft: false,
+  },
+  EMPFEHLUNG_FRAGEN: {
+    key: "EMPFEHLUNG_FRAGEN",
+    title: "Empfehlungen erfragen",
+    body: EMPFEHLUNG_FRAGEN,
     isDraft: false,
   },
 };

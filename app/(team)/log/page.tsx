@@ -9,7 +9,7 @@ import { offeneMeilensteine } from "@/lib/meilensteine";
 import QuickCounter from "@/components/QuickCounter";
 import WettbewerbNav from "@/components/WettbewerbNav";
 import MeilensteinMelden from "@/components/MeilensteinMelden";
-import { CalendarCheckIcon, ChevronRightIcon, FlameIcon, HashIcon, PhoneIcon } from "@/components/icons";
+import { CalendarCheckIcon, ChevronRightIcon, FlameIcon, HashIcon, PhoneIcon, SparkIcon } from "@/components/icons";
 import { btnPrimary, card, input, label, pageTitle, sectionTitle, columnNarrow } from "@/components/ui";
 import { deleteLog, logDaily } from "./actions";
 import { quickLog } from "./quickLogAction";
@@ -19,12 +19,14 @@ export const dynamic = "force-dynamic";
 function QuotaIcon({ type, className }: { type: QuotaType; className?: string }) {
   if (type === "CALL") return <PhoneIcon className={className} />;
   if (type === "NUMBERS_PULLED") return <HashIcon className={className} />;
+  if (type === "REFERRAL") return <SparkIcon className={className} />;
   return <CalendarCheckIcon className={className} />;
 }
 
 const quotaIconStyles: Record<QuotaType, string> = {
   CALL: "bg-navy-50 text-navy-700",
   NUMBERS_PULLED: "bg-navy-50 text-navy-600",
+  REFERRAL: "bg-amber-50 text-amber-700",
   APPOINTMENT_SET: "bg-emerald-50 text-emerald-600",
   APPOINTMENT_HELD: "bg-teal-50 text-teal-700",
   DEAL_WON: "bg-gold-100 text-gold-600",

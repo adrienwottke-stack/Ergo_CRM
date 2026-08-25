@@ -14,6 +14,7 @@ import {
   type DueState,
 } from "@/lib/dates";
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
+import { herkunftAusQuelle } from "@/lib/empfehlungen";
 import { faelligeAufgaben, fuehrungsSchritt, mannschaftsLage } from "@/lib/fuehrung";
 import FuehrungsAufgabe from "@/components/FuehrungsAufgabe";
 import StageBadge from "@/components/StageBadge";
@@ -452,8 +453,18 @@ export default async function HeutePage() {
                       </div>
 
                       {/* Vorgeschichte in der Zeile statt im Profil. */}
-                      {(contact.activities[0] || contact.note) && (
+                      {(contact.activities[0] ||
+                        contact.note ||
+                        herkunftAusQuelle(contact.source)) && (
                         <div className="mt-2 space-y-0.5 border-l-2 border-slate-100 pl-2.5">
+                          {/* Zuerst die Herkunft: der Unterschied zwischen
+                              einem kalten und einem warmen Anruf steht in
+                              diesem einen Satz. */}
+                          {herkunftAusQuelle(contact.source) && (
+                            <p className="text-xs font-semibold text-amber-800">
+                              Empfehlung von {herkunftAusQuelle(contact.source)}
+                            </p>
+                          )}
                           {contact.activities[0] && (
                             <p className="line-clamp-2 text-xs text-slate-500">
                               <span className="text-slate-400">

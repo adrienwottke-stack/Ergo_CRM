@@ -35,6 +35,8 @@ export type DialerEntry = {
   phone: string;
   rating: ContactRating | null;
   note: string | null;
+  /** Wer diesen Namen genannt hat. Null = selbst gesammelt. */
+  empfehlungVon: string | null;
   isFirstCall: boolean;
   lastActivity: string | null;
 };
@@ -259,8 +261,17 @@ export default function NameDialer({
           )}
         </button>
 
-        {(current.note || current.lastActivity) && (
+        {(current.note || current.lastActivity || current.empfehlungVon) && (
           <div className="rounded-xl border border-amber-200/80 bg-amber-50/60 p-3">
+            {/* Der Unterschied zwischen einem kalten und einem warmen Anruf
+                steht in diesem einen Satz. Er gehoert deshalb ueber die Notiz
+                und nicht in eine Zeile am Rand: wer nicht weiss, dass er
+                empfohlen wurde, ruft an wie bei einem Fremden. */}
+            {current.empfehlungVon && (
+              <p className="mb-1 text-13 font-semibold text-amber-900">
+                Empfehlung von {current.empfehlungVon}
+              </p>
+            )}
             {current.note && (
               <p className="whitespace-pre-wrap text-sm text-amber-900">
                 {current.note}

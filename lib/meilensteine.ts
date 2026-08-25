@@ -19,7 +19,12 @@
 
 import type { QuotaType } from "@/lib/generated/prisma/enums";
 
-export type MeilensteinArt = "nummern" | "anrufe" | "termine" | "abschluss";
+export type MeilensteinArt =
+  | "nummern"
+  | "empfehlungen"
+  | "anrufe"
+  | "termine"
+  | "abschluss";
 
 type Regel = {
   art: MeilensteinArt;
@@ -38,6 +43,15 @@ const REGELN: readonly Regel[] = [
     type: "NUMBERS_PULLED",
     schwellen: [10, 25, 50],
     satz: (n) => `${n} Nummern gezogen`,
+  },
+  // Deutlich niedrigere Schwellen als bei den Nummern, und das ist Absicht:
+  // drei Empfehlungen an einem Tag sind ein guter Tag, dreissig gibt es nicht.
+  // Wer sie an den Nummern gemessen haette, haette nie eine Meldung gesehen.
+  {
+    art: "empfehlungen",
+    type: "REFERRAL",
+    schwellen: [3, 10, 25],
+    satz: (n) => `${n} Empfehlungen bekommen`,
   },
   {
     art: "anrufe",

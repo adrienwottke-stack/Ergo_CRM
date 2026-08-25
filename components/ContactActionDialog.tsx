@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Modal from "@/components/Modal";
+import EmpfehlungsBlock from "@/components/EmpfehlungsBlock";
 import type { ContactStage, Outcome } from "@/lib/generated/prisma/enums";
 import {
   ALL_LOST_REASONS,
@@ -52,13 +53,11 @@ export default function ContactActionDialog({
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<ContactStage>(targetStage ?? "NEU");
   const [appointment, setAppointment] = useState("");
-  const [referralRows, setReferralRows] = useState(3);
 
   useEffect(() => {
     if (!open || !contact) return;
     setStage(targetStage ?? contact.stage);
     setAppointment(contact.appointmentLocal ?? "");
-    setReferralRows(3);
     setError(null);
   }, [open, contact, targetStage]);
 
@@ -234,40 +233,15 @@ export default function ContactActionDialog({
       title="Empfehlungen erfassen"
       subtitle={contact.name}
     >
+      {/* Derselbe Block wie im Dialog des gehaltenen Termins - sonst driften
+          die beiden Erfassungswege auseinander und einer von beiden kennt die
+          Partnerfrage nicht. */}
       <form onSubmit={submit(addReferrals)}>
         <input type="hidden" name="contactId" value={contact.id} />
-        <p className="text-sm text-slate-600">
-          Jeder Name wird ein neuer Kontakt in „Neu“ mit Erstanruf für heute –
-          verknüpft mit {contact.name}.
-        </p>
-        <div className="mt-4 space-y-3">
-          {Array.from({ length: referralRows }, (_, index) => (
-            <div key={index} className="grid grid-cols-2 gap-3">
-              <input
-                name="referralName"
-                type="text"
-                placeholder={`Name ${index + 1}`}
-                className={input}
-              />
-              <input
-                name="referralPhone"
-                type="tel"
-                placeholder="Telefon"
-                className={input}
-              />
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => setReferralRows((rows) => rows + 1)}
-          className="mt-3 min-h-11 text-sm font-medium text-navy-600 hover:underline"
-        >
-          + weitere Zeile
-        </button>
+        <EmpfehlungsBlock key={contact.id} geberName={contact.name} />
         <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-          Auch ohne Namen speichern: die Frage gilt dann als gestellt und der
-          Kontakt rückt auf „Empfehlung erfragt“.
+          Auch ohne Namen speichern: die Frage gilt dann als gestellt und steht
+          morgen nicht wieder da.
         </p>
         {errorBox}
         {footer("Speichern")}
