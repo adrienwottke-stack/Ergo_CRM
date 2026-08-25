@@ -17,6 +17,7 @@ import { abstandInHandlungen, eigenerHinweis, punkteText } from "@/lib/kommentat
 import { merkeNutzung, schalter } from "@/lib/features";
 import { merkeAnwesenheit } from "@/lib/anwesenheit";
 import { ladeFeed } from "@/lib/feed";
+import { ladeTitelStaende } from "@/lib/titel";
 import { stufeVon } from "@/lib/stufen";
 import ArenaTakt from "@/components/ArenaTakt";
 import WettbewerbNav from "@/components/WettbewerbNav";
@@ -62,7 +63,8 @@ export default async function ArenaPage() {
     "bestmarke",
     "sprint",
     "stufen",
-    "feed"
+    "feed",
+    "titel"
   );
 
   const [
@@ -74,6 +76,7 @@ export default async function ArenaPage() {
     konten,
     gesamtpunkte,
     feed,
+    titel,
   ] = await Promise.all([
     ladeRangliste(wochenStart),
     ladePuls(),
@@ -106,6 +109,7 @@ export default async function ArenaPage() {
     // Punkte ueber die gesamte Zeit - Grundlage der Stufe.
     ladeGesamtpunkte(person.id),
     ladeFeed(person.id),
+    ladeTitelStaende(heute),
   ]);
 
   const stufe = stufeVon(gesamtpunkte);
@@ -126,6 +130,7 @@ export default async function ArenaPage() {
   if (an.bestmarke) gesehen.push(merkeNutzung("bestmarke", person.id));
   if (an.stufen) gesehen.push(merkeNutzung("stufen", person.id));
   if (an.feed && feed.length > 0) gesehen.push(merkeNutzung("feed", person.id));
+  if (an.titel) gesehen.push(merkeNutzung("titel", person.id));
   await Promise.all(gesehen);
 
   // --- eigene Lage ---------------------------------------------------------
@@ -208,6 +213,50 @@ export default async function ArenaPage() {
           }))}
           ungelesen={ungelesen}
         />
+      )}
+
+      {/* --- Titel: mehrere Wege, vorn zu sein ------------------------------ */}
+      {an.titel && (
+        <div className={`${card} p-5`}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className={sectionTitle}>Titel dieser Woche</h2>
+            <span className={kicker}>Stand jetzt</span>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            Punkte belohnen Menge. Titel belohnen, was du kannst — vorn sein
+            geht auch ohne die meisten Punkte.
+          </p>
+
+          <ul className="mt-4 space-y-2.5">
+            {titel.map((stand) => (
+              <li
+                key={stand.schluessel}
+                className="border-t border-slate-100 pt-2.5 first:border-0 first:pt-0"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                  <span className="text-sm font-semibold text-slate-900">
+                    {stand.titel}
+                  </span>
+                  {stand.haelter ? (
+                    <span className="text-sm text-slate-700">
+                      {stand.haelter.name}{" "}
+                      <span className="tabular-nums text-slate-400">
+                        {stand.haelter.wert}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      noch frei
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {stand.haelter ? stand.sagt : stand.offenWeil}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {/* --- Was heute geschafft wurde ------------------------------------- */}
