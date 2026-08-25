@@ -77,11 +77,20 @@ enum LeadershipTaskType {
 
 // Was eine Fuehrungskraft von einem Berater ihrer Struktur sieht. ZAHLEN ist
 // das Minimum und nicht abwaehlbar - sonst waere die Mannschafts-Uebersicht
-// loechrig und damit wertlos. Kundennamen deckt KEINE der beiden Stufen ab;
-// dafuer gibt es die befristete Einzelfreigabe (Bauabschnitt 8).
+// loechrig und damit wertlos.
+//
+// NAMEN ist die Stufe aus docs/struktur-plan.md 3.2 und gilt dauerhaft. Sie
+// ist NICHT der uebliche Weg: fuer den Fall, um den es wirklich geht - ein
+// frisch gestarteter Partner, der Begleitung braucht - oeffnet sich der
+// Verlauf die ersten Wochen von selbst und schliesst sich danach wieder.
+// Siehe lib/einblick.ts. Wer NAMEN setzt, haelt ihn dauerhaft offen.
+//
+// Keine Stufe zeigt Telefonnummern, E-Mail-Adressen, Berufe oder Notizen.
+// Sichtbar wird ausschliesslich, WEN es betrifft und WAS passiert ist.
 enum TeamVisibility {
   ZAHLEN // Aktivitaeten, Quoten, Summen
   PIPELINE // zusaetzlich Phasenverteilung, Fristen, Ueberfaelligkeiten
+  NAMEN // zusaetzlich WEN es betrifft - Kontaktnamen im Verlauf, dauerhaft
 }
 
 // --- Namensliste ------------------------------------------------------------

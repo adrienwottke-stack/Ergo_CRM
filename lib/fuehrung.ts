@@ -23,6 +23,7 @@ import {
   type Signal,
 } from "@/lib/signale";
 import { starterpassStand } from "@/lib/starterpass";
+import { einblickFuer, type Einblick } from "@/lib/einblick";
 import type { Bewegung } from "@/lib/fuehrungsaufgaben";
 import type { LeadershipTaskType, UserRole } from "@/lib/generated/prisma/enums";
 
@@ -106,6 +107,12 @@ export type Mannschaftsperson = {
   telefon: string | null;
   /** Offene Fuehrungsaufgabe. Solange sie ruht, schweigt der Fall oben. */
   betreuung: Betreuung | null;
+  /**
+   * Ob bei dieser Person Kontaktnamen sichtbar sind - und warum. Steht an der
+   * Person und nicht an der Seite, damit die Liste und die Einzelansicht
+   * dieselbe Antwort geben. Siehe lib/einblick.ts.
+   */
+  einblick: Einblick;
   /**
    * Ob die letzte Nachricht an diese Person gelesen wurde. `null` = in den
    * letzten Tagen ging nichts raus. Ohne das schreibt die Fuehrungskraft ins
@@ -214,6 +221,7 @@ export async function mannschaftsLage(betrachter: {
         startedAt: true,
         visibility: true,
         deactivatedAt: true,
+        createdAt: true,
         onboardingDoneAt: true,
         installedAt: true,
         phone: true,
@@ -505,6 +513,13 @@ export async function mannschaftsLage(betrachter: {
       pass: roh && roh.geschafft < roh.gesamt ? roh : null,
       telefon: person.phone,
       betreuung,
+      einblick: einblickFuer({
+        istDu: person.id === betrachter.id,
+        visibility: person.visibility,
+        startedAt: person.startedAt,
+        createdAt: person.createdAt,
+        vorname: person.name.split(" ")[0] ?? person.name,
+      }),
       gelesen: gelesenJe.get(person.id) ?? null,
     };
   });
@@ -535,6 +550,12 @@ export async function mannschaftsLage(betrachter: {
       pass: null,
       telefon: null,
       betreuung: null,
+      einblick: {
+        offen: true,
+        grund: "eigene",
+        endetAm: null,
+        hinweis: "Deine Kontakte.",
+      },
       gelesen: null,
     } satisfies Mannschaftsperson);
 
@@ -793,5 +814,101 @@ export async function astVergleich(userId: string): Promise<AstVergleich | null>
     meiner,
     platz,
     abstand: davor && meiner ? davor.punkte - meiner.punkte : 0,
+  };
+}
+
+// --- Ein Ast im Einzelnen ----------------------------------------------------
+// Die Mannschafts-Uebersicht beantwortet "wo fange ich an". Sobald die Antwort
+// ein Name ist, kommt die naechste Frage - "und was ist da los" -, und dafuer
+// reicht eine Zeile in einer Liste nicht.
+//
+// Bewusst ueber `mannschaftsLage` statt mit eigenen Abfragen: die Zahlen auf
+// der Einzelseite MUESSEN dieselben sein wie in der Liste. Zwei Rechnungen
+// laufen frueher oder spaeter auseinander, und dann glaubt die Fuehrungskraft
+// keiner von beiden mehr - genau der Grund, aus dem es diese Datei gibt.
+//
+// Die Zugriffsgrenze faellt dabei nebenbei mit ab: wer nicht im eigenen Ast
+// haengt, steht nicht in der Lage und ist damit auch hier nicht zu finden.
+
+export type AstLage = {
+  person: Mannschaftsperson;
+  /** Alles unter der Person, ohne sie selbst, in Baumreihenfolge. */
+  ast: Mannschaftsperson[];
+  /** Nur die direkt Unterstellten der Person. */
+  direkte: Mannschaftsperson[];
+  /** Person + Ast zusammengerechnet. Bei jemandem ohne Leute = seine Werte. */
+  summe: Werte;
+  /** Wessen Kontaktnamen der Betrachter im Ast sehen darf. */
+  offen: Mannschaftsperson[];
+  /** Wessen nicht - damit die Luecke benannt wird statt stillschweigend zu sein. */
+  verdeckt: Mannschaftsperson[];
+};
+
+function summeWerte(personen: Mannschaftsperson[]): Werte {
+  const summe = leereWerte();
+  for (const person of personen) {
+    const w = person.werte;
+    summe.anrufeWoche += w.anrufeWoche;
+    summe.vereinbartWoche += w.vereinbartWoche;
+    summe.gehaltenWoche += w.gehaltenWoche;
+    summe.vereinbart14 += w.vereinbart14;
+    summe.gehalten14 += w.gehalten14;
+    summe.gehaltenMonat += w.gehaltenMonat;
+    summe.abschluesseMonat += w.abschluesseMonat;
+    summe.abschluesseGesamt += w.abschluesseGesamt;
+    summe.inAkquise += w.inAkquise;
+    summe.ueberfaellig += w.ueberfaellig;
+    summe.termineOhneEmpfehlung += w.termineOhneEmpfehlung;
+    summe.namenGesamt += w.namenGesamt;
+    summe.anrufeGesamt += w.anrufeGesamt;
+    summe.vereinbartGesamt += w.vereinbartGesamt;
+    summe.gehaltenGesamt += w.gehaltenGesamt;
+    summe.punkteWoche += w.punkteWoche;
+    summe.empfehlungGefragt = summe.empfehlungGefragt || w.empfehlungGefragt;
+    // Die juengste Regung im Ast, nicht die Summe der Daten.
+    if (
+      w.letzteAktivitaet &&
+      (!summe.letzteAktivitaet || w.letzteAktivitaet > summe.letzteAktivitaet)
+    ) {
+      summe.letzteAktivitaet = w.letzteAktivitaet;
+    }
+    // Umgekehrt beim naechsten Schritt: der frueheste ist der dringendste.
+    if (
+      w.naechsterSchritt &&
+      (!summe.naechsterSchritt || w.naechsterSchritt < summe.naechsterSchritt)
+    ) {
+      summe.naechsterSchritt = w.naechsterSchritt;
+    }
+  }
+  return summe;
+}
+
+export async function astLage(
+  betrachter: { id: string; role: UserRole },
+  personId: string
+): Promise<AstLage | null> {
+  const lage = await mannschaftsLage(betrachter);
+  const alle = [lage.ich, ...lage.baum];
+  const person = alle.find((eintrag) => eintrag.id === personId);
+  // Nicht im eigenen Ast = existiert fuer diesen Betrachter nicht. Kein
+  // Unterschied zwischen "gibt es nicht" und "darfst du nicht": beides ist
+  // hier dieselbe Antwort, und das ist Absicht.
+  if (!person) return null;
+
+  const ast = lage.baum.filter(
+    (eintrag) => eintrag.id !== person.id && eintrag.path.startsWith(person.path)
+  );
+  const gesamt = [person, ...ast];
+
+  return {
+    person,
+    ast,
+    // Der Pfad traegt die eigene Id am Ende - "direkt unter X" ist damit eine
+    // exakte Gleichheit statt einer Ebenenrechnung. `ueberId` taugt hier
+    // nicht: es steht absichtlich auf null, wenn der Betrachter selbst fuehrt.
+    direkte: ast.filter((eintrag) => eintrag.path === `${person.path}${eintrag.id}/`),
+    summe: summeWerte(gesamt),
+    offen: gesamt.filter((eintrag) => eintrag.einblick.offen),
+    verdeckt: gesamt.filter((eintrag) => !eintrag.einblick.offen),
   };
 }

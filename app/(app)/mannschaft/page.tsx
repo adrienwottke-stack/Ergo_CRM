@@ -9,6 +9,7 @@ import {
 } from "@/lib/fuehrung";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { ampelFarben, ampelTexte, type Signal } from "@/lib/signale";
+import { NAMENSFENSTER_TAGE } from "@/lib/einblick";
 import { SCHNELLTEXTE_FUEHRUNG } from "@/lib/nachrichten";
 import NachrichtSenden from "@/components/NachrichtSenden";
 import KuemmereMich from "@/components/KuemmereMich";
@@ -56,6 +57,30 @@ function SignalZeile({ signal }: { signal: Signal }) {
         <span className="text-slate-600"> — {signal.schritt}</span>
       </span>
     </li>
+  );
+}
+
+/**
+ * Der Name fuehrt eine Ebene tiefer.
+ *
+ * Die Uebersicht beantwortet "wo fange ich an" - die Antwort ist ein Name, und
+ * ab da will man wissen, was dort los ist. Ohne diesen Griff endet die Fuehrung
+ * bei der Ampel: man sieht, DASS es hakt, aber nie, WORAN.
+ */
+function NameLink({
+  person,
+  klasse,
+}: {
+  person: Mannschaftsperson;
+  klasse: string;
+}) {
+  return (
+    <Link
+      href={`/mannschaft/${person.id}`}
+      className={`${klasse} rounded transition hover:text-navy-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600`}
+    >
+      {person.name}
+    </Link>
   );
 }
 
@@ -137,8 +162,9 @@ export default async function MannschaftPage() {
               : gelb.length > 0
                 ? `Nichts Dringendes. Bei ${gelb.length} ${gelb.length === 1 ? "Person" : "Personen"} hakt es.`
                 : "Alles läuft. Nichts, wo du heute hin müsstest."}{" "}
-          <strong className="font-medium text-slate-600">Keine Kundennamen:</strong> die
-          siehst du nur, wenn ein Berater dir einen Kontakt einzeln freigibt.
+          <strong className="font-medium text-slate-600">Tipp auf einen Namen</strong> — bei
+          frisch Gestarteten liest du die ersten {NAMENSFENSTER_TAGE} Tage mit, bei allen
+          anderen stehen dort Zahlen.
         </p>
       </div>
 
@@ -228,9 +254,7 @@ export default async function MannschaftPage() {
                   }`}
                 >
                   <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                    <span className="text-base font-semibold text-slate-900">
-                      {person.name}
-                    </span>
+                    <NameLink person={person} klasse="text-base font-semibold text-slate-900" />
                     <UeberChip person={person} />
                     <Merkmale person={person} />
                   </div>
@@ -320,7 +344,7 @@ export default async function MannschaftPage() {
                   aria-hidden
                   className={`h-1.5 w-1.5 shrink-0 rounded-full ${ampelFarben[person.ampel]}`}
                 />
-                <span className="text-sm font-medium text-slate-900">{person.name}</span>
+                <NameLink person={person} klasse="text-sm font-medium text-slate-900" />
                 <UeberChip person={person} />
                 <span className="text-sm text-slate-500">
                   {person.signale[0]?.titel ?? "läuft"}
@@ -352,7 +376,7 @@ export default async function MannschaftPage() {
                 className="flex flex-wrap items-baseline gap-x-2 py-2 text-sm"
               >
                 <span aria-hidden className="h-2 w-2 shrink-0 self-center rounded-full bg-amber-400" />
-                <span className="font-medium text-slate-900">{person.name}</span>
+                <NameLink person={person} klasse="font-medium text-slate-900" />
                 {person.ueber && (
                   <span className="text-xs text-slate-400">über {person.ueber}</span>
                 )}
@@ -397,9 +421,7 @@ export default async function MannschaftPage() {
                         aria-hidden
                         className={`h-2.5 w-2.5 rounded-full ${ampelFarben[person.ampel]}`}
                       />
-                      <span className="text-sm font-semibold text-slate-900">
-                        {person.name}
-                      </span>
+                      <NameLink person={person} klasse="text-sm font-semibold text-slate-900" />
                       <span className="sr-only">{ampelTexte[person.ampel]}</span>
                     </span>
                     <UeberChip person={person} />
@@ -527,7 +549,9 @@ export default async function MannschaftPage() {
 
       <p className={kicker}>
         Woche ab Montag, Monat ab dem Ersten, beides nach Berliner Kalender. Signale
-        werden bei jedem Aufruf neu berechnet und nirgends gespeichert.
+        werden bei jedem Aufruf neu berechnet und nirgends gespeichert. Kontaktnamen
+        siehst du die ersten {NAMENSFENSTER_TAGE} Tage nach dem Start — danach nur noch,
+        wenn jemand seinen Verlauf offen lässt. Notizen, Nummern und Berufe nie.
       </p>
     </div>
   );
