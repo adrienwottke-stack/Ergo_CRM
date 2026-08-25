@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { authCookieName, sessionUserId } from "@/lib/session";
+import { avvAkzeptiert } from "@/lib/avv";
 
 export { authCookieName, sessionCookieOptions, sessionUserId } from "@/lib/session";
 export { createSession } from "@/lib/session";
@@ -44,7 +45,30 @@ export async function currentUser() {
   return userId ? prisma.user.findUnique({ where: { id: userId } }) : null;
 }
 
+// --- Der AVV-Riegel -----------------------------------------------------------
+// requireUser ist der Engpass der ganzen Anwendung: JEDE Seite und JEDE Server
+// Action laeuft hier durch, bevor sie eine Zeile liest oder schreibt. Deshalb
+// sitzt das AVV-Gate hier und nicht in einem Layout - ein Layout schuetzt seine
+// Seiten, aber keine Action.
+//
+// Die Middleware kann es nicht uebernehmen: sie laeuft auf der Edge-Runtime und
+// hat keine Datenbankverbindung. Derselbe Grund, aus dem die Willkommens-Weiche
+// unten schon hier steht und nicht dort.
+//
+// REIHENFOLGE: AVV VOR Willkommen. Der Willkommens-Ablauf legt Daten an (Brief,
+// Versprechen, Sprintliste). Ohne Auftragsverarbeitungsvertrag darf davor
+// nichts davon passieren.
 export async function requireUser() {
+  const user = await currentUser();
+  if (!user) redirect("/login");
+  if (!(await avvAkzeptiert(user.id))) redirect("/avv");
+  return user;
+}
+
+// Nur fuer die AVV-Seite selbst und ihre Action. Ohne diese Tuer schickte
+// requireUser die Seite, die die Zustimmung einholt, auf sich selbst - eine
+// Weiterleitungsschleife.
+export async function requireUserOhneAvv() {
   const user = await currentUser();
   if (!user) redirect("/login");
   return user;

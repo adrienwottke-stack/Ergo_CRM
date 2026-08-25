@@ -4,6 +4,7 @@ import { currentUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { icsDatei } from "@/lib/ics";
+import { avvAkzeptiert } from "@/lib/avv";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,15 @@ export async function GET(
 ) {
   const user = await currentUser();
   if (!user) return new NextResponse("Nicht angemeldet.", { status: 401 });
+  // Ohne Auftragsverarbeitungsvertrag wird hier nichts herausgegeben. Diese
+  // Route umgeht requireUser (sie muss einen Status liefern, keine
+  // Weiterleitung) und braucht den Riegel deshalb ausdruecklich.
+  if (!(await avvAkzeptiert(user.id))) {
+    return new NextResponse(
+      "Auftragsverarbeitungsvertrag noch nicht bestaetigt.",
+      { status: 403 }
+    );
+  }
 
   const { datei } = await params;
   if (!datei.endsWith(".ics")) {

@@ -151,6 +151,15 @@ export async function benutzerLoeschen(formData: FormData) {
   }
 
   await prisma.$transaction([
+    // Die Zustimmungen zur Auftragsverarbeitung sind unveraenderlich - ein
+    // Trigger blockt UPDATE und DELETE auch gegen den Eigentuemer der Tabelle.
+    // Dieser eine Weg meldet sich ausdruecklich dabei an, sonst liesse sich
+    // kein Konto mehr loeschen, sobald es einmal zugestimmt hat.
+    //
+    // set_config(..., true) gilt nur fuer DIESE Transaktion. Darum steht es
+    // als erstes Element IM Feld und nicht davor: ausserhalb der Transaktion
+    // waere die Einstellung ueber den Pooler wertlos.
+    prisma.$queryRaw`SELECT set_config('app.avv_loeschen_erlaubt', 'ja', true)`,
     // Die privaten Kontakte gehen mit. Sie haetten sonst keinen Eigentuemer
     // mehr und waeren in keiner Ansicht je wieder sichtbar - Daten, die nur
     // noch Platz belegen.

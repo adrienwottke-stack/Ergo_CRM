@@ -289,12 +289,13 @@ model User {
   herkunftId String?
   herkunft   Invite? @relation("Herkunft", fields: [herkunftId], references: [id], onDelete: SetNull)
 
-  contacts       Contact[]
-  person         Person?
-  stageEvents    StageEvent[]
-  undoEntries    UndoEntry[]
-  pushAbos       PushAbo[]
-  passwortResets PasswortReset[]
+  contacts        Contact[]
+  person          Person?
+  stageEvents     StageEvent[]
+  undoEntries     UndoEntry[]
+  pushAbos        PushAbo[]
+  passwortResets  PasswortReset[]
+  avvZustimmungen AvvAcceptance[]
 
   fuehrungsAufgaben LeadershipTask[] @relation("Fuehrt")
   betrifftMich      LeadershipTask[] @relation("Betrifft")
@@ -718,4 +719,31 @@ model FeedReaktion {
 
   @@unique([eintragId, personId])
   @@index([eintragId])
+}
+
+// Zustimmung zur Auftragsverarbeitung (Art. 28 DSGVO). Ein Nachweis, kein
+// Zustand: hier wird angelegt und gelesen, nie geaendert und nie geloescht.
+// Der Riegel dafuer sitzt in der Datenbank (Trigger in der Migration), nicht
+// in dieser Datei - Prisma verbindet sich als Eigentuemer der Tabelle und
+// umgeht damit jede RLS-Policy.
+//
+// Tabellen- und Spaltennamen in snake_case und damit abweichend vom Rest des
+// Schemas: der Name ist vorgegeben und soll in einer Datenschutz-Auskunft
+// genau so lesbar sein, wie er dort steht.
+model AvvAcceptance {
+  id     String @id @default(cuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Die Fassung als Text, nicht als Zahl: "1.0", "2026-09-01", "1.0-ergo" -
+  // was auf dem Dokument steht, steht auch hier.
+  avvVersion String   @map("avv_version")
+  acceptedAt DateTime @default(now()) @map("accepted_at") @db.Timestamptz(3)
+
+  ipAddress String? @map("ip_address") @db.Inet
+  userAgent String? @map("user_agent")
+
+  // Je Konto und Fassung genau einmal.
+  @@unique([userId, avvVersion])
+  @@map("avv_acceptances")
 }
