@@ -1,9 +1,20 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { astLage, fuehrungsSchritt, type Mannschaftsperson } from "@/lib/fuehrung";
 import { ampelFarben, ampelTexte } from "@/lib/signale";
-import { aufriss, verlauf, VERLAUF_TAGE, type Ereignis } from "@/lib/einblick";
+import {
+  aufriss,
+  letzteSchritte,
+  naechsteSchritte,
+  verlauf,
+  VERLAUF_TAGE,
+  type Ereignis,
+  type NaechsterSchritt,
+} from "@/lib/einblick";
+import { nextStepLabels } from "@/lib/pipeline";
+import { EinladungNachreichen } from "@/components/PersonAufnehmen";
 import { SCHNELLTEXTE_FUEHRUNG } from "@/lib/nachrichten";
 import NachrichtSenden from "@/components/NachrichtSenden";
 import KuemmereMich from "@/components/KuemmereMich";
@@ -63,6 +74,49 @@ function namensListe(ereignis: Ereignis): string {
   return rest > 0 ? `${sichtbar} +${rest} weitere` : sichtbar;
 }
 
+/**
+ * Der Zweizeiler ganz oben.
+ *
+ * Vorher stand auf der Karte "zuletzt 24.08. · naechster 25.08." - zwei Zahlen
+ * ohne Inhalt. Wer daraufhin anruft, faengt das Gespraech mit einer Frage an,
+ * deren Antwort in seiner eigenen Datenbank steht.
+ */
+function SchrittZeile({
+  marke,
+  text,
+  ton = "normal",
+}: {
+  marke: string;
+  text: string;
+  ton?: "normal" | "warnung" | "still";
+}) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+      <span className="w-28 shrink-0 text-11 font-semibold uppercase tracking-wider text-slate-400">
+        {marke}
+      </span>
+      <span
+        className={`text-sm ${
+          ton === "warnung"
+            ? "font-medium text-amber-700"
+            : ton === "still"
+              ? "text-slate-500"
+              : "text-slate-900"
+        }`}
+      >
+        {text}
+      </span>
+    </div>
+  );
+}
+
+function naechsterText(schritt: NaechsterSchritt): string {
+  const wann = schritt.mitUhrzeit
+    ? `${tagKurz.format(schritt.wann)} ${uhrzeit.format(schritt.wann)}`
+    : tagKurz.format(schritt.wann);
+  return `${nextStepLabels[schritt.art]} · ${schritt.kontakt} · ${wann}`;
+}
+
 function Kennzahl({
   wert,
   bezeichnung,
@@ -73,7 +127,7 @@ function Kennzahl({
   betont?: boolean;
 }) {
   return (
-    <div className="min-w-[72px]">
+    <div className="min-w-18">
       <p
         className={`text-lg font-semibold tabular-nums ${betont ? "text-navy-700" : "text-slate-900"}`}
       >
@@ -104,7 +158,7 @@ function VerlaufsTag({
 }) {
   return (
     <li>
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+      <p className="text-11 font-semibold uppercase tracking-wider text-slate-400">
         {tag}
       </p>
       <ul className="mt-1.5 space-y-1.5">
@@ -123,7 +177,7 @@ function VerlaufsTag({
               <span className="text-xs text-slate-400">· {ereignis.zusatz}</span>
             )}
             {mitBerater && (
-              <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+              <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-11 font-medium text-slate-600">
                 {namen.get(ereignis.beraterId) ?? "—"}
               </span>
             )}
@@ -149,12 +203,12 @@ function AstZeile({ person }: { person: Mannschaftsperson }) {
         <span className="text-sm font-medium text-slate-900">{person.name}</span>
         <span className="sr-only">{ampelTexte[person.ampel]}</span>
         {person.fuehrt > 0 && (
-          <span className="rounded-full bg-navy-50 px-2 py-0.5 text-[11px] text-navy-700">
+          <span className="rounded-full bg-navy-50 px-2 py-0.5 text-11 text-navy-700">
             führt {person.fuehrt}
           </span>
         )}
         {!person.einblick.offen && (
-          <span className="text-[11px] text-slate-400">nur Zahlen</span>
+          <span className="text-11 text-slate-400">nur Zahlen</span>
         )}
         <span className="ml-auto text-xs tabular-nums text-slate-500">
           {w.anrufeWoche} Anrufe · {w.gehaltenWoche} gehalten · {w.abschluesseMonat} Abschl.
@@ -171,20 +225,29 @@ export default async function PersonPage({
 }) {
   const { id } = await params;
   const user = await requireUser();
+  const kopfzeilen = await headers();
+  const herkunft = `${kopfzeilen.get("x-forwarded-proto") ?? "http"}://${kopfzeilen.get("host") ?? ""}`;
   const lage = await astLage(user, id);
   if (!lage) notFound();
 
-  const { person, ast, direkte, summe, offen, verdeckt } = lage;
+  const { person, ast, direkte, summe, koepfe, wartende, offen, verdeckt } = lage;
   const fuehrt = ast.length > 0;
 
   // Der Verlauf umfasst die Person UND ihren Ast - aber nur die, deren Namen
   // offen sind. Wer zu ist, faellt aus der Abfrage, nicht erst aus der
   // Anzeige: was nicht geholt wird, kann auch nicht durchrutschen.
   const offeneIds = offen.map((eintrag) => eintrag.id);
-  const [ereignisse, offeneSachen] = await Promise.all([
+  // Der Zweizeiler oben zeigt IHN, nicht seinen Ast - sonst stuende bei einer
+  // Fuehrungskraft der Termin eines Untergebenen als ihr eigener da.
+  const nurEr = person.einblick.offen ? [person.id] : [];
+  const [ereignisse, offeneSachen, zuletztJe, naechstesJe] = await Promise.all([
     verlauf(offeneIds),
     aufriss(offeneIds),
+    letzteSchritte(nurEr),
+    naechsteSchritte(nurEr),
   ]);
+  const zuletzt = zuletztJe.get(person.id) ?? null;
+  const naechstes = naechstesJe.get(person.id) ?? null;
 
   const namen = new Map([person, ...ast].map((eintrag) => [eintrag.id, eintrag.vorname]));
   // Ein Herkunftsschild je Zeile lohnt sich erst, wenn mehr als einer liefert.
@@ -202,7 +265,7 @@ export default async function PersonPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/mannschaft" className="text-[13px] font-medium text-navy-700 hover:underline">
+        <Link href="/mannschaft" className="text-13 font-medium text-navy-700 hover:underline">
           ← Mannschaft
         </Link>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -227,9 +290,70 @@ export default async function PersonPage({
         </p>
       </div>
 
+      {/* --- Zuletzt und als Naechstes ---------------------------------------
+          Ganz oben, noch vor dem eigenen Schritt: das ist die Auskunft, wegen
+          der man den Namen ueberhaupt angetippt hat. */}
+      {person.platzhalter ? (
+        <section className={`${card} p-4 sm:p-5`}>
+          <h2 className={kicker}>Noch nicht dabei</h2>
+          <p className="mt-1.5 text-sm text-slate-600">
+            {person.vorname} steht in der Struktur, nutzt die App aber noch nicht.
+            Hier bleibt es leer, bis er sein Konto hat — Nullen wären eine
+            Behauptung über jemanden, der nie gefragt wurde.
+          </p>
+          <div className="mt-3">
+            <EinladungNachreichen
+              fuerId={person.id}
+              name={person.vorname}
+              vorhandenerCode={person.einladungsCode}
+              herkunft={herkunft}
+            />
+          </div>
+        </section>
+      ) : (
+        <section className={`${card} space-y-2 p-4 sm:p-5`}>
+          <SchrittZeile
+            marke="Zuletzt"
+            ton={zuletzt || person.werte.letzteAktivitaet ? "normal" : "still"}
+            text={
+              zuletzt
+                ? `${zuletzt.was} · ${namensListe(zuletzt)}${zuletzt.zusatz ? ` · ${zuletzt.zusatz}` : ""} · ${tagKurz.format(zuletzt.wann)}`
+                : person.werte.letzteAktivitaet
+                  ? // Einblick zu: das Datum steht ohnehin in den Zahlen, der
+                    // Name nicht.
+                    `Aktivität am ${tagKurz.format(person.werte.letzteAktivitaet)}`
+                  : "Seit dem Start nichts."
+            }
+          />
+          <SchrittZeile
+            marke="Als Nächstes"
+            ton={
+              naechstes?.ueberfaellig
+                ? "warnung"
+                : naechstes || person.werte.naechsterSchritt
+                  ? "normal"
+                  : "still"
+            }
+            text={
+              naechstes
+                ? `${naechsterText(naechstes)}${naechstes.ueberfaellig ? " — überfällig" : ""}`
+                : person.werte.naechsterSchritt
+                  ? `Fällig ${tagKurz.format(person.werte.naechsterSchritt)}`
+                  : "Nichts geplant."
+            }
+          />
+        </section>
+      )}
+
       {/* --- Was zu tun ist --------------------------------------------------
           Steht vor allen Zahlen. Wer die Seite oeffnet, hat eine Frage, und
-          die Antwort gehoert nicht ans Ende. */}
+          die Antwort gehoert nicht ans Ende.
+
+          Bei einem Platzhalter faellt das ganze Stueck weg: "Laeuft." waere
+          eine Bewertung von jemandem, der nie gefragt wurde, und ein
+          Anruf-Knopf zeigte auf eine Nummer, die eine Fuehrungskraft
+          eingetragen hat statt er selbst. */}
+      {!person.platzhalter && (
       <section className={`${card} p-4 sm:p-5`}>
         <h2 className={kicker}>Dein Schritt</h2>
         <p className="mt-1.5 text-sm text-slate-900">{fuehrungsSchritt(person)}</p>
@@ -249,7 +373,7 @@ export default async function PersonPage({
           {person.telefon && (
             <a
               href={`tel:${person.telefon.replace(/[^+\d]/g, "")}`}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-[13px] font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-3.5 text-13 font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
             >
               <PhoneIcon className="h-4 w-4" />
               {person.vorname} anrufen
@@ -283,11 +407,17 @@ export default async function PersonPage({
         )}
       </section>
 
+      )}
+
       {/* --- Zahlen ----------------------------------------------------------
           Bei einer Fuehrungskraft zwei Bloecke nebeneinander: was SIE selbst
           geschafft hat und was ihr Ast geschafft hat. Zusammengerechnet waere
           es dieselbe Verwechslung, die die Rangliste macht - ein Aufbauer
-          sieht dann fleissig aus, ohne selbst gearbeitet zu haben. */}
+          sieht dann fleissig aus, ohne selbst gearbeitet zu haben.
+
+          Ein Platzhalter hat keine eigenen Zahlen - nur die seines Astes,
+          falls schon jemand unter ihm haengt. */}
+      {!person.platzhalter && (
       <section className={`${card} p-4 sm:p-5`}>
         <h2 className={kicker}>{person.vorname} selbst</h2>
         <div className="mt-3 flex flex-wrap gap-x-6 gap-y-3">
@@ -306,8 +436,8 @@ export default async function PersonPage({
         {fuehrt && (
           <div className="mt-4 border-t border-slate-100 pt-4">
             <h2 className={kicker}>
-              Ast gesamt — {person.vorname} und {ast.length}{" "}
-              {ast.length === 1 ? "Person" : "Personen"}
+              Ast gesamt — {koepfe} {koepfe === 1 ? "Kopf" : "Köpfe"}
+              {wartende > 0 && `, ${wartende} noch nicht dabei`}
             </h2>
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-3">
               <Kennzahl wert={summe.anrufeWoche} bezeichnung="Anrufe (Woche)" />
@@ -321,7 +451,28 @@ export default async function PersonPage({
         )}
       </section>
 
+      )}
+
+      {/* Ein Platzhalter mit Leuten darunter: seine eigenen Zahlen gibt es
+          nicht, die seines Astes schon. Das ist der Fall "geplante Ebene" -
+          die Struktur steht, die Person noch nicht. */}
+      {person.platzhalter && fuehrt && (
+        <section className={`${card} p-4 sm:p-5`}>
+          <h2 className={kicker}>
+            Ast unter {person.vorname} — {koepfe} {koepfe === 1 ? "Kopf" : "Köpfe"}
+            {wartende > 0 && `, ${wartende} noch nicht dabei`}
+          </h2>
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-3">
+            <Kennzahl wert={summe.anrufeWoche} bezeichnung="Anrufe (Woche)" />
+            <Kennzahl wert={summe.gehaltenWoche} bezeichnung="Termine gehalten" />
+            <Kennzahl wert={summe.abschluesseMonat} bezeichnung="Abschlüsse (Monat)" betont />
+            <Kennzahl wert={summe.punkteWoche} bezeichnung="Punkte (Woche)" />
+          </div>
+        </section>
+      )}
+
       {/* --- Der Verlauf mit Namen ------------------------------------------ */}
+      {!(person.platzhalter && !fuehrt) && (
       <section className={`${card} p-4 sm:p-5`}>
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h2 className={kicker}>
@@ -337,7 +488,7 @@ export default async function PersonPage({
 
         {offeneIds.length === 0 ? (
           <p className="mt-2 text-sm text-slate-600">
-            Hier stehen keine Namen. {person.einblick.hinweis}
+            Hier stehen keine Vornamen. {person.einblick.hinweis}
           </p>
         ) : tage.length === 0 ? (
           <p className="mt-2 text-sm text-slate-600">
@@ -366,6 +517,7 @@ export default async function PersonPage({
           </p>
         )}
       </section>
+      )}
 
       {/* --- Was ansteht und was liegt --------------------------------------
           Die andere Haelfte: der Verlauf erzaehlt die Vergangenheit, hier
@@ -384,7 +536,7 @@ export default async function PersonPage({
                     >
                       <span className="font-medium text-slate-900">{eintrag.name}</span>
                       {mitBerater && (
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-11 text-slate-400">
                           {namen.get(eintrag.beraterId) ?? "—"}
                         </span>
                       )}
@@ -409,7 +561,7 @@ export default async function PersonPage({
                       <span className="font-medium text-slate-900">{eintrag.name}</span>
                       <span className="text-xs text-slate-500">{eintrag.phase}</span>
                       {mitBerater && (
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-11 text-slate-400">
                           {namen.get(eintrag.beraterId) ?? "—"}
                         </span>
                       )}
@@ -460,8 +612,9 @@ export default async function PersonPage({
       )}
 
       <p className={kicker}>
-        Namen ja, Gesprächsinhalt nein: Notizen, Telefonnummern, E-Mail-Adressen und
-        Berufe der Kontakte stehen hier nirgends — auch nicht im Startfenster.
+        Vorname ja, alles andere nein: Nachnamen, Notizen, Telefonnummern,
+        E-Mail-Adressen und Berufe der Kontakte stehen hier nirgends — auch nicht im
+        Startfenster.
       </p>
     </div>
   );

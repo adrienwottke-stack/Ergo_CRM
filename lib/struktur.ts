@@ -24,6 +24,17 @@ export function liegtImAst(pfad: string, wurzelPfad: string): boolean {
   return pfad.startsWith(wurzelPfad);
 }
 
+/**
+ * Die Id der Fuehrungskraft aus dem Pfad - ohne zweite Abfrage.
+ *
+ * "/a/b/c/" -> "b". Der Pfad traegt die eigene Id am Ende, das vorletzte
+ * Stueck ist damit die Fuehrungskraft. Bei einer Wurzel gibt es keine.
+ */
+export function elternIdVon(pfad: string): string | null {
+  const teile = pfad.split("/").filter(Boolean);
+  return teile.length >= 2 ? (teile[teile.length - 2] ?? null) : null;
+}
+
 /** Ebene im Baum: Wurzel = 0. */
 export function ebene(pfad: string): number {
   return Math.max(0, pfad.split("/").filter(Boolean).length - 1);

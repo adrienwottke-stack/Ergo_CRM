@@ -45,7 +45,7 @@ export default function BriefAkt({ onDone }: { onDone: () => void }) {
         onChange={(event) => setText(event.target.value)}
         maxLength={2000}
         placeholder="Ich mach das, weil …"
-        className="w-full rounded-xl border border-white/25 bg-white/5 px-4 py-3 text-[15px] leading-relaxed text-white placeholder:text-slate-500 focus:border-gold-400 focus:outline-none"
+        className="w-full rounded-xl border border-white/25 bg-white/5 px-4 py-3 text-15 leading-relaxed text-white placeholder:text-slate-500 focus:border-gold-400 focus:outline-none"
       />
 
       <div className="space-y-3">
@@ -53,7 +53,7 @@ export default function BriefAkt({ onDone }: { onDone: () => void }) {
           type="button"
           onClick={weglegen}
           disabled={pending || text.trim().length === 0}
-          className="min-h-12 w-full rounded-xl bg-gold-400 text-[15px] font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98] disabled:opacity-40"
+          className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98] disabled:opacity-40"
         >
           {pending ? "Wird weggelegt …" : "Weglegen"}
         </button>

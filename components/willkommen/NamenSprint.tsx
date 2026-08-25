@@ -198,7 +198,7 @@ export default function NamenSprint({
         <button
           type="button"
           onClick={() => onDone(anzahl)}
-          className="min-h-12 w-full rounded-xl bg-gold-400 text-[15px] font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+          className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
         >
           Weiter
         </button>
@@ -260,7 +260,7 @@ export default function NamenSprint({
         )}
       </div>
 
-      <div className="min-h-[72px]">
+      <div className="min-h-18">
         {anzahl >= 3 && rest > 15 && (
           <p className="text-center text-sm font-medium text-slate-300">
             Weiter. Nicht nachdenken.

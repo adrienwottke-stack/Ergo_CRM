@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ebene, liegtImAst } from "@/lib/struktur";
-import { btnPrimary, card, input, kicker, label, pageTitle, sectionTitle, td, th } from "@/components/ui";
+import { btnPrimary, card, input, kicker, label, pageTitle, sectionTitle, columnWide, td, th } from "@/components/ui";
 import KontoAktionen from "@/components/KontoAktionen";
 import {
   beraterUmhaengen,
@@ -22,6 +22,8 @@ const fehlertexte: Record<string, string> = {
   eigener_ast:
     "Das würde einen Kreis erzeugen: die gewählte Führungskraft hängt selbst unter diesem Berater.",
   unbekannt: "Konto nicht gefunden.",
+  platzhalter:
+    "Das ist ein Platzhalter ohne Zugangsdaten – da gibt es kein Passwort zurückzusetzen. Wer hier hinein soll, bekommt eine Einladung.",
 };
 
 export default async function TeamPage({
@@ -95,13 +97,14 @@ export default async function TeamPage({
   const herkunft = `${kopfzeilen.get("x-forwarded-proto") ?? "http"}://${kopfzeilen.get("host") ?? ""}`;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className={`${columnWide} space-y-8`}>
       <div>
         <h1 className={pageTitle}>Struktur verwalten</h1>
         <p className="mt-1 text-sm text-slate-500">
           Wer Berater unter sich hat, ist Führungskraft – eine eigene Rolle dafür gibt es
-          nicht. Kontakte bleiben in jedem Fall privat; eine Führungskraft sieht Zahlen,
-          keine Kundennamen.
+          nicht. Eine Führungskraft sieht Zahlen und Pipeline, bei frisch Gestarteten
+          30 Tage lang auch die Vornamen ihrer Kontakte. Notizen, Telefonnummern und
+          E-Mail-Adressen sieht sie nie.
         </p>
       </div>
 
@@ -189,7 +192,7 @@ export default async function TeamPage({
               ))}
             </select>
           </div>
-          <button type="submit" className={`${btnPrimary} min-h-[44px]`}>Link erzeugen</button>
+          <button type="submit" className={btnPrimary}>Link erzeugen</button>
         </form>
 
         {offeneInvites.length > 0 && (
@@ -220,7 +223,7 @@ export default async function TeamPage({
                     <input type="hidden" name="on" value={invite.browserFreigabe ? "0" : "1"} />
                     <button
                       type="submit"
-                      className="min-h-[44px] rounded-lg px-3 text-xs font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                      className="min-h-11 rounded-lg px-3 text-xs font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-700"
                     >
                       {invite.browserFreigabe ? "App-Pflicht zurück" : "Ohne App erlauben"}
                     </button>
@@ -229,7 +232,7 @@ export default async function TeamPage({
                     <input type="hidden" name="inviteId" value={invite.id} />
                     <button
                       type="submit"
-                      className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-red-700"
+                      className="min-h-11 rounded-lg px-3 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-red-700"
                     >
                       Zurücknehmen
                     </button>
@@ -260,7 +263,7 @@ export default async function TeamPage({
             sonst entsteht ein Kreis.
           </p>
         </div>
-        <table className="mt-4 w-full min-w-[760px] text-left text-sm">
+        <table className="mt-4 w-full min-w-190 text-left text-sm">
           <thead className="border-y border-slate-200/80 bg-slate-50/60">
             <tr>
               <th className={th}>Name</th>
@@ -307,7 +310,7 @@ export default async function TeamPage({
                         name="leaderId"
                         defaultValue={user.leaderId ?? ""}
                         aria-label={`Führungskraft von ${user.name}`}
-                        className="min-h-[44px] rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700"
+                        className="min-h-11 rounded-lg border border-slate-200 bg-surface px-2 text-sm text-slate-700"
                       >
                         <option value="">— keine (Wurzel)</option>
                         {kandidaten.map((kandidat) => (
@@ -316,7 +319,7 @@ export default async function TeamPage({
                       </select>
                       <button
                         type="submit"
-                        className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-navy-700 hover:bg-navy-50"
+                        className="min-h-11 rounded-lg px-3 text-sm font-medium text-navy-700 hover:bg-navy-50"
                       >
                         Setzen
                       </button>

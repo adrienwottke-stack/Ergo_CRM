@@ -13,7 +13,7 @@ import { DEFAULT_GUIDES, guideKeyForList } from "@/lib/guides";
 import { lostReasonLabels } from "@/lib/pipeline";
 import NameList, { type NameEntry } from "@/components/NameList";
 import GuidePanel from "@/components/GuidePanel";
-import { pageTitle } from "@/components/ui";
+import { pageTitle, column } from "@/components/ui";
 import type { ListKind } from "@/lib/generated/prisma/enums";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +72,7 @@ export default async function NamenPage({
   const guide = DEFAULT_GUIDES[guideKey];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className={`${column} space-y-6`}>
       <div>
         <h1 className={pageTitle}>Namensliste</h1>
         <p className="mt-1 text-sm text-slate-500">{listKindHints[kind]}</p>
@@ -89,7 +89,7 @@ export default async function NamenPage({
               href={`/namen?liste=${value}`}
               className={`flex min-h-11 flex-1 items-center justify-center rounded-full text-sm font-semibold transition ${
                 active
-                  ? "bg-white text-navy-900 ring-1 ring-slate-200"
+                  ? "bg-surface text-navy-900 ring-1 ring-slate-200"
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >

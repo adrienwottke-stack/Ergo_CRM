@@ -192,13 +192,33 @@ model StageEvent {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  passwordSalt String
-  passwordHash String
-  role         UserRole @default(MEMBER)
-  createdAt    DateTime @default(now())
+  id   String @id @default(cuid())
+  name String
+
+  // --- Platzhalter (docs/struktur-plan.md, Abschnitt 2) ----------------------
+  // Ein Konto OHNE Zugangsdaten ist ein Platzhalter: jemand, der in der
+  // Struktur steht, sie aber noch nicht nutzt. Beim Ausrollen auf ein Team ist
+  // die Struktur vorher da - Emil, vier Leute unter ihm, die Ebene darueber -
+  // und sie soll vorher stehen koennen, nicht erst wenn der Letzte eine
+  // Einladung eingeloest hat.
+  //
+  // Bewusst KEIN eigenes Modell: als User ohne Passwort traegt der ganze
+  // Baum-Apparat unveraendert - path, lib/scope.ts, mannschaftsLage,
+  // umhaengen. Ein zweites Modell muesste an jeder dieser Stellen mit dem
+  // ersten zusammengefuehrt werden.
+  //
+  // Und bewusst KEIN zusaetzliches Kennzeichen: Platzhalter ist, wer keinen
+  // passwordHash hat. Ein Boolean daneben koennte falsch stehen, dieser
+  // Zustand nicht. Derselbe Grund, aus dem "Fuehrungskraft" keine Rolle ist.
+  //
+  // Wer hier NULL stehen hat, kommt nirgends hinein: der Riegel sitzt in
+  // app/login/actions.ts und in der Passwort-Zuruecksetzung.
+  email        String? @unique
+  passwordSalt String?
+  passwordHash String?
+
+  role      UserRole @default(MEMBER)
+  createdAt DateTime @default(now())
 
   // Die eigene Nummer, damit die Fuehrungskraft anrufen kann statt zu
   // schreiben. Traegt IMMER der Mensch selbst ein - nie die Fuehrungskraft,
@@ -279,10 +299,11 @@ model User {
   fuehrungsAufgaben LeadershipTask[] @relation("Fuehrt")
   betrifftMich      LeadershipTask[] @relation("Betrifft")
 
-  nachrichtenGesendet Nachricht[] @relation("NachrichtVon")
-  nachrichtenErhalten Nachricht[] @relation("NachrichtAn")
-  invites             Invite[]    @relation("Einladender")
-  invite              Invite?     @relation("Eingeloest")
+  nachrichtenGesendet  Nachricht[] @relation("NachrichtVon")
+  nachrichtenErhalten  Nachricht[] @relation("NachrichtAn")
+  invites              Invite[]    @relation("Einladender")
+  invite               Invite?     @relation("Eingeloest")
+  platzhalterEinladung Invite?     @relation("Platzhalter")
 
   @@index([leaderId])
   @@index([path])
@@ -300,6 +321,16 @@ model Invite {
 
   note      String? // "Max aus dem Infoabend"
   expiresAt DateTime
+
+  // Fuer wen die Einladung ist, wenn die Person schon als Platzhalter im Baum
+  // steht. Gesetzt heisst: beim Einloesen entsteht KEIN neues Konto, sondern
+  // dieser Knoten bekommt Zugangsdaten. Der Mensch behaelt damit seinen Platz
+  // in der Struktur - und alles, was schon an ihm haengt.
+  //
+  // Einmalig: ein Platzhalter hat hoechstens eine offene Einladung. Zwei
+  // Codes auf denselben Knoten waeren zwei Wege in dasselbe Konto.
+  fuerId String? @unique
+  fuer   User?   @relation("Platzhalter", fields: [fuerId], references: [id], onDelete: Cascade)
 
   // Notausgang aus der Installations-Schleuse: normalerweise erscheint das
   // Anmeldeformular erst, wenn die Seite vom Startbildschirm laeuft. Laesst

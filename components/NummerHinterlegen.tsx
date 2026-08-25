@@ -45,7 +45,7 @@ export default function NummerHinterlegen({ fuehrungskraft }: { fuehrungskraft: 
           <button
             type="button"
             onClick={() => setOffen(true)}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-[13px] font-medium text-slate-700 transition hover:border-navy-400 hover:text-navy-800"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-3.5 text-13 font-medium text-slate-700 transition hover:border-navy-400 hover:text-navy-800"
           >
             <PhoneIcon className="h-4 w-4" />
             Nachtragen
@@ -55,7 +55,7 @@ export default function NummerHinterlegen({ fuehrungskraft }: { fuehrungskraft: 
           <button
             type="button"
             onClick={() => setWeg(true)}
-            className="min-h-11 rounded-lg px-2.5 text-[13px] font-medium text-slate-400 transition hover:text-slate-700"
+            className="min-h-11 rounded-lg px-2.5 text-13 font-medium text-slate-400 transition hover:text-slate-700"
           >
             Nicht jetzt
           </button>
@@ -91,7 +91,7 @@ export default function NummerHinterlegen({ fuehrungskraft }: { fuehrungskraft: 
           type="button"
           disabled={pending || wert.trim().length < 5}
           onClick={speichern}
-          className="inline-flex min-h-11 items-center rounded-lg bg-navy-900 px-4 text-sm font-semibold text-white transition hover:bg-navy-950 disabled:opacity-40"
+          className="inline-flex min-h-11 items-center rounded-lg bg-akzent px-4 text-sm font-semibold text-white transition hover:bg-akzent-stark disabled:opacity-40"
         >
           Speichern
         </button>

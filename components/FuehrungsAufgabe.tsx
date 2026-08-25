@@ -43,7 +43,7 @@ export default function FuehrungsAufgabe({ aufgabe }: { aufgabe: AufgabeAnzeige 
       }`}
     >
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-        <span className="rounded-full bg-navy-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-navy-700">
+        <span className="rounded-full bg-navy-50 px-2 py-0.5 text-11 font-semibold uppercase tracking-wide text-navy-700">
           {aufgabenTitel[aufgabe.art]}
         </span>
         <span className="text-sm font-semibold text-slate-900">{aufgabe.name}</span>
@@ -70,7 +70,7 @@ export default function FuehrungsAufgabe({ aufgabe }: { aufgabe: AufgabeAnzeige 
           <input type="hidden" name="aufgabeId" value={aufgabe.id} />
           <button
             type="submit"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-navy-900 px-3.5 text-[13px] font-semibold text-white transition hover:bg-navy-950"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-akzent px-3.5 text-13 font-semibold text-white transition hover:bg-akzent-stark"
           >
             <CheckIcon className="h-4 w-4" />
             Erledigt
@@ -80,7 +80,7 @@ export default function FuehrungsAufgabe({ aufgabe }: { aufgabe: AufgabeAnzeige 
         {aufgabe.anrufen && (
           <a
             href={`tel:${aufgabe.anrufen.telefon.replace(/[^+\d]/g, "")}`}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-[13px] font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-3.5 text-13 font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
           >
             <PhoneIcon className="h-4 w-4" />
             {aufgabe.anrufen.vorname} anrufen
@@ -95,7 +95,7 @@ export default function FuehrungsAufgabe({ aufgabe }: { aufgabe: AufgabeAnzeige 
           <input type="hidden" name="frist" value="drei" />
           <button
             type="submit"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-slate-500 transition hover:text-slate-900"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-13 font-medium text-slate-500 transition hover:text-slate-900"
           >
             <ClockIcon className="h-4 w-4" />
             3 Tage später

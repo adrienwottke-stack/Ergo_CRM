@@ -67,7 +67,7 @@ export default async function WerkstattPage() {
       </div>
 
       <div className={`${card} overflow-x-auto`}>
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-180 text-left text-sm">
           <thead className="border-b border-slate-200/80 bg-slate-50/60">
             <tr>
               <th className={th}>Baustein</th>
@@ -110,7 +110,7 @@ export default async function WerkstattPage() {
                   </td>
                   <td className={td}>
                     <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${standStile[feature.state]}`}
+                      className={`inline-flex rounded-full px-2 py-0.5 text-11 font-semibold ring-1 ring-inset ${standStile[feature.state]}`}
                     >
                       {standTexte[feature.state]}
                     </span>
@@ -122,7 +122,7 @@ export default async function WerkstattPage() {
                         name="state"
                         defaultValue={feature.state}
                         aria-label={`Stand von ${feature.titel}`}
-                        className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs"
+                        className="min-h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-xs"
                       >
                         {Object.entries(standTexte).map(([wert, text]) => (
                           <option key={wert} value={wert}>
@@ -139,7 +139,7 @@ export default async function WerkstattPage() {
                       />
                       <button
                         type="submit"
-                        className="min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                        className="min-h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                       >
                         Übernehmen
                       </button>

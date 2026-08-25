@@ -5,6 +5,7 @@ import NavLinks, { type NavLink } from "@/components/NavLinks";
 import UndoBar from "@/components/UndoBar";
 import InstallationMelder from "@/components/InstallationMelder";
 import { LogoutIcon } from "@/components/icons";
+import { shell, gutter } from "@/components/ui";
 import type { User } from "@/lib/generated/prisma/client";
 
 // Eine Schale fuer alle angemeldeten Seiten.
@@ -56,8 +57,10 @@ export default async function AppShell({
   return (
     <div className="flex min-h-dvh flex-col">
       {/* Helle Kopfzeile mit Haarlinie: die App ist das Blatt, nicht die Buehne. */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-surface">
+        <div
+          className={`${shell} ${gutter} flex h-14 items-center justify-between gap-4`}
+        >
           <Wordmark sub="Beraterbereich" />
           <form action={logout}>
             {/* Am Handy nur das Symbol – der Text sprengt sonst die Kopfzeile. */}
@@ -73,12 +76,12 @@ export default async function AppShell({
         </div>
         {/* Navigation ueber die volle Breite, der aktive Unterstrich liegt
             direkt auf der Haarlinie der Kopfzeile. */}
-        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 sm:px-6">
+        <div className={`${shell} ${gutter} flex items-center gap-2`}>
           <NavLinks links={links} />
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+      <main className={`${shell} ${gutter} flex-1 py-8 sm:py-10`}>
         {children}
       </main>
 

@@ -23,11 +23,11 @@ export default function Rahmen({
       <h1 className="mt-3 text-[1.7rem] font-semibold leading-tight tracking-tight text-white">
         {titel}
       </h1>
-      <div className="mt-3 space-y-3 text-[15px] leading-relaxed text-navy-200">
+      <div className="mt-3 space-y-3 text-15 leading-relaxed text-navy-200">
         {text}
       </div>
       {children && <div className="mt-8">{children}</div>}
-      {fuss && <div className="mt-8 text-[13px] leading-relaxed text-navy-300">{fuss}</div>}
+      {fuss && <div className="mt-8 text-13 leading-relaxed text-navy-300">{fuss}</div>}
     </div>
   );
 }
@@ -45,7 +45,7 @@ export function Schritt({
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-300 text-sm font-semibold text-navy-950">
         {nummer}
       </span>
-      <span className="pt-0.5 text-[15px] leading-relaxed text-white">{children}</span>
+      <span className="pt-0.5 text-15 leading-relaxed text-white">{children}</span>
     </li>
   );
 }

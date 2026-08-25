@@ -8,7 +8,7 @@ import { streakDays } from "@/lib/stats";
 import QuickCounter from "@/components/QuickCounter";
 import WettbewerbNav from "@/components/WettbewerbNav";
 import { CalendarCheckIcon, ChevronRightIcon, FlameIcon, HashIcon, PhoneIcon } from "@/components/icons";
-import { btnPrimary, card, input, label, pageTitle, sectionTitle } from "@/components/ui";
+import { btnPrimary, card, input, label, pageTitle, sectionTitle, columnNarrow } from "@/components/ui";
 import { deleteLog, logDaily } from "./actions";
 import { quickLog } from "./quickLogAction";
 
@@ -61,7 +61,7 @@ export default async function LogPage() {
   );
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    <div className={`${columnNarrow} space-y-8`}>
       <WettbewerbNav />
 
       <div>

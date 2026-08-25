@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
 import ContactForm from "@/components/ContactForm";
 import DeleteContactButton from "@/components/DeleteContactButton";
-import { card, kicker, pageTitle } from "@/components/ui";
+import { card, kicker, pageTitle, columnNarrow } from "@/components/ui";
 import { updateContact } from "../../actions";
 
 export default async function EditContactPage({
@@ -28,7 +28,7 @@ export default async function EditContactPage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className={`${columnNarrow} space-y-6`}>
       <div>
         <Link
           href={`/contacts/${contact.id}`}

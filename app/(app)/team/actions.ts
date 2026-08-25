@@ -177,9 +177,14 @@ export async function passwortResetErzeugen(formData: FormData) {
 
   const konto = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true },
+    select: { id: true, passwordHash: true },
   });
   if (!konto) redirect("/team?error=unbekannt");
+  // Ein Platzhalter hat noch kein Passwort - es gibt also keins
+  // zurueckzusetzen. Sein Weg ins Konto ist die Einladung, und nur die: ein
+  // Reset-Link wuerde daran vorbei ein Konto oeffnen, das nie jemandem
+  // gehoert hat.
+  if (!konto.passwordHash) redirect("/team?error=platzhalter");
 
   const code = neuerResetCode();
   await prisma.$transaction([

@@ -202,7 +202,7 @@ export default function NummernNachtragen({
         <button
           type="button"
           onClick={speichern}
-          className="flex min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-navy-900 text-base font-semibold text-white transition hover:bg-navy-950 active:scale-[0.99]"
+          className="flex min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-akzent text-base font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.99]"
         >
           Weiter
           <ArrowRightIcon className="h-4 w-4" />

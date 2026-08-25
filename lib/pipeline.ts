@@ -135,7 +135,7 @@ export const ALL_LOST_REASONS: LostReason[] = [
 
 export const nextStepLabels: Record<NextStepType, string> = {
   ANRUF: "Anrufen",
-  TERMIN: "Termin durchfuehren",
+  TERMIN: "Termin durchführen",
   NACHFASSEN: "Nachfassen",
   EMPFEHLUNG_ERFRAGEN: "Empfehlungen erfragen",
   SONSTIGES: "Sonstiges",

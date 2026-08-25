@@ -136,7 +136,7 @@ export default function ChatFaden({
             className={`flex ${nachricht.von === "ich" ? "justify-end" : "justify-start"}`}
           >
             <p
-              className={`animate-rise max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[15px] leading-snug ${
+              className={`animate-rise max-w-[85%] rounded-2xl px-3.5 py-2.5 text-15 leading-snug ${
                 nachricht.von === "ich"
                   ? "rounded-br-md bg-gold-400 text-navy-950"
                   : "rounded-bl-md bg-white/10 text-white"
@@ -159,7 +159,7 @@ export default function ChatFaden({
       </div>
 
       {/* Antwortknoepfe unten, in Daumenreichweite. */}
-      <div className="min-h-[76px] pb-2">
+      <div className="min-h-19 pb-2">
         {frageOffen && schritt.art === "frage" && (
           <div className="animate-rise flex flex-col gap-2 sm:flex-row">
             {schritt.optionen.map((option) => (
@@ -167,7 +167,7 @@ export default function ChatFaden({
                 key={option.id}
                 type="button"
                 onClick={() => antworten(option.id)}
-                className="min-h-12 flex-1 rounded-xl border border-white/25 bg-white/5 px-4 text-[15px] font-semibold text-white transition hover:bg-white/15 active:scale-[0.98]"
+                className="min-h-12 flex-1 rounded-xl border border-white/25 bg-white/5 px-4 text-15 font-semibold text-white transition hover:bg-white/15 active:scale-[0.98]"
               >
                 {option.label}
               </button>

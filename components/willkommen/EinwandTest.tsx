@@ -46,7 +46,7 @@ export default function EinwandTest({
         <button
           type="button"
           onClick={onDone}
-          className="min-h-12 w-full rounded-xl bg-gold-400 text-[15px] font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+          className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
         >
           Weiter
         </button>
@@ -80,7 +80,7 @@ export default function EinwandTest({
                 if (navigator.vibrate) navigator.vibrate(option.richtig ? [10, 40, 10] : 25);
                 setGewaehlt(optionIndex);
               }}
-              className={`w-full rounded-xl border px-4 py-3.5 text-left text-[15px] leading-snug transition active:scale-[0.99] ${
+              className={`w-full rounded-xl border px-4 py-3.5 text-left text-15 leading-snug transition active:scale-[0.99] ${
                 zeigeRichtig
                   ? "border-emerald-400 bg-emerald-500/15 text-white"
                   : zeigeFalsch
@@ -101,7 +101,7 @@ export default function EinwandTest({
         })}
       </div>
 
-      <div className="min-h-[92px]">
+      <div className="min-h-23">
         {aufgeloest && (
           <div className="animate-rise space-y-3">
             <p className="rounded-xl bg-white/5 px-4 py-3 text-sm leading-relaxed text-slate-200 ring-1 ring-inset ring-white/10">
@@ -110,7 +110,7 @@ export default function EinwandTest({
             <button
               type="button"
               onClick={weiter}
-              className="min-h-12 w-full rounded-xl bg-gold-400 text-[15px] font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+              className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
             >
               {index + 1 < einwaende.length ? "Nächster Einwand" : "Verstanden"}
             </button>

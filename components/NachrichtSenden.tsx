@@ -55,7 +55,7 @@ export default function NachrichtSenden({
         <button
           type="button"
           onClick={() => setOffen(true)}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-[13px] font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-3.5 text-13 font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
         >
           <span aria-hidden className="text-base leading-none">
             ✉
@@ -121,7 +121,7 @@ export default function NachrichtSenden({
                 type="button"
                 disabled={pending || eigener.trim().length === 0}
                 onClick={() => senden(eigener)}
-                className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-navy-900 text-sm font-semibold text-white transition hover:bg-navy-950 disabled:opacity-40"
+                className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-akzent text-sm font-semibold text-white transition hover:bg-akzent-stark disabled:opacity-40"
               >
                 Senden
               </button>

@@ -6,7 +6,7 @@ import { isListKind, listKindLabels } from "@/lib/namelist";
 import NummernNachtragen, {
   type NummerEintrag,
 } from "@/components/NummernNachtragen";
-import { pageTitle } from "@/components/ui";
+import { pageTitle, columnNarrow } from "@/components/ui";
 import { XIcon } from "@/components/icons";
 import type { ListKind } from "@/lib/generated/prisma/enums";
 
@@ -68,7 +68,7 @@ export default async function NummernPage({
   }));
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className={`${columnNarrow} space-y-5`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className={pageTitle}>Nummern nachtragen</h1>

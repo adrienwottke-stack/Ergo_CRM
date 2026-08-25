@@ -1,5 +1,27 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Farbsystem
+   ---------------------------------------------------------------------------
+   WICHTIG fuer alle, die hier spaeter etwas aendern:
+
+   Tailwind v4 uebersetzt jede Farbklasse in "var(--color-...)". Deshalb kippt
+   der Dunkelmodus die Rampen selbst um (siehe .dark weiter unten) - eine
+   Seite muss dafuer nicht angefasst werden. Der Preis: "slate-900" heisst
+   danach nicht mehr "dunkel", sondern "die staerkste Textstufe". Genauso ist
+   "slate-50" die leiseste Flaeche, egal in welchem Modus.
+
+   Neuer Code soll deshalb die semantischen Tokens benutzen - surface, canvas,
+   line, ink, akzent - und nicht die Rampe. Die Rampe existiert nur noch,
+   damit der Bestand mitkippt.
+
+   Ausnahme: Flaechen, die in BEIDEN Modi dunkel bleiben (Schleuse, Willkommen,
+   Offline-Seite). Die tragen die Klasse "buehne" und bekommen dort die
+   Hell-Rampe zurueck - sonst wuerde heller Text auf ihnen unsichtbar.
+--------------------------------------------------------------------------- */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
@@ -19,13 +41,255 @@
   --color-navy-900: #12233c;
   --color-navy-950: #0a1628;
 
+  /* Zwischenstufen, die das Standardraster nicht kennt. Als rem, damit sie
+     mit der Wurzel mitwachsen - eine feste px-Angabe waere sonst der einzige
+     Baustein, der auf grossen Schirmen klein bleibt, waehrend alles um ihn
+     herum groesser wird. Die Namen nennen die Groesse bei 16-px-Wurzel,
+     also am Handy und am Notebook. */
+  --text-10: 0.625rem;
+  --text-11: 0.6875rem;
+  --text-13: 0.8125rem;
+  --text-15: 0.9375rem;
+
   /* Gold: Auszeichnung, Platz 1, dezente Akzente */
   --color-gold-100: #f7ecd4;
   --color-gold-400: #d4a942;
   --color-gold-600: #a97f24;
+
+  /* ---- Semantische Tokens: die Sprache fuer neuen Code ---- */
+
+  /* Flaechen */
+  --color-canvas: #f4f6fa;
+  --color-surface: #ffffff;
+  --color-sunken: #eef1f7;
+
+  /* Linien */
+  --color-line: #e1e6ef;
+  --color-line-strong: #c8d1de;
+
+  /* Schrift */
+  --color-ink: #0f172a;
+  --color-ink-muted: #4d5a70;
+  --color-ink-soft: #7b8698;
+
+  /* Akzent: Hauptknopf und alles, was fuehrt */
+  --color-akzent: #12233c;
+  --color-akzent-stark: #0a1628;
+
+  /* ---- Tiefe ----
+     Navy-getoent, nie schwarz: ein schwarzer Schatten auf hellem Grund wirkt
+     schmutzig, ein leicht blauer wirkt wie Licht. */
+  --shadow-card: 0 1px 2px rgb(16 32 56 / 0.04), 0 1px 3px rgb(16 32 56 / 0.06);
+  --shadow-lift: 0 2px 4px rgb(16 32 56 / 0.05), 0 8px 20px -6px rgb(16 32 56 / 0.14);
+  --shadow-pop: 0 2px 8px rgb(16 32 56 / 0.1), 0 12px 32px -8px rgb(16 32 56 / 0.24);
+}
+
+/* ---------------------------------------------------------------------------
+   Dunkelmodus
+   ---------------------------------------------------------------------------
+   Die Rampen sind nicht stur gespiegelt, sondern neu gesetzt: die hellen
+   Stufen (50-200) werden zu leisen Flaechen, die dunklen (600-950) zu Schrift.
+   Alle Graus haben einen Navy-Stich - ein neutralgraues Dunkel sieht billig
+   aus, ein blaustichiges sieht nach Nacht aus.
+--------------------------------------------------------------------------- */
+
+.dark {
+  /* Grau: 50-100 Flaeche, 200-300 Linie, ab 400 Schrift */
+  --color-slate-50: #172131;
+  --color-slate-100: #1d2838;
+  --color-slate-200: #273344;
+  --color-slate-300: #334154;
+  --color-slate-400: #7d8ba0;
+  --color-slate-500: #94a2b8;
+  --color-slate-600: #aab6c9;
+  --color-slate-700: #c3cddb;
+  --color-slate-800: #d8e0ea;
+  --color-slate-900: #eaf0f7;
+  --color-slate-950: #f6f9fc;
+
+  /* Navy: 50-300 Flaeche, ab 400 Schrift und Balken */
+  --color-navy-50: #16243a;
+  --color-navy-100: #1b2c46;
+  --color-navy-200: #24395a;
+  --color-navy-300: #2f4c76;
+  --color-navy-400: #5f8dc0;
+  --color-navy-500: #6fa0d0;
+  --color-navy-600: #7fb0dd;
+  --color-navy-700: #93bfe8;
+  --color-navy-800: #a9cdf0;
+  --color-navy-900: #c0daf5;
+  --color-navy-950: #d6e7fa;
+
+  /* Gold: die 400 ist die Marke und bleibt, wie sie ist */
+  --color-gold-100: #2e2512;
+  --color-gold-400: #d4a942;
+  --color-gold-600: #e6c470;
+
+  --color-emerald-50: #10251c;
+  --color-emerald-100: #163024;
+  --color-emerald-200: #1e4433;
+  --color-emerald-300: #2a5f47;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #22c58e;
+  --color-emerald-600: #45d49b;
+  --color-emerald-700: #6ce0ae;
+  --color-emerald-800: #92e9c4;
+  --color-emerald-900: #b9f2d9;
+  --color-emerald-950: #d9f9ea;
+
+  --color-red-50: #2b1518;
+  --color-red-100: #3a1b1f;
+  --color-red-200: #4d2328;
+  --color-red-300: #6b2f36;
+  --color-red-400: #f87171;
+  --color-red-500: #ef4444;
+  --color-red-600: #f8807f;
+  --color-red-700: #fb9b9b;
+  --color-red-800: #fdb8b8;
+  --color-red-900: #fed2d2;
+
+  --color-amber-50: #2a2010;
+  --color-amber-100: #382a12;
+  --color-amber-200: #4b3817;
+  --color-amber-300: #6b4f1e;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f5b026;
+  --color-amber-600: #f7c052;
+  --color-amber-700: #f9d182;
+  --color-amber-800: #fbdfa8;
+  --color-amber-900: #fdedcd;
+  --color-amber-950: #fef6e6;
+
+  --color-teal-50: #0d2422;
+  --color-teal-100: #12302d;
+  --color-teal-200: #17433f;
+  --color-teal-300: #1f5d57;
+  --color-teal-400: #2dd4bf;
+  --color-teal-500: #1fc5b0;
+  --color-teal-600: #3fd6c3;
+  --color-teal-700: #6ee2d4;
+  --color-teal-800: #9aece2;
+  --color-teal-900: #c4f4ee;
+
+  /* Semantik */
+  --color-canvas: #0c131e;
+  --color-surface: #141d2b;
+  --color-sunken: #0a1017;
+  --color-line: #26313f;
+  --color-line-strong: #384656;
+  --color-ink: #eaf0f7;
+  --color-ink-muted: #a9b5c6;
+  --color-ink-soft: #7d8ba0;
+
+  /* Der Hauptknopf wird heller statt dunkler - sonst verschwindet er. */
+  --color-akzent: #2f6bb0;
+  --color-akzent-stark: #3d7cc4;
+
+  /* Im Dunkeln traegt ein blauer Schatten nicht mehr, hier zaehlt Schwarz. */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.24);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.3), 0 8px 20px -6px rgb(0 0 0 / 0.5);
+  --shadow-pop: 0 2px 8px rgb(0 0 0 / 0.4), 0 12px 32px -8px rgb(0 0 0 / 0.65);
+}
+
+/* Dauerhaft dunkle Flaechen holen sich die Hell-Rampe zurueck: dort ist
+   "text-navy-200" helle Schrift auf Navy und muss das bleiben. Steht nach
+   .dark und gilt damit innerhalb der Buehne. */
+.buehne,
+.dark .buehne {
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  --color-navy-50: #f2f6fb;
+  --color-navy-100: #e0eaf6;
+  --color-navy-200: #bed3ea;
+  --color-navy-300: #93b4d9;
+  --color-navy-400: #5f8dc0;
+  --color-navy-500: #3a6ba4;
+  --color-navy-600: #2b5387;
+  --color-navy-700: #22426c;
+  --color-navy-800: #1a3253;
+  --color-navy-900: #12233c;
+  --color-navy-950: #0a1628;
+
+  --color-gold-100: #f7ecd4;
+  --color-gold-400: #d4a942;
+  --color-gold-600: #a97f24;
+
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-emerald-950: #022c22;
+
+  --color-red-50: #fef2f2;
+  --color-red-100: #fee2e2;
+  --color-red-200: #fecaca;
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+  --color-red-700: #b91c1c;
+  --color-red-800: #991b1b;
+  --color-red-900: #7f1d1d;
+
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
+  --color-amber-950: #451a03;
+
+  --color-teal-50: #f0fdfa;
+  --color-teal-100: #ccfbf1;
+  --color-teal-200: #99f6e4;
+  --color-teal-300: #5eead4;
+  --color-teal-400: #2dd4bf;
+  --color-teal-500: #14b8a6;
+  --color-teal-600: #0d9488;
+  --color-teal-700: #0f766e;
+  --color-teal-800: #115e59;
+  --color-teal-900: #134e4a;
+
+  --color-surface: #12233c;
+  --color-sunken: #0a1628;
+  --color-line: #22426c;
+  --color-line-strong: #2b5387;
+  --color-ink: #ffffff;
+  --color-ink-muted: #bed3ea;
+  --color-ink-soft: #93b4d9;
+  --color-akzent: #d4a942;
+  --color-akzent-stark: #a97f24;
 }
 
 html {
+  /* Die ganze Oberflaeche haengt an dieser einen Zahl: Schrift, Abstaende,
+     Radien und Spaltenbreiten rechnen in rem, also in Vielfachen davon.
+     Bis 1280 px bleibt sie bei 16 px - Handy und Notebook sehen aus wie
+     bisher. Darueber waechst sie linear mit bis 20 px ab 2560 px: auf einem
+     grossen Schirm wird die App groesser, statt nur die Raender breiter.
+     Die rem-Anteile im clamp() rechnen gegen die Browser-Einstellung des
+     Nutzers - wer seine Schrift hochgestellt hat, behaelt sie. */
+  font-size: clamp(1rem, 0.75rem + 0.3125vw, 1.25rem);
   /* Sicherung gegen seitliches Scrollen: ein zu breites Element wuerde sonst
      die Seite verschieben, und der sticky Header endet an der Bildschirm-
      statt an der Seitenbreite. "clip" (nicht "hidden") laesst sticky heil,
@@ -34,11 +298,17 @@ html {
   /* Platz fuer die Scrollleiste dauerhaft reservieren, damit das Oeffnen
      eines Dialogs (body overflow: hidden) den Header nicht springen laesst. */
   scrollbar-gutter: stable;
+  /* Damit Formularelemente, Scrollleiste und Auswahlmenues mitkippen. */
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 body {
-  background: #f7f8f9;
-  color: #0f172a;
+  background: var(--color-canvas);
+  color: var(--color-ink);
   /* Ziffern gleich breit ausrichten waere hier falsch (Fliesstext) - aber
      die Standard-Ligaturen von Inter bleiben an. Tabellenziffern setzen
      die Bausteine gezielt per "tabular-nums". */
@@ -70,7 +340,9 @@ input[type="number"]::-webkit-outer-spin-button {
   opacity: 1;
 }
 
-/* Dezente Bewegungssprache – respektiert reduzierte Bewegung */
+/* Dezente Bewegungssprache – respektiert reduzierte Bewegung.
+   Alles hier drin ist Zugabe: faellt es weg, steht die Seite trotzdem
+   vollstaendig und richtig da. */
 @media (prefers-reduced-motion: no-preference) {
   @keyframes rise-in {
     from {
@@ -94,19 +366,81 @@ input[type="number"]::-webkit-outer-spin-button {
     }
   }
 
+  /* Balken wachsen aus dem Nichts - per transform, nicht per width, damit es
+     auch auf aelteren Handys ruhig laeuft. */
+  @keyframes bar-grow {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  /* Nur fuer den roten Zustand "braucht dich". Ein einziger Punkt in der
+     ganzen App darf atmen, sonst wird die Seite unruhig. */
+  @keyframes halo {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgb(239 68 68 / 0.45);
+    }
+    50% {
+      box-shadow: 0 0 0 5px rgb(239 68 68 / 0);
+    }
+  }
+
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+
   .animate-rise {
     animation: rise-in 0.35s ease-out both;
+    /* Listen staffeln sich ueber --rise-delay, gesetzt per style-Attribut. */
+    animation-delay: var(--rise-delay, 0ms);
   }
 
   .animate-tick {
     animation: tick-up 0.18s ease-out;
   }
+
+  .animate-bar {
+    transform-origin: left;
+    animation: bar-grow 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--rise-delay, 0ms);
+  }
+
+  .animate-halo {
+    animation: halo 2.4s ease-out infinite;
+  }
+
+  .animate-shimmer {
+    background-image: linear-gradient(
+      90deg,
+      var(--color-slate-100) 0%,
+      var(--color-slate-200) 50%,
+      var(--color-slate-100) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
 }
 
 /* Druck-Layout (Tätigkeitsbericht als PDF/Ausdruck) */
 @media print {
+  html {
+    /* Auf Papier gibt es keinen Bildschirm, an den sich etwas anpassen
+       koennte - feste 16 px, damit der Ausdruck immer gleich aussieht. */
+    font-size: 16px;
+  }
+
   body {
     background: #fff;
+    color: #0f172a;
   }
 
   main {

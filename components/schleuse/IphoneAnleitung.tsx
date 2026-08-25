@@ -52,7 +52,7 @@ export default function IphoneAnleitung() {
           Oben rechts auf <strong>„Hinzufügen“</strong> – fertig
         </Schritt>
       </ol>
-      <p className="mt-6 text-[13px] leading-relaxed text-navy-300">
+      <p className="mt-6 text-13 leading-relaxed text-navy-300">
         Danach öffnest du Ergo CRM über das neue Symbol und legst dort deinen Zugang
         an. Nicht mehr hier im Browser – sonst musst du dich gleich zweimal anmelden.
       </p>

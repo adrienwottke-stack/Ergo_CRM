@@ -30,7 +30,7 @@ export default function WettbewerbNav() {
             aria-current={aktiv ? "page" : undefined}
             className={`flex min-h-11 flex-1 shrink-0 items-center justify-center whitespace-nowrap rounded-full px-4 text-sm font-semibold transition ${
               aktiv
-                ? "bg-white text-navy-900 ring-1 ring-slate-200"
+                ? "bg-surface text-navy-900 ring-1 ring-slate-200"
                 : "text-slate-500 hover:text-slate-800"
             }`}
           >

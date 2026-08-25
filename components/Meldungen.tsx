@@ -113,7 +113,7 @@ export default function Meldungen({ vapidKey }: { vapidKey: string }) {
         type="button"
         onClick={einschalten}
         disabled={stand === "lädt"}
-        className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-navy-900 px-4 text-sm font-semibold text-white transition hover:bg-navy-950 disabled:opacity-60"
+        className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-akzent px-4 text-sm font-semibold text-white transition hover:bg-akzent-stark disabled:opacity-60"
       >
         <BellIcon className="h-4 w-4" />
         {stand === "lädt" ? "Moment …" : "Einschalten"}

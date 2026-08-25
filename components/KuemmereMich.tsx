@@ -47,7 +47,7 @@ export default function KuemmereMich({
       <button
         type="button"
         onClick={() => setOffen(true)}
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-navy-900 px-3.5 text-[13px] font-semibold text-white transition hover:bg-navy-950 disabled:opacity-50"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-akzent px-3.5 text-13 font-semibold text-white transition hover:bg-akzent-stark disabled:opacity-50"
       >
         <CheckIcon className="h-4 w-4" />
         Ich kümmere mich

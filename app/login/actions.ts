@@ -81,7 +81,13 @@ export async function login(formData: FormData) {
   const email = text(formData, "email").toLowerCase();
   if (!validEmail(email)) redirect("/login?error=1");
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || (await hashPassword(password, user.passwordSalt)) !== user.passwordHash) {
+  // Ein Platzhalter hat keine Zugangsdaten (siehe schema.prisma, User) und
+  // darf sich auf keinem Weg anmelden. Der Vergleich unten wuerde ihn zwar
+  // ohnehin abweisen - "irgendein Hash" ist nie gleich NULL -, aber ein
+  // Riegel, der nur zufaellig haelt, ist keiner. Er steht hier ausdruecklich,
+  // damit er beim naechsten Umbau nicht lautlos verschwindet.
+  if (!user || !user.passwordHash || !user.passwordSalt) redirect("/login?error=1");
+  if ((await hashPassword(password, user.passwordSalt)) !== user.passwordHash) {
     redirect("/login?error=1");
   }
 

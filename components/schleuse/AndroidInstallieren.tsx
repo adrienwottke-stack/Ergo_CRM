@@ -111,7 +111,7 @@ export default function AndroidInstallieren() {
           type="button"
           onClick={installieren}
           disabled={!bereit}
-          className="min-h-12 w-full rounded-xl bg-amber-300 px-6 text-[15px] font-semibold text-navy-950 transition hover:bg-amber-200 active:scale-[0.99] disabled:opacity-50"
+          className="min-h-12 w-full rounded-xl bg-amber-300 px-6 text-15 font-semibold text-navy-950 transition hover:bg-amber-200 active:scale-[0.99] disabled:opacity-50"
         >
           {bereit ? "Auf dem Handy installieren" : "Einen Moment …"}
         </button>

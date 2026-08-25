@@ -20,7 +20,7 @@ sabotiert — es wird frisiert. Dann stehen schöne Zahlen drin, die nichts wert
 | Struktur | **Ein Baum** (wer führt wen), als Selbstreferenz am `User`. Werbung wird als reines Infofeld mitgeführt |
 | Baum-Technik | **Materialisierter Pfad** (`path`), kein rekursives CTE — Prisma kann keins |
 | Führungskraft | **Keine Rolle, sondern eine Position.** Wer Direkte unter sich hat, ist Führungskraft — und bleibt gleichzeitig Berater mit eigenen Kunden |
-| Sichtbarkeit | **Stufe 2: Zahlen + Pipeline, keine Kundennamen.** Namen nur über befristete Einzelfreigabe je Kontakt |
+| Sichtbarkeit | **Stufe 2: Zahlen + Pipeline.** Zusätzlich **Vornamen** der Kontakte, aber nur im 30-Tage-Startfenster eines neuen Partners (Stufe 3, `lib/einblick.ts`) oder dauerhaft per `TeamVisibility.NAMEN`. Nie Nachnamen, Notizen, Nummern, E-Mail-Adressen |
 | Tiefe | Zahlen über die **ganze Struktur**, Details nur **eine Ebene tief** |
 | Zugänge | **Einladungslink mit Code**, Selbstregistrierung unterhalb der einladenden Führungskraft |
 | Reichweite | Erst **du + 2–3 Testleute**. Eine Instanz, ein Baum. Mehrmandanten-Fähigkeit ist ausdrücklich kein Ziel dieser Ausbaustufe |
@@ -108,11 +108,27 @@ Zwei Details, die dabei auffallen werden:
 |---|---|---|
 | **1 · `ZAHLEN`** | Anrufe, Termine, gehaltene Termine, Abschlüsse, Einheiten, Quoten | Minimum, nicht abschaltbar |
 | **2 · `PIPELINE`** | zusätzlich: wie viele in welcher Phase, was überfällig ist, wie lange etwas liegt — **ohne jeden Namen** | **Voreinstellung** |
-| **3 · Namen** | einzelne Kontakte, per Freigabe | über `ContactShare`, siehe 3.3 |
+| **3 · `NAMEN`** | zusätzlich **Vornamen** der Kontakte und der Verlauf (was zuletzt war, was ansteht) | **gebaut**, `lib/einblick.ts`. Öffnet sich für neue Partner 30 Tage lang von selbst und schließt sich wieder; dauerhaft nur, wenn der Partner es so einstellt |
 | **4 · Vertretung** | Vollzugriff auf ein Konto | **nicht in dieser Ausbaustufe** |
 
-Stufe 2 trägt die Führung. „Du hast 14 Kontakte in *Termin vereinbart*, davon 9 überfällig"
-ist eine vollständige Coaching-Grundlage — dafür braucht niemand einen Kundennamen.
+Stufe 2 trägt die Führung bei einem **erfahrenen** Partner. „Du hast 14 Kontakte in
+*Termin vereinbart*, davon 9 überfällig" ist dort eine vollständige Coaching-Grundlage.
+
+**Bei einem frisch gestarteten Partner trägt sie nicht.** Wer drei Wochen dabei ist,
+braucht keine Quote, sondern jemanden, der mitliest — welcher Termin stattgefunden hat,
+wer angerufen wurde, was liegen geblieben ist. Genau in den Wochen, in denen die meisten
+aufhören. Deshalb ist Stufe 3 gebaut und öffnet sich im Startfenster von selbst.
+
+Die Grenze verläuft nicht mehr bei „Name ja/nein", sondern bei **Vorname ja, alles andere
+nein**: „Julia" reicht für das Gespräch, um das es geht — der Partner weiß, wer Julia ist.
+„Julia Kremer" wäre ein identifizierbarer Mensch in einer fremden Kundenliste, und das
+macht keine Begleitung besser. Zwei Riegel setzen das an der Quelle durch (`nurVorname`
+und die Positivliste `ERLAUBTE_VERMERKE` in `lib/einblick.ts`) — nicht in der Anzeige.
+
+Was das für die Texte heißt: **jede Stelle, die dem Nutzer ein Versprechen macht, muss
+diese Ausnahme mitnennen.** Vier taten es nicht und wurden nachgezogen — am wichtigsten
+das Kleingedruckte über „Zugang anlegen" auf der Einladungsseite, denn das ist die
+Bedingung, unter der jemand zusagt.
 
 Der Berater darf auf Stufe 1 heruntergehen. Stufe 1 ist das Minimum und nicht abwählbar,
 sonst wäre die Mannschafts-Übersicht löchrig und damit wertlos.

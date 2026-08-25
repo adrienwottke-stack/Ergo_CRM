@@ -47,8 +47,8 @@ export const LOST_CHIPS: { label: string; reason: string }[] = [
 const chip = (active: boolean) =>
   `inline-flex min-h-11 items-center rounded-full px-3.5 text-sm font-medium transition ${
     active
-      ? "bg-navy-900 text-white"
-      : "border border-slate-300 bg-white text-slate-600 hover:border-slate-400"
+      ? "bg-akzent text-white"
+      : "border border-slate-300 bg-surface text-slate-600 hover:border-slate-400"
   }`;
 
 // Termin in zwei Tipps: Tag antippen, Uhrzeit antippen, speichern. Der
@@ -73,7 +73,7 @@ export function AppointmentDialog({
     <Modal open={open} onClose={onClose} title="Termin vereinbart" subtitle={name}>
       <div className="space-y-4">
         <div>
-          <p className="mb-2 text-[13px] font-medium text-slate-600">Tag</p>
+          <p className="mb-2 text-13 font-medium text-slate-600">Tag</p>
           <div className="flex flex-wrap gap-2">
             {DAY_CHIPS.map((entry) => {
               const value = inDays(entry.offset);
@@ -92,7 +92,7 @@ export function AppointmentDialog({
         </div>
 
         <div>
-          <p className="mb-2 text-[13px] font-medium text-slate-600">Uhrzeit</p>
+          <p className="mb-2 text-13 font-medium text-slate-600">Uhrzeit</p>
           <div className="flex flex-wrap gap-2">
             {TIME_CHIPS.map((value) => (
               <button
@@ -108,7 +108,7 @@ export function AppointmentDialog({
         </div>
 
         <label className="block">
-          <span className="text-[13px] font-medium text-slate-600">
+          <span className="text-13 font-medium text-slate-600">
             Oder genau eintragen
           </span>
           <input
@@ -169,11 +169,11 @@ export function AppointmentHeldDialog({
 
   const ergebnisse = [
     { wert: "abschluss", text: "Abschluss", stil: "bg-emerald-600 text-white hover:bg-emerald-700" },
-    { wert: "offen", text: "Noch offen", stil: "bg-navy-900 text-white hover:bg-navy-950" },
+    { wert: "offen", text: "Noch offen", stil: "bg-akzent text-white hover:bg-akzent-stark" },
     {
       wert: "kein_abschluss",
       text: "Kein Abschluss",
-      stil: "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
+      stil: "border border-slate-300 bg-surface text-slate-700 hover:bg-slate-50",
     },
   ];
 
@@ -181,7 +181,7 @@ export function AppointmentHeldDialog({
     <Modal open={open} onClose={onClose} title="Termin gehalten" subtitle={name}>
       <div className="space-y-5">
         <div>
-          <p className="mb-2 text-[13px] font-medium text-slate-600">
+          <p className="mb-2 text-13 font-medium text-slate-600">
             Wen hat {name} dir empfohlen?
           </p>
           <div className="space-y-2">
@@ -218,7 +218,7 @@ export function AppointmentHeldDialog({
         </div>
 
         <div className="border-t border-slate-100 pt-4">
-          <p className="mb-2 text-[13px] font-medium text-slate-600">
+          <p className="mb-2 text-13 font-medium text-slate-600">
             Und? Was kam raus?
           </p>
           <div className="grid gap-2 sm:grid-cols-3">

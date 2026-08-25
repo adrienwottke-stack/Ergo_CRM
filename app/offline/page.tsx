@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Kein Netz · Ergo CRM" };
 // steht im Treppenhaus und soll in einem Satz wissen, woran er ist.
 export default function OfflinePage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-navy-950 px-6 text-center">
+    <div className="buehne flex min-h-screen items-center justify-center bg-navy-950 px-6 text-center">
       <div className="max-w-sm">
         <p className="text-sm font-medium uppercase tracking-wider text-amber-300">
           Kein Netz

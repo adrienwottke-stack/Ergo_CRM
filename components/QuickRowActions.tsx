@@ -42,13 +42,13 @@ import {
 } from "@/components/icons";
 
 const knopf =
-  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium transition active:scale-[0.98] disabled:opacity-50";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 text-13 font-medium transition active:scale-[0.98] disabled:opacity-50";
 
 const stil = {
   call: `${knopf} bg-emerald-50 text-emerald-700 hover:bg-emerald-100`,
-  primaer: `${knopf} bg-navy-900 text-white hover:bg-navy-950`,
+  primaer: `${knopf} bg-akzent text-white hover:bg-akzent-stark`,
   erfolg: `${knopf} bg-emerald-600 text-white hover:bg-emerald-700`,
-  neutral: `${knopf} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`,
+  neutral: `${knopf} border border-slate-300 bg-surface text-slate-700 hover:bg-slate-50`,
   weich: `${knopf} bg-slate-100 text-slate-600 hover:bg-slate-200`,
   warm: `${knopf} bg-amber-100 text-amber-900 hover:bg-amber-200`,
 };

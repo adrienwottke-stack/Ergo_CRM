@@ -43,7 +43,11 @@ export async function GET(request: NextRequest) {
 
   const [konten, faellig, offeneNamen, aktivHeute, termineHeute] = await Promise.all([
     prisma.user.findMany({
-      where: { deactivatedAt: null },
+      // Platzhalter fallen hier gar nicht erst herein: sie haben kein
+      // Push-Abo, koennen also nichts empfangen, und sie sollen auch nicht
+      // als Anlass fuer eine Meldung an IHRE Fuehrungskraft taugen. Wer nie
+      // eingeladen wurde, ist nicht still - er ist noch nicht gefragt worden.
+      where: { deactivatedAt: null, passwordHash: { not: null } },
       // path und onboardingDoneAt fuer die Fuehrungs-Meldung: sie geht ueber
       // die ganze Struktur, nicht nur ueber die Direkten.
       select: {

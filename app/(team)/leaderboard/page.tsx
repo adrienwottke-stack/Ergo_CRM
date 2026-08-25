@@ -46,12 +46,12 @@ const podiumStyles = [
   },
   {
     chip: "bg-slate-200 text-slate-600 ring-slate-500/20",
-    card: "border-slate-200/80 bg-white",
+    card: "border-slate-200/80 bg-surface",
     label: "Platz 2",
   },
   {
     chip: "bg-amber-100 text-amber-700 ring-amber-600/20",
-    card: "border-slate-200/80 bg-white",
+    card: "border-slate-200/80 bg-surface",
     label: "Platz 3",
   },
 ];
@@ -61,14 +61,14 @@ function RankChip({ rank }: { rank: number }) {
   if (style) {
     return (
       <span
-        className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-semibold ring-1 ring-inset ${style.chip}`}
+        className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-13 font-semibold ring-1 ring-inset ${style.chip}`}
       >
         {rank}
       </span>
     );
   }
   return (
-    <span className="inline-flex h-7 w-7 items-center justify-center text-[13px] font-medium tabular-nums text-slate-500">
+    <span className="inline-flex h-7 w-7 items-center justify-center text-13 font-medium tabular-nums text-slate-500">
       {rank}
     </span>
   );
@@ -241,7 +241,7 @@ export default async function LeaderboardPage({
           </div>
 
           <div className={`${card} overflow-x-auto`}>
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-160 text-left text-sm">
               <thead className="border-b border-slate-200/80 bg-slate-50/60">
                 <tr>
                   <th className={th}>Platz</th>

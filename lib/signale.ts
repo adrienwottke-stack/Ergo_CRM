@@ -34,7 +34,14 @@ export const SCHWELLEN = {
 };
 
 export type Schwere = "rot" | "gelb";
-export type Ampel = "gruen" | "gelb" | "rot";
+
+/**
+ * "grau" ist kein schlechteres Gruen, sondern die Abwesenheit einer Aussage:
+ * ein Platzhalter hat nie gearbeitet, also gibt es nichts zu bewerten. Ohne
+ * eigenen Wert muesste er sich eine der drei anderen Farben teilen - und jede
+ * davon waere eine Behauptung ueber jemanden, der noch gar nicht dabei ist.
+ */
+export type Ampel = "grau" | "gruen" | "gelb" | "rot";
 
 export type Signal = {
   schluessel: string;
@@ -45,6 +52,12 @@ export type Signal = {
 };
 
 export type SignalEingabe = {
+  /**
+   * Konto ohne Zugangsdaten - steht in der Struktur, nutzt sie noch nicht.
+   * Schaltet alles Uebrige ab: siehe signaleFuer, erster Absatz.
+   */
+  platzhalter: boolean;
+
   /** Stufe 1 – steht bei jedem Berater zur Verfuegung. */
   tageSeitAktivitaet: number | null; // null = im Rueckblick gar nichts
   termineVereinbart14: number;
@@ -77,6 +90,18 @@ function termine(anzahl: number): string {
 
 export function signaleFuer(e: SignalEingabe): Signal[] {
   const signale: Signal[] = [];
+
+  // Ein Platzhalter schweigt vollstaendig - vor allem anderen, noch vor der
+  // Ankunft. Wer nie eingeladen wurde, hat keine Quote, keinen Rueckstand und
+  // keine Stille; er hat einen Zettel mit seinem Namen darauf.
+  //
+  // Das ist keine Kosmetik. Beim Ausrollen auf ein Team stehen zwanzig
+  // Platzhalter im Baum. Wuerden die nach fuenf Tagen "Seit 5 Tagen keine
+  // Aktivitaet" melden, waere die Ampel in derselben Woche verbrannt, in der
+  // sie eingefuehrt wurde - genau der Fehler, vor dem der Kopf dieser Datei
+  // unter Punkt 3 warnt.
+  if (e.platzhalter) return signale;
+
   const tageDabei = e.tageDabei;
   // Frisch eingeladen: alles ausser der Ankunft schweigt. Sonst steht bei
   // jedem Neuen am zweiten Tag eine rote Ampel mit drei Vorwuerfen.
@@ -195,7 +220,8 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
   return signale;
 }
 
-export function ampelVon(signale: Signal[]): Ampel {
+export function ampelVon(signale: Signal[], platzhalter = false): Ampel {
+  if (platzhalter) return "grau";
   if (signale.some((signal) => signal.schwere === "rot")) return "rot";
   return signale.length > 0 ? "gelb" : "gruen";
 }
@@ -207,19 +233,25 @@ export function ampelVon(signale: Signal[]): Ampel {
  * muss sich selbst zusammenreimen, wo sie anfaengt. Genau die Arbeit soll ihr
  * das Werkzeug abnehmen.
  */
-export function dringlichkeit(signale: Signal[]): number {
+export function dringlichkeit(signale: Signal[], platzhalter = false): number {
+  // Platzhalter ganz ans Ende, hinter die Unauffaelligen: sie brauchen keine
+  // Fuehrung, sondern eine Einladung - und die verschickt man nicht aus einer
+  // Dringlichkeitsliste heraus.
+  if (platzhalter) return 400;
   const rot = signale.filter((signal) => signal.schwere === "rot").length;
   if (rot > 0) return 100 - rot;
   return signale.length > 0 ? 200 - signale.length : 300;
 }
 
 export const ampelFarben: Record<Ampel, string> = {
+  grau: "bg-slate-300",
   gruen: "bg-emerald-500",
   gelb: "bg-amber-400",
   rot: "bg-red-500",
 };
 
 export const ampelTexte: Record<Ampel, string> = {
+  grau: "noch nicht dabei",
   gruen: "läuft",
   gelb: "hakt",
   rot: "braucht dich",

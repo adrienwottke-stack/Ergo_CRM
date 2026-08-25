@@ -197,7 +197,7 @@ export default function NamenSammeln({
             type="button"
             onClick={eintragen}
             aria-label="Namen hinzufügen"
-            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-navy-900 px-4 text-white transition hover:bg-navy-950 active:scale-[0.99]"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-akzent px-4 text-white transition hover:bg-akzent-stark active:scale-[0.99]"
           >
             <PlusIcon className="h-4 w-4" />
           </button>
@@ -232,7 +232,7 @@ export default function NamenSammeln({
         <button
           type="button"
           onClick={() => setStufe((wert) => wert + 1)}
-          className="flex min-h-14 flex-1 items-center justify-center rounded-xl bg-navy-900 text-base font-semibold text-white transition hover:bg-navy-950 active:scale-[0.99]"
+          className="flex min-h-14 flex-1 items-center justify-center rounded-xl bg-akzent text-base font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.99]"
         >
           {dieseRunde.length > 0 ? "Weiter" : "Fällt mir keiner ein"}
         </button>

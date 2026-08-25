@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
 import { berlinDayOf, berlinToday, dayToUtcDate, shiftDay } from "@/lib/dates";
-import { card, kicker, pageTitle } from "@/components/ui";
+import { card, kicker, pageTitle, columnNarrow } from "@/components/ui";
 import { CalendarCheckIcon, PhoneIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -71,7 +71,7 @@ export default async function KalenderPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className={`${columnNarrow} space-y-6`}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className={pageTitle}>Kalender</h1>
@@ -84,7 +84,7 @@ export default async function KalenderPage() {
         {termine.length > 0 && (
           <a
             href="/kalender/alle.ics"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           >
             <CalendarCheckIcon className="h-4 w-4" />
             Alle übernehmen

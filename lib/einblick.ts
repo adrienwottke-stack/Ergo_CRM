@@ -13,23 +13,26 @@
 //    Antrag, den jemand stellen muss, wird genau dann nicht gestellt, wenn er
 //    gebraucht wird - der Neue weiss ja nicht, dass es ihn gibt. Und ein
 //    Schalter, den die Fuehrungskraft umlegt, bleibt fuer immer an.
-// 2. Sichtbar wird WEN und WAS, nie WAS BESPROCHEN WURDE. Notiztexte,
-//    Telefonnummern, E-Mail-Adressen und Berufe bleiben drin - siehe
-//    `bekannterVermerk` weiter unten, das ist der wichtigste Riegel der Datei.
+// 2. Sichtbar wird WEN und WAS, nie WAS BESPROCHEN WURDE - und "wen" heisst
+//    der VORNAME, nicht der ganze Mensch. Notiztexte, Telefonnummern,
+//    E-Mail-Adressen, Berufe und Nachnamen bleiben drin. Die beiden Riegel
+//    dafuer heissen `bekannterVermerk` und `nurVorname` und sitzen beide an
+//    der Quelle: was hier nicht herauskommt, kann keine Seite weiter unten
+//    wieder hervorholen.
 // 3. Der Verlauf zeigt nichts, was die Zahlen nicht ohnehin zeigen - er zeigt
 //    es nur mit Namen dran. Es entsteht keine zweite Wahrheit.
 //
 // Siehe docs/struktur-plan.md, Abschnitt 3.2.
 
 import { prisma } from "@/lib/prisma";
-import { berlinDayOf } from "@/lib/dates";
+import { berlinDayOf, hasTimeOfDay } from "@/lib/dates";
 import {
   contactStageLabels,
   isContactStage,
   isLostReason,
   lostReasonLabels,
 } from "@/lib/pipeline";
-import type { TeamVisibility } from "@/lib/generated/prisma/enums";
+import type { NextStepType, TeamVisibility } from "@/lib/generated/prisma/enums";
 
 const TAG_MS = 24 * 60 * 60 * 1000;
 
@@ -69,6 +72,8 @@ export type Einblick = {
 };
 
 export type EinblickEingabe = {
+  /** Konto ohne Zugangsdaten - steht im Baum, hat nie gearbeitet. */
+  platzhalter: boolean;
   istDu: boolean;
   visibility: TeamVisibility;
   /** Eintritt. Faellt auf die Kontoanlage zurueck, wenn er nie gesetzt wurde. */
@@ -86,6 +91,19 @@ export type EinblickEingabe = {
  * lib/scope.ts. Diese Funktion entscheidet nur die Tiefe, nie die Reichweite.
  */
 export function einblickFuer(person: EinblickEingabe): Einblick {
+  // Vor allem anderen: bei einem Platzhalter gibt es keine Kontakte, also
+  // nichts zu oeffnen. "Noch 30 Tage mitlesbar" waere ein Versprechen auf
+  // Daten, die es nicht gibt - und die Startfrist liefe los, bevor der Mensch
+  // ueberhaupt eingeladen wurde.
+  if (person.platzhalter) {
+    return {
+      offen: false,
+      grund: null,
+      endetAm: null,
+      hinweis: `${person.vorname} nutzt die App noch nicht.`,
+    };
+  }
+
   if (person.istDu) {
     return { offen: true, grund: "eigene", endetAm: null, hinweis: "Deine Kontakte." };
   }
@@ -184,6 +202,23 @@ const ERLAUBTE_VERMERKE = new Set([
 function bekannterVermerk(text: string): string | null {
   const sauber = text.trim();
   return ERLAUBTE_VERMERKE.has(sauber) ? sauber : null;
+}
+
+/**
+ * Der zweite Riegel: nur der Vorname verlaesst diese Datei.
+ *
+ * "Julia" reicht fuer das Gespraech, um das es geht - der Partner weiss, wer
+ * Julia ist, und die Fuehrungskraft muss es nicht wissen. "Julia Kremer" waere
+ * dagegen ein identifizierbarer Mensch in einer fremden Kundenliste, und dafuer
+ * gibt es keinen Grund, der eine Begleitung besser machen wuerde.
+ *
+ * Wie bei den Vermerken sitzt der Riegel an der Quelle und nicht in der
+ * Anzeige: was hier abgeschnitten wird, kann keine Seite weiter unten wieder
+ * hervorholen.
+ */
+function nurVorname(name: string): string {
+  const sauber = name.trim();
+  return sauber.split(/\s+/)[0] || sauber;
 }
 
 /**
@@ -307,7 +342,7 @@ export async function verlauf(
       id: `s_${stufe.id}`,
       wann: stufe.at,
       beraterId: stufe.contact.ownerId,
-      kontakt: stufe.contact.name,
+      kontakt: nurVorname(stufe.contact.name),
       art: gedeutet.art,
       was: gedeutet.was,
       zusatz: gedeutet.zusatz,
@@ -327,7 +362,7 @@ export async function verlauf(
       id: `a_${vermerk.id}`,
       wann: vermerk.date,
       beraterId: vermerk.contact.ownerId,
-      kontakt: vermerk.contact.name,
+      kontakt: nurVorname(vermerk.contact.name),
       art: VERMERK_ART[vermerk.type] ?? "anruf",
       was: VERMERK_WAS[vermerk.type] ?? "angerufen",
       zusatz: bekannterVermerk(vermerk.text),
@@ -440,7 +475,7 @@ export async function aufriss(beraterIds: string[]): Promise<Aufriss> {
     termine: termine.map((kontakt) => ({
       id: kontakt.id,
       beraterId: kontakt.ownerId!,
-      name: kontakt.name,
+      name: nurVorname(kontakt.name),
       phase: contactStageLabels[kontakt.stage],
       wann: kontakt.appointmentAt,
       tageOffen: null,
@@ -448,7 +483,7 @@ export async function aufriss(beraterIds: string[]): Promise<Aufriss> {
     liegt: liegen.map((kontakt) => ({
       id: kontakt.id,
       beraterId: kontakt.ownerId!,
-      name: kontakt.name,
+      name: nurVorname(kontakt.name),
       phase: contactStageLabels[kontakt.stage],
       wann: kontakt.nextStepAt,
       tageOffen: kontakt.nextStepAt
@@ -456,4 +491,115 @@ export async function aufriss(beraterIds: string[]): Promise<Aufriss> {
         : null,
     })),
   };
+}
+
+// --- Zuletzt und als Naechstes ----------------------------------------------
+//
+// Auf der Mannschaftskarte stand bis hierhin "zuletzt 24.08. · naechster
+// 25.08." - zwei Zahlen ohne Inhalt. Sie beantworten, DASS etwas war, aber
+// nicht WAS. Eine Fuehrungskraft, die daraufhin anruft, faengt das Gespraech
+// mit einer Frage an, deren Antwort in ihrer eigenen Datenbank steht.
+//
+// Beide Funktionen arbeiten im STAPEL, nicht je Person: bei fuenfzig Koepfen
+// waeren es sonst hundert Abfragen fuer eine Uebersichtsseite.
+
+export type NaechsterSchritt = {
+  art: NextStepType;
+  kontakt: string;
+  wann: Date;
+  /** Der Schritt ist ein vereinbarter Termin, keine Wiedervorlage. */
+  istTermin: boolean;
+  /** Der Zeitpunkt traegt eine echte Uhrzeit - sonst gilt der ganze Tag. */
+  mitUhrzeit: boolean;
+  ueberfaellig: boolean;
+};
+
+/**
+ * Das juengste Ereignis je Berater.
+ *
+ * Bewusst ueber das bestehende `verlauf()` statt mit eigener Abfrage: sonst
+ * gaebe es zwei Stellen, die "was war zuletzt" beantworten, und die wuerden
+ * frueher oder spaeter verschiedene Dinge sagen. Die Kosten sind gering - der
+ * Verlauf wird auf derselben Seite ohnehin gebraucht.
+ */
+export async function letzteSchritte(
+  beraterIds: string[]
+): Promise<Map<string, Ereignis>> {
+  const ereignisse = await verlauf(beraterIds);
+  const je = new Map<string, Ereignis>();
+  // Absteigend sortiert - der erste Treffer je Berater ist der juengste.
+  for (const ereignis of ereignisse) {
+    if (!je.has(ereignis.beraterId)) je.set(ereignis.beraterId, ereignis);
+  }
+  return je;
+}
+
+/**
+ * Der naechste faellige Schritt je Berater.
+ *
+ * Ein vereinbarter Termin gewinnt gegen eine reine Wiedervorlage, auch wenn
+ * die frueher faellig waere: ein Termin ist der haertere Fixpunkt, und er ist
+ * das, worueber gesprochen wird. Eine Wiedervorlage laesst sich verschieben,
+ * ein Termin nicht.
+ */
+export async function naechsteSchritte(
+  beraterIds: string[]
+): Promise<Map<string, NaechsterSchritt>> {
+  if (beraterIds.length === 0) return new Map();
+
+  const kontakte = await prisma.contact.findMany({
+    where: {
+      ownerId: { in: beraterIds },
+      outcome: "OFFEN",
+      nextStepType: { not: null },
+      nextStepAt: { not: null },
+    },
+    orderBy: { nextStepAt: "asc" },
+    select: {
+      name: true,
+      ownerId: true,
+      stage: true,
+      nextStepType: true,
+      nextStepAt: true,
+      appointmentAt: true,
+    },
+  });
+
+  const jetzt = Date.now();
+  const je = new Map<string, NaechsterSchritt>();
+
+  for (const kontakt of kontakte) {
+    if (!kontakt.ownerId || !kontakt.nextStepType || !kontakt.nextStepAt) continue;
+
+    // Bei einem vereinbarten Termin ist der naechste Schritt der TERMIN - und
+    // damit `appointmentAt`, nicht `nextStepAt`. Die beiden sind nicht
+    // dasselbe: `nextStepAt` ist die Wiedervorlage, die das Playbook daneben
+    // setzt, und die liegt regelmaessig einen Tag davor. Wer sie als
+    // Terminzeit anzeigt, nennt der Fuehrungskraft die falsche Uhrzeit.
+    const istTermin =
+      kontakt.nextStepType === "TERMIN" &&
+      kontakt.stage === "TERMIN_VEREINBART" &&
+      kontakt.appointmentAt !== null;
+    const wann = istTermin ? kontakt.appointmentAt! : kontakt.nextStepAt;
+
+    const eintrag: NaechsterSchritt = {
+      art: kontakt.nextStepType,
+      kontakt: nurVorname(kontakt.name),
+      wann,
+      istTermin,
+      // Reine Fristen liegen auf UTC-Mitternacht und meinen den ganzen Tag.
+      // "Mo., 24.08. 02:00" waere kein Zeitpunkt, sondern die Zeitzone.
+      mitUhrzeit: hasTimeOfDay(wann),
+      ueberfaellig: wann.getTime() < jetzt,
+    };
+
+    const bisher = je.get(kontakt.ownerId);
+    // Aufsteigend nach nextStepAt sortiert: der erste Treffer ist der
+    // fruehste. Ein Termin loest ihn ab - aber nur einen Nicht-Termin, sonst
+    // gewaenne der spaetere von zwei Terminen.
+    if (!bisher) je.set(kontakt.ownerId, eintrag);
+    else if (istTermin && !bisher.istTermin) je.set(kontakt.ownerId, eintrag);
+  }
+
+  return je;
 }

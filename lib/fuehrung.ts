@@ -11,7 +11,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { sichtbarkeit } from "@/lib/scope";
-import { ebene } from "@/lib/struktur";
+import { ebene, elternIdVon } from "@/lib/struktur";
 import { berlinToday, dayToUtcDate, startOfMonth, startOfWeek } from "@/lib/dates";
 import { quotaTypePoints } from "@/lib/labels";
 import {
@@ -24,6 +24,7 @@ import {
 } from "@/lib/signale";
 import { starterpassStand } from "@/lib/starterpass";
 import { einblickFuer, type Einblick } from "@/lib/einblick";
+import { statusVon } from "@/lib/einladung";
 import type { Bewegung } from "@/lib/fuehrungsaufgaben";
 import type { LeadershipTaskType, UserRole } from "@/lib/generated/prisma/enums";
 
@@ -88,6 +89,16 @@ export type Mannschaftsperson = {
   ueberId: string | null;
   fuehrt: number;
   ausgetreten: boolean;
+  /**
+   * Steht in der Struktur, hat aber keine Zugangsdaten - siehe schema.prisma,
+   * User. Traegt keine Leistungszahl und keine Ampel: was er nicht getan hat,
+   * hat er nicht versaeumt.
+   */
+  platzhalter: boolean;
+  /** Beim Platzhalter: eine Einladung ist raus und noch nicht eingeloest. */
+  eingeladen: boolean;
+  /** Der offene Einladungscode, damit die Fuehrungskraft ihn erneut schicken kann. */
+  einladungsCode: string | null;
   angekommen: boolean;
   installiert: boolean;
   frischGestartet: boolean;
@@ -208,6 +219,7 @@ export async function mannschaftsLage(betrachter: {
     zaehlerGesamt,
     letzterZaehler,
     offeneAufgaben,
+    platzhalterEinladungen,
     letzteNachrichten,
   ] = await Promise.all([
     prisma.user.findMany({
@@ -222,6 +234,10 @@ export async function mannschaftsLage(betrachter: {
         visibility: true,
         deactivatedAt: true,
         createdAt: true,
+        // Nicht der Hash selbst wird gebraucht, nur ob einer da ist - aber
+        // Prisma kennt kein "is not null" im select. Er verlaesst diese
+        // Funktion nicht.
+        passwordHash: true,
         onboardingDoneAt: true,
         installedAt: true,
         phone: true,
@@ -313,6 +329,19 @@ export async function mannschaftsLage(betrachter: {
       where: { leaderId: betrachter.id, doneAt: null },
       orderBy: { dueAt: "asc" },
       select: { id: true, memberId: true, dueAt: true, note: true, signal: true },
+    }),
+    // Einladungen, die auf einen Platzhalter im Baum zeigen. Daraus wird
+    // "eingeladen, wartet" statt "noch nicht eingeladen" - der Unterschied
+    // zwischen "ich muss noch etwas tun" und "ich warte auf ihn".
+    prisma.invite.findMany({
+      where: { fuerId: { in: sicht.beraterIds } },
+      select: {
+        fuerId: true,
+        code: true,
+        usedCount: true,
+        maxUses: true,
+        expiresAt: true,
+      },
     }),
     // Die letzte Nachricht an jeden - fuer "gelesen" bzw. "noch nicht gelesen".
     prisma.nachricht.findMany({
@@ -425,6 +454,13 @@ export async function mannschaftsLage(betrachter: {
     if (!aufgabeJe.has(aufgabe.memberId)) aufgabeJe.set(aufgabe.memberId, aufgabe);
   }
 
+  const einladungJe = new Map<string, string>();
+  for (const einladung of platzhalterEinladungen) {
+    if (einladung.fuerId && statusVon(einladung) === "offen") {
+      einladungJe.set(einladung.fuerId, einladung.code);
+    }
+  }
+
   // Absteigend sortiert - der erste Treffer je Empfaenger ist der juengste.
   const gelesenJe = new Map<string, boolean>();
   for (const nachricht of letzteNachrichten) {
@@ -441,9 +477,11 @@ export async function mannschaftsLage(betrachter: {
   const alle: Mannschaftsperson[] = berater.map((person) => {
     const w = werte.get(person.id) ?? leereWerte();
     const pipelineSichtbar = person.visibility === "PIPELINE";
+    const platzhalter = person.passwordHash === null;
     const angekommen = person.onboardingDoneAt !== null;
     const tageDabei = person.startedAt ? tageSeit(person.startedAt) : null;
     const signale = signaleFuer({
+      platzhalter,
       tageSeitAktivitaet: w.letzteAktivitaet ? tageSeit(w.letzteAktivitaet) : null,
       termineVereinbart14: w.vereinbart14,
       termineGehalten14: w.gehalten14,
@@ -461,7 +499,7 @@ export async function mannschaftsLage(betrachter: {
     // nicht durch ist. Danach waere er eine Zeile, die nichts mehr sagt.
     const seitStart = person.onboardingDoneAt ? tageSeit(person.onboardingDoneAt) : null;
     const roh =
-      seitStart !== null && seitStart <= STARTERPASS_TAGE
+      !platzhalter && seitStart !== null && seitStart <= STARTERPASS_TAGE
         ? starterpassStand({
             namen: w.namenGesamt,
             anrufe: w.anrufeGesamt,
@@ -500,6 +538,9 @@ export async function mannschaftsLage(betrachter: {
         person.leaderId && person.leaderId !== betrachter.id ? person.leaderId : null,
       fuehrt: person._count.team,
       ausgetreten: person.deactivatedAt !== null,
+      platzhalter,
+      eingeladen: platzhalter && einladungJe.has(person.id),
+      einladungsCode: platzhalter ? (einladungJe.get(person.id) ?? null) : null,
       angekommen,
       installiert: person.installedAt !== null,
       frischGestartet:
@@ -508,12 +549,15 @@ export async function mannschaftsLage(betrachter: {
       tageDabei,
       werte: w,
       signale,
-      ampel: ampelVon(signale),
-      rang: dringlichkeit(signale),
+      ampel: ampelVon(signale, platzhalter),
+      rang: dringlichkeit(signale, platzhalter),
       pass: roh && roh.geschafft < roh.gesamt ? roh : null,
       telefon: person.phone,
       betreuung,
       einblick: einblickFuer({
+        // Bei einem Platzhalter gibt es nichts zu sehen - und "noch 30 Tage
+        // mitlesbar" waere ein Versprechen auf Daten, die es nicht gibt.
+        platzhalter,
         istDu: person.id === betrachter.id,
         visibility: person.visibility,
         startedAt: person.startedAt,
@@ -538,6 +582,9 @@ export async function mannschaftsLage(betrachter: {
       ueberId: null,
       fuehrt: 0,
       ausgetreten: false,
+      platzhalter: false,
+      eingeladen: false,
+      einladungsCode: null,
       angekommen: true,
       installiert: true,
       frischGestartet: false,
@@ -769,7 +816,11 @@ export async function astVergleich(userId: string): Promise<AstVergleich | null>
   if (wurzeln.length < 2) return null;
 
   const konten = await prisma.user.findMany({
-    where: { deactivatedAt: null },
+    // Platzhalter haben nie gearbeitet und zaehlen deshalb weder als Kopf noch
+    // mit Punkten. Sonst sieht der Ast, in dem gerade ein Team eingetragen
+    // wurde, schlagartig schlechter aus als der daneben - bestraft wuerde das
+    // Eintragen, nicht das Arbeiten.
+    where: { deactivatedAt: null, passwordHash: { not: null } },
     select: { id: true, path: true, person: { select: { id: true } } },
   });
   const wochenStart = startOfWeek(berlinToday());
@@ -836,18 +887,41 @@ export type AstLage = {
   ast: Mannschaftsperson[];
   /** Nur die direkt Unterstellten der Person. */
   direkte: Mannschaftsperson[];
-  /** Person + Ast zusammengerechnet. Bei jemandem ohne Leute = seine Werte. */
+  /** Person + Ast zusammengerechnet, ohne Platzhalter. */
   summe: Werte;
+  /** Koepfe hinter der Summe - also ohne Platzhalter. */
+  koepfe: number;
+  /** Platzhalter im Ast. Stehen im Baum, zaehlen in keiner Zahl. */
+  wartende: number;
   /** Wessen Kontaktnamen der Betrachter im Ast sehen darf. */
   offen: Mannschaftsperson[];
   /** Wessen nicht - damit die Luecke benannt wird statt stillschweigend zu sein. */
   verdeckt: Mannschaftsperson[];
 };
 
+/**
+ * Leistungszahlen ueber mehrere Koepfe.
+ *
+ * Platzhalter fallen heraus - und zwar hier, an der einzigen Stelle, an der
+ * summiert wird, statt an jeder Anzeigestelle einzeln. Ein Konto ohne
+ * Zugangsdaten hat nie gearbeitet; es mitzuzaehlen hiesse, eine Struktur
+ * kleinzurechnen, sobald jemand sie im Voraus einträgt. Beim Ausrollen auf ein
+ * Team waere das genau der falsche Moment fuer einen Einbruch in den Quoten.
+ *
+ * Ausgetretene bleiben drin: die haben gearbeitet, ihre Zahlen sind echt.
+ */
 function summeWerte(personen: Mannschaftsperson[]): Werte {
   const summe = leereWerte();
   for (const person of personen) {
-    const w = person.werte;
+    if (person.platzhalter) continue;
+    addiereWerte(summe, person.werte);
+  }
+  return summe;
+}
+
+/** Zaehlt `w` auf `summe` drauf. Die einzige Stelle, an der Werte addiert werden. */
+function addiereWerte(summe: Werte, w: Werte): void {
+  {
     summe.anrufeWoche += w.anrufeWoche;
     summe.vereinbartWoche += w.vereinbartWoche;
     summe.gehaltenWoche += w.gehaltenWoche;
@@ -880,7 +954,53 @@ function summeWerte(personen: Mannschaftsperson[]): Werte {
       summe.naechsterSchritt = w.naechsterSchritt;
     }
   }
-  return summe;
+}
+
+/** Was ein Ast zusammen leistet - und wie viele darin noch warten. */
+export type AstWert = {
+  werte: Werte;
+  /** Koepfe, die zaehlen: ohne Platzhalter. */
+  koepfe: number;
+  /** Platzhalter im Ast. Stehen im Baum, zaehlen in keiner Zahl. */
+  wartende: number;
+};
+
+/**
+ * Fuer JEDEN Knoten die Summe seines Astes, in einem Durchlauf.
+ *
+ * Das Organigramm braucht die Zahl an jedem Kasten. Sie je Kasten aus dem
+ * Baum zusammenzusuchen waere quadratisch; hier wird stattdessen von unten
+ * nach oben gefaltet: absteigend nach Tiefe sortiert ist ein Knoten immer
+ * fertig, bevor seine Fuehrungskraft an die Reihe kommt.
+ *
+ * Die Eltern-Id kommt aus dem Pfad (`elternIdVon`) statt aus `ueberId` - das
+ * steht absichtlich auf null, wenn der Betrachter selbst fuehrt, und waere
+ * hier die falsche Auskunft.
+ */
+export function astSummen(personen: Mannschaftsperson[]): Map<string, AstWert> {
+  const summen = new Map<string, AstWert>();
+  for (const person of personen) {
+    summen.set(person.id, {
+      werte: person.platzhalter ? leereWerte() : { ...person.werte },
+      koepfe: person.platzhalter ? 0 : 1,
+      wartende: person.platzhalter ? 1 : 0,
+    });
+  }
+
+  const vonUntenNachOben = [...personen].sort(
+    (a, b) => ebene(b.path) - ebene(a.path)
+  );
+  for (const person of vonUntenNachOben) {
+    const elternId = elternIdVon(person.path);
+    const oben = elternId ? summen.get(elternId) : null;
+    const meins = summen.get(person.id);
+    if (!oben || !meins) continue;
+    addiereWerte(oben.werte, meins.werte);
+    oben.koepfe += meins.koepfe;
+    oben.wartende += meins.wartende;
+  }
+
+  return summen;
 }
 
 export async function astLage(
@@ -900,6 +1020,8 @@ export async function astLage(
   );
   const gesamt = [person, ...ast];
 
+  const zaehlend = gesamt.filter((eintrag) => !eintrag.platzhalter);
+
   return {
     person,
     ast,
@@ -908,6 +1030,8 @@ export async function astLage(
     // nicht: es steht absichtlich auf null, wenn der Betrachter selbst fuehrt.
     direkte: ast.filter((eintrag) => eintrag.path === `${person.path}${eintrag.id}/`),
     summe: summeWerte(gesamt),
+    koepfe: zaehlend.length,
+    wartende: gesamt.length - zaehlend.length,
     offen: gesamt.filter((eintrag) => eintrag.einblick.offen),
     verdeckt: gesamt.filter((eintrag) => !eintrag.einblick.offen),
   };

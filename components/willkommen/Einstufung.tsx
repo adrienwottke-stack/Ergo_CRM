@@ -90,10 +90,10 @@ export default function Einstufung({ onDone }: { onDone: () => void }) {
             className={`min-h-20 rounded-2xl ${farbe} px-2 transition active:scale-[0.95]`}
           >
             <span className="block text-2xl font-bold">{rating}</span>
-            <span className="block text-[11px] font-medium leading-tight opacity-85">
+            <span className="block text-11 font-medium leading-tight opacity-85">
               {ratingLabels[rating]}
             </span>
-            <span className="block text-[10px] leading-tight opacity-70">
+            <span className="block text-10 leading-tight opacity-70">
               {ratingHints[rating]}
             </span>
           </button>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { normalisiereCode, statusVon } from "@/lib/einladung";
+import { NAMENSFENSTER_TAGE } from "@/lib/einblick";
 import { btnPrimary, card, input, label, pageTitle } from "@/components/ui";
 import Schleuse from "@/components/schleuse/Schleuse";
 import QrCode from "@/components/schleuse/QrCode";
@@ -209,13 +210,20 @@ export default async function EinladungPage({
               />
             </div>
 
-            <button type="submit" className={`${btnPrimary} min-h-[44px] w-full justify-center`}>
+            <button type="submit" className={`${btnPrimary} w-full justify-center`}>
               Zugang anlegen
             </button>
 
-            <p className="text-center text-xs text-slate-500">
-              {invite.leader.name} sieht deine Aktivitätszahlen und deine Pipeline –
-              aber keine Namen deiner Kunden.
+            {/* Was hier steht, ist die Bedingung, unter der jemand zusagt.
+                Es muss deshalb vollstaendig sein und darf nichts weglassen,
+                was spaeter doch passiert - auch nicht das Unbequeme. */}
+            <p className="text-center text-xs leading-relaxed text-slate-500">
+              {invite.leader.name} sieht deine Aktivitätszahlen und deine Pipeline.
+              In deinen ersten {NAMENSFENSTER_TAGE} Tagen zusätzlich die{" "}
+              <strong className="font-medium text-slate-600">Vornamen</strong> deiner
+              Kontakte und was du mit ihnen gemacht hast — das ist die Starthilfe, und
+              sie läuft danach von selbst aus. Deine Notizen, Telefonnummern und
+              E-Mail-Adressen bleiben immer bei dir.
             </p>
           </form>
         </div>

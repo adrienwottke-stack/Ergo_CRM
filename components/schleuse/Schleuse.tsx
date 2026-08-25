@@ -48,11 +48,11 @@ export default function Schleuse({
   // Erster Renderdurchlauf: noch nichts entschieden. Lieber eine ruhige
   // Flaeche als ein Formular, das gleich wieder verschwindet.
   if (zweig === "unbekannt") {
-    return <div className="min-h-screen bg-navy-950" aria-hidden="true" />;
+    return <div className="buehne min-h-screen bg-navy-950" aria-hidden="true" />;
   }
 
   return (
-    <div className="min-h-screen bg-navy-950">
+    <div className="buehne min-h-screen bg-navy-950">
       {zweig === "inapp" && <AusInAppBrowser link={link} />}
       {zweig === "android" && <AndroidInstallieren />}
       {zweig === "iphone" && <IphoneAnleitung />}
@@ -67,7 +67,7 @@ export default function Schleuse({
             </p>
           }
           fuss={
-            <p className="break-all rounded-lg bg-white/5 px-3 py-2 font-mono text-[12px] text-navy-200 ring-1 ring-inset ring-white/10">
+            <p className="break-all rounded-lg bg-white/5 px-3 py-2 font-mono text-xs text-navy-200 ring-1 ring-inset ring-white/10">
               {link}
             </p>
           }

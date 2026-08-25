@@ -73,7 +73,7 @@ export default function EinladungErstellen() {
         Mehrfach-Code für den Infoabend — beliebig viele können ihn scannen
       </label>
 
-      <button type="submit" disabled={pending} className={`${btnPrimary} min-h-[44px]`}>
+      <button type="submit" disabled={pending} className={btnPrimary}>
         {pending ? "Wird erzeugt …" : "Link erzeugen"}
       </button>
     </form>

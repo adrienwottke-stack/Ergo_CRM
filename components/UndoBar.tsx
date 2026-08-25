@@ -80,7 +80,7 @@ export default function UndoBar() {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4">
-      <div className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl bg-navy-950 py-2 pl-4 pr-2 text-white shadow-lg">
+      <div className="buehne pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl bg-navy-950 py-2 pl-4 pr-2 text-white shadow-lg">
         <p className="min-w-0 flex-1 truncate text-sm">{eintrag.label}</p>
         <span className="shrink-0 text-xs tabular-nums text-slate-400">{rest}s</span>
         <button

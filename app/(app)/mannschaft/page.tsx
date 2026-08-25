@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth";
 import {
   RUECKBLICK_TAGE,
+  astSummen,
   astVergleich,
   fuehrungsSchritt,
   mannschaftsLage,
@@ -14,7 +16,10 @@ import { SCHNELLTEXTE_FUEHRUNG } from "@/lib/nachrichten";
 import NachrichtSenden from "@/components/NachrichtSenden";
 import KuemmereMich from "@/components/KuemmereMich";
 import { PhoneIcon } from "@/components/icons";
-import { card, kicker, pageTitle } from "@/components/ui";
+import Organigramm, { type OrgaKnoten } from "@/components/Organigramm";
+import PersonAufnehmen from "@/components/PersonAufnehmen";
+import { elternIdVon } from "@/lib/struktur";
+import { card, filterPill, kicker, pageTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +39,7 @@ function Kennzahl({
   betont?: boolean;
 }) {
   return (
-    <div className="min-w-[72px]">
+    <div className="min-w-18">
       <p className={`text-lg font-semibold tabular-nums ${betont ? "text-navy-700" : "text-slate-900"}`}>
         {wert}
       </p>
@@ -88,7 +93,7 @@ function NameLink({
 function UeberChip({ person }: { person: Mannschaftsperson }) {
   if (!person.ueber) return null;
   return (
-    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-11 font-medium text-slate-600">
       über {person.ueber}
     </span>
   );
@@ -112,20 +117,38 @@ function Gelesen({ person, klasse = "" }: { person: Mannschaftsperson; klasse?: 
 }
 
 function Merkmale({ person }: { person: Mannschaftsperson }) {
+  // Ein Platzhalter traegt genau ein Merkmal, und keines der anderen.
+  // "Start nicht beendet" waere ein Vorwurf an jemanden, der nie eingeladen
+  // wurde - und "noch im Browser" eine Auskunft ueber ein Geraet, das es nicht
+  // gibt.
+  if (person.platzhalter) {
+    return (
+      <>
+        <span className="rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-11 font-medium text-slate-500">
+          {person.eingeladen ? "eingeladen, wartet" : "noch nicht eingeladen"}
+        </span>
+        {person.fuehrt > 0 && (
+          <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs text-navy-700">
+            führt {person.fuehrt}
+          </span>
+        )}
+      </>
+    );
+  }
   return (
     <>
       {person.frischGestartet && (
-        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-11 font-medium text-emerald-800">
           {person.werte.letzteAktivitaet ? "frisch gestartet" : "heute gestartet"}
         </span>
       )}
       {!person.angekommen && (
-        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-11 font-medium text-amber-800">
           Start nicht beendet
         </span>
       )}
       {person.angekommen && !person.installiert && (
-        <span className="text-[11px] text-slate-400">noch im Browser</span>
+        <span className="text-11 text-slate-400">noch im Browser</span>
       )}
       {person.fuehrt > 0 && (
         <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs text-navy-700">
@@ -139,8 +162,32 @@ function Merkmale({ person }: { person: Mannschaftsperson }) {
   );
 }
 
-export default async function MannschaftPage() {
+/** Was in einem Kasten steht - eine Zeile, mehr passt nicht hinein. */
+function kopfzeile(person: Mannschaftsperson): string {
+  if (person.platzhalter) {
+    return person.eingeladen ? "eingeladen, wartet" : "noch nicht eingeladen";
+  }
+  if (person.ausgetreten) return "ausgetreten";
+  if (!person.angekommen) return "Start nicht beendet";
+  const w = person.werte;
+  return `${w.anrufeWoche} Anrufe · ${w.gehaltenWoche} gehalten`;
+}
+
+export default async function MannschaftPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ansicht?: string }>;
+}) {
+  const { ansicht } = await searchParams;
+  // Das Bild ist die Vorgabe. Die Liste bleibt einen Tipp entfernt - sie
+  // traegt die Signale und die Knoepfe, fuer die im Kasten kein Platz ist.
+  const alsListe = ansicht === "liste";
   const user = await requireUser();
+  const kopfzeilen = await headers();
+  // Wie in app/(app)/einladen/page.tsx: der Ursprung kommt aus der Anfrage,
+  // damit der Link auf jedem Geraet stimmt - und nicht erst nach der
+  // Hydrierung im Browser entsteht.
+  const herkunft = `${kopfzeilen.get("x-forwarded-proto") ?? "http"}://${kopfzeilen.get("host") ?? ""}`;
   const [lage, aeste] = await Promise.all([
     mannschaftsLage(user),
     astVergleich(user.id),
@@ -149,6 +196,51 @@ export default async function MannschaftPage() {
 
   const rot = lage.dringend.filter((person) => person.ampel === "rot");
   const gelb = lage.dringend.filter((person) => person.ampel === "gelb");
+
+  const alle = [lage.ich, ...lage.baum];
+  const summen = astSummen(alle);
+  const knoten: OrgaKnoten[] = alle.map((person) => {
+    const ast = summen.get(person.id);
+    // Die Ast-Zeile steht nur bei Fuehrungskraeften: wer fuehrt, wird an
+    // seinem Ast gemessen und nicht an seiner eigenen Anrufzahl. Genau die
+    // Verwechslung, die die Rangliste macht.
+    const astZeile =
+      person.fuehrt > 0 && ast
+        ? ast.koepfe === 0
+          ? // Ein Ast, in dem noch niemand ein Konto hat: "0 Köpfe · 0 Pkt"
+            // wäre die Zahl einer Niederlage, dabei ist es der Normalzustand
+            // zwei Tage nach dem Eintragen.
+            `Ast: ${ast.wartende} ${ast.wartende === 1 ? "Person" : "Personen"}, noch keiner dabei`
+          : `Ast: ${ast.koepfe} ${ast.koepfe === 1 ? "Kopf" : "Köpfe"}` +
+            (ast.wartende > 0 ? ` (+${ast.wartende} wartend)` : "") +
+            ` · ${ast.werte.punkteWoche} Pkt`
+        : null;
+    return {
+      id: person.id,
+      name: person.name,
+      // Die Wurzel der Anzeige ist der Betrachter - ueber ihm haengt hier
+      // nichts, auch wenn er selbst eine Fuehrungskraft hat.
+      elternId: person.istDu ? null : elternIdVon(person.path),
+      ampel: person.ampel,
+      istDu: person.istDu,
+      platzhalter: person.platzhalter,
+      eingeladen: person.eingeladen,
+      ausgetreten: person.ausgetreten,
+      fuehrt: person.fuehrt,
+      kopf: kopfzeile(person),
+      ast: astZeile,
+    };
+  });
+
+  // Unter wen darf gehaengt werden: der eigene Ast, man selbst zuerst.
+  // Platzhalter sind erlaubt - eine geplante Ebene bekommt ihre Leute, bevor
+  // sie selbst ein Konto hat.
+  const fuehrungen = [
+    { id: lage.ich.id, name: lage.ich.name || "Du", istDu: true },
+    ...lage.baum
+      .filter((person) => !person.ausgetreten)
+      .map((person) => ({ id: person.id, name: person.name, istDu: false })),
+  ];
 
   return (
     <div className="space-y-6">
@@ -163,8 +255,8 @@ export default async function MannschaftPage() {
                 ? `Nichts Dringendes. Bei ${gelb.length} ${gelb.length === 1 ? "Person" : "Personen"} hakt es.`
                 : "Alles läuft. Nichts, wo du heute hin müsstest."}{" "}
           <strong className="font-medium text-slate-600">Tipp auf einen Namen</strong> — bei
-          frisch Gestarteten liest du die ersten {NAMENSFENSTER_TAGE} Tage mit, bei allen
-          anderen stehen dort Zahlen.
+          frisch Gestarteten liest du die ersten {NAMENSFENSTER_TAGE} Tage mit: Vornamen
+          der Kontakte und was passiert ist. Bei allen anderen stehen dort Zahlen.
         </p>
       </div>
 
@@ -179,6 +271,13 @@ export default async function MannschaftPage() {
             erzeugst du einen Link oder QR-Code — wer ihn einlöst, hängt automatisch
             unter dir.
           </p>
+          <p className="mt-3 text-sm text-slate-600">
+            Oder du trägst die Struktur ein, bevor jemand die App nutzt — beim
+            Ausrollen eines Teams steht sie ohnehin schon.
+          </p>
+          <div className="mt-3">
+            <PersonAufnehmen fuehrungen={fuehrungen} herkunft={herkunft} />
+          </div>
         </div>
       )}
 
@@ -294,7 +393,7 @@ export default async function MannschaftPage() {
                     {person.telefon && (
                       <a
                         href={`tel:${person.telefon.replace(/[^+\d]/g, "")}`}
-                        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-[13px] font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-3.5 text-13 font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
                       >
                         <PhoneIcon className="h-4 w-4" />
                         {person.vorname} anrufen
@@ -392,15 +491,30 @@ export default async function MannschaftPage() {
           Namen der Fuehrungskraft davor. Wer hier steht, ist bereits oben
           abgehandelt - das hier ist zum Nachsehen, nicht zum Entscheiden. */}
       {!lage.fuehrtNiemanden && (
-        // Bei sechs Leuten ist die Liste eine Uebersicht, bei zwanzig eine
-        // Bleiwueste. Zugeklappt bleibt sie das Nachschlagewerk, das sie ist -
-        // entschieden wird oben.
-        <details open={lage.baum.length <= 8} className="group space-y-3">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2">
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h2 className={kicker}>Deine Struktur ({lage.baum.length})</h2>
-            <span className="text-xs text-slate-400 group-open:hidden">anzeigen</span>
-            <span className="hidden text-xs text-slate-400 group-open:inline">zuklappen</span>
-          </summary>
+            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              {/* Zwei Sichten auf dieselbe Struktur. Das Bild beantwortet
+                  "wer haengt unter wem", die Liste "was ist mit wem los" -
+                  und traegt die Knoepfe, fuer die im Kasten kein Platz ist. */}
+              <Link href="/mannschaft" scroll={false} className={filterPill(!alsListe)}>
+                Organigramm
+              </Link>
+              <Link
+                href="/mannschaft?ansicht=liste"
+                scroll={false}
+                className={filterPill(alsListe)}
+              >
+                Liste
+              </Link>
+              <PersonAufnehmen fuehrungen={fuehrungen} herkunft={herkunft} />
+            </div>
+          </div>
+
+          {!alsListe && <Organigramm knoten={knoten} />}
+
+          {alsListe && (
           <ul className="mt-3 space-y-3">
             {lage.baum.map((person) => {
               const w = person.werte;
@@ -430,20 +544,30 @@ export default async function MannschaftPage() {
                       {/* "seit über 60 Tagen nichts" bei jemandem, der gestern
                           dazugekommen ist, ist schlicht falsch - und es ist
                           das Erste, was eine frische Fuehrungskraft liest. */}
-                      {w.letzteAktivitaet
+                      {person.platzhalter
+                        ? "nutzt die App noch nicht"
+                        : w.letzteAktivitaet
                         ? `zuletzt ${datumKurz.format(w.letzteAktivitaet)}`
                         : !person.angekommen
                           ? "noch nicht gestartet"
                           : person.tageDabei !== null && person.tageDabei <= RUECKBLICK_TAGE
                             ? "seit dem Start nichts"
                             : `seit über ${RUECKBLICK_TAGE} Tagen nichts`}
-                      {" · "}
-                      {w.naechsterSchritt
-                        ? `${schrittUeberfaellig ? "offen seit" : "nächster"} ${datumKurz.format(w.naechsterSchritt)}`
-                        : "nichts geplant"}
+                      {!person.platzhalter && (
+                        <>
+                          {" · "}
+                          {w.naechsterSchritt
+                            ? `${schrittUeberfaellig ? "offen seit" : "nächster"} ${datumKurz.format(w.naechsterSchritt)}`
+                            : "nichts geplant"}
+                        </>
+                      )}
                     </span>
                   </div>
 
+                  {/* Nullen sind bei einem Platzhalter keine Auskunft, sondern
+                      eine Behauptung: "0 Anrufe" liest sich wie Faulheit und
+                      heisst in Wahrheit "noch nie gefragt worden". */}
+                  {!person.platzhalter && (
                   <div className="mt-3 flex flex-wrap gap-x-6 gap-y-3">
                     <Kennzahl wert={w.anrufeWoche} bezeichnung="Anrufe (Woche)" />
                     <Kennzahl wert={w.vereinbartWoche} bezeichnung="Termine vereinbart" />
@@ -456,6 +580,7 @@ export default async function MannschaftPage() {
                       </>
                     )}
                   </div>
+                  )}
 
                   {/* Der Sponsor sieht denselben Stand wie der Neue selbst auf
                       /heute - sonst redet er über Zahlen, die der andere nicht
@@ -484,36 +609,49 @@ export default async function MannschaftPage() {
                   )}
 
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-                    <NachrichtSenden
-                      anId={person.id}
-                      name={person.name}
-                      schnelltexte={SCHNELLTEXTE_FUEHRUNG}
-                      variante="knopf"
-                    />
+                    {/* Eine Nachricht an einen Platzhalter kaeme nie an: er hat
+                        kein Konto, das ein Postfach oeffnen koennte. */}
+                    {!person.platzhalter && (
+                      <NachrichtSenden
+                        anId={person.id}
+                        name={person.name}
+                        schnelltexte={SCHNELLTEXTE_FUEHRUNG}
+                        variante="knopf"
+                      />
+                    )}
                     {/* Wo geschrieben werden kann, muss auch angerufen werden
                         koennen - der Anruf ist der staerkere Griff, nicht der
                         seltenere. */}
                     {person.telefon && (
                       <a
                         href={`tel:${person.telefon.replace(/[^+\d]/g, "")}`}
-                        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-[13px] font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-3.5 text-13 font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
                       >
                         <PhoneIcon className="h-4 w-4" />
                         {person.vorname} anrufen
                       </a>
                     )}
                     <Gelesen person={person} />
-                    {!person.pipelineSichtbar && (
+                    {person.platzhalter ? (
                       <p className="ml-auto text-xs text-slate-400">
-                        {person.vorname} zeigt nur Zahlen, keinen Trichter.
+                        {person.eingeladen
+                          ? "Einladung ist raus."
+                          : "Antippen, um einen Einladungslink zu erzeugen."}
                       </p>
+                    ) : (
+                      !person.pipelineSichtbar && (
+                        <p className="ml-auto text-xs text-slate-400">
+                          {person.vorname} zeigt nur Zahlen, keinen Trichter.
+                        </p>
+                      )
                     )}
                   </div>
                 </li>
               );
             })}
           </ul>
-        </details>
+          )}
+        </section>
       )}
 
       {/* --- Das eigene Geschaeft --------------------------------------------
@@ -525,7 +663,7 @@ export default async function MannschaftPage() {
           <h2 className={kicker}>Dein eigenes Geschäft</h2>
           <Link
             href="/heute"
-            className="ml-auto text-[13px] font-medium text-navy-700 hover:underline"
+            className="ml-auto text-13 font-medium text-navy-700 hover:underline"
           >
             Zu deiner Liste
           </Link>
@@ -549,9 +687,10 @@ export default async function MannschaftPage() {
 
       <p className={kicker}>
         Woche ab Montag, Monat ab dem Ersten, beides nach Berliner Kalender. Signale
-        werden bei jedem Aufruf neu berechnet und nirgends gespeichert. Kontaktnamen
-        siehst du die ersten {NAMENSFENSTER_TAGE} Tage nach dem Start — danach nur noch,
-        wenn jemand seinen Verlauf offen lässt. Notizen, Nummern und Berufe nie.
+        werden bei jedem Aufruf neu berechnet und nirgends gespeichert. Von den Kontakten
+        siehst du die ersten {NAMENSFENSTER_TAGE} Tage nach dem Start den Vornamen —
+        danach nur noch, wenn jemand seinen Verlauf offen lässt. Nachnamen, Notizen,
+        Nummern, E-Mail-Adressen und Berufe nie.
       </p>
     </div>
   );

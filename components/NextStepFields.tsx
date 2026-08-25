@@ -63,7 +63,7 @@ export default function NextStepFields({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-      <p className="text-[13px] font-semibold text-slate-900">Nächster Schritt</p>
+      <p className="text-13 font-semibold text-slate-900">Nächster Schritt</p>
       <p className="mt-0.5 text-xs text-slate-500">
         {hint ?? "Vorschlag aus dem Playbook – anpassen oder übernehmen."}
       </p>

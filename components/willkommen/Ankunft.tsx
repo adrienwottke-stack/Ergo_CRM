@@ -148,7 +148,7 @@ export default function Ankunft({
           href={`https://wa.me/?text=${teilenText}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex min-h-12 w-full items-center justify-center rounded-xl border border-white/25 bg-white/5 text-[15px] font-semibold text-white transition hover:bg-white/10"
+          className="flex min-h-12 w-full items-center justify-center rounded-xl border border-white/25 bg-white/5 text-15 font-semibold text-white transition hover:bg-white/10"
         >
           Kurz zurückmelden — „Bin drin“
         </a>

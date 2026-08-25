@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth";
 import QrCode from "@/components/schleuse/QrCode";
 import EinladungErstellen from "@/components/EinladungErstellen";
 import { eigeneEinladungZuruecknehmen } from "./actions";
-import { card, pageTitle, sectionTitle } from "@/components/ui";
+import { card, pageTitle, sectionTitle, columnNarrow } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -46,13 +46,14 @@ export default async function EinladenPage() {
   const eingeloest = invites.filter((invite) => invite.usedCount > 0);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className={`${columnNarrow} space-y-6`}>
       <div>
         <h1 className={pageTitle}>Einladen</h1>
         <p className="mt-1 text-sm text-slate-500">
           Wer deinen Link öffnet, wird von dir persönlich begrüßt, baut im
           Start seine Namensliste — und hängt danach in deiner Struktur. Du
-          siehst Zahlen und Pipeline, nie Kundennamen.
+          siehst Zahlen und Pipeline, bei Neuen die ersten 30 Tage auch die
+          Vornamen ihrer Kontakte. Notizen und Nummern nie.
         </p>
       </div>
 

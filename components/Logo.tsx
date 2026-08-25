@@ -35,7 +35,7 @@ export function Wordmark({
       <LogoMark className="h-8 w-8 shrink-0" />
       <span className="min-w-0 leading-tight">
         <span
-          className={`block truncate text-[15px] font-semibold tracking-tight ${
+          className={`block truncate text-15 font-semibold tracking-tight ${
             onDark ? "text-white" : "text-slate-900"
           }`}
         >
@@ -43,7 +43,7 @@ export function Wordmark({
         </span>
         {sub && (
           <span
-            className={`hidden truncate text-[11px] font-medium sm:block ${
+            className={`hidden truncate text-11 font-medium sm:block ${
               onDark ? "text-slate-400" : "text-slate-500"
             }`}
           >

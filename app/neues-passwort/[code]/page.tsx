@@ -39,7 +39,7 @@ export default async function NeuesPasswortPage({
   return (
     <main className="flex min-h-dvh items-center justify-center bg-[#f7f8f9] p-4">
       <div className="w-full max-w-sm">
-        <div className="rounded-xl border border-slate-200 bg-white p-8">
+        <div className="rounded-xl border border-slate-200 bg-surface p-8">
           <div className="flex flex-col items-center text-center">
             <LogoMark className="h-12 w-12" />
             <h1 className="mt-4 text-xl font-semibold tracking-[-0.02em] text-slate-900">

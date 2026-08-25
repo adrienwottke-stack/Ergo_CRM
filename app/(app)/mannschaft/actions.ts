@@ -12,7 +12,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { strukturKonten } from "@/lib/struktur";
+import { pfadUnter, strukturKonten } from "@/lib/struktur";
+import { ablaufDatum, neuerCode } from "@/lib/einladung";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { artFuerSignal, istFrist, tageFuerFrist } from "@/lib/fuehrungsaufgaben";
 
@@ -135,4 +136,121 @@ export async function aufgabeVerschieben(formData: FormData) {
     data: { dueAt: faellig },
   });
   neuRechnen();
+}
+
+// --- Platzhalter: die Struktur steht vor den Konten --------------------------
+//
+// Beim Ausrollen auf ein Team ist die Struktur vorher da: Emil, vier Leute
+// unter ihm, die Ebene darueber. Bis hierhin konnte der Baum davon nichts
+// abbilden - ein Mensch tauchte erst auf, wenn er eine Einladung eingeloest
+// hatte. Wer eine Struktur plant, brauchte also ein zweites Werkzeug daneben,
+// und ab dem Moment stimmt eines von beiden nicht mehr.
+//
+// Ein Platzhalter ist ein User ohne Zugangsdaten (siehe schema.prisma). Er
+// steht im Baum, laesst sich umhaengen und ansehen - und zaehlt in keiner
+// Leistungszahl mit, weil er nie gearbeitet hat.
+
+/** Kein Name, kein Knoten. Alles andere ist freiwillig. */
+const NAME_MAX = 60;
+
+export async function personAufnehmen(formData: FormData) {
+  const user = await requireUser();
+  const name = feld(formData, "name").slice(0, NAME_MAX);
+  const unterId = feld(formData, "unterId") || user.id;
+  const telefon = feld(formData, "telefon").slice(0, 30) || null;
+  const mitEinladung = feld(formData, "mitEinladung") === "on";
+
+  if (!name) return { fehler: "Ohne Namen geht es nicht." };
+
+  // Die einzige Stelle, an der hier etwas schiefgehen kann: wer sich Leute
+  // UEBER sich oder quer in einen fremden Ast haengt, zerlegt still die
+  // Sichtbarkeit. Geprueft wird deshalb gegen strukturKonten - dieselbe
+  // Funktion, aus der auch lib/scope.ts seine Grenze zieht -, nicht gegen
+  // leaderId.
+  const meine = await strukturKonten(user.id);
+  if (!meine.includes(unterId)) {
+    return { fehler: "Diese Führungskraft liegt nicht in deiner Struktur." };
+  }
+
+  const chef = await prisma.user.findUnique({
+    where: { id: unterId },
+    select: { id: true, path: true },
+  });
+  if (!chef) return { fehler: "Führungskraft nicht gefunden." };
+
+  const angelegt = await prisma.$transaction(async (tx) => {
+    // Ohne email, ohne passwordSalt, ohne passwordHash - genau das macht ihn
+    // zum Platzhalter. Kein Person-Datensatz: wer nie gearbeitet hat, gehoert
+    // in keine Rangliste. Der entsteht erst beim Einloesen der Einladung.
+    const neu = await tx.user.create({
+      data: { name, phone: telefon, leaderId: chef.id, recruitedById: user.id },
+      select: { id: true },
+    });
+    // Der Pfad braucht die eigene Id und kann deshalb erst jetzt stehen -
+    // dieselbe zweistufige Anlage wie beim Einloesen einer Einladung.
+    await tx.user.update({
+      where: { id: neu.id },
+      data: { path: pfadUnter(chef.path, neu.id) },
+    });
+
+    if (!mitEinladung) return { id: neu.id, code: null as string | null };
+
+    // Die Einladung zeigt auf den Knoten: beim Einloesen entsteht KEIN
+    // zweites Konto, sondern dieser hier bekommt Zugangsdaten.
+    const code = neuerCode();
+    await tx.invite.create({
+      data: {
+        code,
+        leaderId: user.id,
+        fuerId: neu.id,
+        note: name,
+        expiresAt: ablaufDatum(),
+      },
+    });
+    return { id: neu.id, code };
+  });
+
+  neuRechnen();
+  revalidatePath("/team");
+  return { id: angelegt.id, code: angelegt.code };
+}
+
+/**
+ * Einladung fuer einen Platzhalter, der noch keine hat - oder dessen alte
+ * abgelaufen ist.
+ *
+ * Getrennt vom Aufnehmen, weil beides getrennt passiert: erst traegt man
+ * abends die Struktur ein, und Tage spaeter greift man zum Telefon.
+ */
+export async function einladungFuerPlatzhalter(formData: FormData) {
+  const user = await requireUser();
+  const fuerId = feld(formData, "fuerId");
+  if (!fuerId) return { fehler: "Wen denn?" };
+  if (!(await inMeinerStruktur(user.id, fuerId))) {
+    return { fehler: "Diese Person liegt nicht in deiner Struktur." };
+  }
+
+  const ziel = await prisma.user.findUnique({
+    where: { id: fuerId },
+    select: { name: true, passwordHash: true },
+  });
+  if (!ziel) return { fehler: "Person nicht gefunden." };
+  // Wer schon ein Konto hat, braucht keine Einladung mehr - und bekommt ueber
+  // diesen Weg auch keine, sonst waere es ein zweiter Zugang zu einem fremden,
+  // bereits benutzten Konto.
+  if (ziel.passwordHash) return { fehler: `${ziel.name} ist längst dabei.` };
+
+  const code = neuerCode();
+  // Die alte Einladung weicht: ein Platzhalter hat hoechstens eine offene
+  // (eindeutiger Index auf Invite.fuerId). Zwei Codes auf denselben Knoten
+  // waeren zwei Wege in dasselbe Konto.
+  await prisma.$transaction([
+    prisma.invite.deleteMany({ where: { fuerId } }),
+    prisma.invite.create({
+      data: { code, leaderId: user.id, fuerId, note: ziel.name, expiresAt: ablaufDatum() },
+    }),
+  ]);
+
+  neuRechnen();
+  return { code };
 }

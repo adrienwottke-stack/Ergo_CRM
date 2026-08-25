@@ -26,7 +26,7 @@ export function FuehrungsKarten({ onDone }: { onDone: () => void }) {
       <button
         type="button"
         onClick={() => (letzte ? onDone() : setIndex(index + 1))}
-        className="min-h-12 w-full rounded-xl bg-gold-400 text-[15px] font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+        className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
       >
         {letzte ? "Dann lad ich mal ein" : "Weiter"}
       </button>
@@ -64,7 +64,7 @@ export function EinladenAkt({ onDone }: { onDone: () => void }) {
           </p>
         </div>
         <div>
-          <label htmlFor="greeting" className="block text-[13px] font-medium text-slate-300">
+          <label htmlFor="greeting" className="block text-13 font-medium text-slate-300">
             Deine persönliche Zeile (optional, aber mach sie)
           </label>
           <textarea
@@ -74,14 +74,14 @@ export function EinladenAkt({ onDone }: { onDone: () => void }) {
             value={greeting}
             onChange={(event) => setGreeting(event.target.value)}
             placeholder="Max, du hast gesagt du willst raus aus dem Lager. Los geht's."
-            className="mt-1.5 w-full rounded-xl border border-white/25 bg-white/5 px-4 py-3 text-[15px] text-white placeholder:text-slate-500 focus:border-gold-400 focus:outline-none"
+            className="mt-1.5 w-full rounded-xl border border-white/25 bg-white/5 px-4 py-3 text-15 text-white placeholder:text-slate-500 focus:border-gold-400 focus:outline-none"
           />
         </div>
         <button
           type="button"
           onClick={erzeugen}
           disabled={pending}
-          className="min-h-12 w-full rounded-xl bg-gold-400 text-[15px] font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98] disabled:opacity-40"
+          className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98] disabled:opacity-40"
         >
           {pending ? "Wird erzeugt …" : "Link erzeugen"}
         </button>
@@ -115,7 +115,7 @@ export function EinladenAkt({ onDone }: { onDone: () => void }) {
           )}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex min-h-12 w-full items-center justify-center rounded-xl bg-gold-400 text-[15px] font-bold text-navy-950 transition hover:bg-gold-100"
+          className="flex min-h-12 w-full items-center justify-center rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100"
         >
           Per WhatsApp verschicken
         </a>
@@ -130,7 +130,7 @@ export function EinladenAkt({ onDone }: { onDone: () => void }) {
               // Dann eben von Hand markieren - der Link steht ja da.
             }
           }}
-          className="min-h-12 w-full rounded-xl border border-white/25 bg-white/5 text-[15px] font-semibold text-white transition hover:bg-white/10"
+          className="min-h-12 w-full rounded-xl border border-white/25 bg-white/5 text-15 font-semibold text-white transition hover:bg-white/10"
         >
           {kopiert ? "Kopiert ✓" : "Link kopieren"}
         </button>

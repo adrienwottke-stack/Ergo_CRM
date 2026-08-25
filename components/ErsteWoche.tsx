@@ -117,7 +117,7 @@ export default async function ErsteWoche({ user }: { user: User }) {
       {briefFaellig && (
         <section className={`${card} border-gold-400/50 bg-gold-100/30 p-5`}>
           <p className={kicker}>Von dir, an dich — Tag 1</p>
-          <blockquote className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-slate-800">
+          <blockquote className="mt-2 whitespace-pre-line text-15 leading-relaxed text-slate-800">
             „{user.whyLetter}“
           </blockquote>
           <p className="mt-3 text-sm text-slate-600">
@@ -127,7 +127,7 @@ export default async function ErsteWoche({ user }: { user: User }) {
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Link
               href="/namen"
-              className="inline-flex min-h-11 items-center rounded-lg bg-navy-800 px-4 text-sm font-medium text-white transition hover:bg-navy-900"
+              className="inline-flex min-h-11 items-center rounded-lg bg-akzent px-4 text-sm font-medium text-white transition hover:bg-akzent-stark"
             >
               Zur Namensliste
             </Link>
@@ -154,7 +154,7 @@ export default async function ErsteWoche({ user }: { user: User }) {
           </p>
           <Link
             href="/namen"
-            className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-navy-800 px-4 text-sm font-medium text-white transition hover:bg-navy-900"
+            className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-akzent px-4 text-sm font-medium text-white transition hover:bg-akzent-stark"
           >
             Zur Namensliste
           </Link>
@@ -176,7 +176,7 @@ export default async function ErsteWoche({ user }: { user: User }) {
               <li key={mission.titel} className="flex items-center gap-2.5 text-sm">
                 <span
                   aria-hidden
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-11 font-bold ${
                     mission.fertig
                       ? "bg-emerald-500 text-white"
                       : "bg-slate-100 text-slate-400"
@@ -231,7 +231,7 @@ export default async function ErsteWoche({ user }: { user: User }) {
           <form action={abrechnungGesehen} className="mt-3">
             <button
               type="submit"
-              className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-surface px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
               Gesehen
             </button>

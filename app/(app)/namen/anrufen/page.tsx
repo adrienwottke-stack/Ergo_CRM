@@ -11,7 +11,7 @@ import {
 } from "@/lib/namelist";
 import { DEFAULT_GUIDES, guideKeyForList } from "@/lib/guides";
 import NameDialer, { type DialerEntry } from "@/components/NameDialer";
-import { pageTitle } from "@/components/ui";
+import { pageTitle, columnNarrow } from "@/components/ui";
 import { XIcon } from "@/components/icons";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
 
@@ -71,7 +71,7 @@ export default async function AnrufenPage({
   const guide = DEFAULT_GUIDES[guideKey];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className={`${columnNarrow} space-y-5`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className={pageTitle}>Durchlauf · {listKindLabels[kind]}</h1>

@@ -165,7 +165,7 @@ export function leaderChat(vorname: string): ChatSchritt[] {
     { art: "blase", text: `Moin ${vorname}! Ab heute ist das hier auch deine Führungszentrale.` },
     {
       art: "blase",
-      text: "Kurz die Spielregeln: Du siehst von deinen Leuten Zahlen und Pipeline — nie Kundennamen.",
+      text: "Kurz die Spielregeln: Du siehst von deinen Leuten Zahlen und Pipeline. Bei frisch Gestarteten die ersten 30 Tage auch die Vornamen ihrer Kontakte und was sie damit gemacht haben — danach nicht mehr. Notizen und Nummern nie.",
     },
     {
       art: "frage",

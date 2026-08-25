@@ -302,7 +302,7 @@ export default async function ContactDetailPage({
                 {index < contact.activities.length - 1 && (
                   <span
                     aria-hidden
-                    className="absolute left-[15px] top-9 h-[calc(100%-1.5rem)] w-px bg-slate-200"
+                    className="absolute left-[calc(1rem-1px)] top-9 h-[calc(100%-1.5rem)] w-px bg-slate-200"
                   />
                 )}
                 <span
@@ -312,7 +312,7 @@ export default async function ContactDetailPage({
                 </span>
                 <div className={`${card} flex-1 px-5 py-4`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[13px] font-semibold text-slate-900">
+                    <span className="text-13 font-semibold text-slate-900">
                       {activityTypeLabels[activity.type]}
                     </span>
                     <span className="text-xs text-slate-400">

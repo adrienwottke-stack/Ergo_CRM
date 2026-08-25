@@ -349,7 +349,7 @@ export default function NameDialer({
             type="button"
             disabled={pending}
             onClick={() => setDialog("lost")}
-            className={`${bigButton} border border-slate-300 bg-white text-slate-600 hover:bg-slate-50`}
+            className={`${bigButton} border border-slate-300 bg-surface text-slate-600 hover:bg-slate-50`}
           >
             <XIcon className="h-5 w-5" /> Kein Interesse
           </button>
@@ -440,7 +440,7 @@ function Stat({
   return (
     <div className={`rounded-xl px-3 py-2.5 ${tones[tone]}`}>
       <dd className="text-xl font-semibold tabular-nums">{value}</dd>
-      <dt className="text-[11px] font-medium opacity-80">{label}</dt>
+      <dt className="text-11 font-medium opacity-80">{label}</dt>
     </div>
   );
 }

@@ -105,7 +105,7 @@ export default function RanglisteMoment({ onDone }: { onDone: () => void }) {
       <button
         type="button"
         onClick={onDone}
-        className="min-h-12 w-full rounded-xl bg-gold-400 text-[15px] font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+        className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
       >
         Letzter Schritt
       </button>

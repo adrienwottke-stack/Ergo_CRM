@@ -64,7 +64,7 @@ export default function QuickCounter({
           {optimisticCount}
         </span>
       </p>
-      <p className="mt-1 text-[13px] font-medium text-slate-600">{label}</p>
+      <p className="mt-1 text-13 font-medium text-slate-600">{label}</p>
       <button
         type="button"
         onClick={handleClick}

@@ -20,7 +20,7 @@ export default function Einwandhilfe({ kind }: { kind: ListKind }) {
 
   return (
     <div className="space-y-1.5">
-      <p className="text-[11px] font-bold uppercase tracking-wider text-navy-700">
+      <p className="text-11 font-bold uppercase tracking-wider text-navy-700">
         Wenn er sagt …
       </p>
       {einwaende.map((einwand, index) => {
@@ -37,7 +37,7 @@ export default function Einwandhilfe({ kind }: { kind: ListKind }) {
             </button>
             {auf && (
               <div className="space-y-2 px-3 pb-3">
-                <p className="rounded-lg border-l-[3px] border-emerald-400 bg-emerald-50 px-3 py-2 text-[15px] font-medium leading-snug text-emerald-950">
+                <p className="rounded-lg border-l-[3px] border-emerald-400 bg-emerald-50 px-3 py-2 text-15 font-medium leading-snug text-emerald-950">
                   {antwortAuf(einwand)}
                 </p>
                 <p className="text-xs leading-relaxed text-slate-500">
