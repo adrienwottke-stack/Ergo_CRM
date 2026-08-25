@@ -244,6 +244,13 @@ export default async function MannschaftPage({
         </p>
       </div>
 
+      {!lage.fuehrtNiemanden && lage.gesamtstruktur && (
+        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          Du führst selbst niemanden – als Admin siehst du hier trotzdem die
+          gesamte Struktur.
+        </p>
+      )}
+
       {lage.fuehrtNiemanden && (
         <div className={`${card} p-6`}>
           <p className="text-sm font-medium text-slate-900">Noch niemand in deiner Struktur</p>
@@ -481,7 +488,9 @@ export default async function MannschaftPage({
       {!lage.fuehrtNiemanden && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h2 className={kicker}>Deine Struktur ({lage.baum.length})</h2>
+            <h2 className={kicker}>
+              {lage.gesamtstruktur ? "Gesamte Struktur" : "Deine Struktur"} ({lage.baum.length})
+            </h2>
             <div className="ml-auto flex flex-wrap items-center gap-1.5">
               {/* Zwei Sichten auf dieselbe Struktur. Das Bild beantwortet
                   "wer haengt unter wem", die Liste "was ist mit wem los" -

@@ -157,6 +157,13 @@ export type Mannschaftslage = {
   /** Wo sich die Fuehrungskraft schon gekuemmert hat und die Frist laeuft. */
   ruhend: Mannschaftsperson[];
   fuehrtNiemanden: boolean;
+  /**
+   * Admin ohne eigene Struktur: `baum` zeigt hier ausnahmsweise die GANZE
+   * Instanz statt nichts. Ein Admin soll die Struktur immer sehen koennen,
+   * auch wenn unter ihm selbst niemand haengt - siehe lib/scope.ts, Umfang
+   * "ALLE".
+   */
+  gesamtstruktur: boolean;
 };
 
 const leereWerte = (): Werte => ({
@@ -201,7 +208,15 @@ export async function mannschaftsLage(betrachter: {
   id: string;
   role: UserRole;
 }): Promise<Mannschaftslage> {
-  const sicht = await sichtbarkeit(betrachter, "STRUKTUR");
+  let sicht = await sichtbarkeit(betrachter, "STRUKTUR");
+  // Ein Admin ohne eigene Leute soll trotzdem die Struktur sehen koennen -
+  // sonst zeigt die Seite nur die Einladen-Karte, obwohl das ganze Netzwerk
+  // laengst steht. `beraterIds` enthaelt immer mindestens den Betrachter
+  // selbst; genau ein Eintrag heisst also "fuehrt niemanden".
+  const gesamtstruktur = betrachter.role === "ADMIN" && sicht.beraterIds.length <= 1;
+  if (gesamtstruktur) {
+    sicht = await sichtbarkeit(betrachter, "ALLE");
+  }
 
   const heute = berlinToday();
   const heuteStart = dayToUtcDate(heute);
@@ -662,6 +677,7 @@ export async function mannschaftsLage(betrachter: {
     dringend: auffaellig.filter((person) => !person.betreuung?.ruht),
     ruhend: auffaellig.filter((person) => person.betreuung?.ruht),
     fuehrtNiemanden: baum.length === 0,
+    gesamtstruktur,
   };
 }
 

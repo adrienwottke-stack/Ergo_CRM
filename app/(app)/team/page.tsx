@@ -22,6 +22,7 @@ const fehlertexte: Record<string, string> = {
   unbekannt: "Konto nicht gefunden.",
   platzhalter:
     "Das ist ein Platzhalter ohne Zugangsdaten – da gibt es kein Passwort zurückzusetzen. Wer hier hinein soll, bekommt eine Einladung.",
+  name_vergeben: "Diesen Namen trägt schon jemand anders in der Rangliste.",
 };
 
 export default async function TeamPage({
@@ -36,11 +37,12 @@ export default async function TeamPage({
     zurueck?: string;
     geloescht?: string;
     reset?: string;
+    umbenannt?: string;
   }>;
 }) {
   const admin = await requireAdmin();
   const [
-    { error, moved, invited, revoked, ausgetragen, zurueck, geloescht, reset },
+    { error, moved, invited, revoked, ausgetragen, zurueck, geloescht, reset, umbenannt },
     kopfzeilen,
     users,
     invites,
@@ -139,6 +141,11 @@ export default async function TeamPage({
       {geloescht && (
         <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
           Konto gelöscht. Wer darunter hing, ist eine Ebene hochgerückt.
+        </p>
+      )}
+      {umbenannt && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+          Name geändert.
         </p>
       )}
 

@@ -18,10 +18,11 @@ import Modal from "@/components/Modal";
 import {
   benutzerAustragen,
   benutzerLoeschen,
+  namenAendern,
   passwortResetErzeugen,
 } from "@/app/(app)/team/actions";
 import { TrashIcon } from "@/components/icons";
-import { btnSecondary } from "@/components/ui";
+import { btnPrimary, btnSecondary, input, label } from "@/components/ui";
 
 function LoeschKnopf() {
   const { pending } = useFormStatus();
@@ -32,6 +33,15 @@ function LoeschKnopf() {
       className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-fest-gefahr px-5 text-sm font-medium text-white transition hover:bg-fest-gefahr-stark active:scale-[0.99] disabled:opacity-60"
     >
       {pending ? "Löscht …" : "Endgültig löschen"}
+    </button>
+  );
+}
+
+function SpeichernKnopf() {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" disabled={pending} className={`${btnPrimary} disabled:opacity-60`}>
+      {pending ? "Speichert …" : "Speichern"}
     </button>
   );
 }
@@ -56,9 +66,19 @@ export default function KontoAktionen({
   istDu: boolean;
 }) {
   const [offen, setOffen] = useState(false);
+  const [nameOffen, setNameOffen] = useState(false);
 
   return (
     <div className="flex flex-wrap items-center gap-1">
+      <button
+        type="button"
+        onClick={() => setNameOffen(true)}
+        title={`Name von ${name} ändern`}
+        className={`${still} text-slate-500 hover:bg-slate-50 hover:text-navy-700`}
+      >
+        Name ändern
+      </button>
+
       <form action={passwortResetErzeugen}>
         <input type="hidden" name="userId" value={userId} />
         <button
@@ -153,6 +173,45 @@ export default function KontoAktionen({
               Abbrechen
             </button>
             <LoeschKnopf />
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={nameOffen}
+        onClose={() => setNameOffen(false)}
+        title="Name ändern"
+        subtitle={name}
+      >
+        <form action={namenAendern} className="space-y-4">
+          <input type="hidden" name="userId" value={userId} />
+          <div>
+            <label htmlFor={`name-${userId}`} className={label}>
+              Name
+            </label>
+            <input
+              id={`name-${userId}`}
+              name="name"
+              type="text"
+              required
+              maxLength={60}
+              defaultValue={name}
+              className={input}
+            />
+          </div>
+          <p className="text-sm text-slate-500">
+            Ändert den Namen im Konto und, falls vorhanden, in der Rangliste –
+            beides zusammen, damit nichts auseinanderläuft.
+          </p>
+          <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setNameOffen(false)}
+              className={btnSecondary}
+            >
+              Abbrechen
+            </button>
+            <SpeichernKnopf />
           </div>
         </form>
       </Modal>

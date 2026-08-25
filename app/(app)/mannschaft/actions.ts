@@ -16,6 +16,7 @@ import { pfadUnter, strukturKonten } from "@/lib/struktur";
 import { ablaufDatum, neuerCode } from "@/lib/einladung";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { artFuerSignal, istFrist, tageFuerFrist } from "@/lib/fuehrungsaufgaben";
+import type { UserRole } from "@/lib/generated/prisma/enums";
 
 const TAG_MS = 24 * 60 * 60 * 1000;
 
@@ -36,8 +37,17 @@ function neuRechnen() {
  * Aufgabe den Namen auf der Heute-Liste zeigt, waere das ein Weg, Namen aus
  * fremden Strukturen abzufragen.
  */
-async function inMeinerStruktur(leaderId: string, memberId: string): Promise<boolean> {
+async function inMeinerStruktur(
+  leaderId: string,
+  memberId: string,
+  role: UserRole
+): Promise<boolean> {
   if (leaderId === memberId) return false;
+  // Ein Admin sieht auf /mannschaft die ganze Instanz, sobald er selbst
+  // niemanden fuehrt (siehe lib/fuehrung.ts, gesamtstruktur) - dieselbe
+  // Ausnahme muss hier gelten, sonst laufen Knoepfe ins Leere, die die Seite
+  // gerade erst gezeigt hat.
+  if (role === "ADMIN") return true;
   const konten = await strukturKonten(leaderId);
   return konten.includes(memberId);
 }
@@ -50,7 +60,7 @@ export async function aufgabeVornehmen(formData: FormData) {
   const anlass = feld(formData, "anlass").slice(0, 200) || null;
   const notiz = feld(formData, "notiz").slice(0, 200) || null;
   if (!memberId) return;
-  if (!(await inMeinerStruktur(user.id, memberId))) return;
+  if (!(await inMeinerStruktur(user.id, memberId, user.role))) return;
 
   // Die Kette bleibt auch in der Aufgabe erhalten.
   //
@@ -166,10 +176,13 @@ export async function personAufnehmen(formData: FormData) {
   // UEBER sich oder quer in einen fremden Ast haengt, zerlegt still die
   // Sichtbarkeit. Geprueft wird deshalb gegen strukturKonten - dieselbe
   // Funktion, aus der auch lib/scope.ts seine Grenze zieht -, nicht gegen
-  // leaderId.
-  const meine = await strukturKonten(user.id);
-  if (!meine.includes(unterId)) {
-    return { fehler: "Diese Führungskraft liegt nicht in deiner Struktur." };
+  // leaderId. Ein Admin ist davon ausgenommen: er sieht auf /mannschaft
+  // ohnehin die ganze Instanz, sobald er selbst niemanden fuehrt.
+  if (user.role !== "ADMIN") {
+    const meine = await strukturKonten(user.id);
+    if (!meine.includes(unterId)) {
+      return { fehler: "Diese Führungskraft liegt nicht in deiner Struktur." };
+    }
   }
 
   const chef = await prisma.user.findUnique({
@@ -231,7 +244,7 @@ export async function einladungFuerPlatzhalter(formData: FormData) {
   const user = await requireUser();
   const fuerId = feld(formData, "fuerId");
   if (!fuerId) return { fehler: "Wen denn?" };
-  if (!(await inMeinerStruktur(user.id, fuerId))) {
+  if (!(await inMeinerStruktur(user.id, fuerId, user.role))) {
     return { fehler: "Diese Person liegt nicht in deiner Struktur." };
   }
 

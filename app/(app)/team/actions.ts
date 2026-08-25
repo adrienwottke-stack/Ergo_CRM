@@ -71,6 +71,43 @@ export async function einladungBrowserFreigabe(formData: FormData) {
   redirect("/team");
 }
 
+// Prisma meldet einen verletzten Eindeutigkeits-Index als P2002.
+function isDuplicate(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: string }).code === "P2002"
+  );
+}
+
+const NAME_MAX = 60;
+
+// Der Name steht an zwei Stellen: User fuers Konto, Person fuer die
+// Rangliste (siehe app/login/actions.ts). Beide muessen gleichzeitig
+// korrigiert werden, sonst laufen Struktur und Rangliste auseinander -
+// Person.name ist ausserdem eindeutig, ein Zusammenstoss bricht sauber ab.
+export async function namenAendern(formData: FormData) {
+  await requireAdmin();
+  const userId = value(formData, "userId");
+  const name = value(formData, "name").slice(0, NAME_MAX);
+  if (!userId || !name) redirect("/team?error=invalid");
+
+  try {
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: userId }, data: { name } }),
+      prisma.person.updateMany({ where: { userId }, data: { name } }),
+    ]);
+  } catch (fehler) {
+    if (isDuplicate(fehler)) redirect("/team?error=name_vergeben");
+    throw fehler;
+  }
+
+  revalidatePath("/team");
+  revalidatePath("/mannschaft");
+  revalidatePath("/leaderboard");
+  redirect("/team?umbenannt=1");
+}
+
 // Berater unter eine andere Fuehrungskraft haengen. Leere Auswahl macht ihn zur
 // eigenen Wurzel.
 export async function beraterUmhaengen(formData: FormData) {
