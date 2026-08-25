@@ -5,6 +5,7 @@ import UndoBar from "@/components/UndoBar";
 import InstallationMelder from "@/components/InstallationMelder";
 import { LogoutIcon } from "@/components/icons";
 import ThemaSchalter from "@/components/ThemaSchalter";
+import RueckmeldungGeben from "@/components/RueckmeldungGeben";
 import { shell, gutter } from "@/components/ui";
 import type { User } from "@/lib/generated/prisma/client";
 
@@ -74,6 +75,12 @@ export default async function AppShell({
         >
           <Wordmark sub="Beraterbereich" onDark />
           <div className="flex shrink-0 items-center gap-1">
+            {/* Das Megafon steht in der Kopfzeile und NICHT in der Navigation:
+                ein Navigationspunkt kostet einen Platz und damit
+                Aufmerksamkeit von allen - auch von denen, die nie etwas melden
+                wollen (docs/audit-kernmodell.md, 5.14). Und kein schwebender
+                Knopf unten rechts: dort liegt bereits die Undo-Leiste. */}
+            <RueckmeldungGeben />
             <ThemaSchalter />
             <form action={logout}>
               {/* Am Handy nur das Symbol – der Text sprengt sonst die Kopfzeile. */}

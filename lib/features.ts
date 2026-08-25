@@ -31,7 +31,12 @@ export type ArenaKey =
   // Die Zahl, in der der Betrieb rechnet - kein Wettbewerbsbaustein, aber im
   // selben Bereich und damit derselben Regel unterworfen: kein Baustein ohne
   // Schluessel, Schalter und Zaehlstelle.
-  | "einheiten";
+  | "einheiten"
+  // Das Megafon in der Kopfzeile. Steht in jedem Bereich und damit ausserhalb
+  // der Arena, faellt aber unter dieselbe Regel. Gezaehlt wird, wie oft es
+  // ueberhaupt benutzt wird: bleibt die Zahl bei null, war die Huerde nicht
+  // das Problem, sondern es gibt nichts zu sagen.
+  | "rueckmeldung";
 
 // Eine Abfrage je Anfrage, danach beantwortet der Cache alle weiteren Fragen.
 export const featureStates = cache(async (): Promise<Map<string, FeatureState>> => {
