@@ -178,3 +178,22 @@ export async function sprintStand(
   }
   return stand;
 }
+
+// --- Stufen -----------------------------------------------------------------
+
+// Punkte über die gesamte Zeit. Grundlage der Stufen (lib/stufen.ts) und damit
+// der Freischaltungen - deshalb bewusst OHNE Zeitfenster: eine Stufe, die im
+// Januar wieder verschwindet, schaltet nichts frei.
+//
+// Gerechnet, nicht gespeichert - wie überall hier. Bei den Datenmengen dieses
+// Netzwerks ist das eine Abfrage, keine Last.
+export async function ladeGesamtpunkte(personId: string): Promise<number> {
+  const logs = await prisma.dailyLog.findMany({
+    where: { personId },
+    select: { type: true, count: true },
+  });
+
+  let punkte = 0;
+  for (const log of logs) punkte += log.count * quotaTypePoints[log.type];
+  return punkte;
+}

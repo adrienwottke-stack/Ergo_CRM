@@ -15,7 +15,19 @@ import { prisma } from "@/lib/prisma";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import type { FeatureState } from "@/lib/generated/prisma/enums";
 
-export type ArenaKey = "puls" | "zweikampf" | "bestmarke" | "sprint";
+export type ArenaKey =
+  | "puls"
+  | "zweikampf"
+  | "bestmarke"
+  | "sprint"
+  // Die Schleife, die einen Grund gibt, das Ding ueberhaupt aufzumachen:
+  // Anwesenheit -> Stufen -> Freischaltung. Der Feed ist der Ort, an dem ein
+  // Ergebnis jemanden erreicht.
+  | "anwesenheit"
+  | "stufen"
+  | "titel"
+  | "feed"
+  | "spiel";
 
 // Eine Abfrage je Anfrage, danach beantwortet der Cache alle weiteren Fragen.
 export const featureStates = cache(async (): Promise<Map<string, FeatureState>> => {

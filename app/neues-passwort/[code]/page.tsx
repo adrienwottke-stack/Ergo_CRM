@@ -37,7 +37,7 @@ export default async function NeuesPasswortPage({
     reset !== null && reset.usedAt === null && reset.expiresAt.getTime() > Date.now();
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[#f7f8f9] p-4">
+    <main className="flex min-h-dvh items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-sm">
         <div className="rounded-xl border border-slate-200 bg-surface p-8">
           <div className="flex flex-col items-center text-center">

@@ -5,6 +5,7 @@ import NavLinks, { type NavLink } from "@/components/NavLinks";
 import UndoBar from "@/components/UndoBar";
 import InstallationMelder from "@/components/InstallationMelder";
 import { LogoutIcon } from "@/components/icons";
+import ThemaSchalter from "@/components/ThemaSchalter";
 import { shell, gutter } from "@/components/ui";
 import type { User } from "@/lib/generated/prisma/client";
 
@@ -38,7 +39,7 @@ export async function navigationFuer(user: User): Promise<NavLink[]> {
     { href: "/einladen", label: "Einladen" },
     // Ein Punkt fuer den ganzen Wettbewerb. Rangliste und eigene Aktivitaeten
     // haengen darunter und markieren denselben Punkt mit.
-    { href: "/arena", label: "Wettbewerb", match: ["/leaderboard", "/log"] },
+    { href: "/arena", label: "Wettbewerb", match: ["/leaderboard", "/log", "/spiel"] },
     ...(user.role === "ADMIN"
       ? [{ href: "/team", label: "Team", match: ["/werkstatt"] }]
       : []),
@@ -56,23 +57,33 @@ export default async function AppShell({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/* Helle Kopfzeile mit Haarlinie: die App ist das Blatt, nicht die Buehne. */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-surface">
+      {/* Dunkle Kopfzeile mit Gold-Haarlinie.
+          Vorher war sie weiss auf hellgrauem Grund - dadurch war die Marke
+          praktisch unsichtbar und die App las sich wie ein Formular. Jetzt
+          traegt die Leiste das Navy, und darunter beginnt das Blatt.
+          "buehne" nimmt sie vom Dunkelmodus aus: sie ist in beiden Ansichten
+          dieselbe: ein fester Anker, egal wie der Rest gerade steht.
+          Das Polster oben faengt die Statusleiste ab, wenn die App vom
+          Startbildschirm laeuft (statusBarStyle black-translucent). */}
+      <header className="buehne sticky top-0 z-20 border-b border-navy-800 bg-navy-950 pt-[env(safe-area-inset-top)] shadow-card">
         <div
           className={`${shell} ${gutter} flex h-14 items-center justify-between gap-4`}
         >
-          <Wordmark sub="Beraterbereich" />
-          <form action={logout}>
-            {/* Am Handy nur das Symbol – der Text sprengt sonst die Kopfzeile. */}
-            <button
-              type="submit"
-              aria-label="Abmelden"
-              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 sm:px-3"
-            >
-              <LogoutIcon className="h-4.5 w-4.5 sm:hidden" />
-              <span className="hidden sm:inline">Abmelden</span>
-            </button>
-          </form>
+          <Wordmark sub="Beraterbereich" onDark />
+          <div className="flex shrink-0 items-center gap-1">
+            <ThemaSchalter />
+            <form action={logout}>
+              {/* Am Handy nur das Symbol – der Text sprengt sonst die Kopfzeile. */}
+              <button
+                type="submit"
+                aria-label="Abmelden"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-2 text-sm font-medium text-navy-200 transition hover:bg-white/10 hover:text-white sm:px-3"
+              >
+                <LogoutIcon className="h-4.5 w-4.5 sm:hidden" />
+                <span className="hidden sm:inline">Abmelden</span>
+              </button>
+            </form>
+          </div>
         </div>
         {/* Navigation ueber die volle Breite, der aktive Unterstrich liegt
             direkt auf der Haarlinie der Kopfzeile. */}

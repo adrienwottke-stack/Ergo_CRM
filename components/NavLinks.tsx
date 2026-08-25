@@ -20,6 +20,10 @@ export default function NavLinks({ links }: { links: NavLink[] }) {
     // Ohne sichtbaren Balken, der wuerde die Leiste optisch zerschneiden.
     // Aktiv ist ein 2-px-Unterstrich auf der Haarlinie der Kopfzeile
     // (der Container zieht sich per -mb-px auf sie drauf), keine Pille.
+    //
+    // Die Leiste steht auf dem dunklen Navy der Kopfzeile, deshalb die
+    // hellen Farben. Der aktive Punkt ist der einzige Ort, an dem Gold
+    // traegt statt nur zu schmuecken: man findet sich damit sofort wieder.
     <nav className="no-scrollbar -mb-px flex items-center gap-4 overflow-x-auto sm:gap-5">
       {links.map((link) => {
         const active = link.exact
@@ -34,8 +38,8 @@ export default function NavLinks({ links }: { links: NavLink[] }) {
             aria-current={active ? "page" : undefined}
             className={`inline-flex h-11 shrink-0 items-center whitespace-nowrap border-b-2 px-0.5 text-sm font-medium transition ${
               active
-                ? "border-navy-800 text-slate-900"
-                : "border-transparent text-slate-500 hover:text-slate-900"
+                ? "border-gold-400 text-white"
+                : "border-transparent text-navy-200 hover:border-navy-600 hover:text-white"
             }`}
           >
             {link.label}

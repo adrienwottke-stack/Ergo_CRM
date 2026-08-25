@@ -4,8 +4,9 @@
 //
 // In der Hauptnavigation steht ein einziger Punkt ("Wettbewerb"). Was darunter
 // zusammengehoert, verlinkt sich hier: die Arena als Ort des Geschehens, die
-// Rangliste als Tabelle, die eigenen Aktivitaeten zum Nachtragen. Drei Seiten,
-// eine Sache - das gehoert eine Ebene tiefer und nicht in die Kopfzeile.
+// Rangliste als Tabelle, die eigenen Aktivitaeten zum Nachtragen, und das
+// Spiel als das, was man sich damit aufmacht. Vier Seiten, eine Sache - das
+// gehoert eine Ebene tiefer und nicht in die Kopfzeile.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -14,6 +15,7 @@ const PUNKTE = [
   { href: "/arena", label: "Arena" },
   { href: "/leaderboard", label: "Rangliste" },
   { href: "/log", label: "Meine Aktivitäten" },
+  { href: "/spiel", label: "Spiel" },
 ];
 
 export default function WettbewerbNav() {
