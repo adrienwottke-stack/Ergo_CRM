@@ -17,10 +17,21 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/start",
     scope: "/",
     display: "standalone",
+    // Gilt nur fuer Handys - Fenster am Rechner dreht niemand hochkant, und
+    // Chrome wie Safari ignorieren die Angabe dort.
     orientation: "portrait",
     background_color: "#0a1628",
     theme_color: "#0a1628",
     lang: "de",
+    // Ein Fenster, nicht zehn. Ohne diese Zeile oeffnet jeder Klick auf einen
+    // Link - aus einer Meldung, aus einer Mail - am Rechner ein weiteres
+    // App-Fenster, und man arbeitet nach zwei Tagen in einem Stapel Kopien.
+    // "navigate-existing" holt stattdessen das offene Fenster nach vorn und
+    // schickt es auf die neue Seite.
+    launch_handler: { client_mode: "navigate-existing" },
+    // Was das hier ist, falls ein Verzeichnis fragt. Kostet nichts, und ohne
+    // die Angabe sortiert der Rechner-Browser die App unter "Sonstiges".
+    categories: ["business", "productivity"],
     icons: [
       { src: "/icon.svg", type: "image/svg+xml", sizes: "any" },
       { src: "/icon-192.png", type: "image/png", sizes: "192x192", purpose: "any" },

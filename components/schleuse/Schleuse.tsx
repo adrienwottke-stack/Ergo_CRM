@@ -58,8 +58,8 @@ export default function Schleuse({
       {zweig === "iphone" && <IphoneAnleitung />}
       {zweig === "rechner" && (
         <Rahmen
-          kicker="Falsches Gerät"
-          titel="Das gehört auf dein Handy"
+          kicker="Erst das Handy"
+          titel="Dein Zugang entsteht auf dem Handy"
           text={
             <p>
               Ergo CRM arbeitet dort, wo du telefonierst. Scann den Code mit deiner
@@ -67,9 +67,28 @@ export default function Schleuse({
             </p>
           }
           fuss={
-            <p className="break-all rounded-lg bg-white/5 px-3 py-2 font-mono text-xs text-navy-200 ring-1 ring-inset ring-white/10">
-              {link}
-            </p>
+            <>
+              <p className="break-all rounded-lg bg-white/5 px-3 py-2 font-mono text-xs text-navy-200 ring-1 ring-inset ring-white/10">
+                {link}
+              </p>
+              {/* Der Rechner bleibt fuer die EINLADUNG zu - ein Konto entsteht
+                  am Handy, sonst fehlt spaeter genau die Erinnerung, die den
+                  Rueckruf ausloest. Wer sein Konto schon hat, arbeitet hier
+                  aber laengst mit: Namen nachtragen, Kalender sortieren. Ohne
+                  diese Zeile war der Rechner eine Sackgasse, auch fuer den,
+                  der laengst durch die Schleuse ist. */}
+              <p className="mt-4">
+                Du hast schon ein Konto?{" "}
+                <a
+                  href="/login"
+                  className="font-medium text-amber-300 underline underline-offset-4 hover:text-amber-200"
+                >
+                  Hier am Rechner anmelden
+                </a>
+                . Am Schreibtisch läuft alles mit – nur angelegt wird der Zugang
+                am Handy.
+              </p>
+            </>
           }
         >
           {qr}

@@ -3,6 +3,8 @@ import { Wordmark } from "@/components/Logo";
 import NavLinks, { type NavLink } from "@/components/NavLinks";
 import UndoBar from "@/components/UndoBar";
 import InstallationMelder from "@/components/InstallationMelder";
+import AppInstallieren from "@/components/AppInstallieren";
+import AktivitaetZaehlen from "@/components/AktivitaetZaehlen";
 import { LogoutIcon } from "@/components/icons";
 import ThemaSchalter from "@/components/ThemaSchalter";
 import RueckmeldungGeben from "@/components/RueckmeldungGeben";
@@ -75,6 +77,19 @@ export default async function AppShell({
         >
           <Wordmark sub="Beraterbereich" onDark />
           <div className="flex shrink-0 items-center gap-1">
+            {/* Das Plus steht ganz links in der Gruppe - am weitesten weg von
+                "Abmelden" und als einziges mit Flaeche: es ist die einzige
+                Handlung hier, alles andere daneben ist Einstellung.
+                Warum kein Navigationspunkt "Aktivitaeten": ein Tab wechselt die
+                Seite, und wer zwischen zwei Anrufen +1 tippt, will genau das
+                nicht - er will dort bleiben, wo er ist. Die Leiste traegt
+                ausserdem schon acht Punkte. */}
+            <AktivitaetZaehlen />
+            {/* Nur am Rechner und nur im Browser-Tab: das Symbol erklaert, wie
+                Ergo CRM hier in ein eigenes Fenster kommt. Am Handy erscheint
+                es nie - dort ist die Installation Pflicht und laengst
+                erledigt, bevor jemand diese Kopfzeile ueberhaupt sieht. */}
+            <AppInstallieren />
             {/* Das Megafon steht in der Kopfzeile und NICHT in der Navigation:
                 ein Navigationspunkt kostet einen Platz und damit
                 Aufmerksamkeit von allen - auch von denen, die nie etwas melden
