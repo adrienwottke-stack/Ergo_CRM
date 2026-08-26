@@ -62,7 +62,11 @@
   /* ---------- Screens ---------- */
   .screen {
     position: absolute; inset: 0; display: none; flex-direction: column;
-    padding: max(12px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
+    /* Oben Platz fuer den Rueckweg ins CRM (.heimweg, fixiert). Ohne diesen
+       Streifen legt sich der Knopf im Spiel ueber die erste Wert-Kachel.
+       .stage traegt flex:1 und schluckt die Differenz - die Karte wird ein
+       paar Pixel flacher, verdeckt wird nichts. */
+    padding: max(42px, calc(env(safe-area-inset-top) + 34px)) 14px max(12px, env(safe-area-inset-bottom));
   }
   .screen.on { display: flex; }
 
