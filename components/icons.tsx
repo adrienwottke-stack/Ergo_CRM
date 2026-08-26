@@ -105,6 +105,14 @@ export function PlusIcon({ className }: { className?: string }) {
   );
 }
 
+export function MinusIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
 export function ClipboardIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>
@@ -233,6 +241,17 @@ export function MikrofonIcon({ className }: { className?: string }) {
       <rect x="9" y="3" width="6" height="11" rx="3" />
       <path d="M5 11a7 7 0 0 0 14 0" />
       <path d="M12 18v3" />
+    </svg>
+  );
+}
+
+export function AppFensterIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 8h18" />
+      <path d="M12 11v5" />
+      <path d="m9.5 14 2.5 2.5L14.5 14" />
     </svg>
   );
 }

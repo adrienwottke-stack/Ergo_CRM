@@ -5,6 +5,7 @@ import type { QuotaType } from "@/lib/generated/prisma/enums";
 import {
   CalendarCheckIcon,
   HashIcon,
+  MinusIcon,
   PhoneIcon,
   PlusIcon,
   SparkIcon,
@@ -33,11 +34,16 @@ export default function QuickCounter({
   label,
   count,
   action,
+  zurueck,
 }: {
   type: QuotaType;
   label: string;
   count: number;
-  action: (type: string, count: number) => Promise<void>;
+  // Die Aktionen geben den wahren Tagesstand zurueck; hier wird er nicht
+  // gebraucht (die Seite rechnet sich nach revalidatePath ohnehin neu), aber
+  // der Typ darf ihn nicht verbieten.
+  action: (type: string, count: number) => Promise<unknown>;
+  zurueck: (type: string) => Promise<unknown>;
 }) {
   const [isPending, startTransition] = useTransition();
   const [optimisticCount, addOptimistic] = useOptimistic(
@@ -49,6 +55,15 @@ export default function QuickCounter({
     startTransition(async () => {
       addOptimistic(1);
       await action(type, 1);
+    });
+  };
+
+  // Derselbe Griff wie im Schnellfenster der Kopfzeile: ein Fehltipper ist
+  // einen Tipp entfernt wieder weg, nicht erst unten im Verlauf.
+  const handleZurueck = () => {
+    startTransition(async () => {
+      addOptimistic(-1);
+      await zurueck(type);
     });
   };
 
@@ -68,14 +83,25 @@ export default function QuickCounter({
         </span>
       </p>
       <p className="mt-1 text-13 font-medium text-slate-600">{label}</p>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={isPending && optimisticCount - count > 3}
-        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 transition hover:border-navy-300 hover:bg-navy-50 hover:text-navy-700 active:scale-[0.97]"
-      >
-        <PlusIcon className="h-4 w-4" />1
-      </button>
+      <div className="mt-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleZurueck}
+          disabled={optimisticCount <= 0}
+          aria-label={`${label} eins zurück`}
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-slate-400 hover:text-slate-900 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:text-slate-500 disabled:active:scale-100"
+        >
+          <MinusIcon className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={isPending && optimisticCount - count > 3}
+          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 transition hover:border-navy-300 hover:bg-navy-50 hover:text-navy-700 active:scale-[0.97]"
+        >
+          <PlusIcon className="h-4 w-4" />1
+        </button>
+      </div>
     </div>
   );
 }

@@ -360,6 +360,20 @@ gerechnet. Eingefroren wird nur, was ein Ergebnis ist: Duell-Stände und Titel.
 **`/log` — bleibt die Arbeitsfläche**, bekommt drei Ergänzungen: Puls-Streifen, „Fordern"-Knopf
 neben jedem Namen aus der Rangliste, und die eigene Bestmarke als zweite Messlatte.
 
+**Der Schnellzähler in der Kopfzeile** (`components/AktivitaetZaehlen.tsx`): ein Plus
+neben dem Megafon, auf jeder Seite. Es öffnet ein Fenster mit den drei manuellen Arten —
+Anrufe, Nummern, Termine vereinbart — je mit `+1` und `−`, darunter eine Zeile
+„X Punkte heute · Y Tage Serie". Grund: der Weg zur eigenen Zahl lag drei Tipps und einen
+Seitenwechsel tief (Wettbewerb → Meine Aktivitäten → +1). Für die häufigste Handlung des
+Tages ist das der falsche Preis; wer zwischen zwei Anrufen steht, zählt dann gar nicht.
+
+Bewusst **kein Navigationspunkt**: ein Tab wechselt die Seite, und genau das will man beim
+Zählen nicht — man will dort bleiben, wo man gerade arbeitet. Die Leiste trägt außerdem
+schon acht Punkte. Dasselbe Muster wie beim Megafon (14.1): ein Symbol kostet nur den
+Aufmerksamkeit, der es benutzt. Der Stand wird erst beim Öffnen geladen, nicht bei jedem
+Seitenaufruf. Tageskappen und Nachtragsfenster (Abschnitt 4) bleiben unangetastet — das
+Fenster zählt ausschließlich für heute, Nachtragen bleibt auf `/log`.
+
 Mobil zuerst: Alles muss mit dem Daumen erreichbar sein, die Reaktionsknöpfe mindestens
 44 px hoch — wie im restlichen CRM (`min-h-11`).
 

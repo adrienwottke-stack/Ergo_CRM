@@ -12,7 +12,7 @@ import MeilensteinMelden from "@/components/MeilensteinMelden";
 import { CalendarCheckIcon, ChevronRightIcon, FlameIcon, HashIcon, PhoneIcon, SparkIcon } from "@/components/icons";
 import { btnPrimary, card, input, label, pageTitle, sectionTitle, columnNarrow } from "@/components/ui";
 import { deleteLog, logDaily } from "./actions";
-import { quickLog } from "./quickLogAction";
+import { quickLog, quickLogZurueck } from "./quickLogAction";
 
 export const dynamic = "force-dynamic";
 
@@ -96,7 +96,14 @@ export default async function LogPage() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         {manualQuotaTypes.map((type) => (
-          <QuickCounter key={type} type={type} label={quotaTypeLabels[type]} count={todayByType.get(type) ?? 0} action={quickLog} />
+          <QuickCounter
+            key={type}
+            type={type}
+            label={quotaTypeLabels[type]}
+            count={todayByType.get(type) ?? 0}
+            action={quickLog}
+            zurueck={quickLogZurueck}
+          />
         ))}
       </div>
 
