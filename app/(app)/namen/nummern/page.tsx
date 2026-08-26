@@ -2,13 +2,12 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
-import { isListKind, listKindLabels } from "@/lib/namelist";
+import { listKindLabels, listeAus } from "@/lib/namelist";
 import NummernNachtragen, {
   type NummerEintrag,
 } from "@/components/NummernNachtragen";
 import { pageTitle, columnNarrow } from "@/components/ui";
 import { XIcon } from "@/components/icons";
-import type { ListKind } from "@/lib/generated/prisma/enums";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +28,7 @@ export default async function NummernPage({
 }) {
   const user = await requireUser();
   const { liste } = await searchParams;
-  const kind: ListKind = liste && isListKind(liste) ? liste : "RECRUITING";
+  const kind = listeAus(liste, user.startTrack);
 
   const [ohneNummer, mitNummer] = await Promise.all([
     prisma.contact.findMany({

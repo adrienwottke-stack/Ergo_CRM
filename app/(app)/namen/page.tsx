@@ -4,9 +4,9 @@ import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
 import {
   LIST_KINDS,
-  isListKind,
   listKindHints,
   listKindLabels,
+  listeAus,
   sectionOf,
 } from "@/lib/namelist";
 import { DEFAULT_GUIDES, guideKeyForList } from "@/lib/guides";
@@ -15,7 +15,6 @@ import { lostReasonLabels } from "@/lib/pipeline";
 import NameList, { type NameEntry } from "@/components/NameList";
 import GuidePanel from "@/components/GuidePanel";
 import { pageTitle, column } from "@/components/ui";
-import type { ListKind } from "@/lib/generated/prisma/enums";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +34,7 @@ export default async function NamenPage({
 }) {
   const user = await requireUser();
   const { liste } = await searchParams;
-  const kind: ListKind = liste && isListKind(liste) ? liste : "RECRUITING";
+  const kind = listeAus(liste, user.startTrack);
 
   const guideKey = guideKeyForList[kind];
   const contacts = await prisma.contact.findMany({

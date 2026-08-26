@@ -311,3 +311,77 @@ Zurückkommen vom Telefonat, 5–6 sind überschaubar.
    ist es nachträglich eine Migration.
 4. **Durchklick am echten Gerät** — Build, Typprüfung und Leitfaden-Zerlegung sind geprüft,
    der Ablauf am Handy noch nicht.
+
+---
+
+## 11. Namen umhängen und von der Liste nehmen
+
+Nachtrag vom 26.08.2026 — **umgesetzt**.
+
+### Der Anlass
+
+Ein Partner tippt zwanzig Namen in die Namensliste — und merkt hinterher, dass der falsche
+Reiter offen war. Bis hierhin gab es dafür genau **einen** Weg: jeden Namen einzeln mit dem
+Kreuz von der Liste nehmen und im richtigen Reiter neu eintippen. Zwanzig Namen, vierzig
+Handgriffe, und die A/B/C-Einstufung war danach weg.
+
+Dass der Fall auftritt, war absehbar: `/namen` öffnet ohne Parameter **Recruiting**. Wer
+Verkauf meint und nicht auf die Reiter schaut, sammelt in der falschen Liste.
+
+### Die Entscheidungen
+
+| Thema | Entscheidung | Warum |
+|---|---|---|
+| Ziel des Schiebens | **Kein Menü** — es gibt genau zwei Listen, das Ziel ist eindeutig | Ein Menü mit einem Eintrag ist ein Entscheidungspunkt ohne Entscheidung |
+| Schieben heißt schieben | Die Quell-Liste **fällt weg**, die Ziel-Liste kommt dazu | Kopieren wäre die Liste zweimal abzuarbeiten |
+| Kreuz | Nimmt ab jetzt **nur diese Liste** herunter, nicht beide | Wer im Recruiting-Reiter herunternimmt, meint Recruiting |
+| Kontakt | Wird **nie gelöscht**, weder einzeln noch im Stapel | Dieselbe Tabelle wie das CRM — ein Löschen hier risse Historie und Wettbewerbspunkte mit |
+| Viele auf einmal | **Auswahlmodus** mit „Alle 17", nicht Drag-and-Drop | Drag-and-Drop am Handy über zwanzig Zeilen hinweg trifft niemand |
+| Rückgängig | Setzt den **Vorher-Stand exakt** zurück, 30 Sekunden lang | Das Gegenteil der Aktion wäre fast richtig — ein Name, der auf beiden Listen stand, käme mit einer zurück. Kein Protokoll, keine zweite Tabelle, gilt auch für siebzehn Namen auf einmal |
+| Fortschritts-Anker | `lastProgressAt` bleibt **unberührt** | Ein Umzug ist kein Fortschritt am Menschen; sonst verstummte der Liegenbleiber-Alarm bei allen umgehängten Namen |
+
+### Die Oberfläche
+
+Jede Zeile der offenen Liste trägt rechts zwei Knöpfe:
+
+```
+┌──────────────────────────────────────────────┐
+│  (A)  Peter Fiedler          → Verkauf   ✕   │
+│       0171 2345678                           │
+└──────────────────────────────────────────────┘
+         └ ein Tipp: hängt um   └ ein Tipp: von der Liste
+```
+
+Das Ziel steht **als Wort** am Pfeil. Ein bloßer Pfeil sagt nicht, wohin.
+
+Über der Liste steht klein „Mehrere verschieben" (erst ab zwei Namen). Ein Tipp darauf, und
+die Liste wird zur Auswahl: **die ganze Zeile ist der Knopf**, oben rechts „Alle 17", und am
+unteren Rand liegt die Leiste mit dem Ziel und „Von der Liste". Danach ein Streifen über der
+Liste: *„17 Namen stehen jetzt auf Verkauf. · Rückgängig"*.
+
+Im Auswahlmodus verschwinden Erfassungsfeld, „Durchlauf starten" und die eingeklappten
+Abschnitte. Wer sortiert, sortiert — und tippt nicht versehentlich auf den grünen Knopf.
+
+### Der Bauteil
+
+Eine Server-Action für alles: `moveNames({ ids, von, nach })` in
+`app/(app)/namen/actions.ts`. `von` fällt weg, `nach` kommt dazu, `null` heißt jeweils
+„nichts tun". Damit deckt sie beide Fälle ab — umhängen und herunternehmen —, und es gibt
+nur **eine** Stelle, die sich verrechnen kann. Sie ersetzt `toggleListKind` (stand in keiner
+Oberfläche) und `removeFromList` (räumte beide Listen ab). Zurück gibt sie den Vorher-Stand
+je angefasstem Kontakt; `restoreLists` setzt genau den wieder — das ist das Rückgängig.
+
+Gerechnet wird in `lib/namelist.ts` (`listenNach`, `andereListe`, `gleicheListen`), nicht in
+der Action — dieselbe Rolle, die die Datei schon für A/B/C spielt. Der Schreibvorgang läuft
+als **eine Transaktion**: bei siebzehn Namen darf nicht die Hälfte umziehen und die andere
+stehen bleiben. Die Ids kommen aus dem Browser und werden vorher gegen `eigene()` geprüft.
+
+### Was bewusst nicht gebaut ist
+
+- **Echtes Löschen aus der Namensliste.** Es gibt es schon — im Kontaktprofil, wo man den
+  ganzen Menschen sieht, bevor man ihn entfernt. In einer Liste, die man im Stapel bedient,
+  wäre ein Löschknopf neben einem Schiebeknopf der falsche Nachbar.
+- **Ein dritter Reiter oder eigene Listen.** Zwei Listen sind der Grund, aus dem das
+  Umhängen ohne Menü auskommt. Eine dritte Liste kostet dieses Menü.
+- **Umhängen aus „Geschafft" und „Raus".** Beide Abschnitte sind Rückblick, keine
+  Arbeitsliste. Wer dort etwas ändern will, geht ins Profil.

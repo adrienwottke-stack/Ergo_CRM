@@ -73,6 +73,70 @@ export const listKindHints: Record<ListKind, string> = {
   VERKAUF: "Wen könntest du beraten?",
 };
 
+// Wie die Liste im Fliesstext heisst. "auf deiner Verkauf-Liste" liest sich
+// wie ein Datenbankfeld; gesprochen wird es anders.
+export const listKindListLabels: Record<ListKind, string> = {
+  RECRUITING: "Recruiting-Liste",
+  VERKAUF: "Verkaufsliste",
+};
+
+// Welche Liste ist gemeint?
+//
+// Der Parameter aus der Adresse schlaegt alles - er steht dort, weil jemand
+// einen Reiter angetippt hat. Fehlt er, gilt die Antwort aus dem Willkommen
+// ("Kunden gewinnen" = VERKAUF, "Team aufbauen" = RECRUITING). Erst wenn auch
+// die fehlt, bleibt RECRUITING.
+//
+// Vorher stand an allen vier Einstiegen hart "RECRUITING". Das Menue verspricht
+// aber "Namen" - nicht "Recruiting" -, und dieselbe parameterlose Adresse
+// benutzen auch die Heute-Seite, die Push-Meldung und die Erste-Woche-Karte.
+// Wer darueber hereinkam, tippte seine Kundennamen in die Recruiting-Liste,
+// ohne dass irgendwo widersprochen haette. Genau so ist es passiert.
+export function listeAus(
+  liste: string | undefined,
+  startTrack: ListKind | null
+): ListKind {
+  if (liste && isListKind(liste)) return liste;
+  return startTrack ?? "RECRUITING";
+}
+
+// Es gibt genau zwei Listen. Deshalb ist das Ziel eines Umhaengens eindeutig -
+// ein Menue mit einem einzigen Eintrag waere ein Entscheidungspunkt ohne
+// Entscheidung (docs/audit-kernmodell.md, 1.5).
+export function andereListe(kind: ListKind): ListKind {
+  return kind === "RECRUITING" ? "VERKAUF" : "RECRUITING";
+}
+
+/**
+ * Die Listen-Zugehoerigkeit nach einem Umhaengen.
+ *
+ * `von` faellt weg, `nach` kommt dazu; `null` heisst jeweils "nichts tun".
+ * Damit deckt eine Funktion beide Faelle ab - schieben (von + nach) und von
+ * der Liste nehmen (nur von) - und es gibt nur eine Stelle, die sich verrechnen
+ * kann.
+ *
+ * Wichtig: es faellt IMMER nur die genannte Liste weg. Wer einen Namen im
+ * Recruiting-Reiter herunternimmt, der auch auf Verkauf steht, verliert nur
+ * das Recruiting - vorher raeumte das Kreuz beide Listen ab.
+ */
+export function listenNach(
+  aktuell: ListKind[],
+  von: ListKind | null,
+  nach: ListKind | null
+): ListKind[] {
+  const ziel = new Set(aktuell);
+  if (von) ziel.delete(von);
+  if (nach) ziel.add(nach);
+  // Ueber LIST_KINDS gefiltert, damit die Reihenfolge stabil bleibt: sonst
+  // sieht ein Vorher-Nachher-Vergleich einen Unterschied, wo keiner ist.
+  return LIST_KINDS.filter((kind) => ziel.has(kind));
+}
+
+/** Gleiche Listen, gleiche Reihenfolge? Beide Seiten kommen aus listenNach. */
+export function gleicheListen(a: ListKind[], b: ListKind[]): boolean {
+  return a.length === b.length && a.every((kind, i) => kind === b[i]);
+}
+
 // --- Ziel -------------------------------------------------------------------
 // 20 ist ein Ziel, keine Obergrenze: der Balken bleibt bei 100 % stehen,
 // weitere Namen sind erlaubt.

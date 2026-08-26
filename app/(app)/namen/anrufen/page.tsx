@@ -5,8 +5,8 @@ import { eigene } from "@/lib/scope";
 import {
   compareByRating,
   isContactRating,
-  isListKind,
   listKindLabels,
+  listeAus,
   ratingLabels,
 } from "@/lib/namelist";
 import { DEFAULT_GUIDES, guideKeyForList } from "@/lib/guides";
@@ -14,7 +14,7 @@ import { herkunftAusQuelle } from "@/lib/empfehlungen";
 import NameDialer, { type DialerEntry } from "@/components/NameDialer";
 import { pageTitle, columnNarrow } from "@/components/ui";
 import { XIcon } from "@/components/icons";
-import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
+import type { ContactRating } from "@/lib/generated/prisma/enums";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export default async function AnrufenPage({
 }) {
   const user = await requireUser();
   const { liste, stufe } = await searchParams;
-  const kind: ListKind = liste && isListKind(liste) ? liste : "RECRUITING";
+  const kind = listeAus(liste, user.startTrack);
   const rating: ContactRating | null =
     stufe && isContactRating(stufe) ? stufe : null;
 

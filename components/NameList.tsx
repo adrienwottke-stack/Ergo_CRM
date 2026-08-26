@@ -1,24 +1,36 @@
 "use client";
 
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   addName,
-  removeFromList,
+  moveNames,
+  restoreLists,
   setPhone,
   setRating,
 } from "@/app/(app)/namen/actions";
 import {
   NACHFUELL_SCHWELLE,
   NAME_TARGET,
+  andereListe,
+  listKindLabels,
   nextRating,
   ratingHints,
   ratingLabels,
   ratingPalette,
   targetPercent,
 } from "@/lib/namelist";
+import { UNDO_WINDOW_SECONDS } from "@/lib/undo-window";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
-import { CheckIcon, PhoneIcon, PlusIcon, SparkIcon, XIcon } from "@/components/icons";
+import {
+  ArrowRightIcon,
+  CheckIcon,
+  PhoneIcon,
+  PlusIcon,
+  SparkIcon,
+  UndoIcon,
+  XIcon,
+} from "@/components/icons";
 import { card, chip, input } from "@/components/ui";
 import { liegtLabel } from "@/lib/liegenbleiber";
 
@@ -39,7 +51,11 @@ export type NameEntry = {
 // den Server warten, und der Buchstabe muss sofort umspringen.
 type Patch =
   | { kind: "add"; name: string; phone: string | null }
-  | { kind: "rating"; id: string; rating: ContactRating | null };
+  | { kind: "rating"; id: string; rating: ContactRating | null }
+  // Umgehaengt oder heruntergenommen: die Zeile gehoert nicht mehr in diesen
+  // Reiter und verschwindet sofort. Siebzehn Zeilen, die erst nach dem
+  // Server-Rundlauf gehen, sehen aus wie ein Fehlschlag.
+  | { kind: "weg"; ids: string[] };
 
 function applyPatch(entries: NameEntry[], patch: Patch): NameEntry[] {
   if (patch.kind === "add") {
@@ -59,10 +75,32 @@ function applyPatch(entries: NameEntry[], patch: Patch): NameEntry[] {
       },
     ];
   }
+  if (patch.kind === "weg") {
+    const raus = new Set(patch.ids);
+    return entries.filter((entry) => !raus.has(entry.id));
+  }
   return entries.map((entry) =>
     entry.id === patch.id ? { ...entry, rating: patch.rating } : entry
   );
 }
+
+// Eine optimistisch eingefuegte Zeile traegt noch keine echte Id (siehe
+// applyPatch) und darf an keine Server-Aktion gehen.
+function istEcht(id: string) {
+  return !id.startsWith("neu-");
+}
+
+/**
+ * Was zuletzt umgezogen ist und wie es davor stand.
+ *
+ * Der Vorher-Stand kommt vom Server zurueck; das Zuruecknehmen setzt ihn genau
+ * so wieder. Ein blosses "Gegenteil der Aktion" waere fast richtig - aber ein
+ * Name, der auf beiden Listen stand, kaeme mit einer zurueck.
+ */
+type Rueckgaengig = {
+  vorher: Awaited<ReturnType<typeof moveNames>>["vorher"];
+  text: string;
+};
 
 export default function NameList({
   entries,
@@ -76,9 +114,15 @@ export default function NameList({
   const [hint, setHint] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
   const [showLost, setShowLost] = useState(false);
+  // Auswahlmodus: null = aus. Eine (auch leere) Menge = an.
+  const [auswahl, setAuswahl] = useState<Set<string> | null>(null);
+  const [rueckgaengig, setRueckgaengig] = useState<Rueckgaengig | null>(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
+
+  // Es gibt genau zwei Listen, also ist das Ziel eindeutig. Kein Menue.
+  const ziel = andereListe(kind);
 
   const open = optimistic.filter((entry) => entry.section === "offen");
   const done = optimistic.filter((entry) => entry.section === "geschafft");
@@ -91,6 +135,22 @@ export default function NameList({
   // Ueber die ganze offene Liste, nicht nur die gefilterte Sicht: der Nachtrag
   // arbeitet ohnehin alle ab.
   const ohneNummer = open.filter((entry) => !entry.phone).length;
+
+  const auswaehlbar = open.filter((entry) => istEcht(entry.id));
+  const gewaehlt = auswahl?.size ?? 0;
+  const alleGewaehlt = auswaehlbar.length > 0 && gewaehlt === auswaehlbar.length;
+  const auswaehlend = auswahl !== null;
+
+  // Der Streifen verschwindet von selbst - dasselbe Fenster wie beim
+  // Rueckgaengig der Gespraechsergebnisse, damit es sich gleich anfuehlt.
+  useEffect(() => {
+    if (!rueckgaengig) return;
+    const timer = setTimeout(
+      () => setRueckgaengig(null),
+      UNDO_WINDOW_SECONDS * 1000
+    );
+    return () => clearTimeout(timer);
+  }, [rueckgaengig]);
 
   const submitName = () => {
     const name = nameRef.current?.value.trim() ?? "";
@@ -121,12 +181,11 @@ export default function NameList({
   };
 
   const cycleRating = (entry: NameEntry) => {
-    // Eine optimistisch eingefuegte Zeile traegt noch keine echte Id (siehe
-    // applyPatch). Wer sofort auf den Buchstaben tippt, wuerde sie an den
-    // Server schicken - der findet nichts, und die Einstufung waere still weg.
-    // Das Fenster ist kurz, aber es ist genau der Moment, in dem jemand zwanzig
-    // Namen hintereinander eintippt.
-    if (entry.id.startsWith("neu-")) return;
+    // Wer sofort auf den Buchstaben tippt, wuerde eine Zeile ohne echte Id an
+    // den Server schicken - der findet nichts, und die Einstufung waere still
+    // weg. Das Fenster ist kurz, aber es ist genau der Moment, in dem jemand
+    // zwanzig Namen hintereinander eintippt.
+    if (!istEcht(entry.id)) return;
 
     const next = nextRating(entry.rating);
     const data = new FormData();
@@ -139,14 +198,66 @@ export default function NameList({
     });
   };
 
+  // Der eine Weg fuer alles: einen Namen oder siebzehn, umhaengen oder
+  // herunternehmen. `von` faellt weg, `nach` kommt dazu.
+  const schieben = (
+    ids: string[],
+    von: ListKind | null,
+    nach: ListKind | null,
+    text: string
+  ) => {
+    const echte = ids.filter(istEcht);
+    if (echte.length === 0) return;
+
+    const data = new FormData();
+    data.set("ids", echte.join(","));
+    if (von) data.set("von", von);
+    if (nach) data.set("nach", nach);
+
+    setHint(null);
+    setAuswahl(null);
+    setRueckgaengig(null);
+
+    startTransition(async () => {
+      applyOptimistic({ kind: "weg", ids: echte });
+      const ergebnis = await moveNames(data);
+      // Hat sich nichts bewegt, gibt es auch nichts zurueckzunehmen - sonst
+      // stuende ein Streifen da, dessen Knopf nichts tut.
+      if (ergebnis.count > 0) {
+        setRueckgaengig({ vorher: ergebnis.vorher, text });
+      }
+    });
+  };
+
+  const zurueck = () => {
+    if (!rueckgaengig) return;
+
+    const data = new FormData();
+    data.set("vorher", JSON.stringify(rueckgaengig.vorher));
+
+    setRueckgaengig(null);
+    startTransition(async () => {
+      await restoreLists(data);
+    });
+  };
+
+  const umschalten = (id: string) => {
+    setAuswahl((aktuell) => {
+      const naechste = new Set(aktuell ?? []);
+      if (naechste.has(id)) naechste.delete(id);
+      else naechste.add(id);
+      return naechste;
+    });
+  };
+
   // Nachfuell-Alarm: nicht die Gesamtzahl zaehlt, sondern was noch zu
   // arbeiten ist. Zwanzig Namen, von denen achtzehn erledigt sind, sind ein
   // leerer Trichter.
   const nachfuellen = total > 0 && open.length < NACHFUELL_SCHWELLE;
 
   return (
-    <div className="space-y-5">
-      {nachfuellen && (
+    <div className={`space-y-5 ${auswaehlend ? "pb-24" : ""}`}>
+      {nachfuellen && !auswaehlend && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-semibold text-amber-900">
             {open.length === 0
@@ -186,57 +297,79 @@ export default function NameList({
         </div>
       </div>
 
-      {/* Schnell-Erfassung: Name breit, Nummer schmal, Enter legt an. */}
-      <div className={`${card} space-y-3 p-4`}>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            ref={nameRef}
-            type="text"
-            autoFocus={entries.length === 0}
-            placeholder="Name"
-            enterKeyHint="done"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                submitName();
-              }
-            }}
-            className={`${input} mt-0 flex-1`}
-          />
-          <input
-            ref={phoneRef}
-            type="tel"
-            placeholder="Nummer (optional)"
-            enterKeyHint="done"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                submitName();
-              }
-            }}
-            className={`${input} mt-0 sm:w-48`}
-          />
+      {/* Was gerade umgezogen ist, und der Weg zurueck. Bewusst im Fluss der
+          Seite statt als schwebender Streifen: der Rueckgaengig-Balken der
+          Gespraechsergebnisse sitzt schon unten am Rand, und zwei davon
+          uebereinander liest niemand. */}
+      {rueckgaengig && (
+        <div className="flex items-center gap-3 rounded-xl border border-navy-200 bg-navy-50 py-2 pl-4 pr-2">
+          <p className="min-w-0 flex-1 text-sm font-medium text-navy-900">
+            {rueckgaengig.text}
+          </p>
           <button
             type="button"
-            onClick={submitName}
-            aria-label="Namen hinzufügen"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-akzent px-4 text-sm font-medium text-white transition hover:bg-akzent-stark active:scale-[0.99]"
+            onClick={zurueck}
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-navy-700 transition hover:bg-navy-100"
           >
-            <PlusIcon className="h-4 w-4" />
-            <span className="sm:hidden">Hinzufügen</span>
+            <UndoIcon className="h-4 w-4" />
+            Rückgängig
           </button>
         </div>
-        {hint && <p className="text-xs font-medium text-amber-700">{hint}</p>}
-        {/* Der gefuehrte Weg fuer alle, denen nach sechs Namen nichts mehr
-            einfaellt - und das sind fast alle. */}
-        <Link
-          href={`/namen/sammeln?liste=${kind}`}
-          className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
-        >
-          <SparkIcon className="h-4 w-4" />
-          Fällt dir keiner mehr ein? Sammeln starten
-        </Link>
-      </div>
+      )}
+
+      {/* Schnell-Erfassung: Name breit, Nummer schmal, Enter legt an. */}
+      {!auswaehlend && (
+        <div className={`${card} space-y-3 p-4`}>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              ref={nameRef}
+              type="text"
+              autoFocus={entries.length === 0}
+              placeholder="Name"
+              enterKeyHint="done"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  submitName();
+                }
+              }}
+              className={`${input} mt-0 flex-1`}
+            />
+            <input
+              ref={phoneRef}
+              type="tel"
+              placeholder="Nummer (optional)"
+              enterKeyHint="done"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  submitName();
+                }
+              }}
+              className={`${input} mt-0 sm:w-48`}
+            />
+            <button
+              type="button"
+              onClick={submitName}
+              aria-label="Namen hinzufügen"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-akzent px-4 text-sm font-medium text-white transition hover:bg-akzent-stark active:scale-[0.99]"
+            >
+              <PlusIcon className="h-4 w-4" />
+              <span className="sm:hidden">Hinzufügen</span>
+            </button>
+          </div>
+          {hint && <p className="text-xs font-medium text-amber-700">{hint}</p>}
+          {/* Der gefuehrte Weg fuer alle, denen nach sechs Namen nichts mehr
+              einfaellt - und das sind fast alle. */}
+          <Link
+            href={`/namen/sammeln?liste=${kind}`}
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
+          >
+            <SparkIcon className="h-4 w-4" />
+            Fällt dir keiner mehr ein? Sammeln starten
+          </Link>
+        </div>
+      )}
 
       {open.length > 0 && (
         <>
@@ -246,59 +379,119 @@ export default function NameList({
               ohnehin nach Naehe, enger Kreis zuerst. Wer filtern konnte, konnte
               vor allem eines - die unangenehmen Namen wegblenden. */}
 
-          {/* Ohne Nummer kein Anruf. Frueher stand hier ein toter Knopf
-              ("Erst Nummern eintragen") und der Partner musste sich selbst
-              ausdenken, wie er zwanzig Nummern in die Liste bekommt. Jetzt ist
-              der Satz der Weg. */}
-          {callable > 0 ? (
-            <Link
-              href={`/namen/anrufen?liste=${kind}`}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-fest-erfolg text-base font-semibold text-white transition hover:bg-fest-erfolg-stark active:scale-[0.99]"
-            >
-              <PhoneIcon className="h-5 w-5" />
-              Durchlauf starten · {callable} {callable === 1 ? "Name" : "Namen"}
-            </Link>
-          ) : (
-            <Link
-              href={`/namen/nummern?liste=${kind}`}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-akzent text-base font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.99]"
-            >
-              <PhoneIcon className="h-5 w-5" />
-              Nummern nachtragen · {ohneNummer}{" "}
-              {ohneNummer === 1 ? "Name" : "Namen"}
-            </Link>
+          {!auswaehlend && (
+            <>
+              {/* Ohne Nummer kein Anruf. Frueher stand hier ein toter Knopf
+                  ("Erst Nummern eintragen") und der Partner musste sich selbst
+                  ausdenken, wie er zwanzig Nummern in die Liste bekommt. Jetzt
+                  ist der Satz der Weg. */}
+              {callable > 0 ? (
+                <Link
+                  href={`/namen/anrufen?liste=${kind}`}
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-fest-erfolg text-base font-semibold text-white transition hover:bg-fest-erfolg-stark active:scale-[0.99]"
+                >
+                  <PhoneIcon className="h-5 w-5" />
+                  Durchlauf starten · {callable}{" "}
+                  {callable === 1 ? "Name" : "Namen"}
+                </Link>
+              ) : (
+                <Link
+                  href={`/namen/nummern?liste=${kind}`}
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-akzent text-base font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.99]"
+                >
+                  <PhoneIcon className="h-5 w-5" />
+                  Nummern nachtragen · {ohneNummer}{" "}
+                  {ohneNummer === 1 ? "Name" : "Namen"}
+                </Link>
+              )}
+
+              {callable > 0 && ohneNummer > 0 && (
+                <Link
+                  href={`/namen/nummern?liste=${kind}`}
+                  className="-mt-2 inline-flex min-h-11 items-center justify-center gap-1.5 text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
+                >
+                  {ohneNummer} {ohneNummer === 1 ? "Name hat" : "Namen haben"}{" "}
+                  noch keine Nummer — nachtragen
+                </Link>
+              )}
+
+              {/* Zaehlt, was die Plaketten unten einzeln zeigen. Ohne diese
+                  Zeile muesste man zwanzig Namen absuchen, um zu merken, dass
+                  sechs davon liegen. */}
+              {liegen > 0 && (
+                <p className="text-sm font-semibold text-red-700">
+                  {liegen === 1
+                    ? "Ein Name liegt seit Tagen."
+                    : `${liegen} Namen liegen seit Tagen.`}{" "}
+                  <span className="font-normal text-slate-500">
+                    Anrufen oder von der Liste nehmen.
+                  </span>
+                </p>
+              )}
+            </>
           )}
 
-          {callable > 0 && ohneNummer > 0 && (
-            <Link
-              href={`/namen/nummern?liste=${kind}`}
-              className="-mt-2 inline-flex min-h-11 items-center justify-center gap-1.5 text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
-            >
-              {ohneNummer} {ohneNummer === 1 ? "Name hat" : "Namen haben"} noch
-              keine Nummer — nachtragen
-            </Link>
-          )}
-
-          {/* Zaehlt, was die Plaketten unten einzeln zeigen. Ohne diese Zeile
-              muesste man zwanzig Namen absuchen, um zu merken, dass sechs
-              davon liegen. */}
-          {liegen > 0 && (
-            <p className="text-sm font-semibold text-red-700">
-              {liegen === 1
-                ? "Ein Name liegt seit Tagen."
-                : `${liegen} Namen liegen seit Tagen.`}{" "}
-              <span className="font-normal text-slate-500">
-                Anrufen oder von der Liste nehmen.
-              </span>
+          {/* Der Einstieg ins Umhaengen von vielen. Steht bewusst klein ueber
+              der Liste: der Normalfall ist Anrufen, nicht Sortieren. */}
+          <div className="flex min-h-11 items-center justify-between gap-3">
+            <p className="text-13 font-semibold text-slate-500">
+              {auswaehlend
+                ? `${gewaehlt} von ${auswaehlbar.length} ausgewählt`
+                : `${open.length} offen`}
             </p>
-          )}
+            {auswaehlend ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setAuswahl(
+                    alleGewaehlt
+                      ? new Set()
+                      : new Set(auswaehlbar.map((entry) => entry.id))
+                  )
+                }
+                className="shrink-0 text-13 font-semibold text-navy-600 transition hover:text-navy-800 hover:underline"
+              >
+                {alleGewaehlt ? "Keinen" : `Alle ${auswaehlbar.length}`}
+              </button>
+            ) : (
+              auswaehlbar.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setAuswahl(new Set())}
+                  className="shrink-0 text-13 font-semibold text-navy-600 transition hover:text-navy-800 hover:underline"
+                >
+                  Mehrere verschieben
+                </button>
+              )
+            )}
+          </div>
 
           <ul className="space-y-2">
             {open.map((entry) => (
               <NameRow
                 key={entry.id}
                 entry={entry}
+                ziel={ziel}
+                auswaehlend={auswaehlend}
+                gewaehlt={auswahl?.has(entry.id) ?? false}
+                onToggle={() => umschalten(entry.id)}
                 onCycleRating={() => cycleRating(entry)}
+                onMove={() =>
+                  schieben(
+                    [entry.id],
+                    kind,
+                    ziel,
+                    `${entry.name} steht jetzt auf ${listKindLabels[ziel]}.`
+                  )
+                }
+                onDrop={() =>
+                  schieben(
+                    [entry.id],
+                    kind,
+                    null,
+                    `${entry.name} ist von der Liste.`
+                  )
+                }
               />
             ))}
           </ul>
@@ -325,7 +518,7 @@ export default function NameList({
         </div>
       )}
 
-      {done.length > 0 && (
+      {done.length > 0 && !auswaehlend && (
         <div className={`${card} overflow-hidden`}>
           <button
             type="button"
@@ -362,7 +555,7 @@ export default function NameList({
         </div>
       )}
 
-      {lost.length > 0 && (
+      {lost.length > 0 && !auswaehlend && (
         <div className={`${card} overflow-hidden`}>
           <button
             type="button"
@@ -393,6 +586,54 @@ export default function NameList({
           )}
         </div>
       )}
+
+      {/* Die Leiste des Auswahlmodus. Liegt am Daumen, nicht am Kopf der
+          Seite - bei siebzehn Namen scrollt man beim Auswaehlen nach unten. */}
+      {auswaehlend && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4">
+          <div className="buehne pointer-events-auto flex w-full max-w-md items-center gap-2 rounded-xl bg-navy-950 py-2 pl-3 pr-2 text-white shadow-lg">
+            <button
+              type="button"
+              disabled={gewaehlt === 0}
+              onClick={() =>
+                schieben(
+                  [...(auswahl ?? [])],
+                  kind,
+                  ziel,
+                  `${gewaehlt} ${gewaehlt === 1 ? "Name steht" : "Namen stehen"} jetzt auf ${listKindLabels[ziel]}.`
+                )
+              }
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gold-400 px-3 text-sm font-semibold text-navy-950 transition hover:bg-gold-100 disabled:opacity-40"
+            >
+              <ArrowRightIcon className="h-4 w-4" />
+              {listKindLabels[ziel]}
+            </button>
+            <button
+              type="button"
+              disabled={gewaehlt === 0}
+              onClick={() =>
+                schieben(
+                  [...(auswahl ?? [])],
+                  kind,
+                  null,
+                  `${gewaehlt} ${gewaehlt === 1 ? "Name ist" : "Namen sind"} von der Liste.`
+                )
+              }
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-3 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+            >
+              Von der Liste
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuswahl(null)}
+              aria-label="Auswahl beenden"
+              className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white"
+            >
+              <XIcon className="h-4.5 w-4.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -401,10 +642,23 @@ export default function NameList({
 
 function NameRow({
   entry,
+  ziel,
+  auswaehlend,
+  gewaehlt,
   onCycleRating,
+  onToggle,
+  onMove,
+  onDrop,
 }: {
   entry: NameEntry;
+  /** Die andere Liste - Beschriftung des Schiebe-Knopfes. */
+  ziel: ListKind;
+  auswaehlend: boolean;
+  gewaehlt: boolean;
   onCycleRating: () => void;
+  onToggle: () => void;
+  onMove: () => void;
+  onDrop: () => void;
 }) {
   const [, startTransition] = useTransition();
   const [editingPhone, setEditingPhone] = useState(false);
@@ -422,16 +676,45 @@ function NameRow({
     });
   };
 
-  const drop = () => {
-    const data = new FormData();
-    data.set("contactId", entry.id);
-    startTransition(() => {
-      void removeFromList(data);
-    });
-  };
+  // Im Auswahlmodus ist die ganze Zeile der Knopf: bei siebzehn Namen trifft
+  // niemand siebzehnmal ein Kaestchen von zwanzig Pixeln.
+  if (auswaehlend) {
+    return (
+      <li>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-pressed={gewaehlt}
+          className={`${card} flex min-h-16 w-full items-center gap-3 p-3 text-left transition ${
+            gewaehlt ? "ring-2 ring-akzent" : ""
+          }`}
+        >
+          <span
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-semibold ${
+              gewaehlt
+                ? "bg-akzent text-white"
+                : "border border-dashed border-slate-300 text-slate-400"
+            }`}
+          >
+            {gewaehlt ? <CheckIcon className="h-5 w-5" /> : (entry.rating ?? "–")}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-slate-900">
+              {entry.name}
+            </span>
+            {entry.phone && (
+              <span className="block truncate text-sm text-slate-500">
+                {entry.phone}
+              </span>
+            )}
+          </span>
+        </button>
+      </li>
+    );
+  }
 
   return (
-    <li className={`${card} flex min-h-16 items-center gap-3 p-3`}>
+    <li className={`${card} flex min-h-16 items-center gap-2 p-3`}>
       {/* Ein Tipp zykelt – → A → B → C → –. Kein Menü, kein Dialog. */}
       <button
         type="button"
@@ -442,7 +725,7 @@ function NameRow({
             : "Einstufen"
         }
         title={entry.rating ? ratingHints[entry.rating] : "Einstufen"}
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-semibold transition active:scale-95 ${
+        className={`mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-semibold transition active:scale-95 ${
           palette
             ? palette.chip
             : "border border-dashed border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600"
@@ -495,12 +778,25 @@ function NameRow({
         )}
       </div>
 
+      {/* Ein Tipp haengt den Namen um. Das Ziel steht dran, weil ein blosser
+          Pfeil nicht sagt, wohin. */}
       <button
         type="button"
-        onClick={drop}
+        onClick={onMove}
+        aria-label={`${entry.name} auf die Liste ${listKindLabels[ziel]} schieben`}
+        title={`Auf ${listKindLabels[ziel]} schieben`}
+        className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-500 transition hover:bg-navy-50 hover:text-navy-700"
+      >
+        <ArrowRightIcon className="h-3.5 w-3.5" />
+        {listKindLabels[ziel]}
+      </button>
+
+      <button
+        type="button"
+        onClick={onDrop}
         aria-label={`${entry.name} von der Liste nehmen`}
         title="Von der Liste nehmen (Kontakt bleibt erhalten)"
-        className="flex h-11 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-50 hover:text-slate-500"
+        className="flex h-11 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-50 hover:text-slate-500"
       >
         <XIcon className="h-4.5 w-4.5" />
       </button>

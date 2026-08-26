@@ -12,12 +12,24 @@
 
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { addName } from "@/app/(app)/namen/actions";
+import { addName, moveNames } from "@/app/(app)/namen/actions";
 import { STUETZEN, STUETZEN_ANZAHL } from "@/lib/gedaechtnisstuetzen";
-import { NAME_TARGET, listKindLabels } from "@/lib/namelist";
+import {
+  NAME_TARGET,
+  andereListe,
+  listKindHints,
+  listKindLabels,
+  listKindListLabels,
+} from "@/lib/namelist";
 import type { ListKind } from "@/lib/generated/prisma/enums";
-import { ArrowLeftIcon, CheckIcon, PhoneIcon, PlusIcon } from "@/components/icons";
-import { btnPrimary, card, input } from "@/components/ui";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CheckIcon,
+  PhoneIcon,
+  PlusIcon,
+} from "@/components/icons";
+import { btnPrimary, card, input, kicker } from "@/components/ui";
 
 export default function NamenSammeln({
   kind,
@@ -33,7 +45,16 @@ export default function NamenSammeln({
     STUETZEN.map(() => [])
   );
   const [hinweis, setHinweis] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  // Die Kontakte dieser Runde. Nur damit laesst sich am Ende "alle umhaengen"
+  // anbieten - ein Name allein ist kein Griff, an dem der Server etwas findet.
+  // Bewusst ohne die, die schon auf der Liste standen ("already"): die hat
+  // diese Runde nicht angelegt, also zieht sie sie auch nicht mit um.
+  const [ids, setIds] = useState<string[]>([]);
+  // Wohin die Namen dieser Runde am Ende gehoeren. null = unveraendert auf
+  // `kind`. Ein Zustand fuer beide Richtungen, damit der Knopf am Abschluss
+  // immer nur "in die andere Liste" heisst - und der Weg zurueck derselbe ist.
+  const [verschoben, setVerschoben] = useState<ListKind | null>(null);
+  const [pending, startTransition] = useTransition();
   const feldRef = useRef<HTMLInputElement>(null);
 
   // Eingefroren beim Betreten. addName laesst den Server neu rechnen, und der
@@ -69,7 +90,32 @@ export default function NamenSammeln({
       const ergebnis = await addName(data);
       if (ergebnis.status === "already") {
         setHinweis(`${ergebnis.name} steht schon auf der Liste.`);
+        return;
       }
+      setIds((alt) => [...alt, ergebnis.id]);
+    });
+  };
+
+  // Auf welcher Liste die Namen dieser Runde liegen, und wohin ein Umhaengen
+  // ginge. Waehrend des Sammelns ist das immer `kind`; erst der Abschluss
+  // kann daran etwas aendern.
+  const liste = verschoben ?? kind;
+  const ziel = andereListe(liste);
+
+  // Der ganze Stapel auf einmal. Es gibt genau zwei Listen, also ist das Ziel
+  // eindeutig und braucht kein Menue (docs/audit-kernmodell.md, 1.5).
+  const umhaengen = () => {
+    if (ids.length === 0) return;
+
+    const data = new FormData();
+    data.set("ids", ids.join(","));
+    data.set("von", liste);
+    data.set("nach", ziel);
+
+    // Sofort umschalten, Server hinterher - dasselbe Muster wie beim Eintragen.
+    setVerschoben(ziel === kind ? null : ziel);
+    startTransition(async () => {
+      await moveNames(data);
     });
   };
 
@@ -84,10 +130,21 @@ export default function NamenSammeln({
             ? "Keine neuen Namen"
             : `${neueNamen.length} ${neueNamen.length === 1 ? "Name" : "Namen"} dazu`}
         </h2>
+        {/* Die Liste gehoert in den Satz, den er ohnehin liest. Vorher stand
+            hier "auf deiner Liste" - welche, sagte diese Seite nie.
+
+            Nach einem Umhaengen bleibt der Gesamtstand weg: `gesamt` zaehlt die
+            Liste, auf der gesammelt wurde. Wie viele auf der anderen schon
+            liegen, weiss diese Seite nicht - und eine geratene Zahl ist
+            schlimmer als keine. */}
         <p className="mt-1 text-sm text-slate-500">
-          {gesamt >= NAME_TARGET
-            ? `Damit stehen ${gesamt} auf deiner Liste. Das reicht zum Loslegen.`
-            : `Damit stehen ${gesamt} von ${NAME_TARGET} auf deiner Liste.`}
+          {verschoben
+            ? `Sie liegen jetzt auf deiner ${listKindListLabels[liste]}.`
+            : neueNamen.length === 0
+              ? `Auf deiner ${listKindListLabels[liste]} stehen ${gesamt} von ${NAME_TARGET}.`
+              : gesamt >= NAME_TARGET
+                ? `Sie stehen auf deiner ${listKindListLabels[liste]} — damit sind es ${gesamt}. Das reicht zum Loslegen.`
+                : `Sie stehen auf deiner ${listKindListLabels[liste]} — damit sind es ${gesamt} von ${NAME_TARGET}.`}
         </p>
 
         {/* Ohne Nummer kein Anruf: die frisch gesammelten Namen haben noch
@@ -96,7 +153,7 @@ export default function NamenSammeln({
         {neueNamen.length > 0 ? (
           <>
             <Link
-              href={`/namen/nummern?liste=${kind}`}
+              href={`/namen/nummern?liste=${liste}`}
               className={`${btnPrimary} mt-6`}
             >
               <PhoneIcon className="h-4 w-4" />
@@ -108,17 +165,50 @@ export default function NamenSammeln({
             </p>
           </>
         ) : (
-          <Link href={`/namen?liste=${kind}`} className={`${btnPrimary} mt-6`}>
+          <Link href={`/namen?liste=${liste}`} className={`${btnPrimary} mt-6`}>
             Zur Namensliste
           </Link>
         )}
 
+        {/* Der Ausweg genau dort, wo der Fehler auffaellt. Auf der Liste selbst
+            gibt es das Umhaengen laengst - nur kommt dort nicht an, wer eben
+            zwanzig Namen in den falschen Reiter getippt hat. */}
+        {ids.length > 0 && (
+          <div className="mt-6 w-full rounded-lg bg-sunken px-4 py-3 text-left">
+            <p className="text-13 text-slate-600">
+              {verschoben
+                ? "Umgehängt. Hier ist der Weg zurück, falls es doch die andere war."
+                : `Falsche Liste? Die ${ids.length} Namen dieser Runde ziehen in einem Zug um.`}
+            </p>
+            <button
+              type="button"
+              onClick={umhaengen}
+              disabled={pending}
+              className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-navy-700 transition hover:text-navy-900 disabled:opacity-40"
+            >
+              <ArrowRightIcon className="h-4 w-4" />
+              {verschoben
+                ? `Doch zurück nach ${listKindLabels[ziel]}`
+                : `Alle ${ids.length} nach ${listKindLabels[ziel]}`}
+            </button>
+          </div>
+        )}
+
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4">
-          {gesamt < NAME_TARGET && (
+          {verschoben && (
+            <Link
+              href={`/namen/sammeln?liste=${liste}`}
+              className="min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
+            >
+              Weiter sammeln
+            </Link>
+          )}
+          {gesamt < NAME_TARGET && !verschoben && (
             <button
               type="button"
               onClick={() => {
                 setGesammelt(STUETZEN.map(() => []));
+                setIds([]);
                 setStufe(0);
               }}
               className="min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
@@ -128,7 +218,7 @@ export default function NamenSammeln({
           )}
           {neueNamen.length > 0 && (
             <Link
-              href={`/namen?liste=${kind}`}
+              href={`/namen?liste=${liste}`}
               className="min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
             >
               Zur Namensliste
@@ -162,6 +252,31 @@ export default function NamenSammeln({
       </div>
 
       <div className={`${card} space-y-4 p-5`}>
+        {/* Welche Liste hier gefuellt wird - an der Eingabe, nicht als graue
+            Fussnote am Seitenende. Die zehn Szenen sind fuer beide Listen
+            dieselben ("Familie", "Verein", "Nachbarn"); ohne diese Zeile liest
+            sich der ganze Ablauf wie "schreib alle auf, die du kennst". Genau
+            so landen Kundennamen in der Recruiting-Liste. */}
+        <div className="flex items-start justify-between gap-3 border-b border-line pb-3">
+          <div className="min-w-0">
+            <p className={kicker}>{listKindListLabels[kind]}</p>
+            <p className="mt-0.5 text-13 font-medium text-slate-700">
+              {listKindHints[kind]}
+            </p>
+          </div>
+          {/* Der Wechsel steht nur da, solange die Runde leer ist. Wer schon
+              getippt hat, soll nicht die Liste unter seinen Namen wegziehen -
+              fuer den ist das Umhaengen am Ende der richtige Weg. */}
+          {neueNamen.length === 0 && (
+            <Link
+              href={`/namen/sammeln?liste=${andereListe(kind)}`}
+              className="shrink-0 text-13 font-medium text-navy-700 transition hover:text-navy-900 hover:underline"
+            >
+              Wechseln
+            </Link>
+          )}
+        </div>
+
         <div>
           <h2 className="text-xl font-semibold tracking-[-0.01em] text-slate-900">
             {stuetze!.titel}
@@ -239,8 +354,7 @@ export default function NamenSammeln({
       </div>
 
       <p className="text-center text-xs text-slate-400">
-        Nummern und Einstufung kommen später auf der Liste ·{" "}
-        {listKindLabels[kind]}
+        Nummern und Einstufung kommen später auf der Liste
       </p>
     </div>
   );
