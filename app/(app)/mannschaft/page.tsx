@@ -202,9 +202,13 @@ export default async function MannschaftPage({
     return {
       id: person.id,
       name: person.name,
-      // Die Wurzel der Anzeige ist der Betrachter - ueber ihm haengt hier
-      // nichts, auch wenn er selbst eine Fuehrungskraft hat.
-      elternId: person.istDu ? null : elternIdVon(person.path),
+      // Kein Sonderfall fuer den Betrachter selbst: haengt seine echte
+      // Fuehrungskraft nicht mit im Bild (der Normalfall - nur der eigene
+      // Ast ist sichtbar), macht `baulayout` ihn ohnehin zur Wurzel. Steht sie
+      // aber mit im Bild (Admin-Ansicht "gesamte Struktur"), muss der
+      // Betrachter dort auch wirklich unter ihr haengen - sonst zeigt das Bild
+      // eine andere Hierarchie als der Rest der Seite.
+      elternId: elternIdVon(person.path),
       ampel: person.ampel,
       istDu: person.istDu,
       platzhalter: person.platzhalter,
