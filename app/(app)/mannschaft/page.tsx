@@ -752,7 +752,7 @@ export default async function MannschaftPage({
           <p className={kicker}>
             Einheiten trägt jeder selbst ein. „Team&ldquo; ist alles unter der
             Person, über alle Ebenen — sie zählen in keiner Rangliste mit, und
-            auf die Kernstufe zählen nur die eigenen.
+            auf die Karrierestufe zählen nur die eigenen.
           </p>
         </section>
       )}

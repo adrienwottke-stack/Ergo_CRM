@@ -11,7 +11,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, isValidDay, shiftDay } from "@/lib/dates";
-import { istKernstufe, parseEinheiten } from "@/lib/einheiten";
+import { istKarrierestufe, parseEinheiten } from "@/lib/einheiten";
 
 // Wie weit zurueck eine Buchung datiert werden darf. Zwei Jahre, weil
 // Einheiten monatsweise abgerechnet werden und der Auszug spaet kommt.
@@ -80,18 +80,18 @@ export async function buchungLoeschen(formData: FormData) {
 }
 
 /**
- * Kernstufe und Startbestand.
+ * Karrierestufe und Startbestand.
  *
- * Die Kernstufe entscheidet, in welcher Runde jemand steht und wessen Zahlen
+ * Die Karrierestufe entscheidet, in welcher Runde jemand steht und wessen Zahlen
  * er sieht. Ein leeres Feld setzt sie zurueck auf "nicht eingetragen" - dann
  * sieht er keine Runde und steht in keiner.
  */
 export async function standSpeichern(formData: FormData) {
   const user = await requireUser();
 
-  const stufeRoh = feld(formData, "kernstufe");
+  const stufeRoh = feld(formData, "karrierestufe");
   const stufe = stufeRoh ? Number(stufeRoh) : null;
-  const kernstufe = stufe !== null && istKernstufe(stufe) ? stufe : null;
+  const karrierestufe = stufe !== null && istKarrierestufe(stufe) ? stufe : null;
 
   const startRoh = feld(formData, "einheitenStart");
   const start = parseEinheiten(startRoh);
@@ -99,7 +99,7 @@ export async function standSpeichern(formData: FormData) {
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      kernstufe,
+      karrierestufe,
       // Ein leeres Feld laesst den Bestand stehen, statt ihn auf 0 zu setzen:
       // wer nur seine Stufe korrigiert, soll nicht nebenbei seine Historie
       // verlieren. Eine echte 0 kommt durch parseEinheiten als 0 an.

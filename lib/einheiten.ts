@@ -1,10 +1,10 @@
-// Einheiten und Kernstufe (docs/einheiten-plan.md).
+// Einheiten und Karrierestufe (docs/einheiten-plan.md).
 //
 // Das Werkzeug zaehlt bis hierhin Taetigkeiten: Anrufe, Nummern, Termine,
 // Abschluesse. Das ist die richtige Waehrung fuer den Anfang - wer noch nichts
 // erreicht hat, kann wenigstens fleissig sein. Es ist aber nicht die Waehrung,
 // in der der Betrieb rechnet. Dort zaehlen EINHEITEN, und an ihnen haengt die
-// KERNSTUFE.
+// KARRIERESTUFE.
 //
 // Drei Regeln, die den Rest erklaeren:
 //
@@ -19,7 +19,7 @@
 //    andere. Dieselbe Ueberlegung wie bei der Anwesenheit, die deshalb kein
 //    sechster QuotaType wurde.
 // 3. ALLES, WAS SPAETER ANDERS SEIN KOENNTE, STEHT ALS EINE KONSTANTE HIER.
-//    Der Schnitt des Produktionsmonats und die Schwelle zu Kernstufe 2 sind
+//    Der Schnitt des Produktionsmonats und die Schwelle zu Karrierestufe 2 sind
 //    Fragen an die Praxis, nicht an den Code.
 
 import { prisma } from "@/lib/prisma";
@@ -124,25 +124,25 @@ export function produktionsmonat(tag: string): Produktionsmonat {
   };
 }
 
-// --- Die Kernstufe ----------------------------------------------------------
-// "Kernstufe" und nicht "Stufe": lib/stufen.ts belegt das Wort im selben
+// --- Die Karrierestufe ----------------------------------------------------------
+// "Karrierestufe" und nicht "Stufe": lib/stufen.ts belegt das Wort im selben
 // Bereich schon (Anwaerter bis Veteran, gerechnet aus Wettbewerbspunkten,
 // sichtbar auf /spiel). Zwei Dinge gleich zu nennen waere der sichere Weg in
 // die Verwechslung.
 
-export const KERNSTUFE_MIN = 1;
-// Sechs, nicht neun: darueber gibt es im Betrieb keine Kernstufe mehr. Die
-// Zahl steht nur hier - istKernstufe() und das max-Feld im Formular haengen
+export const KARRIERESTUFE_MIN = 1;
+// Sechs, nicht neun: darueber gibt es im Betrieb keine Karrierestufe mehr. Die
+// Zahl steht nur hier - istKarrierestufe() und das max-Feld im Formular haengen
 // beide daran, in der Datenbank sitzt kein Constraint.
-export const KERNSTUFE_MAX = 6;
+export const KARRIERESTUFE_MAX = 6;
 
 /**
- * Was es bis zur naechsten Kernstufe braucht, in Hundertsteln.
+ * Was es bis zur naechsten Karrierestufe braucht, in Hundertsteln.
  *
  * Die 500 stehen schon in docs/recruiting-plan.md ("nach ~500 Einheiten besteht
  * der Alltag aus Rekrutierung") und sind dort als offener Punkt markiert.
  *
- * Fuer Kernstufe 2 aufwaerts steht hier ABSICHTLICH nichts: eine erfundene
+ * Fuer Karrierestufe 2 aufwaerts steht hier ABSICHTLICH nichts: eine erfundene
  * Schwelle ist schlimmer als keine, weil sie jemandem sagt, er sei fast da.
  * Ohne Eintrag zeigt die Seite die Zahlen und die Runde, aber keinen Balken.
  */
@@ -150,19 +150,19 @@ export const SCHWELLEN: Record<number, number> = {
   1: 500 * 100,
 };
 
-export function schwelleFuer(kernstufe: number | null): number | null {
-  if (kernstufe === null) return null;
-  return SCHWELLEN[kernstufe] ?? null;
+export function schwelleFuer(karrierestufe: number | null): number | null {
+  if (karrierestufe === null) return null;
+  return SCHWELLEN[karrierestufe] ?? null;
 }
 
-export function istKernstufe(wert: number): boolean {
+export function istKarrierestufe(wert: number): boolean {
   return (
-    Number.isInteger(wert) && wert >= KERNSTUFE_MIN && wert <= KERNSTUFE_MAX
+    Number.isInteger(wert) && wert >= KARRIERESTUFE_MIN && wert <= KARRIERESTUFE_MAX
   );
 }
 
 // --- Die Stufenrunde --------------------------------------------------------
-// Wer dieselbe Kernstufe traegt, sieht die Einheiten der anderen - ueber die
+// Wer dieselbe Karrierestufe traegt, sieht die Einheiten der anderen - ueber die
 // ganze Instanz, quer durch alle Aeste.
 //
 // Das ist BEWUSST NICHT lib/scope.ts. Dort liegt die Struktur-Grenze ("ich und
@@ -188,20 +188,20 @@ export type EinheitenSeite = {
   ich: EinheitenStand;
   /**
    * Die Runde inklusive der eigenen Zeile, sortiert nach dem laufenden Monat.
-   * Leer, solange keine Kernstufe eingetragen ist.
+   * Leer, solange keine Karrierestufe eingetragen ist.
    *
    * Sortiert nach MONAT, nicht nach Gesamt: Gesamt ist Biografie - wer lange
    * dabei ist, steht dort immer vorn, und die Liste waere jeden Monat dieselbe.
    */
   runde: EinheitenStand[];
-  /** Was die eigene Kernstufe bis zur naechsten braucht, oder null. */
+  /** Was die eigene Karrierestufe bis zur naechsten braucht, oder null. */
   schwelle: number | null;
 };
 
 type Betrachter = {
   id: string;
   name: string;
-  kernstufe: number | null;
+  karrierestufe: number | null;
   einheitenStart: number;
 };
 
@@ -258,11 +258,11 @@ export async function ladeEinheiten(
   // Platzhalter (Konten ohne Zugangsdaten) und Ausgetretene stehen in keiner
   // Runde: wer nie gearbeitet hat, hat keine Einheiten.
   const konten =
-    betrachter.kernstufe === null
+    betrachter.karrierestufe === null
       ? []
       : await prisma.user.findMany({
           where: {
-            kernstufe: betrachter.kernstufe,
+            karrierestufe: betrachter.karrierestufe,
             deactivatedAt: null,
             passwordHash: { not: null },
           },
@@ -298,8 +298,8 @@ export async function ladeEinheiten(
   return {
     monat,
     ich: staende.find((stand) => stand.istDu)!,
-    runde: betrachter.kernstufe === null ? [] : staende,
-    schwelle: schwelleFuer(betrachter.kernstufe),
+    runde: betrachter.karrierestufe === null ? [] : staende,
+    schwelle: schwelleFuer(betrachter.karrierestufe),
   };
 }
 
@@ -313,7 +313,7 @@ export async function ladeEinheiten(
 // 1. TEAM IST EXKLUSIV. "Team" ist alles UNTER jemandem, ohne ihn selbst. Ein
 //    Blattknoten hat Team = 0 und trotzdem Eigeneinheiten. Wer beides in eine
 //    Zahl wirft, kann spaeter nie mehr sagen, was jemand selbst geschrieben
-//    hat - und genau danach fragt die Kernstufe.
+//    hat - und genau danach fragt die Karrierestufe.
 // 2. NICHTS WIRD GESPEICHERT. Die Summe entsteht bei jedem Aufruf aus dem
 //    Struktur-Pfad. Ein mitgefuehrtes Feld muesste bei jeder Buchung UND bei
 //    jedem Umhaengen fortgeschrieben werden - und stuende ab dem ersten

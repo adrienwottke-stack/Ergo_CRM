@@ -275,19 +275,24 @@ model User {
   // keiner laufenden Auswertung mehr mit.
   deactivatedAt DateTime?
 
-  // --- Einheiten und Kernstufe (docs/einheiten-plan.md) ----------------------
+  // --- Einheiten und Karrierestufe (docs/einheiten-plan.md) ------------------
   // Die Zahl, in der der Betrieb rechnet - anders als die Taetigkeiten, die
   // das Werkzeug bisher zaehlt.
   //
-  // kernstufe traegt der Mensch selbst ein, wie die Telefonnummer. NULL heisst
-  // "nicht eingetragen" und wird NIE auf 1 vorbelegt: eine geratene Stufe
-  // stellt jemanden in die falsche Runde, und dort stuenden dann fremde Zahlen
-  // neben seinem Namen.
+  // karrierestufe traegt der Mensch selbst ein, wie die Telefonnummer. NULL
+  // heisst "nicht eingetragen" und wird NIE auf 1 vorbelegt: eine geratene
+  // Stufe stellt jemanden in die falsche Runde, und dort stuenden dann fremde
+  // Zahlen neben seinem Namen.
   //
-  // "Kernstufe" und nicht "Stufe", weil lib/stufen.ts das Wort im selben
+  // "Karrierestufe" und nicht "Stufe", weil lib/stufen.ts das Wort im selben
   // Bereich schon belegt (Anwaerter bis Veteran, gerechnet aus
   // Wettbewerbspunkten, sichtbar auf /spiel).
-  kernstufe Int?
+  //
+  // Die SPALTE heisst weiterhin "kernstufe": so hiess das Feld, als die
+  // Migration 20260825235000_einheiten lief, und die ist gefahren. Ein
+  // Umbenennen in der Datenbank braechte nichts, was den Eingriff wert waere -
+  // gelesen wird der Name hier, und hier steht er richtig.
+  karrierestufe Int? @map("kernstufe")
 
   // Was vor der App schon stand, in Hundertsteln. Niemand traegt drei Jahre
   // nach: eine Zahl, danach laufen die Buchungen.
@@ -377,7 +382,7 @@ model User {
 //
 // Am User und nicht an der Person: Person ist die Wettbewerbs-Identitaet, an
 // der DailyLog haengt - dort etwas anzubauen waere der kurze Weg, Einheiten
-// doch noch in die Punktewertung zu ziehen. Und die Kernstufe sitzt am Konto.
+// doch noch in die Punktewertung zu ziehen. Und die Karrierestufe sitzt am Konto.
 model Einheitenbuchung {
   id     String @id @default(cuid())
   userId String

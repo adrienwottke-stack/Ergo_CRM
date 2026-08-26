@@ -1,4 +1,4 @@
-# Einheiten und Kernstufe
+# Einheiten und Karrierestufe
 
 Stand: 25.08.2026. Gebaut in einem Zug, weil die Zahl fehlt, an der der Beruf
 tatsächlich gemessen wird.
@@ -12,7 +12,7 @@ vereinbarte und gehaltene Termine, Abschlüsse. Das ist die richtige Währung f�
 den Anfang — wer noch nichts erreicht hat, kann wenigstens fleißig sein.
 
 Es ist aber nicht die Währung, in der der Betrieb rechnet. Dort zählen
-**Einheiten**, und an ihnen hängt die **Kernstufe**: wer wo steht, wer wohin
+**Einheiten**, und an ihnen hängt die **Karrierestufe**: wer wo steht, wer wohin
 kommt, wer wann Stufe 2 erreicht. Diese Zahl steht heute nirgends im Werkzeug —
 sie liegt in einem Portal daneben, und wer sie sehen will, verlässt die App.
 
@@ -39,10 +39,10 @@ Faktoren. Genau der Apparat ist rausgeflogen und kommt nicht wieder.
 
 | # | Sache | Kurz |
 |---|---|---|
-| 1 | **Kernstufe am Konto** | Eine Zahl, selbst eingetragen. NULL = nicht gesetzt |
+| 1 | **Karrierestufe am Konto** | Eine Zahl, selbst eingetragen. NULL = nicht gesetzt |
 | 2 | **Einheiten buchen** | Menge, Tag, optionale Notiz. Auch negativ (Storno) |
 | 3 | **Zwei Zahlen** | Eigeneinheiten gesamt (→ Schritte Richtung Stufe 2) und Einheiten im laufenden Produktionsmonat |
-| 4 | **Die Stufenrunde** | Wer dieselbe Kernstufe hat, sieht die Einheiten der anderen — Name und Zahl, sonst nichts |
+| 4 | **Die Stufenrunde** | Wer dieselbe Karrierestufe hat, sieht die Einheiten der anderen — Name und Zahl, sonst nichts |
 | 5 | **Seite `/einheiten`** | Fünfter Reiter im Wettbewerb, neben „Meine Aktivitäten" |
 
 ### Explizit nicht gebaut
@@ -64,7 +64,7 @@ Faktoren. Genau der Apparat ist rausgeflogen und kommt nicht wieder.
 Am `User`, nicht an der `Person`:
 
 ```prisma
-kernstufe      Int?          // NULL = nicht eingetragen
+karrierestufe      Int?          // NULL = nicht eingetragen
 einheitenStart Int @default(0)   // Hundertstel, Bestand vor der App
 ```
 
@@ -90,7 +90,7 @@ Drei Festlegungen:
    in `lib/einheiten.ts`.
 2. **Am `User`, nicht an der `Person`.** `Person` ist die Wettbewerbs-Identität,
    an der `DailyLog` hängt — dort etwas anzubauen wäre der kurze Weg, Einheiten
-   doch noch in die Punktewertung zu ziehen. Außerdem sitzt die Kernstufe am
+   doch noch in die Punktewertung zu ziehen. Außerdem sitzt die Karrierestufe am
    Konto, und die Stufenrunde ist eine Abfrage über Konten.
 3. **Ein Startbestand statt Altbuchungen.** Niemand tippt drei Jahre nach. Eine
    Zahl („was vor der App schon stand"), danach laufen die Buchungen.
@@ -118,12 +118,12 @@ damit lässt sich der Schnitt später ändern, ohne Daten anzufassen.
 
 ---
 
-## 5. Kernstufe und Schwelle
+## 5. Karrierestufe und Schwelle
 
-**Warum „Kernstufe" und nicht „Stufe":** `lib/stufen.ts` belegt das Wort schon
+**Warum „Karrierestufe" und nicht „Stufe":** `lib/stufen.ts` belegt das Wort schon
 — Anwärter bis Veteran, gerechnet aus Wettbewerbspunkten, sichtbar auf
 `/spiel`. Zwei Dinge im selben Bereich „Stufe" zu nennen wäre der sichere Weg
-in die Verwechslung. Im Betrieb heißt es ohnehin Kernstufe.
+in die Verwechslung. Im Betrieb heißt es ohnehin Karrierestufe.
 
 Die Schwelle zu Stufe 2: **500 Einheiten Eigenumsatz**. Die Zahl steht schon in
 `docs/recruiting-plan.md` („nach ~500 Einheiten besteht der Alltag aus
@@ -138,7 +138,7 @@ falsche Schwelle ist schlimmer als keine: sie sagt jemandem, er sei fast da.
 
 ## 6. Sichtbarkeit: die Stufenrunde
 
-Wer dieselbe Kernstufe trägt, sieht die Einheiten der anderen — **über die
+Wer dieselbe Karrierestufe trägt, sieht die Einheiten der anderen — **über die
 ganze Instanz, quer durch alle Äste.**
 
 Das ist bewusst **nicht** `lib/scope.ts`. Dort liegt die Struktur-Grenze („ich
@@ -150,7 +150,7 @@ sondern „wer ist so weit wie ich". Sie steht deshalb als eigene Funktion in
 Sichtbar wird ausschließlich, was auch die Rangliste zeigt: **Name und Zahl.**
 Keine Kontaktdaten, keine Pipeline, keine Namen von Kunden.
 
-Wer keine Kernstufe eingetragen hat, sieht keine Runde — und steht in keiner.
+Wer keine Karrierestufe eingetragen hat, sieht keine Runde — und steht in keiner.
 Kein Ratespiel, keine Voreinstellung auf 1: eine falsche Stufe würde jemanden
 in die falsche Runde stellen, und dort stünde er dann mit fremden Zahlen.
 
@@ -170,13 +170,13 @@ Runde. Wer nie gearbeitet hat, hat keine Einheiten.
   ─────────────────────────────────────────────
   Dieser Produktionsmonat        Eigeneinheiten gesamt
   12,5                           327,5
-                                 ▓▓▓▓▓▓▓▓▓░░░░  noch 172,5 bis Kernstufe 2
+                                 ▓▓▓▓▓▓▓▓▓░░░░  noch 172,5 bis Karrierestufe 2
 
   [ Einheiten eintragen ]  Menge · Tag · Notiz
 
-  Deine Kernstufe: 1        [ ändern ]
+  Deine Karrierestufe: 1        [ ändern ]
 
-  Kernstufe 1 — 6 Leute
+  Karrierestufe 1 — 6 Leute
   ─────────────────────────────────────────────
   Du            12,5     327,5
   Marc           9,0     411,0
@@ -205,9 +205,9 @@ die Liste wäre jeden Monat dieselbe. Der Monat ist das, was gerade läuft.
 
 | # | Frage | Wer entscheidet |
 |---|---|---|
-| 1 | Stimmen **500 Einheiten** als Schwelle zu Kernstufe 2? | Praxis. Eine Zeile in `lib/einheiten.ts` |
+| 1 | Stimmen **500 Einheiten** als Schwelle zu Karrierestufe 2? | Praxis. Eine Zeile in `lib/einheiten.ts` |
 | 2 | Läuft der **Produktionsmonat** wirklich vom 1. bis zum Monatsende? | Praxis. Eine Zeile ebenda |
-| 3 | Schwellen für Kernstufe 3 und höher | Offen, bis die Zahlen bekannt sind |
+| 3 | Schwellen für Karrierestufe 3 und höher | Offen, bis die Zahlen bekannt sind |
 | 4 | ~~Soll die Führungskraft die Einheiten ihrer Leute sehen (`/mannschaft`)?~~ | **Entschieden 26.08.2026: ja.** Siehe Abschnitt 10 |
 | 5 | **Die Tätigkeiten selbst sind noch nicht sauber** (Anmerkung des Users, 25.08.) | Eigener Durchgang — gehört nicht in dieses Feature |
 
@@ -226,8 +226,8 @@ bei jeder Führungskraft über ihm mit.
 **Team ist exklusiv:** alles UNTER jemandem, ohne ihn selbst. Ein Blattknoten
 hat Team = 0 und trotzdem Eigeneinheiten. Wer beides in eine Zahl wirft, kann
 später nie mehr sagen, was jemand selbst geschrieben hat — und genau danach
-fragt die Kernstufe. Deshalb bleibt der Fortschrittsbalken zur nächsten
-Kernstufe unverändert an den **Eigeneinheiten** hängen (die Schwelle heißt „500
+fragt die Karrierestufe. Deshalb bleibt der Fortschrittsbalken zur nächsten
+Karrierestufe unverändert an den **Eigeneinheiten** hängen (die Schwelle heißt „500
 Einheiten Eigenumsatz", nicht Teamumsatz).
 
 ### Nichts wird gespeichert
@@ -263,11 +263,11 @@ Stelle abschalten und an der anderen nicht.
 **Einheiten bleiben aus jeder Rangliste heraus**, Team-Einheiten erst recht.
 Sonst schlüge Aufbau plötzlich doch Verkauf — nur andersherum als befürchtet.
 
-### Kernstufe geht bis 6
+### Karrierestufe geht bis 6
 
-`KERNSTUFE_MAX` von 9 auf **6**: darüber gibt es im Betrieb keine Kernstufe.
+`KARRIERESTUFE_MAX` von 9 auf **6**: darüber gibt es im Betrieb keine Karrierestufe.
 Eine Zeile in `lib/einheiten.ts`, keine Migration — in der Datenbank sitzt kein
-Constraint, `istKernstufe()` und das `max`-Feld im Formular hängen beide an
+Constraint, `istKarrierestufe()` und das `max`-Feld im Formular hängen beide an
 dieser Konstante. Gegen die echte DB geprüft: niemand steht über Stufe 2, es
 verliert also niemand seine Stufe.
 

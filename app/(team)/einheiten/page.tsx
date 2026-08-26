@@ -2,8 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { berlinToday, dayDisplayFormat } from "@/lib/dates";
 import {
-  KERNSTUFE_MAX,
-  KERNSTUFE_MIN,
+  KARRIERESTUFE_MAX,
+  KARRIERESTUFE_MIN,
   formatEinheiten,
   ladeEinheiten,
   produktionsmonat,
@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
 //
 // Zwei Werte, mehr steht hier nicht: was in diesem Produktionsmonat
 // zusammengekommen ist, und was insgesamt steht - das sind die Schritte
-// Richtung Kernstufe 2. Daneben die Runde: wer dieselbe Kernstufe traegt,
+// Richtung Karrierestufe 2. Daneben die Runde: wer dieselbe Karrierestufe traegt,
 // steht mit Namen und Zahl in derselben Liste.
 //
 // Was NICHT hier steht: Sparten, Beitraege, Euro, Kunden. Eine Einheit ist
@@ -47,7 +47,7 @@ export default async function EinheitenPage() {
       {
         id: user.id,
         name: user.name,
-        kernstufe: user.kernstufe,
+        karrierestufe: user.karrierestufe,
         einheitenStart: user.einheitenStart,
       },
       heute
@@ -70,7 +70,7 @@ export default async function EinheitenPage() {
 
   const { ich, monat, schwelle } = seite;
   const offen = schwelle === null ? null : schwelle - ich.gesamt;
-  const naechsteStufe = user.kernstufe === null ? null : user.kernstufe + 1;
+  const naechsteStufe = user.karrierestufe === null ? null : user.karrierestufe + 1;
 
   return (
     <div className="space-y-8">
@@ -80,9 +80,9 @@ export default async function EinheitenPage() {
         <h1 className={pageTitle}>Einheiten</h1>
         <p className="mt-1 text-sm text-slate-500">
           Deine Zahl, selbst gemeldet.{" "}
-          {user.kernstufe === null
-            ? "Trag deine Kernstufe ein — dann siehst du, wer sonst noch auf deiner Stufe steht."
-            : `Kernstufe ${user.kernstufe}. Wer dieselbe Stufe hat, sieht deine Einheiten — Name und Zahl, sonst nichts.`}
+          {user.karrierestufe === null
+            ? "Trag deine Karrierestufe ein — dann siehst du, wer sonst noch auf deiner Stufe steht."
+            : `Karrierestufe ${user.karrierestufe}. Wer dieselbe Stufe hat, sieht deine Einheiten — Name und Zahl, sonst nichts.`}
         </p>
       </div>
 
@@ -104,7 +104,7 @@ export default async function EinheitenPage() {
           <span className={kicker}>
             {naechsteStufe === null
               ? "Gesamt"
-              : `Schritte Richtung Kernstufe ${naechsteStufe}`}
+              : `Schritte Richtung Karrierestufe ${naechsteStufe}`}
           </span>
           <p className="mt-3 text-4xl font-semibold tracking-tight tabular-nums text-slate-900">
             {formatEinheiten(ich.gesamt)}
@@ -123,16 +123,16 @@ export default async function EinheitenPage() {
               />
               <p className="mt-2 text-xs text-slate-500">
                 {offen <= 0
-                  ? `${formatEinheiten(schwelle)} sind geschafft — trag deine neue Kernstufe ein.`
-                  : `noch ${formatEinheiten(offen)} von ${formatEinheiten(schwelle)} bis Kernstufe ${naechsteStufe}`}
+                  ? `${formatEinheiten(schwelle)} sind geschafft — trag deine neue Karrierestufe ein.`
+                  : `noch ${formatEinheiten(offen)} von ${formatEinheiten(schwelle)} bis Karrierestufe ${naechsteStufe}`}
               </p>
             </div>
           )}
-          {schwelle === null && user.kernstufe !== null && (
+          {schwelle === null && user.karrierestufe !== null && (
             // Lieber nichts als ein Balken auf ein erfundenes Ziel: eine
             // falsche Schwelle sagt jemandem, er sei fast da.
             <p className="mt-4 text-xs text-slate-400">
-              Für Kernstufe {naechsteStufe} ist noch keine Schwelle hinterlegt.
+              Für Karrierestufe {naechsteStufe} ist noch keine Schwelle hinterlegt.
             </p>
           )}
         </div>
@@ -140,7 +140,7 @@ export default async function EinheitenPage() {
 
       {/* --- Was das Team darunter geschrieben hat ---------------------------
           Steht nur da, wenn jemand unter dir haengt. Getrennt von den eigenen
-          Zahlen und nicht dazuaddiert: die Kernstufe misst, was du selbst
+          Zahlen und nicht dazuaddiert: die Karrierestufe misst, was du selbst
           geschrieben hast - eine verschmolzene Summe koennte das nie mehr
           auseinandernehmen. */}
       {team !== null && (
@@ -178,7 +178,7 @@ export default async function EinheitenPage() {
             </div>
           </div>
           <p className="mt-4 text-xs text-slate-500">
-            Zählt nicht auf deine Kernstufe — dafür zählen deine
+            Zählt nicht auf deine Karrierestufe — dafür zählen deine
             Eigeneinheiten. Wer unter dir einträgt, läuft hier automatisch mit
             hoch.
           </p>
@@ -243,33 +243,33 @@ export default async function EinheitenPage() {
         </div>
       </form>
 
-      {/* --- Kernstufe und Startbestand --------------------------------------
+      {/* --- Karrierestufe und Startbestand --------------------------------------
           Steht offen, solange keine Stufe eingetragen ist - ohne sie ist die
           halbe Seite leer. Danach klappt es zu und ist einen Tipp entfernt. */}
-      <details open={user.kernstufe === null} className={`${card} p-6 sm:p-8`}>
+      <details open={user.karrierestufe === null} className={`${card} p-6 sm:p-8`}>
         <summary className="cursor-pointer list-none">
-          <span className={sectionTitle}>Deine Kernstufe</span>
+          <span className={sectionTitle}>Deine Karrierestufe</span>
           <span className="ml-2 text-sm text-slate-500">
-            {user.kernstufe === null
+            {user.karrierestufe === null
               ? "noch nicht eingetragen"
-              : `Stufe ${user.kernstufe}`}
+              : `Stufe ${user.karrierestufe}`}
           </span>
         </summary>
 
         <form action={standSpeichern} className="mt-5 space-y-5">
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
-              <label htmlFor="kernstufe" className={label}>
-                Kernstufe
+              <label htmlFor="karrierestufe" className={label}>
+                Karrierestufe
               </label>
               <input
-                id="kernstufe"
-                name="kernstufe"
+                id="karrierestufe"
+                name="karrierestufe"
                 type="number"
-                min={KERNSTUFE_MIN}
-                max={KERNSTUFE_MAX}
+                min={KARRIERESTUFE_MIN}
+                max={KARRIERESTUFE_MAX}
                 step={1}
-                defaultValue={user.kernstufe ?? ""}
+                defaultValue={user.karrierestufe ?? ""}
                 placeholder="1"
                 className={input}
               />
@@ -308,11 +308,11 @@ export default async function EinheitenPage() {
       </details>
 
       {/* --- Die Runde ------------------------------------------------------- */}
-      {an.einheiten && user.kernstufe !== null && (
+      {an.einheiten && user.karrierestufe !== null && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className={sectionTitle}>
-              Kernstufe {user.kernstufe} — {seite.runde.length}{" "}
+              Karrierestufe {user.karrierestufe} — {seite.runde.length}{" "}
               {seite.runde.length === 1 ? "Person" : "Leute"}
             </h2>
             <span className="text-xs text-slate-500">
@@ -323,7 +323,7 @@ export default async function EinheitenPage() {
           {seite.runde.length === 1 ? (
             <div className={`${card} px-6 py-10 text-center`}>
               <p className="text-sm font-medium text-slate-900">
-                Noch niemand sonst auf Kernstufe {user.kernstufe}
+                Noch niemand sonst auf Karrierestufe {user.karrierestufe}
               </p>
               <p className="mt-1 text-sm text-slate-500">
                 Sobald jemand seine Stufe einträgt, steht er hier neben dir.
