@@ -11,6 +11,11 @@
 // Der Schimmer laeuft nur, wenn Bewegung erlaubt ist - sonst stehen die
 // Flaechen ruhig da (animate-shimmer bringt die Farbe selbst mit, deshalb
 // tragen die Balken zusaetzlich eine eigene Grundfarbe).
+//
+// Unten haengt eine rotierende Spruchzeile im Stil alter Spiele-Ladebildschirme
+// (LadeSpruch). Graue Balken sagen "gleich", der Spruch sagt "lohnt sich".
+
+import LadeSpruch from "@/components/LadeSpruch";
 
 function Balken({ className }: { className: string }) {
   return <div className={`animate-shimmer rounded-lg bg-slate-200 ${className}`} />;
@@ -47,6 +52,12 @@ export default function PageSkeleton() {
             <Balken className="mt-2.5 h-3 w-64" />
           </div>
         ))}
+      </div>
+
+      {/* Der Spruch ist Deko wie der Rest des Platzhalters - Screenreader
+          hoeren gleich die echte Seite, nicht den Witz. */}
+      <div className="pt-2">
+        <LadeSpruch />
       </div>
     </div>
   );
