@@ -22,7 +22,22 @@ import { PhoneIcon } from "@/components/icons";
 import Organigramm, { type OrgaKnoten } from "@/components/Organigramm";
 import PersonAufnehmen from "@/components/PersonAufnehmen";
 import { elternIdVon } from "@/lib/struktur";
-import { card, filterPill, flaeche, kicker, pageTitle } from "@/components/ui";
+import { schalter } from "@/lib/features";
+import {
+  einheitenFuerStruktur,
+  formatEinheiten,
+  produktionsmonat,
+  traegtZahlen,
+} from "@/lib/einheiten";
+import {
+  card,
+  filterPill,
+  flaeche,
+  kicker,
+  pageTitle,
+  td,
+  th,
+} from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -172,16 +187,27 @@ export default async function MannschaftPage({
   // damit der Link auf jedem Geraet stimmt - und nicht erst nach der
   // Hydrierung im Browser entsteht.
   const herkunft = `${kopfzeilen.get("x-forwarded-proto") ?? "http"}://${kopfzeilen.get("host") ?? ""}`;
-  const [lage, aeste] = await Promise.all([
-    mannschaftsLage(user),
+  // Die Lage zuerst: sie bringt die Struktur mit, und die Einheiten-Aufstellung
+  // braucht genau diese Koepfe. Danach laufen die beiden uebrigen Abfragen
+  // nebeneinander statt hintereinander.
+  const lage = await mannschaftsLage(user);
+  const alle = [lage.ich, ...lage.baum];
+  const [aeste, einheitenAn, einheiten] = await Promise.all([
     astVergleich(user.id),
+    schalter("einheiten"),
+    einheitenFuerStruktur(
+      alle.map((person) => ({ id: person.id, path: person.path })),
+      produktionsmonat(berlinToday())
+    ),
   ]);
   const heuteStart = dayToUtcDate(berlinToday()).getTime();
+  // Derselbe Schalter wie auf /einheiten: sonst laesst sich die Sichtbarkeit an
+  // einer Stelle abschalten und an der anderen nicht.
+  const zeigeEinheiten = einheitenAn.einheiten && traegtZahlen(einheiten);
 
   const rot = lage.dringend.filter((person) => person.ampel === "rot");
   const gelb = lage.dringend.filter((person) => person.ampel === "gelb");
 
-  const alle = [lage.ich, ...lage.baum];
   const summen = astSummen(alle);
   const knoten: OrgaKnoten[] = alle.map((person) => {
     const ast = summen.get(person.id);
@@ -651,6 +677,83 @@ export default async function MannschaftPage({
             })}
           </ul>
           )}
+        </section>
+      )}
+
+      {/* --- Einheiten in der Struktur ---------------------------------------
+          Die Zahl, in der der Betrieb rechnet - hier je Kopf aufgeschluesselt.
+          "Eigen" ist, was jemand selbst gemeldet hat, "Team" alles unter ihm.
+          Bewusst getrennt von den Taetigkeits-Kennzahlen oben: das sind zwei
+          Waehrungen, und Einheiten zaehlen in keiner Rangliste mit. */}
+      {zeigeEinheiten && (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className={kicker}>Einheiten in deiner Struktur</h2>
+            <span className="text-xs text-slate-500">
+              {produktionsmonat(berlinToday()).label} · selbst gemeldet
+            </span>
+          </div>
+          <div className={`${card} overflow-x-auto`}>
+            <table className="w-full min-w-140 text-left text-sm">
+              <thead className="border-b border-slate-200/80 bg-slate-50/60">
+                <tr>
+                  <th className={th}>Name</th>
+                  <th className={`${th} text-right`}>Eigene</th>
+                  <th className={`${th} text-right`}>Team</th>
+                  <th className={`${th} text-right`}>Zusammen</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {alle.map((person) => {
+                  const zahlen = einheiten.get(person.id);
+                  if (!zahlen) return null;
+                  return (
+                    <tr
+                      key={person.id}
+                      className={person.istDu ? "bg-navy-50/40" : undefined}
+                    >
+                      <td className={`${td} font-medium text-slate-900`}>
+                        <span
+                          style={{
+                            paddingLeft: `${Math.min(person.tiefe, 3) * 12}px`,
+                          }}
+                        >
+                          {person.istDu ? "Du" : person.name}
+                        </span>
+                      </td>
+                      {/* Bei einem Platzhalter ist "0,00" keine Auskunft,
+                          sondern eine Behauptung: er hat nie eingetragen, weil
+                          er die App nicht hat. Sein Ast kann trotzdem zaehlen. */}
+                      <td className={`${td} text-right tabular-nums text-slate-900`}>
+                        {person.platzhalter
+                          ? "—"
+                          : formatEinheiten(zahlen.eigenGesamt)}
+                      </td>
+                      {/* Ein Blatt hat kein Team - dort steht nichts statt einer
+                          Null ueber jemanden, der noch niemanden hat. */}
+                      <td className={`${td} text-right tabular-nums text-slate-600`}>
+                        {person.fuehrt > 0
+                          ? formatEinheiten(zahlen.teamGesamt)
+                          : "—"}
+                      </td>
+                      <td
+                        className={`${td} text-right font-semibold tabular-nums text-slate-900`}
+                      >
+                        {person.platzhalter && zahlen.astGesamt === 0
+                          ? "—"
+                          : formatEinheiten(zahlen.astGesamt)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className={kicker}>
+            Einheiten trägt jeder selbst ein. „Team&ldquo; ist alles unter der
+            Person, über alle Ebenen — sie zählen in keiner Rangliste mit, und
+            auf die Kernstufe zählen nur die eigenen.
+          </p>
         </section>
       )}
 

@@ -52,10 +52,10 @@ Faktoren. Genau der Apparat ist rausgeflogen und kommt nicht wieder.
   Punktehistorie wäre rückwirkend eine andere. Dieselbe Überlegung wie bei der
   Anwesenheit, die deshalb kein sechster `QuotaType` wurde.
 - **Keine Automatik aus Abschlüssen.** Siehe oben.
-- **Kein Einheiten-Blick für Führungskräfte in `/mannschaft`.** Naheliegend,
-  aber nicht verlangt — und die Struktursicht hat ihre eigene Stufenordnung
-  (`TeamVisibility`), in die das erst sauber eingepasst werden müsste.
 - **Keine Meldung an den Feed, kein Push.** Erst laufen lassen.
+
+> **Nachgetragen 26.08.2026:** Der Punkt „kein Einheiten-Blick für
+> Führungskräfte in `/mannschaft`" ist eingelöst — siehe Abschnitt 10.
 
 ---
 
@@ -208,5 +208,73 @@ die Liste wäre jeden Monat dieselbe. Der Monat ist das, was gerade läuft.
 | 1 | Stimmen **500 Einheiten** als Schwelle zu Kernstufe 2? | Praxis. Eine Zeile in `lib/einheiten.ts` |
 | 2 | Läuft der **Produktionsmonat** wirklich vom 1. bis zum Monatsende? | Praxis. Eine Zeile ebenda |
 | 3 | Schwellen für Kernstufe 3 und höher | Offen, bis die Zahlen bekannt sind |
-| 4 | Soll die Führungskraft die Einheiten ihrer Leute sehen (`/mannschaft`)? | Nicht gebaut. Braucht eine Einordnung in `TeamVisibility` |
+| 4 | ~~Soll die Führungskraft die Einheiten ihrer Leute sehen (`/mannschaft`)?~~ | **Entschieden 26.08.2026: ja.** Siehe Abschnitt 10 |
 | 5 | **Die Tätigkeiten selbst sind noch nicht sauber** (Anmerkung des Users, 25.08.) | Eigener Durchgang — gehört nicht in dieses Feature |
+
+---
+
+## 10. Team-Einheiten (26.08.2026)
+
+Eigeneinheiten trägt jeder selbst ein. Was darunter hängt, läuft **von allein
+nach oben**: wer einen Geschäftspartner unter sich hat, sieht dessen Zahlen in
+seiner Team-Summe — und der wiederum die seiner Leute, über alle Ebenen. Ein
+Einser ohne jemanden unter sich trägt seine Eigeneinheiten ein, und sie zählen
+bei jeder Führungskraft über ihm mit.
+
+### Zwei Zahlen, nie eine
+
+**Team ist exklusiv:** alles UNTER jemandem, ohne ihn selbst. Ein Blattknoten
+hat Team = 0 und trotzdem Eigeneinheiten. Wer beides in eine Zahl wirft, kann
+später nie mehr sagen, was jemand selbst geschrieben hat — und genau danach
+fragt die Kernstufe. Deshalb bleibt der Fortschrittsbalken zur nächsten
+Kernstufe unverändert an den **Eigeneinheiten** hängen (die Schwelle heißt „500
+Einheiten Eigenumsatz", nicht Teamumsatz).
+
+### Nichts wird gespeichert
+
+Keine Migration, kein Feld, kein Propagieren. Die Summe entsteht bei jedem
+Aufruf aus dem Struktur-Pfad (`User.path`, `lib/struktur.ts`). Ein
+mitgeführtes Feld müsste bei jeder Buchung UND bei jedem Umhängen
+fortgeschrieben werden — und stünde ab dem ersten verpassten Fall dauerhaft
+falsch da.
+
+Gerechnet wird von unten nach oben: absteigend nach Tiefe sortiert ist ein
+Knoten immer fertig, bevor seine Führungskraft an die Reihe kommt. Dasselbe
+Verfahren wie `astSummen` in `lib/fuehrung.ts` — dort für Tätigkeiten, hier für
+Einheiten. Bewusst eine **eigene Fassung** in `lib/einheiten.ts` statt eines
+gemeinsamen Bausteins: die beiden Zahlenwelten sollen sich nicht vermischen,
+das ist der ganze Sinn der Trennung. (Bei einem dritten Verwender neu
+bewerten.)
+
+### Wo es steht
+
+| Ort | Was |
+|---|---|
+| `/einheiten` | Eigene Team-Summe als eigene Karte — Monat, Insgesamt, „Du und dein Team zusammen". Fehlt komplett, wenn niemand unter dir hängt (eine 0 wäre dort keine Auskunft, sondern eine leere Karte für die Mehrheit ohne eigene Leute) |
+| `/mannschaft` | Aufschlüsselung je Kopf: Eigene / Team / Zusammen, in Baumreihenfolge. Bei jemandem ohne Leute steht in der Team-Spalte „—", keine 0 |
+
+**Keine neue `TeamVisibility`-Regel.** Reine Summen sind laut Enum-Kommentar
+(`ZAHLEN // Aktivitaeten, Quoten, Summen`) auf jeder Sichtbarkeitsstufe
+sichtbar; die bestehende STRUKTUR-Grenze aus `mannschaftsLage()` ist die
+Autorisierung. `/mannschaft` respektiert denselben Feature-Schalter
+`einheiten` wie `/einheiten` — sonst ließe sich die Sichtbarkeit an einer
+Stelle abschalten und an der anderen nicht.
+
+**Einheiten bleiben aus jeder Rangliste heraus**, Team-Einheiten erst recht.
+Sonst schlüge Aufbau plötzlich doch Verkauf — nur andersherum als befürchtet.
+
+### Kernstufe geht bis 6
+
+`KERNSTUFE_MAX` von 9 auf **6**: darüber gibt es im Betrieb keine Kernstufe.
+Eine Zeile in `lib/einheiten.ts`, keine Migration — in der Datenbank sitzt kein
+Constraint, `istKernstufe()` und das `max`-Feld im Formular hängen beide an
+dieser Konstante. Gegen die echte DB geprüft: niemand steht über Stufe 2, es
+verliert also niemand seine Stufe.
+
+### Geprüft
+
+`scripts/einheiten-team-probe.mjs` (lesend, wiederholbar) rechnet den Rollup
+auf zwei Wegen — per SQL über den Pfad-Präfix und per Faltung — und vergleicht.
+Weil die echten Daten die Faltung nicht prüfen (nur ein Kopf hat Einheiten, und
+der steht ganz oben), enthält die Probe zusätzlich einen erfundenen
+vierstufigen Baum mit bekannten Zahlen.

@@ -6,6 +6,8 @@ import {
   KERNSTUFE_MIN,
   formatEinheiten,
   ladeEinheiten,
+  produktionsmonat,
+  teamEinheiten,
 } from "@/lib/einheiten";
 import { merkeNutzung, schalter } from "@/lib/features";
 import WettbewerbNav from "@/components/WettbewerbNav";
@@ -40,7 +42,7 @@ export default async function EinheitenPage() {
   const user = await requireUser();
   const heute = berlinToday();
 
-  const [seite, person, an] = await Promise.all([
+  const [seite, person, an, team] = await Promise.all([
     ladeEinheiten(
       {
         id: user.id,
@@ -55,6 +57,7 @@ export default async function EinheitenPage() {
       select: { id: true },
     }),
     schalter("einheiten"),
+    teamEinheiten(user.id, produktionsmonat(heute)),
   ]);
 
   const buchungen = await prisma.einheitenbuchung.findMany({
@@ -134,6 +137,53 @@ export default async function EinheitenPage() {
           )}
         </div>
       </div>
+
+      {/* --- Was das Team darunter geschrieben hat ---------------------------
+          Steht nur da, wenn jemand unter dir haengt. Getrennt von den eigenen
+          Zahlen und nicht dazuaddiert: die Kernstufe misst, was du selbst
+          geschrieben hast - eine verschmolzene Summe koennte das nie mehr
+          auseinandernehmen. */}
+      {team !== null && (
+        <div className={`${card} p-5 sm:p-6`}>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <span className={kicker}>Dein Team</span>
+            <span className="text-xs text-slate-500">
+              alles unter dir, über alle Ebenen
+            </span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-10 gap-y-4">
+            <div>
+              <p className="text-3xl font-semibold tracking-tight tabular-nums text-slate-900">
+                {formatEinheiten(team.monat)}
+              </p>
+              <p className="mt-1 text-13 font-medium text-slate-600">
+                Team-Einheiten im {monat.label}
+              </p>
+            </div>
+            <div>
+              <p className="text-3xl font-semibold tracking-tight tabular-nums text-slate-900">
+                {formatEinheiten(team.gesamt)}
+              </p>
+              <p className="mt-1 text-13 font-medium text-slate-600">
+                Team-Einheiten insgesamt
+              </p>
+            </div>
+            <div>
+              <p className="text-3xl font-semibold tracking-tight tabular-nums text-navy-900">
+                {formatEinheiten(ich.gesamt + team.gesamt)}
+              </p>
+              <p className="mt-1 text-13 font-medium text-slate-600">
+                Du und dein Team zusammen
+              </p>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-slate-500">
+            Zählt nicht auf deine Kernstufe — dafür zählen deine
+            Eigeneinheiten. Wer unter dir einträgt, läuft hier automatisch mit
+            hoch.
+          </p>
+        </div>
+      )}
 
       {/* --- Eintragen ------------------------------------------------------ */}
       <form action={einheitenBuchen} className={`${card} space-y-5 p-6 sm:p-8`}>

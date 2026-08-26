@@ -24,6 +24,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { addDays, addMonths, dayToUtcDate } from "@/lib/dates";
+import { ebene, elternIdVon, strukturKonten } from "@/lib/struktur";
 
 // --- Rechnen in Hundertsteln ------------------------------------------------
 // Gespeichert wird eine ganze Zahl: 350 = 3,50 Einheiten. Kein Decimal - das
@@ -130,7 +131,10 @@ export function produktionsmonat(tag: string): Produktionsmonat {
 // die Verwechslung.
 
 export const KERNSTUFE_MIN = 1;
-export const KERNSTUFE_MAX = 9;
+// Sechs, nicht neun: darueber gibt es im Betrieb keine Kernstufe mehr. Die
+// Zahl steht nur hier - istKernstufe() und das max-Feld im Formular haengen
+// beide daran, in der Datenbank sitzt kein Constraint.
+export const KERNSTUFE_MAX = 6;
 
 /**
  * Was es bis zur naechsten Kernstufe braucht, in Hundertsteln.
@@ -201,6 +205,50 @@ type Betrachter = {
   einheitenStart: number;
 };
 
+/** Zwei Zahlen je Kopf, in Hundertsteln: alles und der laufende Monat. */
+export type Zahlenpaar = { gesamt: number; monat: number };
+
+/**
+ * Die gebuchten Summen je Konto - EINE Abfrage je Zeitraum, nie eine je Kopf.
+ *
+ * Bewusst OHNE einheitenStart: den holt jede Aufrufstelle selbst, weil sie das
+ * Konto ohnehin schon in der Hand hat. Hier zusaetzlich zu laden hiesse, ihn an
+ * jeder Stelle zweimal aus der Datenbank zu ziehen.
+ */
+async function buchungssummenJe(
+  ids: string[],
+  monat: Produktionsmonat
+): Promise<Map<string, Zahlenpaar>> {
+  const summen = new Map<string, Zahlenpaar>(
+    ids.map((id) => [id, { gesamt: 0, monat: 0 }])
+  );
+  if (ids.length === 0) return summen;
+
+  const [gesamtZeilen, monatsZeilen] = await Promise.all([
+    prisma.einheitenbuchung.groupBy({
+      by: ["userId"],
+      where: { userId: { in: ids } },
+      _sum: { hundertstel: true },
+    }),
+    prisma.einheitenbuchung.groupBy({
+      by: ["userId"],
+      where: { userId: { in: ids }, tag: { gte: monat.start, lte: monat.ende } },
+      _sum: { hundertstel: true },
+    }),
+  ]);
+
+  for (const zeile of gesamtZeilen) {
+    const eintrag = summen.get(zeile.userId);
+    if (eintrag) eintrag.gesamt = zeile._sum.hundertstel ?? 0;
+  }
+  for (const zeile of monatsZeilen) {
+    const eintrag = summen.get(zeile.userId);
+    if (eintrag) eintrag.monat = zeile._sum.hundertstel ?? 0;
+  }
+
+  return summen;
+}
+
 export async function ladeEinheiten(
   betrachter: Betrachter,
   heute: string
@@ -229,32 +277,16 @@ export async function ladeEinheiten(
     });
   }
 
-  const ids = konten.map((konto) => konto.id);
-  const [gesamtZeilen, monatsZeilen] = await Promise.all([
-    prisma.einheitenbuchung.groupBy({
-      by: ["userId"],
-      where: { userId: { in: ids } },
-      _sum: { hundertstel: true },
-    }),
-    prisma.einheitenbuchung.groupBy({
-      by: ["userId"],
-      where: { userId: { in: ids }, tag: { gte: monat.start, lte: monat.ende } },
-      _sum: { hundertstel: true },
-    }),
-  ]);
-
-  const gesamtJe = new Map(
-    gesamtZeilen.map((zeile) => [zeile.userId, zeile._sum.hundertstel ?? 0])
-  );
-  const monatJe = new Map(
-    monatsZeilen.map((zeile) => [zeile.userId, zeile._sum.hundertstel ?? 0])
+  const gebucht = await buchungssummenJe(
+    konten.map((konto) => konto.id),
+    monat
   );
 
   const staende: EinheitenStand[] = konten.map((konto) => ({
     userId: konto.id,
     name: konto.name,
-    gesamt: konto.einheitenStart + (gesamtJe.get(konto.id) ?? 0),
-    monat: monatJe.get(konto.id) ?? 0,
+    gesamt: konto.einheitenStart + (gebucht.get(konto.id)?.gesamt ?? 0),
+    monat: gebucht.get(konto.id)?.monat ?? 0,
     istDu: konto.id === betrachter.id,
   }));
 
@@ -269,4 +301,143 @@ export async function ladeEinheiten(
     runde: betrachter.kernstufe === null ? [] : staende,
     schwelle: schwelleFuer(betrachter.kernstufe),
   };
+}
+
+// --- Team-Einheiten ---------------------------------------------------------
+// Eigeneinheiten schreibt jeder selbst. Was darunter haengt, laeuft von allein
+// nach oben: wer einen Geschaeftspartner unter sich hat, sieht dessen Zahlen in
+// seiner Team-Summe - und der wiederum die seiner Leute. Ueber alle Ebenen.
+//
+// Zwei Festlegungen, die den Rest erklaeren:
+//
+// 1. TEAM IST EXKLUSIV. "Team" ist alles UNTER jemandem, ohne ihn selbst. Ein
+//    Blattknoten hat Team = 0 und trotzdem Eigeneinheiten. Wer beides in eine
+//    Zahl wirft, kann spaeter nie mehr sagen, was jemand selbst geschrieben
+//    hat - und genau danach fragt die Kernstufe.
+// 2. NICHTS WIRD GESPEICHERT. Die Summe entsteht bei jedem Aufruf aus dem
+//    Struktur-Pfad. Ein mitgefuehrtes Feld muesste bei jeder Buchung UND bei
+//    jedem Umhaengen fortgeschrieben werden - und stuende ab dem ersten
+//    verpassten Fall dauerhaft falsch da.
+
+/** Eigene Zahl, Team-Zahl und beides zusammen - je Kopf, in Hundertsteln. */
+export type EinheitenAufteilung = {
+  eigenGesamt: number;
+  eigenMonat: number;
+  /** Alles UNTER dieser Person, ohne sie selbst. */
+  teamGesamt: number;
+  teamMonat: number;
+  /** Eigen + Team. Was der ganze Ast zusammen geschrieben hat. */
+  astGesamt: number;
+  astMonat: number;
+};
+
+/**
+ * Die Team-Summe des Betrachters: alles unter ihm, ohne ihn selbst.
+ *
+ * `null`, wenn niemand unter ihm haengt - dann gibt es keine Team-Zahl, und
+ * eine 0 waere an der Stelle keine Auskunft, sondern eine leere Karte fuer die
+ * Mehrheit ohne eigene Leute.
+ */
+export async function teamEinheiten(
+  betrachterId: string,
+  monat: Produktionsmonat
+): Promise<Zahlenpaar | null> {
+  const imAst = await strukturKonten(betrachterId);
+  const unterMir = imAst.filter((id) => id !== betrachterId);
+  if (unterMir.length === 0) return null;
+
+  const [konten, gebucht] = await Promise.all([
+    prisma.user.findMany({
+      where: { id: { in: unterMir } },
+      select: { id: true, einheitenStart: true },
+    }),
+    buchungssummenJe(unterMir, monat),
+  ]);
+
+  const summe: Zahlenpaar = { gesamt: 0, monat: 0 };
+  for (const konto of konten) {
+    summe.gesamt += konto.einheitenStart + (gebucht.get(konto.id)?.gesamt ?? 0);
+    summe.monat += gebucht.get(konto.id)?.monat ?? 0;
+  }
+  return summe;
+}
+
+/**
+ * Fuer JEDEN uebergebenen Kopf: was er selbst geschrieben hat, was sein Team
+ * darunter geschrieben hat, und beides zusammen.
+ *
+ * Gefaltet wird von unten nach oben: absteigend nach Tiefe sortiert ist ein
+ * Knoten immer fertig, bevor seine Fuehrungskraft an die Reihe kommt. Dasselbe
+ * Verfahren wie `astSummen` in lib/fuehrung.ts - dort fuer Taetigkeiten, hier
+ * fuer Einheiten. Bewusst eine eigene Fassung statt eines gemeinsamen
+ * Bausteins: die beiden Zahlenwelten sollen sich nicht vermischen, das ist der
+ * ganze Sinn der Trennung in dieser Datei.
+ *
+ * Die Eltern-Id kommt aus dem Pfad, nicht aus leaderId - eine Abfrage weniger,
+ * und der Pfad ist ohnehin die Wahrheit ueber den Baum.
+ */
+export async function einheitenFuerStruktur(
+  personen: { id: string; path: string }[],
+  monat: Produktionsmonat
+): Promise<Map<string, EinheitenAufteilung>> {
+  const aufteilung = new Map<string, EinheitenAufteilung>();
+  if (personen.length === 0) return aufteilung;
+
+  const ids = personen.map((person) => person.id);
+  const [konten, gebucht] = await Promise.all([
+    prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, einheitenStart: true },
+    }),
+    buchungssummenJe(ids, monat),
+  ]);
+  const startJe = new Map(konten.map((konto) => [konto.id, konto.einheitenStart]));
+
+  // Erst jeder mit seiner eigenen Zahl. Der Ast startet gleich der eigenen und
+  // waechst gleich um das, was von unten hochkommt.
+  for (const person of personen) {
+    const eigenGesamt =
+      (startJe.get(person.id) ?? 0) + (gebucht.get(person.id)?.gesamt ?? 0);
+    const eigenMonat = gebucht.get(person.id)?.monat ?? 0;
+    aufteilung.set(person.id, {
+      eigenGesamt,
+      eigenMonat,
+      teamGesamt: 0,
+      teamMonat: 0,
+      astGesamt: eigenGesamt,
+      astMonat: eigenMonat,
+    });
+  }
+
+  const vonUntenNachOben = [...personen].sort(
+    (a, b) => ebene(b.path) - ebene(a.path)
+  );
+  for (const person of vonUntenNachOben) {
+    const elternId = elternIdVon(person.path);
+    const oben = elternId ? aufteilung.get(elternId) : null;
+    const meins = aufteilung.get(person.id);
+    if (!oben || !meins) continue;
+    oben.astGesamt += meins.astGesamt;
+    oben.astMonat += meins.astMonat;
+  }
+
+  // Team ist, was der Ast ohne die eigene Zahl traegt. Erst hier, nach der
+  // Faltung: waehrenddessen ist der Ast noch nicht fertig.
+  for (const eintrag of aufteilung.values()) {
+    eintrag.teamGesamt = eintrag.astGesamt - eintrag.eigenGesamt;
+    eintrag.teamMonat = eintrag.astMonat - eintrag.eigenMonat;
+  }
+
+  return aufteilung;
+}
+
+/** Ob irgendwo eine Zahl steht - sonst braucht die Aufstellung gar nicht erst
+ *  auf den Bildschirm. */
+export function traegtZahlen(
+  aufteilung: Map<string, EinheitenAufteilung>
+): boolean {
+  for (const eintrag of aufteilung.values()) {
+    if (eintrag.astGesamt !== 0 || eintrag.astMonat !== 0) return true;
+  }
+  return false;
 }
