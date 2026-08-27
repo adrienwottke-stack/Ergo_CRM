@@ -2,7 +2,16 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, shiftDay } from "@/lib/dates";
-import { card, chip, cn, kicker, pageTitle, td, th } from "@/components/ui";
+import {
+  card,
+  chip,
+  cn,
+  kicker,
+  pageTitle,
+  sectionTitle,
+  td,
+  th,
+} from "@/components/ui";
 import { MegafonIcon } from "@/components/icons";
 import { OFFENE_STAENDE } from "@/lib/rueckmeldung";
 import { schalten } from "./actions";
@@ -38,17 +47,36 @@ const ABRISS_KOEPFE = 3;
 export default async function WerkstattPage() {
   await requireAdmin();
 
-  const sieben = dayToUtcDate(shiftDay(berlinToday(), -7));
+  const heute = berlinToday();
+  const sieben = dayToUtcDate(shiftDay(heute, -7));
+  const dreissig = dayToUtcDate(shiftDay(heute, -30));
 
-  const [features, nutzung, koepfe, offeneMeldungen] = await Promise.all([
-    prisma.feature.findMany({ orderBy: { titel: "asc" } }),
-    prisma.featureUse.findMany({
-      where: { day: { gte: sieben } },
-      select: { featureKey: true, personId: true },
-    }),
-    prisma.person.count(),
-    prisma.rueckmeldung.count({ where: { stand: { in: [...OFFENE_STAENDE] } } }),
-  ]);
+  const [features, nutzung, koepfe, offeneMeldungen, ohneTreffer] =
+    await Promise.all([
+      prisma.feature.findMany({ orderBy: { titel: "asc" } }),
+      prisma.featureUse.findMany({
+        where: { day: { gte: sieben } },
+        select: { featureKey: true, personId: true },
+      }),
+      prisma.person.count(),
+      prisma.rueckmeldung.count({ where: { stand: { in: [...OFFENE_STAENDE] } } }),
+      // Wonach im Wegweiser gesucht wurde, ohne dass es etwas gab. Ueber Tage
+      // hinweg zusammengezogen: interessant ist das Wort, nicht der Tag.
+      //
+      // Der Faenger dahinter aus demselben Grund wie in lib/features.ts: steht
+      // die Tabelle noch nicht (erster Deploy, Migration unterwegs), soll die
+      // Werkstatt trotzdem aufgehen. Eine Seite, die an einer Messung
+      // abstuerzt, ist schlimmer als eine Messung, die fehlt.
+      prisma.suchbegriff
+        .groupBy({
+          by: ["begriff"],
+          where: { day: { gte: dreissig } },
+          _sum: { count: true },
+          orderBy: { _sum: { count: "desc" } },
+          take: 25,
+        })
+        .catch(() => []),
+    ]);
 
   const kopfZahl = new Map<string, Set<string>>();
   for (const zeile of nutzung) {
@@ -186,6 +214,56 @@ export default async function WerkstattPage() {
         Arena ist weg, sie kostete den Partner Aufmerksamkeit und brachte ihm
         keinen Termin.
       </p>
+
+      {/* --- Das Navigations-Backlog ----------------------------------------
+          Ein Suchbegriff ohne Treffer ist das ehrlichste Stueck Produkt-
+          forschung, das es gibt: jemand sagt in seinen eigenen Worten, was er
+          erwartet hat und nicht fand (docs/findbarkeit-plan.md, Abschnitt 6).
+
+          Jede Zeile ist entweder ein fehlendes Synonym - dann gehoert das Wort
+          in lib/wegweiser.ts und die Sache ist in zwei Minuten erledigt - oder
+          eine fehlende Funktion. Das zweite ist teuer, aber wenigstens belegt.
+
+          Steht ohne Personenbezug da, und zwar nicht nur in der Anzeige:
+          gespeichert wird gar keiner. Nutzung ist eine Zahl, ein Suchbegriff
+          ist Freitext. */}
+      <div className={`${card} p-5 sm:p-6`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className={sectionTitle}>Gesucht, nichts gefunden</h2>
+          <span className="text-xs text-slate-500">letzte 30 Tage</span>
+        </div>
+
+        {ohneTreffer.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">
+            Nichts. Entweder findet jeder alles — oder den Wegweiser benutzt
+            keiner. Welches von beidem, steht oben in der Zeile
+            &bdquo;Wegweiser&ldquo;.
+          </p>
+        ) : (
+          <>
+            <ul className="mt-4 flex flex-wrap gap-2">
+              {ohneTreffer.map((zeile) => (
+                <li
+                  key={zeile.begriff}
+                  className="inline-flex items-center gap-2 rounded-full border border-line-strong bg-surface px-3 py-1.5 text-13"
+                >
+                  <span className="text-slate-800">{zeile.begriff}</span>
+                  <span className="tabular-nums text-slate-400">
+                    {zeile._sum.count ?? 0}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-slate-500">
+              Fehlt nur das Wort, gehört es als Synonym in{" "}
+              <code className="rounded bg-sunken px-1 py-0.5">
+                lib/wegweiser.ts
+              </code>
+              . Fehlt die Sache selbst, steht sie hier als Beleg.
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }

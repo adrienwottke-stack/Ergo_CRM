@@ -9,6 +9,7 @@ import {
   quotaTypePoints,
 } from "@/lib/labels";
 import { kappeRest } from "@/lib/fairness";
+import { eigenerMonatsstand, formatEinheiten } from "@/lib/einheiten";
 import { streakDays, type SchnellStand } from "@/lib/stats";
 import { berlinDayOf, berlinToday, dayToUtcDate } from "@/lib/dates";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
@@ -108,7 +109,7 @@ export async function quickLogZurueck(type: string): Promise<number | null> {
 
 // Was das Schnellfenster beim Oeffnen braucht - und zwar erst dann.
 //
-// Die Kopfzeile steht auf jeder Seite. Wuerde sie diese zwei Abfragen bei jedem
+// Die Kopfzeile steht auf jeder Seite. Wuerde sie diese drei Abfragen bei jedem
 // Aufruf mitschleppen, zahlte jeder Klick in der Anwendung fuer eine Zahl, die
 // die meisten nie sehen. Also laedt das Fenster seinen Stand selbst, wenn es
 // aufgeht.
@@ -117,7 +118,7 @@ export async function standHeute(): Promise<SchnellStand> {
   const person = await requireUserPerson(user.id);
   const heute = berlinToday();
 
-  const [summen, tage] = await Promise.all([
+  const [summen, tage, einheitenMonat] = await Promise.all([
     prisma.dailyLog.groupBy({
       by: ["type"],
       where: { personId: person.id, date: dayToUtcDate(heute) },
@@ -128,6 +129,11 @@ export async function standHeute(): Promise<SchnellStand> {
       select: { date: true },
       distinct: ["date"],
     }),
+    // Die dritte Abfrage geht auf eine andere Tabelle und an einen anderen
+    // Schluessel: Einheiten haengen am Konto, die Zaehler an der Person. Sie
+    // laeuft trotzdem hier mit, damit das Fenster beim Oeffnen EINEN Weg zum
+    // Server macht statt zwei.
+    eigenerMonatsstand(user.id),
   ]);
 
   const stand: Partial<Record<QuotaType, number>> = {};
@@ -144,5 +150,6 @@ export async function standHeute(): Promise<SchnellStand> {
     stand,
     punkte,
     serie: streakDays(new Set(tage.map((eintrag) => berlinDayOf(eintrag.date))), heute),
+    einheitenMonat: formatEinheiten(einheitenMonat),
   };
 }

@@ -11,7 +11,12 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, isValidDay, shiftDay } from "@/lib/dates";
-import { istKarrierestufe, parseEinheiten } from "@/lib/einheiten";
+import {
+  eigenerMonatsstand,
+  formatEinheiten,
+  istKarrierestufe,
+  parseEinheiten,
+} from "@/lib/einheiten";
 
 // Wie weit zurueck eine Buchung datiert werden darf. Zwei Jahre, weil
 // Einheiten monatsweise abgerechnet werden und der Auszug spaet kommt.
@@ -31,16 +36,26 @@ function neuRechnen() {
   revalidatePath("/einheiten");
 }
 
-/** Eine Meldung: Menge, Tag, optional eine Notiz. */
-export async function einheitenBuchen(formData: FormData) {
-  const user = await requireUser();
-  const hundertstel = parseEinheiten(feld(formData, "menge"));
+/**
+ * Der eine Schreibweg fuer eine Buchung.
+ *
+ * Steht als eigene Funktion da, seit die Einheiten auch aus dem Schnellfenster
+ * der Kopfzeile und aus der Frage nach einem Abschluss kommen
+ * (docs/findbarkeit-plan.md). Drei Eingaenge, eine Pruefung, eine Tabelle - es
+ * gibt keinen zweiten Weg in die Datenbank, der eigene Fehler machen kann.
+ */
+async function buchen(
+  userId: string,
+  mengeRoh: string,
+  tagRoh: string,
+  notizRoh: string
+): Promise<boolean> {
+  const hundertstel = parseEinheiten(mengeRoh);
   // 0 ist keine Buchung, sondern ein Fehlgriff im Formular.
-  if (hundertstel === null || hundertstel === 0) return;
+  if (hundertstel === null || hundertstel === 0) return false;
 
   const heute = berlinToday();
-  const roh = feld(formData, "tag");
-  const gewuenscht = roh && isValidDay(roh) ? roh : heute;
+  const gewuenscht = tagRoh && isValidDay(tagRoh) ? tagRoh : heute;
   // Nicht in der Zukunft, nicht vor dem Fenster.
   const tag =
     gewuenscht > heute || gewuenscht < shiftDay(heute, -RUECKWIRKEND_TAGE)
@@ -49,14 +64,53 @@ export async function einheitenBuchen(formData: FormData) {
 
   await prisma.einheitenbuchung.create({
     data: {
-      userId: user.id,
+      userId,
       hundertstel,
       tag: dayToUtcDate(tag),
-      notiz: feld(formData, "notiz").slice(0, 120) || null,
+      notiz: notizRoh.slice(0, 120) || null,
     },
   });
 
   neuRechnen();
+  return true;
+}
+
+/** Eine Meldung: Menge, Tag, optional eine Notiz. */
+export async function einheitenBuchen(formData: FormData) {
+  const user = await requireUser();
+  await buchen(
+    user.id,
+    feld(formData, "menge"),
+    feld(formData, "tag"),
+    feld(formData, "notiz")
+  );
+}
+
+/**
+ * Dieselbe Buchung, aber von unterwegs: aus dem Schnellfenster der Kopfzeile
+ * oder direkt nach einem Abschluss.
+ *
+ * Immer auf heute datiert - wer rueckwirkend buchen will, hat auf /einheiten
+ * ein Datumsfeld. Und immer mit dem neuen Monatsstand als Rueckwert: die Zahl
+ * lebt danach im Browser, und dort soll die wahre stehen und nicht die
+ * erhoffte. Dasselbe Muster wie beim Schnellzaehler (quickLogAction.ts).
+ *
+ * Der Stand kommt fertig formatiert zurueck ("12,5") und nicht als Hundertstel:
+ * lib/einheiten.ts bleibt die einzige Stelle, die das Umrechnen kennt, und ein
+ * Client-Baustein duerfte sie gar nicht laden - sie haengt an Prisma.
+ */
+export async function einheitSchnellBuchen(
+  mengeRoh: string,
+  notizRoh = ""
+): Promise<{ ok: true; monat: string } | { ok: false; fehler: string }> {
+  const user = await requireUser();
+
+  const gebucht = await buchen(user.id, mengeRoh, "", notizRoh);
+  if (!gebucht) {
+    return { ok: false, fehler: "Das war keine Zahl. Zum Beispiel: 12,5" };
+  }
+
+  return { ok: true, monat: formatEinheiten(await eigenerMonatsstand(user.id)) };
 }
 
 /**

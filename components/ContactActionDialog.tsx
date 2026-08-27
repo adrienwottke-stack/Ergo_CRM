@@ -47,7 +47,15 @@ export default function ContactActionDialog({
   contact: ContactLite | null;
   targetStage?: ContactStage;
   onClose: () => void;
-  onSuccess?: () => void;
+  /**
+   * Nach dem Speichern, vor dem Schliessen.
+   *
+   * `stage` traegt die gerade gesetzte Phase (nur im Modus "stage", sonst
+   * null). Die Aufrufstelle braucht das, um an einen Abschluss die Frage nach
+   * den Einheiten zu haengen (docs/findbarkeit-plan.md) - dieses Fenster
+   * selbst kann sie nicht stellen, es wird im selben Moment geschlossen.
+   */
+  onSuccess?: (ergebnis: { stage: ContactStage | null }) => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +79,9 @@ export default function ContactActionDialog({
       startTransition(async () => {
         try {
           await action(formData);
-          onSuccess?.();
+          // Nur der Phasenwechsel meldet eine Phase - bei "Erledigt",
+          // "Verloren" und "Empfehlungen" hat sich keine geaendert.
+          onSuccess?.({ stage: mode === "stage" ? stage : null });
           onClose();
         } catch (caught) {
           setError(

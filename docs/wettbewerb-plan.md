@@ -360,7 +360,7 @@ gerechnet. Eingefroren wird nur, was ein Ergebnis ist: Duell-Stände und Titel.
 **`/log` — bleibt die Arbeitsfläche**, bekommt drei Ergänzungen: Puls-Streifen, „Fordern"-Knopf
 neben jedem Namen aus der Rangliste, und die eigene Bestmarke als zweite Messlatte.
 
-**Der Schnellzähler in der Kopfzeile** (`components/AktivitaetZaehlen.tsx`): ein Plus
+**Der Schnellzähler in der Kopfzeile** (`components/Schnellzugriff.tsx`): ein Plus
 neben dem Megafon, auf jeder Seite. Es öffnet ein Fenster mit den drei manuellen Arten —
 Anrufe, Nummern, Termine vereinbart — je mit `+1` und `−`, darunter eine Zeile
 „X Punkte heute · Y Tage Serie". Grund: der Weg zur eigenen Zahl lag drei Tipps und einen

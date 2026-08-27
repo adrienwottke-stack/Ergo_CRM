@@ -34,6 +34,14 @@ export type OrgaKnoten = {
   kopf: string;
   /** Nur bei Fuehrungskraeften: was der Ast unter ihm leistet. */
   ast: string | null;
+  /**
+   * Fuehrungskette UEBER dem Betrachter - zur Einordnung, nicht zur Fuehrung.
+   *
+   * Diese Kaesten gehoeren zu keinem Ast, den der Betrachter sehen darf: kein
+   * Punkt, keine Zahlen, kein Klick. Ihr Platz im Bild beantwortet nur eine
+   * Frage - unter wem haenge ich -, keine zweite.
+   */
+  istUeber: boolean;
 };
 
 // Feste Kastenmasse. Das Layout muss vor dem Zeichnen feststehen - gemessene
@@ -384,6 +392,24 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
         {knoten.map((k) => {
           const p = pos.get(k.id);
           if (!p) return null;
+
+          // Wer ueber dem Betrachter haengt, ist kein Kasten aus seinem Ast:
+          // kein Klick (dessen Seite darf er nicht oeffnen), keine Ampel
+          // (deren Stand kennt er nicht), nur der Name als Einordnung.
+          if (k.istUeber) {
+            return (
+              <div
+                key={k.id}
+                style={{ left: p.x, top: p.y, width: KASTEN_B, height: KASTEN_H }}
+                className="absolute flex flex-col items-center justify-center rounded-[12px] border border-dashed border-slate-200 bg-slate-50/70 px-[12px] py-[8px]"
+              >
+                <span className="truncate text-[14px] font-medium text-slate-500">
+                  {k.name}
+                </span>
+              </div>
+            );
+          }
+
           return (
             <Link
               key={k.id}

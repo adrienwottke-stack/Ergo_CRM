@@ -164,6 +164,17 @@ export type Mannschaftslage = {
    * "ALLE".
    */
   gesamtstruktur: boolean;
+  /**
+   * Die eigene Fuehrungskette, Wurzel zuerst, der direkte Chef zuletzt.
+   *
+   * `baum` zeigt nur, wer unter dem Betrachter haengt - fuer eine
+   * Fuehrungskraft die richtige Grenze, denn fremde Aeste gehen sie nichts an.
+   * Aber "unter wem haenge ICH" ist dieselbe Frage von der anderen Seite, und
+   * die beantwortet kein Astro-Feld hier: nur der eigene Pfad kennt sie, ohne
+   * dass dafuer eine fremde Struktur sichtbar wird. Nur Namen, keine Zahlen -
+   * Leistung der eigenen Fuehrungskraft ist nicht die Sache des Betrachters.
+   */
+  oben: { id: string; name: string }[];
 };
 
 const leereWerte = (): Werte => ({
@@ -505,9 +516,21 @@ export async function mannschaftsLage(betrachter: {
   }
 
   const nameVon = new Map(berater.map((person) => [person.id, person.name]));
-  const eigeneTiefe = ebene(
-    berater.find((person) => person.id === betrachter.id)?.path ?? "/"
-  );
+  const eigenerPfad = berater.find((person) => person.id === betrachter.id)?.path ?? "/";
+  const eigeneTiefe = ebene(eigenerPfad);
+
+  // Die Kette ueber dem Betrachter: der Pfad traegt sie schon, ohne
+  // rekursive Abfrage. Wurzel zuerst, direkter Chef zuletzt.
+  const obenIds = eigenerPfad.split("/").filter(Boolean).slice(0, -1);
+  const obenKonten =
+    obenIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: obenIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+  const obenNameVon = new Map(obenKonten.map((konto) => [konto.id, konto.name]));
+  const oben = obenIds.map((id) => ({ id, name: obenNameVon.get(id) ?? "?" }));
 
   const alle: Mannschaftsperson[] = berater.map((person) => {
     const w = werte.get(person.id) ?? leereWerte();
@@ -678,6 +701,7 @@ export async function mannschaftsLage(betrachter: {
     ruhend: auffaellig.filter((person) => person.betreuung?.ruht),
     fuehrtNiemanden: baum.length === 0,
     gesamtstruktur,
+    oben,
   };
 }
 

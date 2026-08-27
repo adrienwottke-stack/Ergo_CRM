@@ -23,7 +23,7 @@
 //    Fragen an die Praxis, nicht an den Code.
 
 import { prisma } from "@/lib/prisma";
-import { addDays, addMonths, dayToUtcDate } from "@/lib/dates";
+import { addDays, addMonths, berlinToday, dayToUtcDate } from "@/lib/dates";
 import { ebene, elternIdVon, strukturKonten } from "@/lib/struktur";
 
 // --- Rechnen in Hundertsteln ------------------------------------------------
@@ -207,6 +207,27 @@ type Betrachter = {
 
 /** Zwei Zahlen je Kopf, in Hundertsteln: alles und der laufende Monat. */
 export type Zahlenpaar = { gesamt: number; monat: number };
+
+/**
+ * Was EIN Konto im laufenden Produktionsmonat gebucht hat.
+ *
+ * Die kleine Schwester von ladeEinheiten(): kein Feld, keine Runde, keine
+ * Schwelle - nur die eine Zahl. Dafuer gibt es zwei Stellen, an denen sie
+ * gebraucht wird, ohne dass die ganze Seite gerechnet werden soll: das
+ * Schnellfenster in der Kopfzeile und die Frage nach einem Abschluss
+ * (docs/findbarkeit-plan.md).
+ *
+ * Ohne einheitenStart, und das mit Absicht: der Startbestand ist Historie und
+ * gehoert in die Gesamtsumme, nicht in einen Monat.
+ */
+export async function eigenerMonatsstand(userId: string): Promise<number> {
+  const monat = produktionsmonat(berlinToday());
+  const summe = await prisma.einheitenbuchung.aggregate({
+    where: { userId, tag: { gte: monat.start, lte: monat.ende } },
+    _sum: { hundertstel: true },
+  });
+  return summe._sum.hundertstel ?? 0;
+}
 
 /**
  * Die gebuchten Summen je Konto - EINE Abfrage je Zeitraum, nie eine je Kopf.

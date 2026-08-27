@@ -24,6 +24,7 @@ import ContactActionDialog, {
   type ActionMode,
   type ContactLite,
 } from "@/components/ContactActionDialog";
+import { frageNachEinheiten } from "@/components/EinheitenNachAbschluss";
 import {
   AppointmentDialog,
   AppointmentHeldDialog,
@@ -234,6 +235,13 @@ export default function QuickRowActions({
               await recordAppointmentResult(data);
               undoMoeglich();
               setDialog(null);
+              // Der Abschluss steht jetzt in der Datenbank. Erst danach die
+              // Frage nach der Zahl - sie darf das Speichern nie aufhalten.
+              // Als Ereignis, weil diese Zeile gleich aus der Heute-Liste
+              // faellt: das Fenster haengt in der Schale, nicht an ihr.
+              if (data.get("result") === "abschluss") {
+                frageNachEinheiten(contact.name);
+              }
             } catch (err) {
               setFehler(err instanceof Error ? err.message : "Das hat nicht geklappt.");
             } finally {
@@ -273,6 +281,9 @@ export default function QuickRowActions({
         mode={mehr ?? "stage"}
         contact={contact}
         onClose={() => setMehr(null)}
+        onSuccess={({ stage }) => {
+          if (stage === "ABSCHLUSS") frageNachEinheiten(contact.name);
+        }}
       />
     </>
   );

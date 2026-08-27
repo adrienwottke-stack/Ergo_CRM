@@ -36,7 +36,12 @@ export type ArenaKey =
   // der Arena, faellt aber unter dieselbe Regel. Gezaehlt wird, wie oft es
   // ueberhaupt benutzt wird: bleibt die Zahl bei null, war die Huerde nicht
   // das Problem, sondern es gibt nichts zu sagen.
-  | "rueckmeldung";
+  | "rueckmeldung"
+  // Das Filterfeld im Schnellfenster (docs/findbarkeit-plan.md). Auch das
+  // steht in der Kopfzeile und damit ueberall. Bleibt die Zahl bei null, war
+  // Suchen nicht das Problem - dann hilft nur, die Funktion dorthin zu
+  // bringen, wo sie gebraucht wird, statt sie auffindbar zu machen.
+  | "wegweiser";
 
 // Eine Abfrage je Anfrage, danach beantwortet der Cache alle weiteren Fragen.
 export const featureStates = cache(async (): Promise<Map<string, FeatureState>> => {

@@ -243,8 +243,33 @@ export default async function MannschaftPage({
       fuehrt: person.fuehrt,
       kopf: kopfzeile(person),
       ast: astZeile,
+      istUeber: false,
     };
   });
+
+  // Die Kette ueber dem Betrachter obendrauf - Wurzel zuerst, direkter Chef
+  // direkt ueber "Du". In der Admin-Ansicht "gesamte Struktur" steht sie
+  // unter Umstaenden schon in `knoten` (dort ist jeder mit im Bild, echt
+  // verknuepft ueber den Pfad) - dann bleibt sie aussen vor, sonst haengt
+  // derselbe Mensch zweimal im Bild.
+  const bekannteIds = new Set(knoten.map((k) => k.id));
+  const ueberDir: OrgaKnoten[] = lage.oben.some((person) => bekannteIds.has(person.id))
+    ? []
+    : lage.oben.map((person, i, liste) => ({
+        id: person.id,
+        name: person.name,
+        elternId: i === 0 ? null : liste[i - 1]!.id,
+        ampel: "gruen",
+        istDu: false,
+        platzhalter: false,
+        eingeladen: false,
+        ausgetreten: false,
+        fuehrt: 0,
+        kopf: "",
+        ast: null,
+        istUeber: true,
+      }));
+  knoten.unshift(...ueberDir);
 
   // Unter wen darf gehaengt werden: der eigene Ast, man selbst zuerst.
   // Platzhalter sind erlaubt - eine geplante Ebene bekommt ihre Leute, bevor

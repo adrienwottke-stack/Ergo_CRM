@@ -729,6 +729,27 @@ model FeatureUse {
   @@index([featureKey, day])
 }
 
+// Wonach im Wegweiser gesucht wurde, ohne dass es etwas gab
+// (docs/findbarkeit-plan.md, Abschnitt 6).
+//
+// Ein Suchbegriff ohne Treffer ist das ehrlichste Stueck Produktforschung, das
+// es gibt: der Nutzer sagt in seinen eigenen Worten, was er erwartet hat und
+// nicht fand. Jede Zeile hier ist entweder ein fehlendes Synonym (billig zu
+// beheben) oder eine fehlende Funktion (teuer, aber wenigstens belegt).
+//
+// Anders als FeatureUse OHNE personId - nicht einmal als Schluessel. Nutzung
+// ist eine Zahl, ein Suchbegriff ist Freitext und kann verraten, woran jemand
+// gerade sitzt. Was nicht gespeichert wird, kann auch nicht auf jemanden
+// zeigen.
+model Suchbegriff {
+  begriff String
+  day     DateTime
+  count   Int      @default(1)
+
+  @@id([begriff, day])
+  @@index([day])
+}
+
 // Gemeinsamer Block: 25 Minuten, alle gleichzeitig. Gezaehlt wird ueber
 // DailyLog.createdAt im Fenster - kein zweiter Zaehler, der auseinanderlaufen
 // kann.

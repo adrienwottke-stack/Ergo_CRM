@@ -66,8 +66,20 @@ export const btnSecondary =
 export const btnGhost =
   "text-sm font-medium text-slate-500 transition hover:text-slate-900";
 
-export const input =
-  "mt-1.5 min-h-11 w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/15";
+const inputBasis =
+  "min-h-11 w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/15";
+
+/** Eingabefeld unter einem <label> - der Abstand nach oben steckt schon drin. */
+export const input = `mt-1.5 ${inputBasis}`;
+
+// Dasselbe Feld ohne diesen Abstand - fuer Felder, die ohne Beschriftung
+// darueber stehen (Suchfeld, Zeile mit Knopf daneben).
+//
+// Als eigene Konstante und NICHT als `${input} mt-0`: zwei Tailwind-Klassen
+// derselben Eigenschaft entscheiden nicht nach der Reihenfolge im String,
+// sondern nach der im erzeugten Stylesheet - das haette mal so und mal so
+// ausgesehen.
+export const inputBlank = inputBasis;
 
 export const label = "block text-[13px] font-medium text-slate-600";
 

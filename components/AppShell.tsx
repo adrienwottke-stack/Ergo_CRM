@@ -2,12 +2,14 @@ import { logout } from "@/app/login/actions";
 import { Wordmark } from "@/components/Logo";
 import NavLinks, { type NavLink } from "@/components/NavLinks";
 import UndoBar from "@/components/UndoBar";
+import EinheitenNachAbschluss from "@/components/EinheitenNachAbschluss";
 import InstallationMelder from "@/components/InstallationMelder";
 import AppInstallieren from "@/components/AppInstallieren";
-import AktivitaetZaehlen from "@/components/AktivitaetZaehlen";
+import Schnellzugriff from "@/components/Schnellzugriff";
 import { LogoutIcon } from "@/components/icons";
 import ThemaSchalter from "@/components/ThemaSchalter";
 import RueckmeldungGeben from "@/components/RueckmeldungGeben";
+import { schalter } from "@/lib/features";
 import { shell, gutter } from "@/components/ui";
 import type { User } from "@/lib/generated/prisma/client";
 
@@ -60,6 +62,10 @@ export default async function AppShell({
   children: React.ReactNode;
 }) {
   const links = navigationFuer(user);
+  // Ein Schalter, eine Abfrage, auf jeder Seite. Sie steht hier und nicht im
+  // Schnellzugriff selbst: der ist eine Client-Komponente und kann die
+  // Feature-Tabelle nicht lesen.
+  const { wegweiser: wegweiserAn } = await schalter("wegweiser");
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -83,8 +89,11 @@ export default async function AppShell({
                 Warum kein Navigationspunkt "Aktivitaeten": ein Tab wechselt die
                 Seite, und wer zwischen zwei Anrufen +1 tippt, will genau das
                 nicht - er will dort bleiben, wo er ist. Die Leiste traegt
-                ausserdem schon acht Punkte. */}
-            <AktivitaetZaehlen />
+                ausserdem schon acht Punkte.
+                Hinter demselben Plus haengen inzwischen auch die Einheiten und
+                der Wegweiser (docs/findbarkeit-plan.md) - aus demselben Grund
+                und an derselben Stelle statt als zweites Symbol daneben. */}
+            <Schnellzugriff istAdmin={user.role === "ADMIN"} wegweiserAn={wegweiserAn} />
             {/* Nur am Rechner und nur im Browser-Tab: das Symbol erklaert, wie
                 Ergo CRM hier in ein eigenes Fenster kommt. Am Handy erscheint
                 es nie - dort ist die Installation Pflicht und laengst
@@ -123,6 +132,10 @@ export default async function AppShell({
 
       {/* Liegt ueber allem und meldet sich nur, wenn es etwas zurueckzunehmen gibt. */}
       <UndoBar />
+      {/* Aus demselben Grund hier und nicht an der Zeile: ein Abschluss laesst
+          die Zeile aus der Heute-Liste verschwinden, und mit ihr waere das
+          Fenster weg, bevor jemand antworten konnte. */}
+      <EinheitenNachAbschluss />
       {/* Haelt einmalig fest, wer die App wirklich vom Startbildschirm startet. */}
       <InstallationMelder melden={user.installedAt === null} />
     </div>
