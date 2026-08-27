@@ -46,7 +46,7 @@ export function navigationFuer(user: User): NavLink[] {
     {
       href: "/arena",
       label: "Wettbewerb",
-      match: ["/leaderboard", "/log", "/einheiten", "/spiel"],
+      match: ["/leaderboard", "/log", "/spiel"],
     },
     ...(user.role === "ADMIN"
       ? [{ href: "/team", label: "Team", match: ["/werkstatt"] }]

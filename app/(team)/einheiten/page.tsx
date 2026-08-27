@@ -10,7 +10,7 @@ import {
   teamEinheiten,
 } from "@/lib/einheiten";
 import { merkeNutzung, schalter } from "@/lib/features";
-import WettbewerbNav from "@/components/WettbewerbNav";
+import SeitenKopf from "@/components/SeitenKopf";
 import Fortschritt from "@/components/Fortschritt";
 import EinheitenEintragen from "@/components/EinheitenEintragen";
 import EinheitenHilfe from "@/components/EinheitenHilfe";
@@ -20,7 +20,6 @@ import {
   input,
   kicker,
   label,
-  pageTitle,
   sectionTitle,
   td,
   th,
@@ -75,17 +74,17 @@ export default async function EinheitenPage() {
 
   return (
     <div className="space-y-8">
-      <WettbewerbNav />
-
-      <div>
-        <h1 className={pageTitle}>Einheiten</h1>
-        <p className="mt-1 text-sm text-ink-muted">
-          Deine Zahl, selbst gemeldet.{" "}
-          {user.karrierestufe === null
-            ? "Trag deine Karrierestufe ein — dann siehst du, wer sonst noch auf deiner Stufe steht."
-            : `Karrierestufe ${user.karrierestufe}. Wer dieselbe Stufe hat, sieht deine Einheiten — Name und Zahl, sonst nichts.`}
-        </p>
-      </div>
+      <SeitenKopf
+        titel="Einheiten"
+        unterzeile={
+          <>
+            Deine Zahl, selbst gemeldet.{" "}
+            {user.karrierestufe === null
+              ? "Trag deine Karrierestufe ein — dann siehst du, wer sonst noch auf deiner Stufe steht."
+              : `Karrierestufe ${user.karrierestufe}. Wer dieselbe Stufe hat, sieht deine Einheiten — Name und Zahl, sonst nichts.`}
+          </>
+        }
+      />
 
       {/* --- Die zwei Zahlen -------------------------------------------------
           Links das Laufende, rechts das Erarbeitete. Der Balken haengt bewusst

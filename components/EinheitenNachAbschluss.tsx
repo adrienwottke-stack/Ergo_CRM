@@ -6,7 +6,7 @@
 // muessen. Ein Partner, der gerade "Abschluss" getippt hat, hat die Zahl im
 // Kopf - zwei Minuten spaeter nicht mehr, und in zwei Wochen fehlt sie im
 // Monat. Also wird hier gefragt und nicht darauf gehofft, dass er den Weg
-// ueber Wettbewerb -> Einheiten von selbst findet.
+// zu den Einheiten von selbst findet.
 //
 // Vier Regeln, die den Rest erklaeren:
 //
@@ -144,7 +144,7 @@ export default function EinheitenNachAbschluss() {
 
         <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
           <p className="text-xs text-ink-muted">
-            Geht auch später — unter Wettbewerb › Einheiten.
+            Geht auch später — unter Einheiten.
           </p>
           <button type="button" onClick={schliessen} className={btnGhost}>
             Später

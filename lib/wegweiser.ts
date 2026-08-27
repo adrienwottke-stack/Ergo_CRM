@@ -40,7 +40,7 @@ export const WEGWEISER: WegweiserEintrag[] = [
     id: "einheiten-eintragen",
     titel: "Einheiten eintragen",
     href: "/einheiten",
-    bereich: "Wettbewerb",
+    bereich: "Einheiten",
     synonyme: [
       "einheit",
       "produktion",
