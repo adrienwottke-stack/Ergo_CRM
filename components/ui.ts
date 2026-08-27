@@ -135,7 +135,7 @@ export const flaeche = (ton: Ton = "neutral") =>
   `rounded-2xl border schatten-karte ${flaechen[ton]}`;
 
 const chips: Record<Ton, string> = {
-  neutral: "bg-slate-100 text-slate-600",
+  neutral: "bg-sunken text-ink-muted",
   info: "bg-navy-50 text-navy-700",
   erfolg: "bg-emerald-50 text-emerald-700",
   warnung: "bg-amber-50 text-amber-800",

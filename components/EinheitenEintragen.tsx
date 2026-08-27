@@ -65,7 +65,7 @@ export default function EinheitenEintragen({ heute }: { heute: string }) {
     <form onSubmit={speichern} className={`${card} space-y-5 p-6 sm:p-8`}>
       <div>
         <h2 className={sectionTitle}>Einheiten eintragen</h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           Was dazugekommen ist. Ein Storno trägst du mit Minus ein
           (&bdquo;-12,5&ldquo;).
         </p>
@@ -138,7 +138,7 @@ export default function EinheitenEintragen({ heute }: { heute: string }) {
         <p className="text-sm text-emerald-700">Eingetragen.</p>
       )}
 
-      <div className="flex justify-end border-t border-slate-100 pt-5">
+      <div className="flex justify-end border-t border-line pt-5">
         <button type="submit" className={btnPrimary} disabled={laeuft}>
           {laeuft ? "…" : "Speichern"}
         </button>

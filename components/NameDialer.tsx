@@ -24,7 +24,7 @@ import {
   PhoneOffIcon,
   TrophyIcon,
 } from "@/components/icons";
-import { btnPrimary, btnSecondary, card } from "@/components/ui";
+import { btnPrimary, btnSecondary, card, inputBlank } from "@/components/ui";
 import Fortschritt from "@/components/Fortschritt";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
 
@@ -357,7 +357,7 @@ export default function NameDialer({
             value={note}
             onChange={(event) => setNote(event.target.value)}
             placeholder="Was war noch wichtig?"
-            className="w-full rounded-lg border border-line-strong p-2.5 text-sm focus:border-navy-500 focus:outline-none"
+            className={inputBlank}
           />
         ) : (
           <button

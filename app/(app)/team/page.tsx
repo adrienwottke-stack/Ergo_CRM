@@ -109,42 +109,42 @@ export default async function TeamPage({
       </div>
 
       {error && (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-600/10">
+        <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
           {fehlertexte[error] ?? fehlertexte.invalid}
         </p>
       )}
       {moved && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Berater wurde umgehängt.
         </p>
       )}
       {invited && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Einladung erzeugt – der Link steht unten.
         </p>
       )}
       {revoked && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Einladung zurückgenommen.
         </p>
       )}
       {ausgetragen && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Konto ausgetragen. Es bleibt im Baum stehen und zählt nirgends mehr mit.
         </p>
       )}
       {zurueck && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Konto wieder aufgenommen.
         </p>
       )}
       {geloescht && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Konto gelöscht. Wer darunter hing, ist eine Ebene hochgerückt.
         </p>
       )}
       {umbenannt && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Name geändert.
         </p>
       )}

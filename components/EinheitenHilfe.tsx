@@ -86,7 +86,7 @@ export default function EinheitenHilfe() {
         aria-label="Wo finde ich meine Einheiten?"
         aria-expanded={offen}
         aria-controls={id}
-        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sunken text-[11px] font-semibold text-ink-muted transition hover:bg-line hover:text-ink"
+        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sunken text-11 font-semibold text-ink-muted transition hover:bg-line hover:text-ink"
       >
         ?
       </button>

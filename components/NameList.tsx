@@ -31,7 +31,7 @@ import {
   UndoIcon,
   XIcon,
 } from "@/components/icons";
-import { card, chip, input } from "@/components/ui";
+import { card, chip, input, inputBlank } from "@/components/ui";
 import Fortschritt from "@/components/Fortschritt";
 import { liegtLabel } from "@/lib/liegenbleiber";
 
@@ -766,7 +766,7 @@ function NameRow({
               }
               if (event.key === "Escape") setEditingPhone(false);
             }}
-            className="mt-1 w-full max-w-48 rounded-md border border-line-strong px-2 py-1 text-sm"
+            className={`${inputBlank} mt-1 max-w-48`}
           />
         ) : entry.phone ? (
           <p className="truncate text-sm text-ink-muted">{entry.phone}</p>
