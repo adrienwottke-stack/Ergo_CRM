@@ -315,7 +315,7 @@ export default async function TeamPage({
                         name="leaderId"
                         defaultValue={user.leaderId ?? ""}
                         aria-label={`Führungskraft von ${user.name}`}
-                        className="min-h-11 rounded-lg border border-line bg-surface px-2 text-sm text-ink-muted"
+                        className="min-h-11 rounded-xl border border-line bg-surface px-2 text-sm text-ink-muted"
                       >
                         <option value="">— keine (Wurzel)</option>
                         {kandidaten.map((kandidat) => (

@@ -318,7 +318,7 @@ export default function NameDialer({
         </p>
 
         {error && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </p>
         )}
