@@ -17,6 +17,13 @@ import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
 import { liegtLabel, liegtSeit } from "@/lib/liegenbleiber";
 import { herkunftAusQuelle } from "@/lib/empfehlungen";
 import { faelligeAufgaben, fuehrungsSchritt, mannschaftsLage } from "@/lib/fuehrung";
+import {
+  eigenerGesamtstand,
+  eigenerMonatsstand,
+  formatEinheiten,
+  produktionsmonat,
+  schwelleFuer,
+} from "@/lib/einheiten";
 import FuehrungsAufgabe from "@/components/FuehrungsAufgabe";
 import StageBadge from "@/components/StageBadge";
 import NextStepBadge from "@/components/NextStepBadge";
@@ -26,6 +33,8 @@ import ErsteWoche from "@/components/ErsteWoche";
 import Meldungen from "@/components/Meldungen";
 import Postfach from "@/components/Postfach";
 import NummerHinterlegen from "@/components/NummerHinterlegen";
+import EinheitenKarte from "@/components/EinheitenKarte";
+import TerminFrageKarte, { type TerminFrage } from "@/components/TerminFrageKarte";
 import { card, chip, flaeche } from "@/components/ui";
 import SeitenKopf from "@/components/SeitenKopf";
 import LeerZustand from "@/components/LeerZustand";
@@ -69,8 +78,16 @@ export default async function HeutePage() {
   const today = berlinToday();
   const horizon = addDays(dayToUtcDate(today), 8);
 
-  const [contacts, orphans, offeneNamen, meineFuehrung, gefuehrte, nachrichten] =
-    await Promise.all([
+  const [
+    contacts,
+    orphans,
+    offeneNamen,
+    meineFuehrung,
+    gefuehrte,
+    nachrichten,
+    einheitenMonat,
+    einheitenGesamt,
+  ] = await Promise.all([
     prisma.contact.findMany({
       where: {
         ...sicht.kontakte,
@@ -140,7 +157,20 @@ export default async function HeutePage() {
       take: 5,
       select: { id: true, text: true, gelesenAt: true, von: { select: { name: true } } },
     }),
+    // Einheiten-Karte (AP-02): zwei billige Aggregationen fuer Monats- und
+    // Gesamtstand, keine Stufenrunde (ladeEinheiten waere hier auf einer
+    // force-dynamic-Seite zu teuer). Anders als der FK-Zweig unten braucht das
+    // keine Bedingung - die Karte ist ein Dashboard-Baustein, der immer da
+    // ist, keine Meldung, die nur manchmal etwas zu sagen hat.
+    eigenerMonatsstand(user.id),
+    eigenerGesamtstand(user.id, user.einheitenStart),
   ]);
+
+  // Schwellen-Fortschritt (AP-02): misst den GESAMT-Stand, nicht den Monat -
+  // schwelleFuer bleibt hier bewusst synchron (lib/einheiten.ts); ein
+  // spaeteres Paket zieht diesen Aufrufer beim Async-Umbau mit um.
+  const einheitenSchwelle = schwelleFuer(user.karrierestufe);
+  const naechsteKarrierestufe = user.karrierestufe === null ? null : user.karrierestufe + 1;
 
   // Emil oeffnet die App morgens im Auto und landet hier - nicht auf
   // /mannschaft. Bis hierhin erfuhr er von einem stillen Partner erst, wenn er
@@ -169,24 +199,56 @@ export default async function HeutePage() {
     data,
   }));
 
+  // AP-10: ein vergangener, noch nicht bewerteter Termin bekommt eine eigene
+  // Frage ganz oben (TerminFrageKarte) statt einer Zeile in den normalen
+  // Faelligkeits-Gruppen. "Vergangen" ist hier der TATSAECHLICHE Zeitpunkt
+  // (appointmentAt < jetzt) und nicht nur der Kalendertag wie bei dueState -
+  // ein Termin von heute Vormittag waere im Tages-Raster sonst noch "Heute"
+  // und liefe dort ein zweites Mal mit denselben Gehalten/Geplatzt-Knoepfen.
+  // Herausgefiltert wird deshalb aus ALLEN drei Gruppen, nicht nur aus
+  // "Überfällig" - eine Frage, keine doppelten Knoepfe.
+  const jetztZeitpunkt = new Date();
+  const terminFragenRows = rows.filter(
+    (row) =>
+      row.data.nextStepType === "TERMIN" &&
+      row.data.appointmentAt !== null &&
+      row.data.appointmentAt < jetztZeitpunkt
+  );
+  const terminFragenIds = new Set(terminFragenRows.map((row) => row.data.id));
+  const restRows = rows.filter((row) => !terminFragenIds.has(row.data.id));
+
+  const terminFragen: TerminFrage[] = terminFragenRows.map((row) => ({
+    contact: {
+      id: row.data.id,
+      name: row.data.name,
+      phone: row.data.phone,
+      stage: row.data.stage,
+      outcome: row.data.outcome,
+      appointmentLocal: utcToBerlinLocalInput(row.data.appointmentAt!),
+      hasStep: true,
+      referralsAsked: row.data.referralsAskedAt !== null,
+    },
+    appointmentAt: row.data.appointmentAt!,
+  }));
+
   const groups: { key: DueState; title: string; hint: string; rows: Row[] }[] = [
     {
       key: "overdue",
       title: "Überfällig",
       hint: "Zuerst abarbeiten",
-      rows: rows.filter((row) => row.due === "overdue"),
+      rows: restRows.filter((row) => row.due === "overdue"),
     },
     {
       key: "today",
       title: "Heute",
       hint: "Dein Tagespensum",
-      rows: rows.filter((row) => row.due === "today"),
+      rows: restRows.filter((row) => row.due === "today"),
     },
     {
       key: "week",
       title: "Diese Woche",
       hint: "Kommt auf dich zu",
-      rows: rows.filter((row) => row.due === "week"),
+      rows: restRows.filter((row) => row.due === "week"),
     },
   ];
 
@@ -235,6 +297,25 @@ export default async function HeutePage() {
         />
       )}
 
+      {/* AP-02: das Dashboard, das Emil wollte - Zahlen und Eintragen ganz
+          oben, nicht unter Wettbewerb. Nach dem Postfach: der Aufmacher der
+          Seite bleibt Mensch, gleich danach die eigene Zahl. Immer da, keine
+          Bedingung - ein Dashboard-Baustein ist keine Meldung. */}
+      <EinheitenKarte
+        monat={formatEinheiten(einheitenMonat)}
+        monatLabel={produktionsmonat(today).label}
+        gesamt={formatEinheiten(einheitenGesamt)}
+        schwelle={einheitenSchwelle === null ? null : formatEinheiten(einheitenSchwelle)}
+        naechsteStufe={naechsteKarrierestufe}
+        karrierestufeFehlt={user.karrierestufe === null}
+      />
+
+      {/* AP-10: die proaktive Frage nach einem vergangenen Termin - noch vor
+          dem FK-Banner und dem Tagespensum. Sonst haette sie sich in der
+          Liste weiter unten versteckt, und genau das war Emils Anlass:
+          "du musst eintragen", nicht "du koenntest, wenn du scrollst". */}
+      <TerminFrageKarte fragen={terminFragen} />
+
       {/* Fragt genau einmal und verschwindet danach fuer immer. Es gibt
           bewusst keine Kontoseite dafuer - ein Bildschirm mit einem Feld
           darauf ist ein Bildschirm zu viel. */}
@@ -281,7 +362,10 @@ export default async function HeutePage() {
       {/* Beim Oeffnen steht da, was heute zu tun ist - als Zahl, nicht als
           Liste, aus der man erst auswaehlen muss. */}
       <div className={`${card} p-5 sm:p-6`}>
-        {openCount === 0 ? (
+        {/* Mit terminFragen.length===0 verknuepft: sonst wuerde "alles
+            abgearbeitet" direkt unter der neuen Terminfrage-Karte stehen,
+            waehrend die noch eine offene Frage zeigt (AP-10-Folge). */}
+        {openCount === 0 && terminFragen.length === 0 ? (
           <p className="text-base font-semibold text-ink">
             Nichts offen – alles abgearbeitet.
           </p>

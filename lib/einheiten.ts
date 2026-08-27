@@ -249,6 +249,33 @@ export async function eigenerMonatsstand(userId: string): Promise<number> {
 }
 
 /**
+ * Der Gesamtstand EINES Kontos: Startbestand plus alle eigenen Buchungen,
+ * ohne Team und ohne Runde.
+ *
+ * Die zweite kleine Schwester von ladeEinheiten() (siehe eigenerMonatsstand
+ * direkt darueber, gleicher Grund): fuer die Einheiten-Karte auf /heute
+ * (docs/emil-feedback-plan.md, AP-02) - force-dynamic, bei jedem Aufruf neu
+ * geladen, und deshalb zu teuer fuer die komplette Stufenrunde aus
+ * ladeEinheiten(). Denselben Wert braucht auch einheitSchnellBuchen fuer
+ * seinen Rueckgabewert, damit der Fortschrittsbalken nach einer
+ * Inline-Buchung ohne Seiten-Reload stimmt.
+ *
+ * einheitenStart wird uebergeben statt selbst geladen - aus demselben Grund
+ * wie bei eigenerMonatsstand: die Aufrufstelle hat das Konto (requireUser())
+ * ohnehin schon in der Hand.
+ */
+export async function eigenerGesamtstand(
+  userId: string,
+  einheitenStart: number
+): Promise<number> {
+  const summe = await prisma.einheitenbuchung.aggregate({
+    where: { userId },
+    _sum: { hundertstel: true },
+  });
+  return einheitenStart + (summe._sum.hundertstel ?? 0);
+}
+
+/**
  * Die gebuchten Summen je Konto - EINE Abfrage je Zeitraum, nie eine je Kopf.
  *
  * Bewusst OHNE einheitenStart: den holt jede Aufrufstelle selbst, weil sie das

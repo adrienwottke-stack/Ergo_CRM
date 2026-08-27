@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, isValidDay, shiftDay } from "@/lib/dates";
 import {
+  eigenerGesamtstand,
   eigenerMonatsstand,
   formatEinheiten,
   istKarrierestufe,
@@ -100,22 +101,27 @@ export async function einheitenBuchen(
 }
 
 /**
- * Dieselbe Buchung, aber von unterwegs: aus dem Schnellfenster der Kopfzeile
- * oder direkt nach einem Abschluss.
+ * Dieselbe Buchung, aber von unterwegs: aus dem Schnellfenster der Kopfzeile,
+ * direkt nach einem Abschluss, oder aus der Einheiten-Karte auf /heute
+ * (docs/emil-feedback-plan.md, AP-02).
  *
  * Immer auf heute datiert - wer rueckwirkend buchen will, hat auf /einheiten
- * ein Datumsfeld. Und immer mit dem neuen Monatsstand als Rueckwert: die Zahl
- * lebt danach im Browser, und dort soll die wahre stehen und nicht die
- * erhoffte. Dasselbe Muster wie beim Schnellzaehler (quickLogAction.ts).
+ * ein Datumsfeld. Und immer mit dem neuen Monats- UND Gesamtstand als
+ * Rueckwert: die Zahlen leben danach im Browser, und dort sollen die wahren
+ * stehen und nicht die erhofften. Dasselbe Muster wie beim Schnellzaehler
+ * (quickLogAction.ts).
  *
- * Der Stand kommt fertig formatiert zurueck ("12,5") und nicht als Hundertstel:
- * lib/einheiten.ts bleibt die einzige Stelle, die das Umrechnen kennt, und ein
- * Client-Baustein duerfte sie gar nicht laden - sie haengt an Prisma.
+ * Beide Staende kommen fertig formatiert zurueck ("12,5") und nicht als
+ * Hundertstel: lib/einheiten.ts bleibt die einzige Stelle, die das Umrechnen
+ * kennt, und ein Client-Baustein duerfte sie gar nicht laden - sie haengt an
+ * Prisma.
  */
 export async function einheitSchnellBuchen(
   mengeRoh: string,
   notizRoh = ""
-): Promise<{ ok: true; monat: string } | { ok: false; fehler: string }> {
+): Promise<
+  { ok: true; monat: string; gesamt: string } | { ok: false; fehler: string }
+> {
   const user = await requireUser();
 
   const gebucht = await buchen(user.id, mengeRoh, "", notizRoh);
@@ -123,7 +129,12 @@ export async function einheitSchnellBuchen(
     return { ok: false, fehler: "Das war keine Zahl. Zum Beispiel: 12,5" };
   }
 
-  return { ok: true, monat: formatEinheiten(await eigenerMonatsstand(user.id)) };
+  const [monat, gesamt] = await Promise.all([
+    eigenerMonatsstand(user.id),
+    eigenerGesamtstand(user.id, user.einheitenStart),
+  ]);
+
+  return { ok: true, monat: formatEinheiten(monat), gesamt: formatEinheiten(gesamt) };
 }
 
 /**
