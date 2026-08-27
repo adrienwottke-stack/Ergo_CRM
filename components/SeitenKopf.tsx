@@ -27,7 +27,7 @@ export default function SeitenKopf({
         {kicker && <p className={cn(kickerStil, "mb-1")}>{kicker}</p>}
         <h1 className={pageTitle}>{titel}</h1>
         {unterzeile && (
-          <p className="mt-1.5 text-sm text-slate-500">{unterzeile}</p>
+          <p className="mt-1.5 text-sm text-ink-muted">{unterzeile}</p>
         )}
       </div>
       {aktion && <div className="shrink-0">{aktion}</div>}

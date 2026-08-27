@@ -17,7 +17,7 @@ export default function StageBadge({
   const palette = contactStagePalette[stage];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
         lost ? lostPalette : palette.pill
       }`}
     >

@@ -33,22 +33,26 @@ export const metadata: Metadata = {
   description: "Kontakt-Tracking für das Ergo-Netzwerk",
   // Am Handy laeuft die Anwendung ueber "Zum Startbildschirm hinzufuegen"
   // wie eine eigene App: eigenes Symbol, keine Adressleiste.
-  // Die Kopfzeile ist jetzt dunkel und reicht bis unter die Statusleiste.
-  // "black-translucent" laesst den Inhalt darunter durchlaufen - zusammen mit
-  // dem safe-area-Polster im AppShell steht das Navy hinter der Uhrzeit, statt
-  // dass daueber ein weisser Streifen klebt.
+  // Die Kopfzeile ist jetzt Glas statt festem Dunkel und kippt mit Hell/Dunkel
+  // mit. "default" laesst die Statusleiste deshalb ihre normale, blickdichte
+  // Erscheinung behalten, statt Inhalt darunter durchlaufen zu lassen wie
+  // vorher bei "black-translucent".
   appleWebApp: {
     capable: true,
     title: "Ergo CRM",
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
   },
   icons: { apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
-  // Dieselbe Farbe wie die Kopfzeile, in beiden Ansichten - die Leiste des
-  // Browsers soll die Kopfzeile fortsetzen, nicht mit ihr brechen.
-  themeColor: "#0a1628",
+  // Zwei Farben statt einer: die Statusleiste bzw. Browser-Umrandung soll den
+  // Tapeten-Canvas fortsetzen, nicht mit ihm brechen - und der wechselt jetzt
+  // mit Hell/Dunkel, statt immer dunkel zu sein.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#eef2f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a101c" },
+  ],
   // Die Kopfzeile ist klebrig und die Ergebnis-Knoepfe sitzen unten – ohne
   // viewportFit verschwinden sie am iPhone hinter der Home-Leiste.
   viewportFit: "cover",

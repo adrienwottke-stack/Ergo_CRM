@@ -69,19 +69,19 @@ export default async function AppShell({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/* Dunkle Kopfzeile mit Gold-Haarlinie.
-          Vorher war sie weiss auf hellgrauem Grund - dadurch war die Marke
-          praktisch unsichtbar und die App las sich wie ein Formular. Jetzt
-          traegt die Leiste das Navy, und darunter beginnt das Blatt.
-          "buehne" nimmt sie vom Dunkelmodus aus: sie ist in beiden Ansichten
-          dieselbe: ein fester Anker, egal wie der Rest gerade steht.
+      {/* Kopfzeile aus Glas mit Haarlinie darunter.
+          Vorher war sie "buehne": dauerhaft dunkles Navy mit Gold-Akzent,
+          unabhaengig vom Hell/Dunkel-Stand der Seite - ein fester Anker, egal
+          wie der Rest gerade stand. Jetzt ist sie echtes Glas (glas-stark:
+          Weichzeichner samt Saettigung, siehe globals.css) und kippt mit dem
+          Rest der Oberflaeche mit - hell auf hell, dunkel auf dunkel.
           Das Polster oben faengt die Statusleiste ab, wenn die App vom
-          Startbildschirm laeuft (statusBarStyle black-translucent). */}
-      <header className="buehne sticky top-0 z-20 border-b border-navy-800 bg-navy-950 pt-[env(safe-area-inset-top)] schatten-karte">
+          Startbildschirm laeuft. */}
+      <header className="glas-stark sticky top-0 z-20 border-b border-line pt-[env(safe-area-inset-top)] schatten-karte">
         <div
           className={`${shell} ${gutter} flex h-14 items-center justify-between gap-4`}
         >
-          <Wordmark sub="Beraterbereich" onDark />
+          <Wordmark sub="Beraterbereich" />
           <div className="flex shrink-0 items-center gap-1">
             {/* Das Plus steht ganz links in der Gruppe - am weitesten weg von
                 "Abmelden" und als einziges mit Flaeche: es ist die einzige
@@ -111,7 +111,7 @@ export default async function AppShell({
               <button
                 type="submit"
                 aria-label="Abmelden"
-                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-2 text-sm font-medium text-navy-200 transition hover:bg-white/10 hover:text-white sm:px-3"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-2 text-sm font-medium text-ink-muted transition hover:bg-sunken hover:text-ink sm:px-3"
               >
                 <LogoutIcon className="h-4.5 w-4.5 sm:hidden" />
                 <span className="hidden sm:inline">Abmelden</span>

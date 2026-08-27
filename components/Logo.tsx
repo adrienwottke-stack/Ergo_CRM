@@ -9,7 +9,7 @@ export function LogoMark({ className }: { className?: string }) {
       aria-hidden
       fill="none"
     >
-      <rect width="32" height="32" rx="8" fill="var(--color-navy-950)" />
+      <rect width="32" height="32" rx="8" fill="var(--color-akzent)" />
       <circle cx="9.6" cy="9.8" r="1.8" fill="#ffffff" />
       <rect x="13.4" y="8.6" width="10.8" height="2.4" rx="1.2" fill="#ffffff" />
       <circle cx="9.6" cy="16" r="1.8" fill="#ffffff" opacity="0.38" />

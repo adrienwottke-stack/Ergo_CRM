@@ -21,9 +21,10 @@ export default function NavLinks({ links }: { links: NavLink[] }) {
     // Aktiv ist ein 2-px-Unterstrich auf der Haarlinie der Kopfzeile
     // (der Container zieht sich per -mb-px auf sie drauf), keine Pille.
     //
-    // Die Leiste steht auf dem dunklen Navy der Kopfzeile, deshalb die
-    // hellen Farben. Der aktive Punkt ist der einzige Ort, an dem Gold
-    // traegt statt nur zu schmuecken: man findet sich damit sofort wieder.
+    // Die Leiste steht jetzt auf Glas statt auf dunklem Navy, deshalb die
+    // Ink-Toene statt der hellen Navy-200-Schrift von vorher. Der aktive
+    // Punkt traegt den Akzent statt Gold: man findet sich damit sofort
+    // wieder, ohne dass ein zweiter Farbton mitreden muss.
     <nav className="no-scrollbar -mb-px flex items-center gap-4 overflow-x-auto sm:gap-5">
       {links.map((link) => {
         const active = link.exact
@@ -38,8 +39,8 @@ export default function NavLinks({ links }: { links: NavLink[] }) {
             aria-current={active ? "page" : undefined}
             className={`inline-flex h-11 shrink-0 items-center whitespace-nowrap border-b-2 px-0.5 text-sm font-medium transition ${
               active
-                ? "border-gold-400 text-white"
-                : "border-transparent text-navy-200 hover:border-navy-600 hover:text-white"
+                ? "border-akzent text-ink font-semibold"
+                : "border-transparent text-ink-muted hover:border-line-strong hover:text-ink"
             }`}
           >
             {link.label}

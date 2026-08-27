@@ -19,7 +19,7 @@ const groessen = {
 } as const;
 
 const textFarben: Record<AmpelWert, string> = {
-  grau: "text-slate-500",
+  grau: "text-ink-soft",
   gruen: "text-emerald-700",
   gelb: "text-amber-700",
   rot: "text-red-700",

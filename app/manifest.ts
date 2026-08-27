@@ -20,8 +20,8 @@ export default function manifest(): MetadataRoute.Manifest {
     // Gilt nur fuer Handys - Fenster am Rechner dreht niemand hochkant, und
     // Chrome wie Safari ignorieren die Angabe dort.
     orientation: "portrait",
-    background_color: "#0a1628",
-    theme_color: "#0a1628",
+    background_color: "#0a101c",
+    theme_color: "#0a101c",
     lang: "de",
     // Ein Fenster, nicht zehn. Ohne diese Zeile oeffnet jeder Klick auf einen
     // Link - aus einer Meldung, aus einer Mail - am Rechner ein weiteres

@@ -12,7 +12,7 @@ import { cn, type Ton } from "@/components/ui";
 
 const fuellung: Record<Ton, string> = {
   neutral: "bg-slate-400",
-  info: "bg-navy-700",
+  info: "bg-akzent",
   erfolg: "bg-emerald-500",
   warnung: "bg-amber-500",
   gefahr: "bg-red-500",
@@ -20,7 +20,7 @@ const fuellung: Record<Ton, string> = {
 
 const hoehen = {
   duenn: "h-[3px]",
-  normal: "h-1.5",
+  normal: "h-1",
   kraeftig: "h-2",
 } as const;
 

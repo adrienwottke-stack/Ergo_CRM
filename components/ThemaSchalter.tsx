@@ -31,8 +31,23 @@ function istDunkel(thema: Thema) {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+// Die beiden <meta name="theme-color">-Tags aus app/layout.tsx haengen an
+// einer prefers-color-scheme-Media-Query und kippen deshalb nur mit der
+// Systemeinstellung mit. Waehlt jemand hier aber "hell" oder "dunkel"
+// ENTGEGEN der Systemeinstellung, muessen beide Tags von Hand auf dieselbe
+// Farbe gesetzt werden - sonst bliebe z. B. die Adressleiste des Browsers
+// hell, waehrend die Seite laengst dunkel ist.
+function themeFarbeSynchronisieren(dunkel: boolean) {
+  const farbe = dunkel ? "#0a101c" : "#eef2f8";
+  document
+    .querySelectorAll('meta[name="theme-color"]')
+    .forEach((meta) => meta.setAttribute("content", farbe));
+}
+
 function anwenden(thema: Thema) {
-  document.documentElement.classList.toggle("dark", istDunkel(thema));
+  const dunkel = istDunkel(thema);
+  document.documentElement.classList.toggle("dark", dunkel);
+  themeFarbeSynchronisieren(dunkel);
 }
 
 export default function ThemaSchalter() {
@@ -75,7 +90,7 @@ export default function ThemaSchalter() {
       onClick={weiter}
       title={`Ansicht: ${beschriftung[thema]}`}
       aria-label={`Ansicht umschalten. Aktuell: ${beschriftung[thema]}`}
-      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-navy-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-400"
+      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent"
     >
       {/* Bis die gemerkte Einstellung da ist, bleibt das Symbol unsichtbar -
           sonst blitzt kurz das falsche auf. Der Platz wird trotzdem gehalten,

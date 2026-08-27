@@ -23,23 +23,26 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: -apple-system, BlinkMacSystemFont, var(--font-inter), "Segoe UI", Roboto,
+    sans-serif;
+  --font-mono: ui-monospace, "SF Mono", var(--font-geist-mono), monospace;
 }
 
 @theme {
-  /* Marken-Navy: Struktur, Buttons, Links */
-  --color-navy-50: #f2f6fb;
-  --color-navy-100: #e0eaf6;
-  --color-navy-200: #bed3ea;
-  --color-navy-300: #93b4d9;
-  --color-navy-400: #5f8dc0;
-  --color-navy-500: #3a6ba4;
-  --color-navy-600: #2b5387;
-  --color-navy-700: #22426c;
-  --color-navy-800: #1a3253;
-  --color-navy-900: #12233c;
-  --color-navy-950: #0a1628;
+  /* Navy-Rampe, jetzt iOS-Blau: Struktur, Knoepfe, Links. Hiess frueher
+     "Marken-Navy" - der Name blieb an der Variable haengen, die Farbe darunter
+     ist mit dem Liquid-Glass-Redesign auf System-Blau gekippt. */
+  --color-navy-50: #eef6ff;
+  --color-navy-100: #d9ebff;
+  --color-navy-200: #b3d6ff;
+  --color-navy-300: #80bbff;
+  --color-navy-400: #3d97ff;
+  --color-navy-500: #007aff;
+  --color-navy-600: #0066d9;
+  --color-navy-700: #0053b0;
+  --color-navy-800: #003f86;
+  --color-navy-900: #0a2e5c;
+  --color-navy-950: #0a1f3e;
 
   /* Zwischenstufen, die das Standardraster nicht kennt. Als rem, damit sie
      mit der Wurzel mitwachsen - eine feste px-Angabe waere sonst der einzige
@@ -58,23 +61,38 @@
 
   /* ---- Semantische Tokens: die Sprache fuer neuen Code ---- */
 
-  /* Flaechen */
-  --color-canvas: #f4f6fa;
-  --color-surface: #ffffff;
-  --color-sunken: #eef1f7;
+  /* Flaechen. "surface" ist ab jetzt Milchglas OHNE Weichzeichner - eine
+     halbtransparente Flaeche, die den Tapeten-Canvas darunter durchscheinen
+     laesst. Echtes Glas (mit backdrop-filter) gibt es nur auf schwebendem
+     Chrome ueber die "glas"-Utilities weiter unten. */
+  --color-canvas: #eef2f8;
+  --color-surface: rgba(255, 255, 255, 0.72);
+  --color-sunken: rgba(16, 32, 58, 0.06);
 
   /* Linien */
-  --color-line: #e1e6ef;
-  --color-line-strong: #c8d1de;
+  --color-line: rgba(16, 32, 56, 0.1);
+  --color-line-strong: rgba(16, 32, 56, 0.16);
 
   /* Schrift */
-  --color-ink: #0f172a;
-  --color-ink-muted: #4d5a70;
-  --color-ink-soft: #7b8698;
+  --color-ink: #0b1220;
+  --color-ink-muted: #46536a;
+  --color-ink-soft: #78849a;
 
-  /* Akzent: Hauptknopf und alles, was fuehrt */
-  --color-akzent: #12233c;
-  --color-akzent-stark: #0a1628;
+  /* Akzent: Hauptknopf und alles, was fuehrt - iOS-Blau, der einzige Akzent
+     der Oberflaeche. */
+  --color-akzent: #007aff;
+  --color-akzent-stark: #0066d9;
+
+  /* iOS-Pivots: Tailwind liefert diese Stufen sonst als Standardfarben aus
+     (reines Rot/Bernstein/Gruen). Ein paar Stellen greifen direkt auf sie zu
+     (bg-red-500, bg-amber-400, ...) - hier kippen nur diese eine Stufe pro
+     Rampe auf die iOS-Systemfarbe, damit sie zum Rest der Oberflaeche passt.
+     Die anderen Stufen derselben Rampen (100, 700, 800, ...) bleiben
+     Tailwind-Standard, genauso die fest-erfolg/-gefahr/-warnung-Tokens unten. */
+  --color-red-500: #ff3b30;
+  --color-amber-400: #ff9f0a;
+  --color-amber-500: #ff9500;
+  --color-emerald-500: #34c759;
 
   /* ---- Gefuellte Ton-Knoepfe ----
      "Anrufen" (gruen), "Loeschen" (rot), "Namen sammeln" (gelb).
@@ -104,9 +122,23 @@
    Als normale Eigenschaft plus @utility bleibt die Variable zur Laufzeit
    erhalten und kippt mit. */
 :root {
-  --schatten-karte: 0 1px 2px rgb(16 32 56 / 0.04), 0 1px 3px rgb(16 32 56 / 0.06);
-  --schatten-hoch: 0 2px 4px rgb(16 32 56 / 0.05), 0 8px 20px -6px rgb(16 32 56 / 0.14);
-  --schatten-pop: 0 2px 8px rgb(16 32 56 / 0.1), 0 12px 32px -8px rgb(16 32 56 / 0.24);
+  --schatten-karte: 0 1px 1px rgb(10 22 40 / 0.03), 0 4px 16px rgb(10 22 40 / 0.06);
+  --schatten-hoch: 0 2px 6px rgb(10 22 40 / 0.05), 0 12px 32px -8px rgb(10 22 40 / 0.12);
+  --schatten-pop: 0 4px 12px rgb(10 22 40 / 0.08), 0 20px 48px -12px rgb(10 22 40 / 0.22);
+
+  /* Glas-Rezept: Milchglas-Flaechen (surface, weiter oben) tragen KEINEN
+     Weichzeichner - nur diese Werte hier tun es, und nur ueber die
+     "glas"-Utilities, also ausschliesslich auf schwebendem Chrome (Kopfzeile,
+     Modal, Undo-Leiste). "-dunkel" bleibt in beiden Ansichten dunkel: eine
+     Pille wie die Undo-Leiste soll nicht ins Helle kippen, nur weil der Tag
+     das tut. Ebenfalls hier statt in @theme, aus demselben Grund wie bei den
+     Schatten oben: sonst backt Tailwind den Wert fest und der Dunkelmodus
+     koennte ihn nicht mehr umschalten. */
+  --glas-flaeche: rgba(255, 255, 255, 0.6);
+  --glas-flaeche-stark: rgba(248, 250, 254, 0.75);
+  --glas-dunkel-flaeche: rgba(13, 22, 38, 0.78);
+  --glas-blur: 18px;
+  --glas-saettigung: 1.6;
 }
 
 @utility schatten-karte {
@@ -119,6 +151,74 @@
 
 @utility schatten-pop {
   box-shadow: var(--schatten-pop);
+}
+
+/* Glas-Utilities: die Flaeche greift immer (Fallback fuer Browser ohne
+   backdrop-filter), der Weichzeichner kommt nur dazu, wenn der Browser ihn
+   kann - siehe @supports weiter unten. */
+@utility glas {
+  background: var(--color-surface);
+}
+
+@utility glas-stark {
+  background: var(--color-surface);
+}
+
+@utility glas-dunkel {
+  background: #0d1626;
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glas {
+    background: var(--glas-flaeche);
+    -webkit-backdrop-filter: blur(var(--glas-blur)) saturate(var(--glas-saettigung));
+    backdrop-filter: blur(var(--glas-blur)) saturate(var(--glas-saettigung));
+  }
+
+  .glas-stark {
+    background: var(--glas-flaeche-stark);
+    -webkit-backdrop-filter: blur(24px) saturate(var(--glas-saettigung));
+    backdrop-filter: blur(24px) saturate(var(--glas-saettigung));
+  }
+
+  .glas-dunkel {
+    background: var(--glas-dunkel-flaeche);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+  }
+}
+
+/* Wer Transparenz reduziert haben will, bekommt satte Flaechen statt Glas -
+   ganz ohne Weichzeichner, auch dort, wo der Browser ihn koennte. */
+@media (prefers-reduced-transparency: reduce) {
+  .glas,
+  .glas-stark,
+  .glas-dunkel {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .glas,
+  .glas-stark {
+    background: color-mix(in srgb, var(--color-canvas), #fff 75%);
+  }
+
+  .dark .glas,
+  .dark .glas-stark {
+    background: #141d2b;
+  }
+
+  .glas-dunkel {
+    background: #0d1626;
+  }
+
+  :root {
+    --color-surface: #ffffff;
+  }
+
+  .dark {
+    --color-surface: #141d2b;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -144,18 +244,18 @@
   --color-slate-900: #eaf0f7;
   --color-slate-950: #f6f9fc;
 
-  /* Navy: 50-300 Flaeche, ab 400 Schrift und Balken */
-  --color-navy-50: #16243a;
-  --color-navy-100: #1b2c46;
-  --color-navy-200: #24395a;
-  --color-navy-300: #2f4c76;
-  --color-navy-400: #5f8dc0;
-  --color-navy-500: #6fa0d0;
-  --color-navy-600: #7fb0dd;
-  --color-navy-700: #93bfe8;
-  --color-navy-800: #a9cdf0;
-  --color-navy-900: #c0daf5;
-  --color-navy-950: #d6e7fa;
+  /* Navy: 50-300 Flaeche, ab 400 Schrift und Balken - iOS-Blau, siehe @theme */
+  --color-navy-50: #0f1e33;
+  --color-navy-100: #132540;
+  --color-navy-200: #1a3154;
+  --color-navy-300: #224170;
+  --color-navy-400: #4a97ff;
+  --color-navy-500: #5ea6ff;
+  --color-navy-600: #74b3ff;
+  --color-navy-700: #8fc2ff;
+  --color-navy-800: #abd2ff;
+  --color-navy-900: #c7e1ff;
+  --color-navy-950: #e0efff;
 
   /* Gold: die 400 ist die Marke und bleibt, wie sie ist */
   --color-gold-100: #2e2512;
@@ -167,7 +267,7 @@
   --color-emerald-200: #1e4433;
   --color-emerald-300: #2a5f47;
   --color-emerald-400: #34d399;
-  --color-emerald-500: #22c58e;
+  --color-emerald-500: #30d158;
   --color-emerald-600: #45d49b;
   --color-emerald-700: #6ce0ae;
   --color-emerald-800: #92e9c4;
@@ -179,7 +279,7 @@
   --color-red-200: #4d2328;
   --color-red-300: #6b2f36;
   --color-red-400: #f87171;
-  --color-red-500: #ef4444;
+  --color-red-500: #ff453a;
   --color-red-600: #f8807f;
   --color-red-700: #fb9b9b;
   --color-red-800: #fdb8b8;
@@ -189,7 +289,7 @@
   --color-amber-100: #382a12;
   --color-amber-200: #4b3817;
   --color-amber-300: #6b4f1e;
-  --color-amber-400: #fbbf24;
+  --color-amber-400: #ff9f0a;
   --color-amber-500: #f5b026;
   --color-amber-600: #f7c052;
   --color-amber-700: #f9d182;
@@ -208,19 +308,24 @@
   --color-teal-800: #9aece2;
   --color-teal-900: #c4f4ee;
 
-  /* Semantik */
-  --color-canvas: #0c131e;
-  --color-surface: #141d2b;
-  --color-sunken: #0a1017;
-  --color-line: #26313f;
-  --color-line-strong: #384656;
-  --color-ink: #eaf0f7;
-  --color-ink-muted: #a9b5c6;
-  --color-ink-soft: #7d8ba0;
+  /* Semantik - Milchglas wie im Hellen, nur dunkel getoent. */
+  --color-canvas: #0a101c;
+  --color-surface: rgba(23, 33, 51, 0.66);
+  --color-sunken: rgba(255, 255, 255, 0.06);
+  --color-line: rgba(255, 255, 255, 0.1);
+  --color-line-strong: rgba(255, 255, 255, 0.17);
+  --color-ink: #eef3fa;
+  --color-ink-muted: #a7b3c6;
+  --color-ink-soft: #7c899e;
 
   /* Der Hauptknopf wird heller statt dunkler - sonst verschwindet er. */
-  --color-akzent: #2f6bb0;
-  --color-akzent-stark: #3d7cc4;
+  --color-akzent: #0a84ff;
+  --color-akzent-stark: #3d9aff;
+
+  /* Glas-Rezept im Dunkeln, siehe :root weiter oben fuer die Erklaerung. */
+  --glas-flaeche: rgba(21, 30, 47, 0.55);
+  --glas-flaeche-stark: rgba(16, 24, 39, 0.72);
+  --glas-dunkel-flaeche: rgba(10, 17, 30, 0.8);
 
   /* Gefuellte Ton-Knoepfe: satt und dunkel genug fuer weisse Schrift, aber
      heller als die Karte dahinter - sonst verschwaende der Knopf im Grund. */
@@ -323,8 +428,9 @@
   --color-ink: #ffffff;
   --color-ink-muted: #bed3ea;
   --color-ink-soft: #93b4d9;
-  --color-akzent: #d4a942;
-  --color-akzent-stark: #a97f24;
+  /* War Gold, ist jetzt derselbe Akzent wie der Rest der Oberflaeche. */
+  --color-akzent: #0a84ff;
+  --color-akzent-stark: #3d9aff;
 }
 
 html {
@@ -364,6 +470,32 @@ body {
      der helle Seitenhintergrund ueber den dunklen Header und die Seite
      schliesst oben nicht sauber ab. Nebenwirkung: kein Pull-to-Refresh. */
   overscroll-behavior-y: none;
+}
+
+/* Tapeten-Canvas: weiche blaue Lichtflecken hinter allem. Statisch (keine
+   Animation) und bewusst OHNE "background-attachment: fixed" - das ist am
+   iPhone die bekannte Falle, die beim Scrollen ruckelt oder ganz einfriert.
+   "fixed" + "inset: 0" auf einem Pseudo-Element loest dasselbe Ziel ohne
+   dieses Risiko. Liegt hinter body (z-index: -1), nicht auf einer Karte:
+   Karten sind Milchglas OHNE Weichzeichner und lassen die Flecken absichtlich
+   durchscheinen. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 40rem at 12% -8%, rgb(0 122 255 / 0.1), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 12%, rgb(90 200 250 / 0.09), transparent 55%),
+    radial-gradient(70rem 50rem at 45% 110%, rgb(88 86 214 / 0.07), transparent 60%);
+}
+
+.dark body::before {
+  background:
+    radial-gradient(60rem 40rem at 12% -8%, rgb(10 132 255 / 0.13), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 12%, rgb(100 210 255 / 0.07), transparent 55%),
+    radial-gradient(70rem 50rem at 45% 110%, rgb(94 92 230 / 0.1), transparent 60%);
 }
 
 ::selection {
@@ -428,10 +560,10 @@ input[type="number"]::-webkit-outer-spin-button {
   @keyframes halo {
     0%,
     100% {
-      box-shadow: 0 0 0 0 rgb(239 68 68 / 0.45);
+      box-shadow: 0 0 0 0 rgb(255 59 48 / 0.45);
     }
     50% {
-      box-shadow: 0 0 0 5px rgb(239 68 68 / 0);
+      box-shadow: 0 0 0 5px rgb(255 59 48 / 0);
     }
   }
 
@@ -504,6 +636,24 @@ input[type="number"]::-webkit-outer-spin-button {
   body {
     background: #fff;
     color: #0f172a;
+  }
+
+  /* Kein Tapeten-Canvas und kein Glas auf Papier - beides ist Bildschirm-Deko
+     und wuerde auf dem Ausdruck nur wie ein Druckfehler aussehen. */
+  body::before {
+    display: none;
+  }
+
+  :root {
+    --color-surface: #fff;
+    --color-canvas: #fff;
+  }
+
+  .glas,
+  .glas-stark {
+    background: #fff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   main {

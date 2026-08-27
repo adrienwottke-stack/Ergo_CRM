@@ -1,15 +1,16 @@
 // Gemeinsame Klassen-Bausteine, damit alle Seiten dieselbe Sprache sprechen.
 //
-// Designlinie "Werkzeug": ruhige Flaechen, klare Kanten, ein Radius-System
-// (12 px Container, 8 px Bedienelemente, rund nur fuer Badges) und Zahlen
-// immer mit Tabellenziffern.
+// Designlinie "Liquid Glass - Werkzeug auf Glas": ruhige transluzente
+// Flaechen statt satter Farbe, Haarlinien statt harter Kanten, Pillen statt
+// eckiger Knoepfe. Radius-System: 16 px fuer Karten, 12 px fuer Felder, Pille
+// (voll gerundet) fuer Knoepfe und Badges. Zahlen immer mit Tabellenziffern.
 //
-// Frueher hiess die Linie zusaetzlich "flache weisse Flaechen, 1-px-Haarlinien
-// statt Schatten". Das war konsequent, aber die Oberflaeche wurde dadurch flach
-// und grau: nichts lag vor etwas anderem, alles hatte dasselbe Gewicht. Jetzt
-// tragen die Haarlinien einen sehr weichen, navy-getoenten Schatten. Einzeln
-// sieht man ihn kaum - aber die Karte loest sich vom Grund, und genau das hat
-// gefehlt.
+// Glas mit echtem Weichzeichner (backdrop-filter, die "glas"-Utilities aus
+// globals.css) ist ausschliesslich schwebendem Chrome vorbehalten - Kopfzeile,
+// Modal, Undo-Leiste. Karten, Chips und Felder hier bleiben Milchglas OHNE
+// Weichzeichner (Token "surface"): halbtransparent genug, um den
+// Tapeten-Canvas dahinter durchscheinen zu lassen, aber ohne die Kosten und
+// Falstricke von Blur auf einer scrollenden Flaeche.
 //
 // Farben kommen ueber die semantischen Tokens aus globals.css (surface, line,
 // ink, akzent), nicht mehr ueber die Rampe. Nur so kippt der Dunkelmodus
@@ -20,13 +21,10 @@ export function cn(...teile: Array<string | false | null | undefined>) {
   return teile.filter(Boolean).join(" ");
 }
 
-export const card = "rounded-xl border border-line bg-surface schatten-karte";
+export const card = "rounded-2xl border border-line bg-surface schatten-karte";
 
 /** Karte, die auf einen Klick wartet: hebt sich unter dem Zeiger leicht an. */
 export const cardInteractive = `${card} transition duration-200 hover:-translate-y-px hover:border-line-strong hover:schatten-hoch`;
-
-/** Eingesenkte Flaeche - fuer Balken-Rinnen, Segment-Gruppen, Code. */
-export const surfaceSunken = "bg-sunken";
 
 // Spaltenbreiten. Eine Seite waehlt nicht mehr selbst eine Zahl, sondern die
 // Rolle ihrer Spalte - dann wachsen alle Seiten gleich mit dem Bildschirm.
@@ -58,16 +56,16 @@ export const shell = "mx-auto w-full max-w-6xl 2xl:max-w-7xl";
 export const gutter = "px-4 sm:px-6 lg:px-8";
 
 export const btnPrimary =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-akzent px-5 py-2 text-sm font-medium text-white schatten-karte transition hover:bg-akzent-stark hover:schatten-hoch active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-akzent px-5 py-2 text-sm font-semibold text-white schatten-karte transition hover:bg-akzent-stark hover:schatten-hoch active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent";
 
 export const btnSecondary =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink transition hover:border-line-strong hover:bg-sunken hover:text-ink active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent";
 
 export const btnGhost =
-  "text-sm font-medium text-slate-500 transition hover:text-slate-900";
+  "text-sm font-medium text-akzent transition hover:text-akzent-stark";
 
 const inputBasis =
-  "min-h-11 w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/15";
+  "min-h-11 w-full rounded-xl border border-transparent bg-sunken px-3.5 py-2 text-sm text-ink transition placeholder:text-ink-soft focus:border-akzent focus:outline-none focus:ring-2 focus:ring-akzent/20";
 
 /** Eingabefeld unter einem <label> - der Abstand nach oben steckt schon drin. */
 export const input = `mt-1.5 ${inputBasis}`;
@@ -81,23 +79,19 @@ export const input = `mt-1.5 ${inputBasis}`;
 // ausgesehen.
 export const inputBlank = inputBasis;
 
-export const label = "block text-[13px] font-medium text-slate-600";
+export const label = "block text-13 font-medium text-ink-muted";
 
 export const pageTitle =
-  "text-[1.75rem] font-semibold tracking-[-0.02em] text-slate-900";
+  "text-[2.125rem] font-bold leading-[1.15] tracking-[-0.022em] text-ink";
 
-export const sectionTitle = "text-base font-semibold tracking-tight text-slate-900";
+export const sectionTitle = "text-[1.0625rem] font-semibold tracking-tight text-ink";
 
 export const th =
-  "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 first:pl-5 last:pr-5";
+  "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-soft first:pl-5 last:pr-5";
 
 // Kleines Überschriften-Label über Kennzahlen ("Zahlen-DNA")
 export const kicker =
-  "text-[11px] font-semibold uppercase tracking-wider text-slate-500";
-
-// Kennzahlen: gross, ruhig, Ziffern buendig untereinander.
-export const statValue =
-  "font-semibold tabular-nums tracking-tight text-slate-900";
+  "text-[11px] font-semibold uppercase tracking-wider text-ink-soft";
 
 export const td = "px-4 py-3.5 first:pl-5 last:pr-5";
 
@@ -105,7 +99,18 @@ export const filterPill = (active: boolean) =>
   `inline-flex min-h-9 items-center rounded-full px-3.5 text-sm font-medium transition ${
     active
       ? "bg-akzent text-white schatten-karte"
-      : "border border-line-strong bg-surface text-slate-600 hover:border-slate-400 hover:text-slate-900"
+      : "border border-line-strong bg-surface text-ink-muted hover:text-ink"
+  }`;
+
+// Die EINE Segmented-Control der App: zwei bis vier gleichwertige
+// Ansichten nebeneinander, in einer eingesenkten Kapsel. Umschalter.tsx und
+// WettbewerbNav.tsx bauen ihre Umschalter bisher noch selbst - die stellen
+// erst eine spaetere Welle auf diesen Baustein um.
+export const segmentGruppe = "inline-flex items-center gap-0.5 rounded-full bg-sunken p-1";
+
+export const segmentKnopf = (aktiv: boolean) =>
+  `inline-flex min-h-9 items-center justify-center rounded-full px-3.5 text-sm font-medium transition${
+    aktiv ? " bg-surface text-ink schatten-karte" : " text-ink-muted hover:text-ink"
   }`;
 
 /**
@@ -127,7 +132,7 @@ const flaechen: Record<Ton, string> = {
 
 /** Getoente Flaeche mit passender Kante. */
 export const flaeche = (ton: Ton = "neutral") =>
-  `rounded-xl border schatten-karte ${flaechen[ton]}`;
+  `rounded-2xl border schatten-karte ${flaechen[ton]}`;
 
 const chips: Record<Ton, string> = {
   neutral: "bg-slate-100 text-slate-600",

@@ -8,7 +8,7 @@ import { cn, type Ton } from "@/components/ui";
 // nicht eine Fussnote.
 
 const tonFarben: Record<Ton, string> = {
-  neutral: "text-slate-900",
+  neutral: "text-ink",
   info: "text-navy-700",
   erfolg: "text-emerald-700",
   warnung: "text-amber-700",
@@ -36,8 +36,8 @@ export default function Kennzahl({
       <p className={cn("text-lg font-semibold tabular-nums tracking-tight", farbe)}>
         {wert}
       </p>
-      <p className="text-xs text-slate-500">{bezeichnung}</p>
-      {hinweis && <p className="text-[11px] text-slate-400">{hinweis}</p>}
+      <p className="text-xs text-ink-soft">{bezeichnung}</p>
+      {hinweis && <p className="text-[11px] text-ink-soft">{hinweis}</p>}
     </div>
   );
 }
@@ -68,7 +68,7 @@ export function KennzahlKachel({
       >
         {wert}
       </p>
-      <p className="mt-0.5 text-[11px] font-medium text-slate-500">{bezeichnung}</p>
+      <p className="mt-0.5 text-[11px] font-medium text-ink-soft">{bezeichnung}</p>
     </div>
   );
 }

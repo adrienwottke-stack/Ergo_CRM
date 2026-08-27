@@ -56,14 +56,14 @@ export default function LeerZustand({
       )}
       <p
         className={cn(
-          "text-sm font-medium text-slate-900",
+          "text-sm font-medium text-ink",
           symbol ? "mt-4" : undefined
         )}
       >
         {titel}
       </p>
       {text && (
-        <p className="mt-1 max-w-sm text-sm text-slate-500">{text}</p>
+        <p className="mt-1 max-w-sm text-sm text-ink-soft">{text}</p>
       )}
       {children && <div className="mt-5">{children}</div>}
     </div>

@@ -16,6 +16,7 @@
 // (LadeSpruch). Graue Balken sagen "gleich", der Spruch sagt "lohnt sich".
 
 import LadeSpruch from "@/components/LadeSpruch";
+import { card } from "@/components/ui";
 
 function Balken({ className }: { className: string }) {
   return <div className={`animate-shimmer rounded-lg bg-slate-200 ${className}`} />;
@@ -31,7 +32,7 @@ export default function PageSkeleton() {
       </div>
 
       {/* Die Karte mit der Tagesleistung */}
-      <div className="rounded-xl border border-line bg-surface p-5 schatten-karte sm:p-6">
+      <div className={`${card} p-5 sm:p-6`}>
         <Balken className="h-9 w-28" />
         <div className="mt-4 grid grid-cols-3 gap-2">
           <Balken className="h-14" />
@@ -44,10 +45,7 @@ export default function PageSkeleton() {
       <div className="space-y-3">
         <Balken className="h-4 w-32" />
         {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className="rounded-xl border border-line bg-surface p-4 schatten-karte"
-          >
+          <div key={i} className={`${card} p-4`}>
             <Balken className="h-4 w-40" />
             <Balken className="mt-2.5 h-3 w-64" />
           </div>

@@ -286,7 +286,7 @@ export default function Schnellzugriff({
         title={wegweiserAn ? "Eintragen oder suchen (Strg+K)" : "Aktivität zählen"}
         // Leichte Flaeche statt nur Umriss: daneben stehen Einstellungen
         // (Thema, Abmelden), das hier ist die eine Handlung in der Leiste.
-        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-akzent text-white transition hover:bg-akzent-stark"
       >
         <PlusIcon className="h-5 w-5" />
       </button>
