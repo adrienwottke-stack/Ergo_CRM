@@ -66,7 +66,7 @@ export default async function OgBild({
             />
           </svg>
           <span style={{ fontSize: "36px", fontWeight: 600, color: "#93b4d9" }}>
-            Ergo CRM
+            Cockpit
           </span>
         </div>
 

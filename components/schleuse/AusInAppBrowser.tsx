@@ -34,7 +34,7 @@ export default function AusInAppBrowser({ link }: { link: string }) {
       text={
         <p>
           Du bist gerade im Browser von WhatsApp. Der kann keine App auf dein Handy
-          legen – und genau dort gehört Ergo CRM hin.
+          legen – und genau dort gehört Cockpit hin.
         </p>
       }
       fuss={

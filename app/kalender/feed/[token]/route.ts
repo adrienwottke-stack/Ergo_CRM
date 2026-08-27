@@ -46,7 +46,7 @@ export async function GET(
   }
 
   const inhalt = icsFeed(await feedEintraege(konto.id), {
-    name: "Ergo CRM",
+    name: "Cockpit",
     namenZeigen: konto.feedNamen,
   });
 

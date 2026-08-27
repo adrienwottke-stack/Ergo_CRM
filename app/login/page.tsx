@@ -24,7 +24,7 @@ export default async function LoginPage({
           <div className="flex flex-col items-center text-center">
             <LogoMark className="h-12 w-12" />
             <h1 className="mt-4 text-xl font-semibold tracking-[-0.02em] text-slate-900">
-              {isFirstSetup ? "Admin-Konto einrichten" : "Ergo CRM"}
+              {isFirstSetup ? "Admin-Konto einrichten" : "Cockpit"}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
               {isFirstSetup

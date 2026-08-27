@@ -62,7 +62,7 @@ export default function AndroidInstallieren() {
     return (
       <Rahmen
         kicker="Fast geschafft"
-        titel="Ergo CRM liegt jetzt auf deinem Startbildschirm"
+        titel="Cockpit liegt jetzt auf deinem Startbildschirm"
         text={
           <p>
             Schließ diesen Tab und öffne die App über das neue Symbol. Dort legst du
@@ -80,7 +80,7 @@ export default function AndroidInstallieren() {
       text={
         <>
           <p>
-            Ergo CRM ist kein Lesezeichen. Es ist die App, in der du morgens siehst,
+            Cockpit ist kein Lesezeichen. Es ist die App, in der du morgens siehst,
             wer heute dran ist – und die dich daran erinnert.
           </p>
           <p>Ein Tipp, dann geht es weiter.</p>
@@ -98,7 +98,7 @@ export default function AndroidInstallieren() {
                 Wähle <strong>„App installieren“</strong> oder
                 <strong> „Zum Startbildschirm hinzufügen“</strong>
               </Schritt>
-              <Schritt nummer={3}>Öffne Ergo CRM über das neue Symbol</Schritt>
+              <Schritt nummer={3}>Öffne Cockpit über das neue Symbol</Schritt>
             </ol>
           </div>
         ) : null

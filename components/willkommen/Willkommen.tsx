@@ -179,7 +179,7 @@ export default function Willkommen({
 
         {/* Der kurze Weg fuer Fuehrungskraefte. */}
         {akt === "chatLeader" && (
-          <ChatFaden schritte={leaderChat(vorname)} absender="Ergo CRM" onDone={weiter} />
+          <ChatFaden schritte={leaderChat(vorname)} absender="Cockpit" onDone={weiter} />
         )}
         {akt === "fuehrung" && <FuehrungsKarten onDone={weiter} />}
         {akt === "einladen" && <EinladenAkt onDone={weiter} />}

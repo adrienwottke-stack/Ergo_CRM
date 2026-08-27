@@ -9,9 +9,9 @@ export default function manifest(): MetadataRoute.Manifest {
     // start_url aus, und ohne gleiche id hielte Chrome das fuer eine zweite
     // App und legte ein zweites Symbol an.
     id: "/",
-    name: "Ergo CRM",
-    short_name: "Ergo CRM",
-    description: "Namensliste und Kontakt-Tracking für das Ergo-Netzwerk",
+    name: "Cockpit",
+    short_name: "Cockpit",
+    description: "Namensliste und Kontakt-Tracking für dein Team",
     // Nicht direkt auf eine Seite, sondern auf die Weiche: /start entscheidet
     // je nach Anmeldung, wo es weitergeht (app/start/route.ts).
     start_url: "/start",

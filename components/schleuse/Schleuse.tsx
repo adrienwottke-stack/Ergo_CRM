@@ -62,7 +62,7 @@ export default function Schleuse({
           titel="Dein Zugang entsteht auf dem Handy"
           text={
             <p>
-              Ergo CRM arbeitet dort, wo du telefonierst. Scann den Code mit deiner
+              Cockpit arbeitet dort, wo du telefonierst. Scann den Code mit deiner
               Handykamera – dann geht es dort weiter, wo es hingehört.
             </p>
           }

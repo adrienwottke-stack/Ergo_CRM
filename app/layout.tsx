@@ -29,8 +29,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ergo CRM",
-  description: "Kontakt-Tracking für das Ergo-Netzwerk",
+  title: "Cockpit",
+  description: "Kontakt-Tracking für dein Team",
   // Am Handy laeuft die Anwendung ueber "Zum Startbildschirm hinzufuegen"
   // wie eine eigene App: eigenes Symbol, keine Adressleiste.
   // Die Kopfzeile ist jetzt Glas statt festem Dunkel und kippt mit Hell/Dunkel
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   // vorher bei "black-translucent".
   appleWebApp: {
     capable: true,
-    title: "Ergo CRM",
+    title: "Cockpit",
     statusBarStyle: "default",
   },
   icons: { apple: "/apple-touch-icon.png" },

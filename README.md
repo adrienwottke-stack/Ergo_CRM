@@ -1,4 +1,4 @@
-# Ergo CRM
+# Cockpit
 
 Führungssystem für eine Schleife: Namen sammeln → anrufen → Termin machen →
 Termin halten → Ergebnis und neue Namen → von vorn. Jedes Teammitglied hat ein

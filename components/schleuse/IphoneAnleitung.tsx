@@ -33,7 +33,7 @@ export default function IphoneAnleitung() {
       text={
         <>
           <p>
-            Ergo CRM ist kein Lesezeichen. Es ist die App, in der du morgens siehst,
+            Cockpit ist kein Lesezeichen. Es ist die App, in der du morgens siehst,
             wer heute dran ist – und die dich daran erinnert.
           </p>
           <p>Dein iPhone macht das über das Teilen-Menü.</p>
@@ -53,7 +53,7 @@ export default function IphoneAnleitung() {
         </Schritt>
       </ol>
       <p className="mt-6 text-13 leading-relaxed text-navy-300">
-        Danach öffnest du Ergo CRM über das neue Symbol und legst dort deinen Zugang
+        Danach öffnest du Cockpit über das neue Symbol und legst dort deinen Zugang
         an. Nicht mehr hier im Browser – sonst musst du dich gleich zweimal anmelden.
       </p>
     </Rahmen>
