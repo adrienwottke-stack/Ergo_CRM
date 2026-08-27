@@ -13,6 +13,7 @@
 import { useState, useTransition } from "react";
 import { meilensteinMelden } from "@/app/(team)/feedAction";
 import { MegafonIcon } from "@/components/icons";
+import { card } from "@/components/ui";
 
 export default function MeilensteinMelden({
   schluessel,
@@ -33,8 +34,10 @@ export default function MeilensteinMelden({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-gold-100/60 px-4 py-3">
-      <p className="text-sm text-slate-800">
+    <div
+      className={`${card} border-gold-400/50 bg-gold-100/30 flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
+    >
+      <p className="text-sm text-ink">
         <span className="font-semibold">{text}.</span> Sag es den anderen.
       </p>
       <button

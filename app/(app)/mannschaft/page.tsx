@@ -58,8 +58,8 @@ function SignalZeile({ signal }: { signal: Signal }) {
         }`}
       />
       <span className="text-sm">
-        <span className="font-medium text-slate-900">{signal.titel}</span>
-        <span className="text-slate-600"> — {signal.schritt}</span>
+        <span className="font-medium text-ink">{signal.titel}</span>
+        <span className="text-ink-muted"> — {signal.schritt}</span>
       </span>
     </li>
   );
@@ -93,7 +93,7 @@ function NameLink({
 function UeberChip({ person }: { person: Mannschaftsperson }) {
   if (!person.ueber) return null;
   return (
-    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-11 font-medium text-slate-600">
+    <span className="rounded-full bg-sunken px-2 py-0.5 text-11 font-medium text-ink-muted">
       über {person.ueber}
     </span>
   );
@@ -108,7 +108,7 @@ function UeberChip({ person }: { person: Mannschaftsperson }) {
 function Gelesen({ person, klasse = "" }: { person: Mannschaftsperson; klasse?: string }) {
   if (person.gelesen === null) return null;
   return (
-    <span className={`text-xs text-slate-400 ${klasse}`}>
+    <span className={`text-xs text-ink-soft ${klasse}`}>
       {person.gelesen
         ? `${person.vorname} hat deine Nachricht gelesen.`
         : "Deine Nachricht ist noch ungelesen."}
@@ -124,7 +124,7 @@ function Merkmale({ person }: { person: Mannschaftsperson }) {
   if (person.platzhalter) {
     return (
       <>
-        <span className="rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-11 font-medium text-slate-500">
+        <span className="rounded-full border border-dashed border-line-strong px-2 py-0.5 text-11 font-medium text-ink-muted">
           {person.eingeladen ? "eingeladen, wartet" : "noch nicht eingeladen"}
         </span>
         {person.fuehrt > 0 && (
@@ -148,7 +148,7 @@ function Merkmale({ person }: { person: Mannschaftsperson }) {
         </span>
       )}
       {person.angekommen && !person.installiert && (
-        <span className="text-11 text-slate-400">noch im Browser</span>
+        <span className="text-11 text-ink-soft">noch im Browser</span>
       )}
       {person.fuehrt > 0 && (
         <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs text-navy-700">
@@ -156,7 +156,7 @@ function Merkmale({ person }: { person: Mannschaftsperson }) {
         </span>
       )}
       {person.ausgetreten && (
-        <span className="text-xs text-slate-400">ausgetreten</span>
+        <span className="text-xs text-ink-soft">ausgetreten</span>
       )}
     </>
   );
@@ -286,7 +286,7 @@ export default async function MannschaftPage({
     <div className="space-y-6">
       <div>
         <h1 className={pageTitle}>Mannschaft</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           {lage.fuehrtNiemanden
             ? "Sobald jemand unter dir hängt, steht hier, wer dich braucht."
             : rot.length > 0
@@ -294,7 +294,7 @@ export default async function MannschaftPage({
               : gelb.length > 0
                 ? `Nichts Dringendes. Bei ${gelb.length} ${gelb.length === 1 ? "Person" : "Personen"} hakt es.`
                 : "Alles läuft. Nichts, wo du heute hin müsstest."}{" "}
-          <strong className="font-medium text-slate-600">Tipp auf einen Namen</strong> — bei
+          <strong className="font-medium text-ink-muted">Tipp auf einen Namen</strong> — bei
           frisch Gestarteten liest du die ersten {NAMENSFENSTER_TAGE} Tage mit: Vornamen
           der Kontakte und was passiert ist. Bei allen anderen stehen dort Zahlen.
         </p>
@@ -312,7 +312,7 @@ export default async function MannschaftPage({
       />
 
       {!lage.fuehrtNiemanden && lage.gesamtstruktur && (
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+        <p className="rounded-lg bg-sunken px-3 py-2 text-sm text-ink-muted">
           Du führst selbst niemanden – als Admin siehst du hier trotzdem die
           gesamte Struktur.
         </p>
@@ -320,8 +320,8 @@ export default async function MannschaftPage({
 
       {lage.fuehrtNiemanden && (
         <div className={`${card} p-6`}>
-          <p className="text-sm font-medium text-slate-900">Noch niemand in deiner Struktur</p>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="text-sm font-medium text-ink">Noch niemand in deiner Struktur</p>
+          <p className="mt-1 text-sm text-ink-muted">
             Unter{" "}
             <Link href="/einladen" className="font-medium text-navy-700 hover:underline">
               Einladen
@@ -329,7 +329,7 @@ export default async function MannschaftPage({
             erzeugst du einen Link oder QR-Code — wer ihn einlöst, hängt automatisch
             unter dir.
           </p>
-          <p className="mt-3 text-sm text-slate-600">
+          <p className="mt-3 text-sm text-ink-muted">
             Oder du trägst die Struktur ein, bevor jemand die App nutzt — beim
             Ausrollen eines Teams steht sie ohnehin schon.
           </p>
@@ -348,7 +348,7 @@ export default async function MannschaftPage({
         <section className={`${card} p-5 sm:p-6`}>
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className={kicker}>Deine Struktur diese Woche</h2>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink-muted">
               {aeste.platz === 1
                 ? `vorn — ${aeste.aeste[1] ? `${aeste.meiner.punkte - aeste.aeste[1].punkte} Punkte Vorsprung` : "allein an der Spitze"}`
                 : `Platz ${aeste.platz} von ${aeste.aeste.length} · ${aeste.abstand} Punkte zurück`}
@@ -356,7 +356,7 @@ export default async function MannschaftPage({
           </div>
           <p className="mt-1 text-2xl font-bold tabular-nums tracking-[-0.02em] text-navy-900">
             {aeste.meiner.punkte}
-            <span className="ml-1.5 text-sm font-medium text-slate-500">
+            <span className="ml-1.5 text-sm font-medium text-ink-muted">
               Punkte aus {aeste.meiner.koepfe} {aeste.meiner.koepfe === 1 ? "Kopf" : "Köpfen"}
             </span>
           </p>
@@ -368,7 +368,7 @@ export default async function MannschaftPage({
                 <li key={ast.id} className="flex items-center gap-2.5">
                   <span
                     className={`w-24 shrink-0 truncate text-xs ${
-                      ast.istMeiner ? "font-semibold text-slate-900" : "text-slate-500"
+                      ast.istMeiner ? "font-semibold text-ink" : "text-ink-muted"
                     }`}
                   >
                     {ast.istMeiner ? "Deine Leute" : ast.name}
@@ -384,7 +384,7 @@ export default async function MannschaftPage({
                   />
                   <span
                     className={`w-10 shrink-0 text-right text-xs tabular-nums ${
-                      ast.istMeiner ? "font-semibold text-slate-900" : "text-slate-500"
+                      ast.istMeiner ? "font-semibold text-ink" : "text-ink-muted"
                     }`}
                   >
                     {ast.punkte}
@@ -417,15 +417,15 @@ export default async function MannschaftPage({
                   }`}
                 >
                   <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                    <NameLink person={person} klasse="text-base font-semibold text-slate-900" />
+                    <NameLink person={person} klasse="text-base font-semibold text-ink" />
                     <Ampel ampel={person.ampel} variante="text" />
                     <UeberChip person={person} />
                     <Merkmale person={person} />
                   </div>
-                  <p className="mt-1.5 text-sm font-medium text-slate-900">{oben.titel}</p>
-                  <p className="text-sm text-slate-600">{fuehrungsSchritt(person)}</p>
+                  <p className="mt-1.5 text-sm font-medium text-ink">{oben.titel}</p>
+                  <p className="text-sm text-ink-muted">{fuehrungsSchritt(person)}</p>
                   {person.signale.length > 1 && (
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-xs text-ink-soft">
                       {person.signale.length === 2
                         ? "Ein weiterer Punkt steht unten."
                         : `${person.signale.length - 1} weitere Punkte stehen unten.`}
@@ -458,7 +458,7 @@ export default async function MannschaftPage({
                     {person.telefon && (
                       <a
                         href={`tel:${person.telefon.replace(/[^+\d]/g, "")}`}
-                        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-3.5 text-13 font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-13 font-medium text-ink-muted transition hover:bg-sunken hover:text-ink"
                       >
                         <PhoneIcon className="h-4 w-4" />
                         {person.vorname} anrufen
@@ -477,7 +477,7 @@ export default async function MannschaftPage({
                   {/* Die Karte muss allein tragen. Wer erst weiterblaettern
                       muss, um zu wissen ob "still" auch "leer" heisst, ruft
                       unvorbereitet an. */}
-                  <p className="mt-2.5 text-xs text-slate-500">
+                  <p className="mt-2.5 text-xs text-ink-muted">
                     {[
                       `${person.werte.anrufeWoche} Anrufe diese Woche`,
                       `${person.werte.inAkquise} offene Namen`,
@@ -501,16 +501,16 @@ export default async function MannschaftPage({
       {lage.ruhend.length > 0 && (
         <section className={`${card} p-4 sm:p-5`}>
           <h2 className={kicker}>Du kümmerst dich</h2>
-          <ul className="mt-2.5 divide-y divide-slate-100">
+          <ul className="mt-2.5 divide-y divide-line">
             {lage.ruhend.map((person) => (
               <li key={person.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-2">
                 <Ampel ampel={person.ampel} variante="punkt" groesse="klein" />
-                <NameLink person={person} klasse="text-sm font-medium text-slate-900" />
+                <NameLink person={person} klasse="text-sm font-medium text-ink" />
                 <UeberChip person={person} />
-                <span className="text-sm text-slate-500">
+                <span className="text-sm text-ink-muted">
                   {person.signale[0]?.titel ?? "läuft"}
                 </span>
-                <span className="ml-auto text-xs text-slate-400">
+                <span className="ml-auto text-xs text-ink-soft">
                   nachfassen{" "}
                   {person.betreuung && person.betreuung.faelligAm.getTime() < heuteStart + 86_400_000
                     ? "heute"
@@ -528,20 +528,22 @@ export default async function MannschaftPage({
           zwischen den roten Karten, waere die Liste nach zwei Wochen wieder
           so lang, dass niemand mehr hinsieht - eine Zeile je Person reicht. */}
       {gelb.length > 0 && (
-        <section className={`${card} p-4 sm:p-5`}>
+        // Amber-Ton statt neutraler Karte: dieselbe Ton-Sprache wie bei
+        // "Heute dran" oben - hier haekt es, brennt aber nicht.
+        <section className={`${flaeche("warnung")} p-4 sm:p-5`}>
           <h2 className={kicker}>Hakt, brennt aber nicht</h2>
-          <ul className="mt-2.5 divide-y divide-slate-100">
+          <ul className="mt-2.5 divide-y divide-line">
             {gelb.map((person) => (
               <li
                 key={person.id}
                 className="flex flex-wrap items-baseline gap-x-2 py-2 text-sm"
               >
                 <span aria-hidden className="h-2 w-2 shrink-0 self-center rounded-full bg-amber-400" />
-                <NameLink person={person} klasse="font-medium text-slate-900" />
+                <NameLink person={person} klasse="font-medium text-ink" />
                 {person.ueber && (
-                  <span className="text-xs text-slate-400">über {person.ueber}</span>
+                  <span className="text-xs text-ink-soft">über {person.ueber}</span>
                 )}
-                <span className="text-slate-600">{person.signale[0]!.titel}</span>
+                <span className="text-ink-muted">{person.signale[0]!.titel}</span>
               </li>
             ))}
           </ul>
@@ -589,21 +591,21 @@ export default async function MannschaftPage({
                   key={person.id}
                   id={`p-${person.id}`}
                   className={`${card} p-4 scroll-mt-24 sm:p-5 ${
-                    person.tiefe > 1 ? "border-l-2 border-l-slate-200" : ""
+                    person.tiefe > 1 ? "border-l-2 border-l-line" : ""
                   }`}
                   style={{ marginLeft: `${Math.min(person.tiefe - 1, 3) * 12}px` }}
                 >
                   <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                     <span className="flex items-center gap-2">
                       <Ampel ampel={person.ampel} variante="punkt" />
-                      <NameLink person={person} klasse="text-sm font-semibold text-slate-900" />
+                      <NameLink person={person} klasse="text-sm font-semibold text-ink" />
                       {/* Der Zustand steht jetzt als Wort daneben, nicht mehr
                           nur im sr-only-Text: "braucht dich" muss man sehen. */}
                       <Ampel ampel={person.ampel} variante="text" />
                     </span>
                     <UeberChip person={person} />
                     <Merkmale person={person} />
-                    <span className="ml-auto text-xs text-slate-500">
+                    <span className="ml-auto text-xs text-ink-muted">
                       {/* "seit über 60 Tagen nichts" bei jemandem, der gestern
                           dazugekommen ist, ist schlicht falsch - und es ist
                           das Erste, was eine frische Fuehrungskraft liest. */}
@@ -649,29 +651,29 @@ export default async function MannschaftPage({
                       /heute - sonst redet er über Zahlen, die der andere nicht
                       kennt. */}
                   {person.pass && (
-                    <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
-                      <span className="text-xs font-medium text-slate-500">Starterpass</span>
+                    <div className="mt-3 flex items-center gap-3 border-t border-line pt-3">
+                      <span className="text-xs font-medium text-ink-muted">Starterpass</span>
                       <Fortschritt
                         anteil={person.pass.geschafft / person.pass.gesamt}
                         ton="info"
                         className="flex-1"
                         beschriftung={`Starterpass: ${person.pass.geschafft} von ${person.pass.gesamt}`}
                       />
-                      <span className="text-xs font-semibold tabular-nums text-slate-700">
+                      <span className="text-xs font-semibold tabular-nums text-ink-muted">
                         {person.pass.geschafft} von {person.pass.gesamt}
                       </span>
                     </div>
                   )}
 
                   {person.signale.length > 0 && (
-                    <ul className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+                    <ul className="mt-4 space-y-2 border-t border-line pt-3">
                       {person.signale.map((signal) => (
                         <SignalZeile key={signal.schluessel} signal={signal} />
                       ))}
                     </ul>
                   )}
 
-                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
                     {/* Eine Nachricht an einen Platzhalter kaeme nie an: er hat
                         kein Konto, das ein Postfach oeffnen koennte. */}
                     {!person.platzhalter && (
@@ -688,7 +690,7 @@ export default async function MannschaftPage({
                     {person.telefon && (
                       <a
                         href={`tel:${person.telefon.replace(/[^+\d]/g, "")}`}
-                        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-3.5 text-13 font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-13 font-medium text-ink-muted transition hover:bg-sunken hover:text-ink"
                       >
                         <PhoneIcon className="h-4 w-4" />
                         {person.vorname} anrufen
@@ -696,14 +698,14 @@ export default async function MannschaftPage({
                     )}
                     <Gelesen person={person} />
                     {person.platzhalter ? (
-                      <p className="ml-auto text-xs text-slate-400">
+                      <p className="ml-auto text-xs text-ink-soft">
                         {person.eingeladen
                           ? "Einladung ist raus."
                           : "Antippen, um einen Einladungslink zu erzeugen."}
                       </p>
                     ) : (
                       !person.pipelineSichtbar && (
-                        <p className="ml-auto text-xs text-slate-400">
+                        <p className="ml-auto text-xs text-ink-soft">
                           {person.vorname} zeigt nur Zahlen, keinen Trichter.
                         </p>
                       )
@@ -726,13 +728,13 @@ export default async function MannschaftPage({
         <section className="space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className={kicker}>Einheiten in deiner Struktur</h2>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink-muted">
               {produktionsmonat(berlinToday()).label} · selbst gemeldet
             </span>
           </div>
           <div className={`${card} overflow-x-auto`}>
             <table className="w-full min-w-140 text-left text-sm">
-              <thead className="border-b border-slate-200/80 bg-slate-50/60">
+              <thead className="border-b border-line/80 bg-sunken/60">
                 <tr>
                   <th className={th}>Name</th>
                   <th className={`${th} text-right`}>Eigene</th>
@@ -740,7 +742,7 @@ export default async function MannschaftPage({
                   <th className={`${th} text-right`}>Zusammen</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {alle.map((person) => {
                   const zahlen = einheiten.get(person.id);
                   if (!zahlen) return null;
@@ -749,7 +751,7 @@ export default async function MannschaftPage({
                       key={person.id}
                       className={person.istDu ? "bg-navy-50/40" : undefined}
                     >
-                      <td className={`${td} font-medium text-slate-900`}>
+                      <td className={`${td} font-medium text-ink`}>
                         <span
                           style={{
                             paddingLeft: `${Math.min(person.tiefe, 3) * 12}px`,
@@ -761,20 +763,20 @@ export default async function MannschaftPage({
                       {/* Bei einem Platzhalter ist "0,00" keine Auskunft,
                           sondern eine Behauptung: er hat nie eingetragen, weil
                           er die App nicht hat. Sein Ast kann trotzdem zaehlen. */}
-                      <td className={`${td} text-right tabular-nums text-slate-900`}>
+                      <td className={`${td} text-right tabular-nums text-ink`}>
                         {person.platzhalter
                           ? "—"
                           : formatEinheiten(zahlen.eigenGesamt)}
                       </td>
                       {/* Ein Blatt hat kein Team - dort steht nichts statt einer
                           Null ueber jemanden, der noch niemanden hat. */}
-                      <td className={`${td} text-right tabular-nums text-slate-600`}>
+                      <td className={`${td} text-right tabular-nums text-ink-muted`}>
                         {person.fuehrt > 0
                           ? formatEinheiten(zahlen.teamGesamt)
                           : "—"}
                       </td>
                       <td
-                        className={`${td} text-right font-semibold tabular-nums text-slate-900`}
+                        className={`${td} text-right font-semibold tabular-nums text-ink`}
                       >
                         {person.platzhalter && zahlen.astGesamt === 0
                           ? "—"
@@ -817,7 +819,7 @@ export default async function MannschaftPage({
           <Kennzahl wert={lage.ich.werte.ueberfaellig} bezeichnung="überfällig" />
         </div>
         {lage.ich.signale.length > 0 && (
-          <ul className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+          <ul className="mt-4 space-y-2 border-t border-line pt-3">
             {lage.ich.signale.map((signal) => (
               <SignalZeile key={signal.schluessel} signal={signal} />
             ))}

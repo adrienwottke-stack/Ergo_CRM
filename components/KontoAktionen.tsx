@@ -30,7 +30,7 @@ function LoeschKnopf() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-fest-gefahr px-5 text-sm font-medium text-white transition hover:bg-fest-gefahr-stark active:scale-[0.99] disabled:opacity-60"
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-fest-gefahr px-5 text-sm font-medium text-white transition hover:bg-fest-gefahr-stark active:scale-[0.99] disabled:opacity-60"
     >
       {pending ? "Löscht …" : "Endgültig löschen"}
     </button>
@@ -74,7 +74,7 @@ export default function KontoAktionen({
         type="button"
         onClick={() => setNameOffen(true)}
         title={`Name von ${name} ändern`}
-        className={`${still} text-slate-500 hover:bg-slate-50 hover:text-navy-700`}
+        className={`${still} text-ink-muted hover:bg-sunken hover:text-navy-700`}
       >
         Name ändern
       </button>
@@ -84,7 +84,7 @@ export default function KontoAktionen({
         <button
           type="submit"
           title={`${name} ein neues Passwort setzen lassen`}
-          className={`${still} text-slate-500 hover:bg-slate-50 hover:text-navy-700`}
+          className={`${still} text-ink-muted hover:bg-sunken hover:text-navy-700`}
         >
           Passwort-Link
         </button>
@@ -101,7 +101,14 @@ export default function KontoAktionen({
                 ? `${name} wieder aufnehmen`
                 : `${name} austragen – bleibt im Baum, zählt nicht mehr mit`
             }
-            className={`${still} text-slate-500 hover:bg-slate-50 hover:text-slate-900`}
+            className={
+              // Austragen ist die destruktive Richtung - fest-gefahr macht das
+              // sichtbar. Zurueckholen holt jemanden zurueck, das ist kein
+              // Alarm und bleibt beim stillen Knopf.
+              ausgetragen
+                ? `${still} text-ink-muted hover:bg-sunken hover:text-ink`
+                : "inline-flex min-h-11 items-center rounded-full bg-fest-gefahr px-3 text-xs font-medium text-white transition hover:bg-fest-gefahr-stark"
+            }
           >
             {ausgetragen ? "Zurückholen" : "Austragen"}
           </button>
@@ -113,7 +120,7 @@ export default function KontoAktionen({
           type="button"
           onClick={() => setOffen(true)}
           aria-label={`${name} löschen`}
-          className={`${still} text-slate-300 hover:bg-red-50 hover:text-red-700`}
+          className={`${still} text-ink-soft hover:bg-red-50 hover:text-red-700`}
         >
           <TrashIcon className="h-4 w-4" />
         </button>
@@ -128,13 +135,13 @@ export default function KontoAktionen({
         <form action={benutzerLoeschen}>
           <input type="hidden" name="userId" value={userId} />
 
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-ink-muted">
             Das lässt sich nicht rückgängig machen.
           </p>
 
-          <ul className="mt-3 space-y-1.5 text-sm text-slate-600">
+          <ul className="mt-3 space-y-1.5 text-sm text-ink-muted">
             <li className="flex gap-2">
-              <span aria-hidden className="text-slate-300">
+              <span aria-hidden className="text-ink-soft">
                 —
               </span>
               {kontakte === 0
@@ -142,14 +149,14 @@ export default function KontoAktionen({
                 : `${kontakte} ${kontakte === 1 ? "Kontakt geht" : "Kontakte gehen"} mit, samt Vorgeschichte.`}
             </li>
             <li className="flex gap-2">
-              <span aria-hidden className="text-slate-300">
+              <span aria-hidden className="text-ink-soft">
                 —
               </span>
               Ranglisten-Einträge und Wettbewerbspunkte verschwinden.
             </li>
             {gefuehrte > 0 && (
               <li className="flex gap-2">
-                <span aria-hidden className="text-slate-300">
+                <span aria-hidden className="text-ink-soft">
                   —
                 </span>
                 {gefuehrte === 1 ? "Der Berater" : `Die ${gefuehrte} Berater`}{" "}
@@ -164,7 +171,7 @@ export default function KontoAktionen({
             „Austragen“ — dann bleibt die Historie stehen.
           </p>
 
-          <div className="mt-5 flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+          <div className="mt-5 flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => setOffen(false)}
@@ -199,11 +206,11 @@ export default function KontoAktionen({
               className={input}
             />
           </div>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-muted">
             Ändert den Namen im Konto und, falls vorhanden, in der Rangliste –
             beides zusammen, damit nichts auseinanderläuft.
           </p>
-          <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => setNameOffen(false)}

@@ -51,7 +51,7 @@ export default async function EinladenPage() {
     <div className={`${columnNarrow} space-y-6`}>
       <div>
         <h1 className={pageTitle}>Einladen</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           Wer deinen Link öffnet, wird von dir persönlich begrüßt, baut im
           Start seine Namensliste — und hängt danach in deiner Struktur. Du
           siehst Zahlen und Pipeline, bei Neuen die ersten 30 Tage auch die
@@ -68,13 +68,13 @@ export default async function EinladenPage() {
             {offen.map((invite) => {
               const link = `${herkunft}/einladung/${invite.code}`;
               return (
-                <li key={invite.id} className="space-y-3 border-t border-slate-100 pt-5 first:border-t-0 first:pt-0">
+                <li key={invite.id} className="space-y-3 border-t border-line pt-5 first:border-t-0 first:pt-0">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <code className="block break-all text-sm font-medium text-slate-900">
+                      <code className="block break-all text-sm font-medium text-ink">
                         {link}
                       </code>
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 text-xs text-ink-muted">
                         {invite.note ? `${invite.note} · ` : ""}
                         gültig bis {datumFormat.format(invite.expiresAt)}
                         {invite.maxUses === null
@@ -83,7 +83,7 @@ export default async function EinladenPage() {
                         {invite.stake ? ` · Einsatz: ${invite.stake}` : ""}
                       </p>
                       {invite.greeting && (
-                        <p className="mt-1 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs italic text-slate-600">
+                        <p className="mt-1 rounded-lg bg-sunken px-2.5 py-1.5 text-xs italic text-ink-muted">
                           „{invite.greeting}“
                         </p>
                       )}
@@ -91,7 +91,7 @@ export default async function EinladenPage() {
                           Zuruecknehmen mit verschwindet, gehoert vor den Klick
                           und nicht danach. */}
                       {invite.fuerId && invite.platzhalterAngelegt && (
-                        <p className="mt-1 text-xs text-slate-400">
+                        <p className="mt-1 text-xs text-ink-soft">
                           Steht in deiner Struktur — Zurücknehmen entfernt den
                           Platz wieder.
                         </p>
@@ -101,7 +101,7 @@ export default async function EinladenPage() {
                       <input type="hidden" name="inviteId" value={invite.id} />
                       <button
                         type="submit"
-                        className="min-h-11 rounded-lg px-3 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-red-700"
+                        className="min-h-11 rounded-lg px-3 text-sm font-medium text-ink-muted hover:bg-sunken hover:text-red-700"
                       >
                         Zurücknehmen
                       </button>
@@ -138,13 +138,13 @@ export default async function EinladenPage() {
           <ul className="space-y-2">
             {eingeloest.map((invite) => (
               <li key={invite.id} className="flex items-center justify-between text-sm">
-                <span className="font-medium text-slate-900">
+                <span className="font-medium text-ink">
                   {invite.usedBy?.name ?? `${invite.usedCount} Konten`}
                   {invite.maxUses === null && invite.usedCount > 1
                     ? ` und ${invite.usedCount - 1} weitere`
                     : ""}
                 </span>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-ink-muted">
                   {invite.note ?? invite.code}
                 </span>
               </li>

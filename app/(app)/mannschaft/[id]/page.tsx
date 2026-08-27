@@ -93,7 +93,7 @@ function SchrittZeile({
 }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-      <span className="w-28 shrink-0 text-11 font-semibold uppercase tracking-wider text-slate-400">
+      <span className="w-28 shrink-0 text-11 font-semibold uppercase tracking-wider text-ink-soft">
         {marke}
       </span>
       <span
@@ -101,8 +101,8 @@ function SchrittZeile({
           ton === "warnung"
             ? "font-medium text-amber-700"
             : ton === "still"
-              ? "text-slate-500"
-              : "text-slate-900"
+              ? "text-ink-muted"
+              : "text-ink"
         }`}
       >
         {text}
@@ -138,7 +138,7 @@ function VerlaufsTag({
 }) {
   return (
     <li>
-      <p className="text-11 font-semibold uppercase tracking-wider text-slate-400">
+      <p className="text-11 font-semibold uppercase tracking-wider text-ink-soft">
         {tag}
       </p>
       <ul className="mt-1.5 space-y-1.5">
@@ -150,16 +150,16 @@ function VerlaufsTag({
               aria-hidden
               className={`h-2 w-2 shrink-0 self-center rounded-full ring-2 ring-surface ${ereignisPunkt[ereignis.art]}`}
             />
-            <span className="w-10 shrink-0 tabular-nums text-xs text-slate-400">
+            <span className="w-10 shrink-0 tabular-nums text-xs text-ink-soft">
               {uhrzeit.format(ereignis.wann)}
             </span>
-            <span className="font-medium text-slate-900">{ereignis.was}</span>
-            <span className="text-slate-600">{namensListe(ereignis)}</span>
+            <span className="font-medium text-ink">{ereignis.was}</span>
+            <span className="text-ink-muted">{namensListe(ereignis)}</span>
             {ereignis.zusatz && (
-              <span className="text-xs text-slate-400">· {ereignis.zusatz}</span>
+              <span className="text-xs text-ink-soft">· {ereignis.zusatz}</span>
             )}
             {mitBerater && (
-              <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-11 font-medium text-slate-600">
+              <span className="ml-auto rounded-full bg-sunken px-2 py-0.5 text-11 font-medium text-ink-muted">
                 {namen.get(ereignis.beraterId) ?? "—"}
               </span>
             )}
@@ -176,19 +176,19 @@ function AstZeile({ person }: { person: Mannschaftsperson }) {
     <li>
       <Link
         href={`/mannschaft/${person.id}`}
-        className="-mx-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg px-2 py-2 transition hover:bg-slate-50"
+        className="-mx-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg px-2 py-2 transition hover:bg-sunken"
       >
         <Ampel ampel={person.ampel} variante="punkt" groesse="klein" className="self-center" />
-        <span className="text-sm font-medium text-slate-900">{person.name}</span>
+        <span className="text-sm font-medium text-ink">{person.name}</span>
         {person.fuehrt > 0 && (
           <span className="rounded-full bg-navy-50 px-2 py-0.5 text-11 text-navy-700">
             führt {person.fuehrt}
           </span>
         )}
         {!person.einblick.offen && (
-          <span className="text-11 text-slate-400">nur Zahlen</span>
+          <span className="text-11 text-ink-soft">nur Zahlen</span>
         )}
-        <span className="ml-auto text-xs tabular-nums text-slate-500">
+        <span className="ml-auto text-xs tabular-nums text-ink-muted">
           {w.anrufeWoche} Anrufe · {w.gehaltenWoche} gehalten · {w.abschluesseMonat} Abschl.
         </span>
       </Link>
@@ -253,13 +253,13 @@ export default async function PersonPage({
               Antwort auf die Frage, mit der man diese Seite oeffnet. */}
           <Ampel ampel={person.ampel} variante="text" />
           {person.ueber && (
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+            <span className="rounded-full bg-sunken px-2.5 py-0.5 text-xs font-medium text-ink-muted">
               über {person.ueber}
             </span>
           )}
-          {person.ausgetreten && <span className="text-xs text-slate-400">ausgetreten</span>}
+          {person.ausgetreten && <span className="text-xs text-ink-soft">ausgetreten</span>}
         </div>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           {person.tageDabei !== null ? `${person.tageDabei} Tage dabei` : "Eintritt unbekannt"}
           {fuehrt && ` · führt ${ast.length} ${ast.length === 1 ? "Person" : "Personen"}`}
           {" · "}
@@ -273,7 +273,7 @@ export default async function PersonPage({
       {person.platzhalter ? (
         <section className={`${card} p-4 sm:p-5`}>
           <h2 className={kicker}>Noch nicht dabei</h2>
-          <p className="mt-1.5 text-sm text-slate-600">
+          <p className="mt-1.5 text-sm text-ink-muted">
             {person.vorname} steht in der Struktur, nutzt die App aber noch nicht.
             Hier bleibt es leer, bis er sein Konto hat — Nullen wären eine
             Behauptung über jemanden, der nie gefragt wurde.
@@ -333,7 +333,7 @@ export default async function PersonPage({
       {!person.platzhalter && (
       <section className={`${card} p-4 sm:p-5`}>
         <h2 className={kicker}>Dein Schritt</h2>
-        <p className="mt-1.5 text-sm text-slate-900">{fuehrungsSchritt(person)}</p>
+        <p className="mt-1.5 text-sm text-ink">{fuehrungsSchritt(person)}</p>
         {person.betreuung && (
           <p className="mt-1 text-xs font-medium text-amber-700">
             Du wolltest am {datumKurz.format(person.betreuung.faelligAm)} nachfassen
@@ -350,7 +350,7 @@ export default async function PersonPage({
           {person.telefon && (
             <a
               href={`tel:${person.telefon.replace(/[^+\d]/g, "")}`}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-3.5 text-13 font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-13 font-medium text-ink-muted transition hover:bg-sunken hover:text-ink"
             >
               <PhoneIcon className="h-4 w-4" />
               {person.vorname} anrufen
@@ -365,7 +365,7 @@ export default async function PersonPage({
           )}
         </div>
         {person.signale.length > 0 && (
-          <ul className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+          <ul className="mt-4 space-y-2 border-t border-line pt-3">
             {person.signale.map((signal) => (
               <li key={signal.schluessel} className="flex gap-2.5">
                 <span
@@ -375,8 +375,8 @@ export default async function PersonPage({
                   }`}
                 />
                 <span className="text-sm">
-                  <span className="font-medium text-slate-900">{signal.titel}</span>
-                  <span className="text-slate-600"> — {signal.schritt}</span>
+                  <span className="font-medium text-ink">{signal.titel}</span>
+                  <span className="text-ink-muted"> — {signal.schritt}</span>
                 </span>
               </li>
             ))}
@@ -411,7 +411,7 @@ export default async function PersonPage({
         </div>
 
         {fuehrt && (
-          <div className="mt-4 border-t border-slate-100 pt-4">
+          <div className="mt-4 border-t border-line pt-4">
             <h2 className={kicker}>
               Ast gesamt — {koepfe} {koepfe === 1 ? "Kopf" : "Köpfe"}
               {wartende > 0 && `, ${wartende} noch nicht dabei`}
@@ -456,7 +456,7 @@ export default async function PersonPage({
             {fuehrt ? "Verlauf im Ast" : "Verlauf"} — letzte {VERLAUF_TAGE} Tage
           </h2>
           {verdeckt.length > 0 && (
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-ink-soft">
               {verdeckt.length} {verdeckt.length === 1 ? "Person zeigt" : "Personen zeigen"} nur
               Zahlen
             </span>
@@ -464,11 +464,11 @@ export default async function PersonPage({
         </div>
 
         {offeneIds.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-ink-muted">
             Hier stehen keine Vornamen. {person.einblick.hinweis}
           </p>
         ) : tage.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-ink-muted">
             In {VERLAUF_TAGE} Tagen ist nichts passiert. Das ist die Auskunft — nicht ein
             fehlender Eintrag.
           </p>
@@ -487,7 +487,7 @@ export default async function PersonPage({
         )}
 
         {verdeckt.length > 0 && (
-          <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-400">
+          <p className="mt-4 border-t border-line pt-3 text-xs text-ink-soft">
             Ohne Namen im Verlauf:{" "}
             {verdeckt.map((eintrag) => eintrag.vorname).join(", ")}. Deren Zahlen stehen
             trotzdem in der Summe oben.
@@ -505,19 +505,19 @@ export default async function PersonPage({
             {offeneSachen.termine.length > 0 && (
               <section className={`${card} p-4 sm:p-5`}>
                 <h2 className={kicker}>Termine, die anstehen</h2>
-                <ul className="mt-2.5 divide-y divide-slate-100">
+                <ul className="mt-2.5 divide-y divide-line">
                   {offeneSachen.termine.map((eintrag) => (
                     <li
                       key={eintrag.id}
                       className="flex flex-wrap items-baseline gap-x-2 py-2 text-sm"
                     >
-                      <span className="font-medium text-slate-900">{eintrag.name}</span>
+                      <span className="font-medium text-ink">{eintrag.name}</span>
                       {mitBerater && (
-                        <span className="text-11 text-slate-400">
+                        <span className="text-11 text-ink-soft">
                           {namen.get(eintrag.beraterId) ?? "—"}
                         </span>
                       )}
-                      <span className="ml-auto text-xs tabular-nums text-slate-500">
+                      <span className="ml-auto text-xs tabular-nums text-ink-muted">
                         {eintrag.wann && `${tagKurz.format(eintrag.wann)} ${uhrzeit.format(eintrag.wann)}`}
                       </span>
                     </li>
@@ -529,16 +529,16 @@ export default async function PersonPage({
             {offeneSachen.liegt.length > 0 && (
               <section className={`${card} p-4 sm:p-5`}>
                 <h2 className={kicker}>Liegt länger als eine Woche</h2>
-                <ul className="mt-2.5 divide-y divide-slate-100">
+                <ul className="mt-2.5 divide-y divide-line">
                   {offeneSachen.liegt.map((eintrag) => (
                     <li
                       key={eintrag.id}
                       className="flex flex-wrap items-baseline gap-x-2 py-2 text-sm"
                     >
-                      <span className="font-medium text-slate-900">{eintrag.name}</span>
-                      <span className="text-xs text-slate-500">{eintrag.phase}</span>
+                      <span className="font-medium text-ink">{eintrag.name}</span>
+                      <span className="text-xs text-ink-muted">{eintrag.phase}</span>
                       {mitBerater && (
-                        <span className="text-11 text-slate-400">
+                        <span className="text-11 text-ink-soft">
                           {namen.get(eintrag.beraterId) ?? "—"}
                         </span>
                       )}
@@ -561,22 +561,22 @@ export default async function PersonPage({
           <h2 className={kicker}>
             {person.vorname}s Direkte ({direkte.length})
           </h2>
-          <ul className="mt-1.5 divide-y divide-slate-100">
+          <ul className="mt-1.5 divide-y divide-line">
             {direkte.map((eintrag) => (
               <AstZeile key={eintrag.id} person={eintrag} />
             ))}
           </ul>
 
           {ast.length > direkte.length && (
-            <details className="group mt-4 border-t border-slate-100 pt-3">
+            <details className="group mt-4 border-t border-line pt-3">
               <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2">
                 <span className={kicker}>
                   Tiefer im Ast ({ast.length - direkte.length})
                 </span>
-                <span className="text-xs text-slate-400 group-open:hidden">anzeigen</span>
-                <span className="hidden text-xs text-slate-400 group-open:inline">zuklappen</span>
+                <span className="text-xs text-ink-soft group-open:hidden">anzeigen</span>
+                <span className="hidden text-xs text-ink-soft group-open:inline">zuklappen</span>
               </summary>
-              <ul className="mt-1.5 divide-y divide-slate-100">
+              <ul className="mt-1.5 divide-y divide-line">
                 {ast
                   .filter((eintrag) => !direkte.includes(eintrag))
                   .map((eintrag) => (

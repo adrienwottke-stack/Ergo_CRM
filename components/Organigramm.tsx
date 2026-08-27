@@ -345,7 +345,7 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
   };
 
   const knopf =
-    "inline-flex h-9 min-w-9 items-center justify-center rounded-lg border border-slate-300 bg-surface px-2.5 text-sm font-medium text-slate-600 shadow-sm transition hover:border-slate-400 hover:text-slate-900";
+    "inline-flex h-11 min-w-11 items-center justify-center rounded-lg border border-line-strong bg-surface px-2.5 text-sm font-medium text-ink-muted schatten-karte transition hover:border-line-strong hover:text-ink";
 
   return (
     <div
@@ -360,7 +360,7 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
       // Statt zweier fester Hoehen: so viel vom Fenster, wie uebrig ist -
       // mit Grenzen, damit die Leinwand am Handy nicht zum Streifen wird und
       // am grossen Schirm nicht die ganze Seite verschluckt.
-      className="relative h-[clamp(20rem,62svh,44rem)] w-full cursor-grab overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60 active:cursor-grabbing"
+      className="relative h-[clamp(20rem,62svh,44rem)] w-full cursor-grab overflow-hidden rounded-xl border border-line bg-sunken/60 active:cursor-grabbing"
     >
       <div
         style={{
@@ -384,7 +384,7 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
               fill="none"
               stroke="currentColor"
               strokeWidth={1.5}
-              className="text-slate-300"
+              className="text-line-strong"
             />
           ))}
         </svg>
@@ -401,9 +401,9 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
               <div
                 key={k.id}
                 style={{ left: p.x, top: p.y, width: KASTEN_B, height: KASTEN_H }}
-                className="absolute flex flex-col items-center justify-center rounded-[12px] border border-dashed border-slate-200 bg-slate-50/70 px-[12px] py-[8px]"
+                className="absolute flex flex-col items-center justify-center rounded-[12px] border border-dashed border-line bg-sunken/70 px-[12px] py-[8px]"
               >
-                <span className="truncate text-[14px] font-medium text-slate-500">
+                <span className="truncate text-[14px] font-medium text-ink-muted">
                   {k.name}
                 </span>
               </div>
@@ -428,10 +428,12 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
               style={{ left: p.x, top: p.y, width: KASTEN_B, height: KASTEN_H }}
               className={`absolute flex flex-col justify-center gap-[2px] rounded-[12px] border bg-surface px-[12px] py-[8px] schatten-karte transition duration-200 hover:border-navy-400 hover:schatten-hoch ${
                 k.istDu
-                  ? "border-navy-800 ring-1 ring-navy-800/15"
+                  ? // Eigene Position im Baum - keine Badge-Kontur, sondern die
+                    // Hervorhebung des einen Kastens, an dem man selbst steht.
+                    "border-akzent ring-1 ring-akzent/25"
                   : k.platzhalter
-                    ? "border-dashed border-slate-300"
-                    : "border-slate-200"
+                    ? "border-dashed border-line-strong"
+                    : "border-line"
               } ${k.ausgetreten ? "opacity-50" : ""}`}
             >
               <span className="flex items-center gap-[6px]">
@@ -439,17 +441,17 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
                   aria-hidden
                   className={`h-[10px] w-[10px] shrink-0 rounded-full ${
                     k.platzhalter
-                      ? "border-2 border-slate-300 bg-surface"
+                      ? "border-2 border-line-strong bg-surface"
                       : `${ampelFarben[k.ampel]} ${k.ampel === "rot" ? "animate-halo" : ""}`
                   }`}
                 />
-                <span className="truncate text-[14px] font-semibold text-slate-900">
+                <span className="truncate text-[14px] font-semibold text-ink">
                   {k.name}
                 </span>
                 <span className="sr-only">{ampelTexte[k.ampel]}</span>
               </span>
 
-              <span className="truncate text-[11px] text-slate-500">{k.kopf}</span>
+              <span className="truncate text-[11px] text-ink-muted">{k.kopf}</span>
 
               {k.ast && (
                 <span className="truncate text-[11px] font-medium text-navy-700">
