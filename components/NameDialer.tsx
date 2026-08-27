@@ -10,7 +10,6 @@ import {
   AppointmentDialog,
   ChoiceDialog,
   LATER_CHIPS,
-  LOST_CHIPS,
 } from "@/components/ResultDialogs";
 import { undoMoeglich } from "@/components/UndoBar";
 import {
@@ -24,7 +23,6 @@ import {
   PhoneIcon,
   PhoneOffIcon,
   TrophyIcon,
-  XIcon,
 } from "@/components/icons";
 import { btnPrimary, btnSecondary, card } from "@/components/ui";
 import Fortschritt from "@/components/Fortschritt";
@@ -42,7 +40,7 @@ export type DialerEntry = {
   lastActivity: string | null;
 };
 
-type Result = "appointment" | "unreachable" | "later" | "lost";
+type Result = "appointment" | "unreachable" | "later";
 
 type Tally = Record<Result | "skipped", number>;
 
@@ -50,7 +48,6 @@ const EMPTY_TALLY: Tally = {
   appointment: 0,
   unreachable: 0,
   later: 0,
-  lost: 0,
   skipped: 0,
 };
 
@@ -80,7 +77,7 @@ export default function NameDialer({
   const [showNote, setShowNote] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [dialog, setDialog] = useState<null | "appointment" | "later" | "lost">(null);
+  const [dialog, setDialog] = useState<null | "appointment" | "later">(null);
 
   // Rueckkehr nach dem Telefonat: wer auf "Anrufen" tippt, verlaesst den
   // Browser. Kommt er zurueck, soll die Ergebnisfrage sofort da stehen –
@@ -145,7 +142,7 @@ export default function NameDialer({
   // --- Ende des Durchlaufs --------------------------------------------------
 
   if (!current) {
-    const done = tally.appointment + tally.unreachable + tally.later + tally.lost;
+    const done = tally.appointment + tally.unreachable + tally.later;
     return (
       <div className={`${card} space-y-5 p-8 text-center`}>
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -167,11 +164,10 @@ export default function NameDialer({
         </div>
 
         {done > 0 && (
-          <dl className="grid grid-cols-2 gap-2 text-left sm:grid-cols-4">
+          <dl className="grid grid-cols-3 gap-2 text-left">
             <Stat label="Termine" value={tally.appointment} tone="emerald" />
             <Stat label="Nicht erreicht" value={tally.unreachable} tone="slate" />
             <Stat label="Später" value={tally.later} tone="amber" />
-            <Stat label="Kein Interesse" value={tally.lost} tone="slate" />
           </dl>
         )}
 
@@ -327,7 +323,7 @@ export default function NameDialer({
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             disabled={pending}
@@ -351,14 +347,6 @@ export default function NameDialer({
             className={`${bigButton} bg-amber-100 text-amber-900 hover:bg-amber-200`}
           >
             <ClockIcon className="h-5 w-5" /> Später
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => setDialog("lost")}
-            className={`${bigButton} border border-line-strong bg-surface text-ink-muted hover:bg-sunken`}
-          >
-            <XIcon className="h-5 w-5" /> Kein Interesse
           </button>
         </div>
 
@@ -409,18 +397,6 @@ export default function NameDialer({
         choices={LATER_CHIPS.map((chip) => ({
           label: chip.label,
           onPick: () => submit("later", { days: chip.days }),
-        }))}
-        onClose={() => setDialog(null)}
-      />
-
-      <ChoiceDialog
-        open={dialog === "lost"}
-        title="Woran lag's?"
-        subtitle={current.name}
-        pending={pending}
-        choices={LOST_CHIPS.map((chip) => ({
-          label: chip.label,
-          onPick: () => submit("lost", { lostReason: chip.reason }),
         }))}
         onClose={() => setDialog(null)}
       />

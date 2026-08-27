@@ -1,6 +1,6 @@
 "use client";
 
-// Die Auswahl-Dialoge hinter den vier Gespraechsergebnissen.
+// Die Auswahl-Dialoge hinter den drei Gespraechsergebnissen.
 //
 // Sie standen zuerst im NameDialer und sind hier herausgezogen, damit die
 // Heute-Liste dieselben benutzt statt eigener. Ein Bedienmuster, eine Stelle.
@@ -37,12 +37,6 @@ export const LATER_CHIPS: { label: string; days: string }[] = [
   { label: "In 1 Woche", days: "7" },
   { label: "In 1 Monat", days: "30" },
   { label: "In 3 Monaten", days: "90" },
-];
-
-export const LOST_CHIPS: { label: string; reason: string }[] = [
-  { label: "Kein Bedarf", reason: "KEIN_BEDARF" },
-  { label: "Kein Interesse", reason: "KEIN_INTERESSE" },
-  { label: "Schon versorgt", reason: "KONKURRENZ" },
 ];
 
 const chip = (active: boolean) =>

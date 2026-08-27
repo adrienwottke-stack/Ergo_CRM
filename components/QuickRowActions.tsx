@@ -7,7 +7,7 @@
 // drei Tipps und vierzehn Anschlaege. Jetzt ist er ein Tipp.
 //
 // Drei Modi, weil nicht jeder faellige Schritt ein Anruf ist:
-//   Anruf-Schritt   -> die vier Gespraechsergebnisse
+//   Anruf-Schritt   -> die drei Gespraechsergebnisse
 //   Termin-Schritt  -> gehalten (mit Empfehlungsfrage) oder geplatzt
 //   anderer Schritt -> Erledigt plus Verschiebe-Chips
 // Alles Seltenere liegt hinter "…".
@@ -30,7 +30,6 @@ import {
   AppointmentHeldDialog,
   ChoiceDialog,
   LATER_CHIPS,
-  LOST_CHIPS,
 } from "@/components/ResultDialogs";
 import { undoMoeglich } from "@/components/UndoBar";
 import {
@@ -74,7 +73,7 @@ export default function QuickRowActions({
   const [pending, setPending] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [dialog, setDialog] = useState<
-    null | "appointment" | "later" | "lost" | "gehalten"
+    null | "appointment" | "later" | "gehalten"
   >(null);
   const [mehr, setMehr] = useState<ActionMode | null>(null);
 
@@ -135,14 +134,6 @@ export default function QuickRowActions({
               className={stil.erfolg}
             >
               <CalendarCheckIcon className="h-4 w-4" /> Termin
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => setDialog("lost")}
-              className={stil.neutral}
-            >
-              <XIcon className="h-4 w-4" /> Kein Interesse
             </button>
           </>
         )}
@@ -259,19 +250,6 @@ export default function QuickRowActions({
         choices={LATER_CHIPS.map((chip) => ({
           label: chip.label,
           onPick: () => senden(recordCallResult, { result: "later", days: chip.days }),
-        }))}
-        onClose={() => setDialog(null)}
-      />
-
-      <ChoiceDialog
-        open={dialog === "lost"}
-        title="Woran lag's?"
-        subtitle={contact.name}
-        pending={pending}
-        choices={LOST_CHIPS.map((chip) => ({
-          label: chip.label,
-          onPick: () =>
-            senden(recordCallResult, { result: "lost", lostReason: chip.reason }),
         }))}
         onClose={() => setDialog(null)}
       />
