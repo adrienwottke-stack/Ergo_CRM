@@ -5,7 +5,7 @@ import { FREISCHALTBAR, istFrei } from "@/lib/freischaltung";
 import { merkeNutzung, schalter } from "@/lib/features";
 import WettbewerbNav from "@/components/WettbewerbNav";
 import { LockIcon, TrophyIcon } from "@/components/icons";
-import { btnPrimary, card, kicker, pageTitle, sectionTitle } from "@/components/ui";
+import { btnGhost, card, kicker, pageTitle, sectionTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export default async function SpielPage() {
 
       <div>
         <h1 className={pageTitle}>Spiel</h1>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-ink-muted">
           Was du dir aufmachst, bleibt offen. Stufen fallen nie zurück — anders
           als die Wochentabelle.
         </p>
@@ -35,11 +35,11 @@ export default async function SpielPage() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <span className={kicker}>Stufe {stand.stufe.nummer}</span>
-              <p className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-slate-900">
+              <p className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-ink">
                 {stand.stufe.name}
               </p>
             </div>
-            <span className="text-sm tabular-nums text-slate-500">
+            <span className="text-sm tabular-nums text-ink-muted">
               {stand.gesamt} Punkte gesamt
             </span>
           </div>
@@ -49,7 +49,7 @@ export default async function SpielPage() {
               dessen, was bewusst nicht gebaut wird - der Ton macht den Spass.
               Ein Satz mit einer konkreten Zahl sagt dasselbe und passt zum Rest
               des Werkzeugs. */}
-          <p className="mt-3 text-sm text-slate-700">
+          <p className="mt-3 text-sm text-ink-muted">
             {stand.naechste ? (
               <>
                 Noch{" "}
@@ -64,18 +64,18 @@ export default async function SpielPage() {
             )}
           </p>
 
-          <ol className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 pt-3">
+          <ol className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3">
             {STUFEN.map((stufe) => (
               <li
                 key={stufe.nummer}
                 className={`text-xs tabular-nums ${
                   stufe.nummer <= stand.stufe.nummer
                     ? "font-semibold text-navy-800"
-                    : "text-slate-400"
+                    : "text-ink-soft"
                 }`}
               >
                 {stufe.name}
-                <span className="ml-1 font-normal text-slate-400">{stufe.ab}</span>
+                <span className="ml-1 font-normal text-ink-soft">{stufe.ab}</span>
               </li>
             ))}
           </ol>
@@ -96,15 +96,17 @@ export default async function SpielPage() {
               return (
                 <li
                   key={eintrag.schluessel}
-                  className={`${card} flex flex-col p-5 ${
-                    offen ? "" : "border-dashed bg-slate-50/60"
-                  }`}
+                  className={
+                    offen
+                      ? `${card} flex flex-col p-5`
+                      : "flex flex-col rounded-2xl border border-dashed border-line-strong bg-sunken p-5"
+                  }
                 >
                   <span
                     className={`flex h-9 w-9 items-center justify-center rounded-full ${
                       offen
                         ? "bg-gold-100 text-gold-600"
-                        : "bg-slate-200/70 text-slate-400"
+                        : "border border-line-strong text-ink-soft"
                     }`}
                   >
                     {offen ? (
@@ -116,12 +118,12 @@ export default async function SpielPage() {
 
                   <p
                     className={`mt-3 text-base font-semibold ${
-                      offen ? "text-slate-900" : "text-slate-500"
+                      offen ? "text-ink" : "text-ink-soft"
                     }`}
                   >
                     {eintrag.name}
                   </p>
-                  <p className="mt-1 flex-1 text-sm text-slate-500">
+                  <p className="mt-1 flex-1 text-sm text-ink-muted">
                     {eintrag.beschreibung}
                   </p>
 
@@ -130,12 +132,12 @@ export default async function SpielPage() {
                       href={eintrag.url}
                       target={eintrag.extern ? "_blank" : undefined}
                       rel={eintrag.extern ? "noopener noreferrer" : undefined}
-                      className={`${btnPrimary} mt-4`}
+                      className={`${btnGhost} mt-4`}
                     >
                       Spielen
                     </a>
                   ) : (
-                    <p className="mt-4 text-sm font-medium text-slate-500">
+                    <p className="mt-4 text-sm font-medium text-ink-soft">
                       Ab Stufe {eintrag.abStufe}
                       {noetig ? ` (${noetig.name})` : ""} — noch{" "}
                       <span className="tabular-nums">{fehlt}</span>{" "}
@@ -147,7 +149,7 @@ export default async function SpielPage() {
             })}
           </ul>
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-muted">
             Storno ist eine eigene Liga: Punkte gehen von der Arbeit ins Spiel,
             nie zurück.
           </p>

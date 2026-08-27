@@ -40,18 +40,18 @@ type RangeKey = keyof typeof ranges;
 
 const podiumStyles = [
   {
-    chip: "bg-gold-100 text-gold-600 ring-gold-600/25",
+    chip: "bg-gold-100 text-gold-600",
     card: "border-gold-400/40 bg-gold-100/40",
     label: "Führung",
   },
   {
-    chip: "bg-slate-200 text-slate-600 ring-slate-500/20",
-    card: "border-slate-200/80 bg-surface",
+    chip: "bg-slate-200 text-slate-600",
+    card: "border-line/80 bg-surface",
     label: "Platz 2",
   },
   {
-    chip: "bg-amber-100 text-amber-700 ring-amber-600/20",
-    card: "border-slate-200/80 bg-surface",
+    chip: "bg-amber-100 text-amber-700",
+    card: "border-line/80 bg-surface",
     label: "Platz 3",
   },
 ];
@@ -61,14 +61,14 @@ function RankChip({ rank }: { rank: number }) {
   if (style) {
     return (
       <span
-        className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-13 font-semibold ring-1 ring-inset ${style.chip}`}
+        className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-13 font-semibold ${style.chip}`}
       >
         {rank}
       </span>
     );
   }
   return (
-    <span className="inline-flex h-7 w-7 items-center justify-center text-13 font-medium tabular-nums text-slate-500">
+    <span className="inline-flex h-7 w-7 items-center justify-center text-13 font-medium tabular-nums text-ink-muted">
       {rank}
     </span>
   );
@@ -154,7 +154,7 @@ export default async function LeaderboardPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className={pageTitle}>Rangliste</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             {ranking.length === 0
               ? "Noch alles offen."
               : `${ranking[0]!.name} führt mit ${ranking[0]!.total} Punkten.`}
@@ -185,10 +185,10 @@ export default async function LeaderboardPage({
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gold-100 text-gold-600">
             <TrophyIcon className="h-6 w-6" />
           </span>
-          <p className="mt-4 text-sm font-medium text-slate-900">
+          <p className="mt-4 text-sm font-medium text-ink">
             Noch keine Einträge in diesem Zeitraum
           </p>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Sei die erste Person auf dem Board!
           </p>
           <Link href="/log" className={`${btnPrimary} mt-6`}>
@@ -216,21 +216,21 @@ export default async function LeaderboardPage({
                     <RankChip rank={index + 1} />
                     <span className={kicker}>{style.label}</span>
                   </div>
-                  <p className="mt-4 truncate text-base font-semibold text-slate-900">
+                  <p className="mt-4 truncate text-base font-semibold text-ink">
                     {row.name}
                   </p>
                   <div className="mt-1 flex items-baseline gap-2">
-                    <p className="text-4xl font-semibold tracking-tight tabular-nums text-slate-900">
+                    <p className="text-4xl font-semibold tracking-tight tabular-nums text-ink">
                       {row.total}
                     </p>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-ink-muted">
                       {index === 0
                         ? "Punkte"
                         : `−${gap} auf Platz 1`}
                     </span>
                   </div>
                   {streak >= 2 && (
-                    <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold text-gold-600 ring-1 ring-inset ring-gold-600/25">
+                    <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold text-gold-600">
                       <FlameIcon className="h-3.5 w-3.5" />
                       {streak} Tage Serie
                     </p>
@@ -242,7 +242,7 @@ export default async function LeaderboardPage({
 
           <div className={`${card} overflow-x-auto`}>
             <table className="w-full min-w-160 text-left text-sm">
-              <thead className="border-b border-slate-200/80 bg-slate-50/60">
+              <thead className="border-b border-line/80 bg-sunken/60">
                 <tr>
                   <th className={th}>Platz</th>
                   <th className={th}>Name</th>
@@ -254,7 +254,7 @@ export default async function LeaderboardPage({
                   <th className={`${th} w-56 text-right`}>Gesamt</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {ranking.map((row, index) => {
                   const streak = streakDays(
                     daysByPerson.get(row.personId) ?? new Set(),
@@ -272,7 +272,7 @@ export default async function LeaderboardPage({
                       <td className={td}>
                         <RankChip rank={index + 1} />
                       </td>
-                      <td className={`${td} font-medium text-slate-900`}>
+                      <td className={`${td} font-medium text-ink`}>
                         <span className="flex items-center gap-2">
                           {row.name}
                           {streak >= 2 && (
@@ -289,14 +289,14 @@ export default async function LeaderboardPage({
                       {allQuotaTypes.map((type) => (
                         <td
                           key={type}
-                          className={`${td} text-right tabular-nums text-slate-600`}
+                          className={`${td} text-right tabular-nums text-ink-muted`}
                         >
                           {row.byType[type]}
                         </td>
                       ))}
                       <td className={td}>
                         <div className="flex items-center justify-end gap-3">
-                          <span className="w-8 text-right text-sm font-semibold tabular-nums text-slate-900">
+                          <span className="w-8 text-right text-sm font-semibold tabular-nums text-ink">
                             {row.total}
                           </span>
                           <span
@@ -321,7 +321,7 @@ export default async function LeaderboardPage({
         </>
       )}
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-muted">
         Woche = ab Montag, Zeitzone Europe/Berlin. Sichtbar sind nur Namen und
         Zahlen – keine Kontaktdaten.
       </p>

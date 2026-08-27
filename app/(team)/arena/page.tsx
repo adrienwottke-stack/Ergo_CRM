@@ -22,6 +22,7 @@ import { stufeVon } from "@/lib/stufen";
 import ArenaTakt from "@/components/ArenaTakt";
 import WettbewerbNav from "@/components/WettbewerbNav";
 import SprintUhr from "@/components/SprintUhr";
+import Fortschritt from "@/components/Fortschritt";
 import NachrichtSenden from "@/components/NachrichtSenden";
 import Postfach from "@/components/Postfach";
 import Feed from "@/components/Feed";
@@ -186,8 +187,8 @@ export default async function ArenaPage() {
         {/* Der Rang, der nicht faellt. Die Tabelle darunter faengt jeden
             Montag bei null an - das hier nicht. */}
         {an.stufen && (
-          <p className="mt-2 text-sm text-slate-500">
-            <Link href="/spiel" className="font-semibold text-slate-900 hover:text-navy-700">
+          <p className="mt-2 text-sm text-ink-muted">
+            <Link href="/spiel" className="font-semibold text-ink hover:text-navy-700">
               {stufe.stufe.name}
             </Link>
             {stufe.naechste ? (
@@ -222,7 +223,7 @@ export default async function ArenaPage() {
             <h2 className={sectionTitle}>Titel dieser Woche</h2>
             <span className={kicker}>Stand jetzt</span>
           </div>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Punkte belohnen Menge. Titel belohnen, was du kannst — vorn sein
             geht auch ohne die meisten Punkte.
           </p>
@@ -231,26 +232,26 @@ export default async function ArenaPage() {
             {titel.map((stand) => (
               <li
                 key={stand.schluessel}
-                className="border-t border-slate-100 pt-2.5 first:border-0 first:pt-0"
+                className="border-t border-line pt-2.5 first:border-0 first:pt-0"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                  <span className="text-sm font-semibold text-slate-900">
+                  <span className="text-sm font-semibold text-ink">
                     {stand.titel}
                   </span>
                   {stand.haelter ? (
-                    <span className="text-sm text-slate-700">
+                    <span className="text-sm text-ink-muted">
                       {stand.haelter.name}{" "}
-                      <span className="tabular-nums text-slate-400">
+                      <span className="tabular-nums text-ink-soft">
                         {stand.haelter.wert}
                       </span>
                     </span>
                   ) : (
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-ink-soft">
                       noch frei
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-xs text-ink-muted">
                   {stand.haelter ? stand.sagt : stand.offenWeil}
                 </p>
               </li>
@@ -268,7 +269,7 @@ export default async function ArenaPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className={sectionTitle}>Gemeinsamer Sprint</h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-ink-muted">
                 {SPRINT_MINUTEN} Minuten, alle gleichzeitig. Gezählt wird, was in
                 dieser Zeit dazukommt.
               </p>
@@ -294,19 +295,19 @@ export default async function ArenaPage() {
                     <span
                       className={`w-32 shrink-0 truncate ${
                         teilnahme.personId === person.id
-                          ? "font-semibold text-slate-900"
-                          : "text-slate-600"
+                          ? "font-semibold text-ink"
+                          : "text-ink-muted"
                       }`}
                     >
                       {teilnahme.person.name}
                     </span>
-                    <span aria-hidden className="h-2 flex-1 overflow-hidden rounded-full bg-navy-100">
-                      <span
-                        className="block h-full rounded-full bg-navy-600 transition-all"
-                        style={{ width: `${Math.max((wert / hoechst) * 100, 3)}%` }}
-                      />
-                    </span>
-                    <span className="w-8 text-right tabular-nums font-semibold text-slate-900">
+                    <Fortschritt
+                      anteil={Math.max(wert / hoechst, 0.03)}
+                      ton="info"
+                      hoehe="normal"
+                      className="flex-1"
+                    />
+                    <span className="w-8 text-right tabular-nums font-semibold text-ink">
                       {wert}
                     </span>
                   </div>
@@ -328,7 +329,7 @@ export default async function ArenaPage() {
       {an.puls && (
         <div className={`${card} p-5`}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm font-medium text-slate-900">
+            <p className="text-sm font-medium text-ink">
               Heute schon dran: {puls.aktiv} von {puls.koepfe}
             </p>
             <span className={kicker}>Puls</span>
@@ -337,8 +338,8 @@ export default async function ArenaPage() {
             <ul className="mt-3 space-y-1.5">
               {puls.zuletzt.map((eintrag) => (
                 <li key={eintrag.name} className="flex justify-between text-sm">
-                  <span className="text-slate-700">{eintrag.name}</span>
-                  <span className="text-xs text-slate-400">{vorMinuten(eintrag.at)}</span>
+                  <span className="text-ink-muted">{eintrag.name}</span>
+                  <span className="text-xs text-ink-soft">{vorMinuten(eintrag.at)}</span>
                 </li>
               ))}
             </ul>
@@ -352,26 +353,26 @@ export default async function ArenaPage() {
           <h2 className={sectionTitle}>Dein Zweikampf</h2>
           <div className="mt-4 space-y-2">
             {vorMir && (
-              <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 text-sm">
-                <span className="text-slate-600">{vorMir.name}</span>
-                <span className="tabular-nums text-slate-600">{vorMir.punkte}</span>
+              <div className="flex items-center justify-between rounded-xl bg-sunken px-4 py-2.5 text-sm">
+                <span className="text-ink-muted">{vorMir.name}</span>
+                <span className="tabular-nums text-ink-muted">{vorMir.punkte}</span>
               </div>
             )}
-            <div className="flex items-center justify-between rounded-xl bg-navy-800 px-4 py-3 text-sm text-white">
-              <span className="font-semibold">
+            <div className="flex items-center justify-between rounded-xl bg-navy-50 px-4 py-3 text-sm">
+              <span className="font-semibold text-navy-900">
                 {platz}. {meine.name}
               </span>
-              <span className="tabular-nums font-semibold">{meine.punkte}</span>
+              <span className="tabular-nums font-semibold text-navy-900">{meine.punkte}</span>
             </div>
             {hinterMir && (
-              <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5 text-sm">
-                <span className="text-slate-600">{hinterMir.name}</span>
-                <span className="tabular-nums text-slate-600">{hinterMir.punkte}</span>
+              <div className="flex items-center justify-between rounded-xl bg-sunken px-4 py-2.5 text-sm">
+                <span className="text-ink-muted">{hinterMir.name}</span>
+                <span className="tabular-nums text-ink-muted">{hinterMir.punkte}</span>
               </div>
             )}
           </div>
           {vorMir && (
-            <p className="mt-3 text-sm text-slate-700">
+            <p className="mt-3 text-sm text-ink-muted">
               <span className="font-semibold">
                 {punkteText(vorMir.punkte - meine.punkte)} auf {vorMir.name}.
               </span>{" "}
@@ -379,7 +380,7 @@ export default async function ArenaPage() {
             </p>
           )}
           {!vorMir && (
-            <p className="mt-3 text-sm text-slate-700">
+            <p className="mt-3 text-sm text-ink-muted">
               Du führst. {hinterMir ? `${punkteText(meine.punkte - hinterMir.punkte)} Vorsprung auf ${hinterMir.name}.` : ""}
             </p>
           )}
@@ -387,13 +388,13 @@ export default async function ArenaPage() {
       )}
 
       {/* --- Tabelle ------------------------------------------------------- */}
-      <div className={`${card} divide-y divide-slate-100`}>
+      <div className={`${card} divide-y divide-line`}>
         {zeilen.length === 0 ? (
           <div className="flex flex-col items-center px-6 py-12 text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gold-100 text-gold-600">
               <TrophyIcon className="h-6 w-6" />
             </span>
-            <p className="mt-4 text-sm font-medium text-slate-900">
+            <p className="mt-4 text-sm font-medium text-ink">
               Diese Woche hat noch keiner etwas geloggt
             </p>
             <Link href="/log" className={`${btnPrimary} mt-5`}>
@@ -408,8 +409,8 @@ export default async function ArenaPage() {
                 zeile.personId === person.id ? "bg-navy-50/60" : ""
               }`}
             >
-              <span className="w-6 text-right tabular-nums text-slate-400">{index + 1}</span>
-              <span className="flex-1 truncate font-medium text-slate-900">
+              <span className="w-6 text-right tabular-nums text-ink-soft">{index + 1}</span>
+              <span className="flex-1 truncate font-medium text-ink">
                 {zeile.name}
                 {zeile.serie >= 2 && (
                   <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-gold-600">
@@ -418,10 +419,10 @@ export default async function ArenaPage() {
                   </span>
                 )}
               </span>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-ink-soft">
                 {zeile.ausCrm > 0 && `${Math.round((zeile.ausCrm / zeile.punkte) * 100)}% aus dem CRM`}
               </span>
-              <span className="w-10 text-right tabular-nums font-semibold text-slate-900">
+              <span className="w-10 text-right tabular-nums font-semibold text-ink">
                 {zeile.punkte}
               </span>
               {/* Ein Wort an den Kollegen, im Moment des Ergebnisses. */}
@@ -436,7 +437,7 @@ export default async function ArenaPage() {
         )}
       </div>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-muted">
         Woche ab Montag, Abpfiff Freitag 18 Uhr. Sichtbar sind nur Namen und
         Zahlen — keine Kontaktdaten.
       </p>

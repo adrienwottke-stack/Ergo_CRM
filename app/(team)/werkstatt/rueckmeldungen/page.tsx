@@ -1,7 +1,18 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
-import { card, chip, cn, filterPill, kicker, label, pageTitle, punkt } from "@/components/ui";
+import {
+  btnSecondary,
+  card,
+  chip,
+  cn,
+  filterPill,
+  input,
+  kicker,
+  label,
+  pageTitle,
+  punkt,
+} from "@/components/ui";
 import { MegafonIcon } from "@/components/icons";
 import LeerZustand from "@/components/LeerZustand";
 import {
@@ -76,7 +87,7 @@ export default async function RueckmeldungenPage({
       <div>
         <p className={kicker}>Werkstatt</p>
         <h1 className={cn(pageTitle, "mt-1")}>Rückmeldungen</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           Nur für dich. Was die Leute von sich aus melden — {offen}{" "}
           {offen === 1 ? "Stück offen" : "Stück offen"}.
         </p>
@@ -121,10 +132,10 @@ export default async function RueckmeldungenPage({
                   )}
                   aria-hidden
                 />
-                <span className="text-sm font-medium text-slate-900">
+                <span className="text-sm font-medium text-ink">
                   {meldung.user.name}
                 </span>
-                <span className="text-[13px] text-slate-500">
+                <span className="text-13 text-ink-muted">
                   {stimmungText(meldung.stimmung)}
                 </span>
                 {meldung.anliegen && (
@@ -133,7 +144,7 @@ export default async function RueckmeldungenPage({
                 <span className={chip(standTon(meldung.stand))}>
                   {standText(meldung.stand)}
                 </span>
-                <span className="ml-auto text-xs tabular-nums text-slate-400">
+                <span className="ml-auto text-xs tabular-nums text-ink-soft">
                   {zeitFormat.format(meldung.createdAt)}
                   {meldung.seite && (
                     <>
@@ -145,7 +156,7 @@ export default async function RueckmeldungenPage({
               </div>
 
               {meldung.text && (
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">
                   {meldung.text}
                 </p>
               )}
@@ -156,13 +167,15 @@ export default async function RueckmeldungenPage({
                       Sonst zoege ein Postfach mit zwanzig Meldungen zwanzig
                       Aufnahmen aus der Datenbank, von denen keine gehoert
                       wird. */}
-                  <audio
-                    controls
-                    preload="none"
-                    src={`/werkstatt/rueckmeldungen/${meldung.id}/audio`}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-slate-400">
+                  <div className="rounded-xl border border-line bg-sunken p-2">
+                    <audio
+                      controls
+                      preload="none"
+                      src={`/werkstatt/rueckmeldungen/${meldung.id}/audio`}
+                      className="w-full"
+                    />
+                  </div>
+                  <p className="text-xs text-ink-soft">
                     Sprachnachricht · {laengeText(meldung.audio.ms)} ·{" "}
                     {Math.round(meldung.audio.bytes / 1024)} KB
                   </p>
@@ -170,7 +183,7 @@ export default async function RueckmeldungenPage({
               )}
 
               {!meldung.text && !meldung.audio && (
-                <p className="text-sm italic text-slate-400">
+                <p className="text-sm italic text-ink-soft">
                   Nur die Stimmung, kein Wort dazu.
                 </p>
               )}
@@ -179,7 +192,7 @@ export default async function RueckmeldungenPage({
                   wird serverseitig neu geprueft. Kein .bind() ans Formular. */}
               <form
                 action={standSetzen}
-                className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-end"
+                className="flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-end"
               >
                 <input type="hidden" name="id" value={meldung.id} />
                 <div className="sm:w-44">
@@ -190,7 +203,7 @@ export default async function RueckmeldungenPage({
                     id={`stand-${meldung.id}`}
                     name="stand"
                     defaultValue={meldung.stand}
-                    className="mt-1.5 min-h-11 w-full rounded-lg border border-line-strong bg-surface px-2 text-sm"
+                    className={input}
                   >
                     {STAENDE.map((eintrag) => (
                       <option key={eintrag.wert} value={eintrag.wert}>
@@ -208,13 +221,10 @@ export default async function RueckmeldungenPage({
                     name="notiz"
                     defaultValue={meldung.notiz ?? ""}
                     placeholder="Was du damit vorhast …"
-                    className="mt-1.5 min-h-11 w-full rounded-lg border border-line-strong bg-surface px-3 text-sm"
+                    className={input}
                   />
                 </div>
-                <button
-                  type="submit"
-                  className="min-h-11 shrink-0 rounded-lg border border-line-strong bg-surface px-4 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-                >
+                <button type="submit" className={cn(btnSecondary, "shrink-0")}>
                   Übernehmen
                 </button>
               </form>

@@ -82,14 +82,14 @@ export default async function LogPage() {
         <div className="flex flex-wrap items-center gap-3">
           <h1 className={pageTitle}>Meine Aktivitäten</h1>
           {streak >= 2 && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2.5 py-1 text-xs font-semibold text-gold-600 ring-1 ring-inset ring-gold-600/25">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2.5 py-1 text-xs font-semibold text-gold-600">
               <FlameIcon className="h-3.5 w-3.5" />
               {streak} Tage Serie
             </span>
           )}
         </div>
-        <p className="mt-1 text-sm text-slate-500">
-          Du loggst als <span className="font-medium text-slate-900">{person.name}</span>.
+        <p className="mt-1 text-sm text-ink-muted">
+          Du loggst als <span className="font-medium text-ink">{person.name}</span>.
           Anrufe und Termine aus deinem CRM werden automatisch gezählt.
         </p>
       </div>
@@ -120,7 +120,7 @@ export default async function LogPage() {
 
       <form action={logDaily} className={`${card} space-y-5 p-6 sm:p-8`}>
         <h2 className={sectionTitle}>Zusätzlich manuell loggen</h2>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink-muted">
           Nur für Aktivitäten, die nicht über einen CRM-Kontakt erfasst wurden.
         </p>
         <div className="grid gap-5 sm:grid-cols-3">
@@ -135,7 +135,7 @@ export default async function LogPage() {
           <label htmlFor="day" className={label}>Tag</label>
           <input id="day" name="day" type="date" defaultValue={today} max={today} className={input} />
         </div>
-        <div className="flex justify-end border-t border-slate-100 pt-5">
+        <div className="flex justify-end border-t border-line pt-5">
           <button type="submit" className={btnPrimary}>Speichern</button>
         </div>
       </form>
@@ -149,11 +149,11 @@ export default async function LogPage() {
         </div>
         {recentLogs.length === 0 ? (
           <div className={`${card} px-6 py-12 text-center`}>
-            <p className="text-sm font-medium text-slate-900">Noch nichts geloggt</p>
-            <p className="mt-1 text-sm text-slate-500">Deine CRM-Aktivitäten erscheinen hier automatisch.</p>
+            <p className="text-sm font-medium text-ink">Noch nichts geloggt</p>
+            <p className="mt-1 text-sm text-ink-muted">Deine CRM-Aktivitäten erscheinen hier automatisch.</p>
           </div>
         ) : (
-          <ul className={`${card} divide-y divide-slate-100`}>
+          <ul className={`${card} divide-y divide-line`}>
             {recentLogs.map((log) => {
               const isToday = log.date.getTime() === todayDate.getTime();
               return (
@@ -163,16 +163,21 @@ export default async function LogPage() {
                       <QuotaIcon type={log.type} className="h-4 w-4" />
                     </span>
                     <span>
-                      <span className="font-semibold text-slate-900">+{log.count}</span>{" "}
-                      <span className="text-slate-600">{quotaTypeLabels[log.type]}</span>
+                      <span className="font-semibold text-ink">+{log.count}</span>{" "}
+                      <span className="text-ink-muted">{quotaTypeLabels[log.type]}</span>
                     </span>
                   </span>
                   <span className="flex items-center gap-4">
-                    <span className="text-xs tabular-nums text-slate-500">{dayDisplayFormat.format(log.date)}</span>
+                    <span className="text-xs tabular-nums text-ink-muted">{dayDisplayFormat.format(log.date)}</span>
                     {isToday && !log.activityId && (
                       <form action={deleteLog}>
                         <input type="hidden" name="logId" value={log.id} />
-                        <button type="submit" className="text-xs font-medium text-slate-500 transition hover:text-red-600">Löschen</button>
+                        <button
+                          type="submit"
+                          className="inline-flex min-h-11 items-center text-xs font-medium text-ink-muted transition hover:text-ink"
+                        >
+                          Löschen
+                        </button>
                       </form>
                     )}
                   </span>

@@ -3,14 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, shiftDay } from "@/lib/dates";
 import {
+  btnSecondary,
   card,
+  cardInteractive,
   chip,
   cn,
+  inputBlank,
   kicker,
   pageTitle,
   sectionTitle,
   td,
   th,
+  type Ton,
 } from "@/components/ui";
 import { MegafonIcon } from "@/components/icons";
 import { OFFENE_STAENDE } from "@/lib/rueckmeldung";
@@ -34,11 +38,11 @@ const standTexte: Record<string, string> = {
   ABGERISSEN: "Abgerissen",
 };
 
-const standStile: Record<string, string> = {
-  TEST: "bg-navy-50 text-navy-700 ring-navy-600/20",
-  LAEUFT: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-  AUS: "bg-slate-100 text-slate-600 ring-slate-400/20",
-  ABGERISSEN: "bg-slate-100 text-slate-500 ring-slate-400/20",
+const standTon: Record<string, Ton> = {
+  TEST: "info",
+  LAEUFT: "erfolg",
+  AUS: "neutral",
+  ABGERISSEN: "neutral",
 };
 
 // Darunter fliegt ein Baustein nach drei Wochen raus.
@@ -92,7 +96,7 @@ export default async function WerkstattPage() {
     <div className="space-y-6">
       <div>
         <h1 className={pageTitle}>Werkstatt</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           Nur für dich. Wie viele Köpfe jeden Baustein in den letzten sieben
           Tagen überhaupt benutzt haben.
         </p>
@@ -102,17 +106,14 @@ export default async function WerkstattPage() {
           Rueckmeldung sagt, WARUM. Das eine ersetzt das andere nicht. */}
       <Link
         href="/werkstatt/rueckmeldungen"
-        className={cn(
-          card,
-          "flex items-center gap-3 p-4 transition hover:-translate-y-px hover:border-line-strong hover:schatten-hoch",
-        )}
+        className={cn(cardInteractive, "flex items-center gap-3 p-4")}
       >
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-50 text-navy-600">
           <MegafonIcon className="h-5 w-5" />
         </span>
         <span className="min-w-0">
-          <span className="block text-sm font-medium text-slate-900">Rückmeldungen</span>
-          <span className="block text-[13px] text-slate-500">
+          <span className="block text-sm font-medium text-ink">Rückmeldungen</span>
+          <span className="block text-13 text-ink-muted">
             Was die Leute von sich aus melden.
           </span>
         </span>
@@ -123,7 +124,7 @@ export default async function WerkstattPage() {
 
       <div className={`${card} overflow-x-auto`}>
         <table className="w-full min-w-180 text-left text-sm">
-          <thead className="border-b border-slate-200/80 bg-slate-50/60">
+          <thead className="border-b border-line/80 bg-sunken/60">
             <tr>
               <th className={th}>Baustein</th>
               <th className={`${th} text-right`}>Benutzt von</th>
@@ -131,20 +132,20 @@ export default async function WerkstattPage() {
               <th className={th}>Schalter</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line">
             {features.map((feature) => {
               const benutzt = kopfZahl.get(feature.key)?.size ?? 0;
               return (
                 <tr key={feature.key} className="align-top">
-                  <td className={`${td} font-medium text-slate-900`}>
+                  <td className={`${td} font-medium text-ink`}>
                     {feature.titel}
                     {feature.beschreibung && (
-                      <p className="mt-1 max-w-sm text-xs font-normal leading-relaxed text-slate-500">
+                      <p className="mt-1 max-w-sm text-xs font-normal leading-relaxed text-ink-muted">
                         {feature.beschreibung}
                       </p>
                     )}
                     {feature.grund && (
-                      <p className="mt-1 max-w-sm text-xs font-normal text-slate-500">
+                      <p className="mt-1 max-w-sm text-xs font-normal text-ink-muted">
                         Bleibt drin, weil: {feature.grund}
                       </p>
                     )}
@@ -156,17 +157,15 @@ export default async function WerkstattPage() {
                       className={
                         koepfe >= ABRISS_KOEPFE && benutzt < ABRISS_KOEPFE
                           ? "text-amber-600"
-                          : "text-slate-900"
+                          : "text-ink"
                       }
                     >
                       {benutzt}
                     </span>
-                    <span className="text-slate-400"> / {koepfe}</span>
+                    <span className="text-ink-soft"> / {koepfe}</span>
                   </td>
                   <td className={td}>
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-11 font-semibold ring-1 ring-inset ${standStile[feature.state]}`}
-                    >
+                    <span className={chip(standTon[feature.state])}>
                       {standTexte[feature.state]}
                     </span>
                   </td>
@@ -177,7 +176,7 @@ export default async function WerkstattPage() {
                         name="state"
                         defaultValue={feature.state}
                         aria-label={`Stand von ${feature.titel}`}
-                        className="min-h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-xs"
+                        className={inputBlank}
                       >
                         {Object.entries(standTexte).map(([wert, text]) => (
                           <option key={wert} value={wert}>
@@ -190,12 +189,9 @@ export default async function WerkstattPage() {
                         defaultValue={feature.grund ?? ""}
                         placeholder="Bleibt drin, weil …"
                         aria-label={`Grund für ${feature.titel}`}
-                        className="min-h-9 w-full rounded-lg border border-slate-300 px-2 text-xs"
+                        className={inputBlank}
                       />
-                      <button
-                        type="submit"
-                        className="min-h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                      >
+                      <button type="submit" className={cn(btnSecondary, "w-full")}>
                         Übernehmen
                       </button>
                     </form>
@@ -230,11 +226,11 @@ export default async function WerkstattPage() {
       <div className={`${card} p-5 sm:p-6`}>
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h2 className={sectionTitle}>Gesucht, nichts gefunden</h2>
-          <span className="text-xs text-slate-500">letzte 30 Tage</span>
+          <span className="text-xs text-ink-muted">letzte 30 Tage</span>
         </div>
 
         {ohneTreffer.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">
+          <p className="mt-3 text-sm text-ink-muted">
             Nichts. Entweder findet jeder alles — oder den Wegweiser benutzt
             keiner. Welches von beidem, steht oben in der Zeile
             &bdquo;Wegweiser&ldquo;.
@@ -247,14 +243,14 @@ export default async function WerkstattPage() {
                   key={zeile.begriff}
                   className="inline-flex items-center gap-2 rounded-full border border-line-strong bg-surface px-3 py-1.5 text-13"
                 >
-                  <span className="text-slate-800">{zeile.begriff}</span>
-                  <span className="tabular-nums text-slate-400">
+                  <span className="text-ink">{zeile.begriff}</span>
+                  <span className="tabular-nums text-ink-soft">
                     {zeile._sum.count ?? 0}
                   </span>
                 </li>
               ))}
             </ul>
-            <p className="mt-4 text-xs text-slate-500">
+            <p className="mt-4 text-xs text-ink-muted">
               Fehlt nur das Wort, gehört es als Synonym in{" "}
               <code className="rounded bg-sunken px-1 py-0.5">
                 lib/wegweiser.ts
