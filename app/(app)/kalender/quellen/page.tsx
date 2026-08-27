@@ -64,7 +64,7 @@ export default async function QuellenPage({
     <div className={`${columnNarrow} space-y-6`}>
       <div>
         <h1 className={pageTitle}>TimeTree hereinholen</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           Damit stehen deine TimeTree-Termine im{" "}
           <Link href="/kalender" className="font-medium text-navy-600 hover:underline">
             Kalender
@@ -122,10 +122,10 @@ export default async function QuellenPage({
             <div key={quelle.id} className={`${card} space-y-3 p-4`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900">
+                  <p className="truncate text-sm font-semibold text-ink">
                     {quelle.name}
                   </p>
-                  <p className="truncate text-xs text-slate-500">
+                  <p className="truncate text-xs text-ink-muted">
                     {quelle.zugangUid} · {quelle._count.termine}{" "}
                     {quelle._count.termine === 1 ? "Termin" : "Termine"}
                     {quelle.letzterLauf
@@ -168,7 +168,7 @@ export default async function QuellenPage({
       {auswahl ? (
         <section className={`${card} space-y-4 p-5`}>
           <h2 className={sectionTitle}>Welchen Kalender?</h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-muted">
             Angemeldet als {auswahl.email}. Bitte das Passwort noch einmal
             eingeben — zwischen den beiden Schritten wird es nicht gespeichert.
           </p>
@@ -181,7 +181,7 @@ export default async function QuellenPage({
                 {auswahl.kalender.map((kalender, i) => (
                   <label
                     key={kalender.id}
-                    className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-line-strong bg-surface px-3.5 text-sm text-slate-700 transition has-[:checked]:border-navy-600 has-[:checked]:bg-navy-50"
+                    className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-line-strong bg-surface px-3.5 text-sm text-ink-muted transition has-[:checked]:border-navy-600 has-[:checked]:bg-navy-50"
                   >
                     <input
                       type="radio"

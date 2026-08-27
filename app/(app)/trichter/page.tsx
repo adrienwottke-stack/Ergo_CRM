@@ -6,6 +6,7 @@ import { berlinToday, dayToUtcDate, shiftDay, startOfWeek } from "@/lib/dates";
 import type { LostReason } from "@/lib/generated/prisma/enums";
 import { lostReasonLabels } from "@/lib/pipeline";
 import { card, filterPill, kicker, pageTitle } from "@/components/ui";
+import Fortschritt from "@/components/Fortschritt";
 
 export const dynamic = "force-dynamic";
 
@@ -196,7 +197,7 @@ export default async function TrichterPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className={pageTitle}>Trichter</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Vier Zahlen. Der schwächste Übergang sagt, woran es hakt.
           </p>
         </div>
@@ -215,10 +216,10 @@ export default async function TrichterPage({
 
       {anrufe === 0 && vereinbart === 0 && gehalten === 0 && abschluesse === 0 ? (
         <div className={`${card} px-6 py-12 text-center`}>
-          <p className="text-sm font-medium text-slate-900">
+          <p className="text-sm font-medium text-ink">
             In diesem Zeitraum ist noch nichts passiert
           </p>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Die Zahlen entstehen von selbst, sobald du telefonierst.
           </p>
         </div>
@@ -229,34 +230,30 @@ export default async function TrichterPage({
               {stufen.map((stufe) => (
                 <li key={stufe.key}>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium text-slate-800">
+                    <span className="text-sm font-medium text-ink">
                       {stufe.titel}
                     </span>
-                    <span className="text-sm tabular-nums text-slate-900">
+                    <span className="text-sm tabular-nums text-ink">
                       <span className="text-lg font-semibold">{stufe.wert}</span>
                       {stufe.vorher !== null && (
-                        <span className="ml-2 text-xs text-slate-500">
+                        <span className="ml-2 text-xs text-ink-muted">
                           {quote(stufe.wert, stufe.vorher)} von zuvor
                         </span>
                       )}
                     </span>
                   </div>
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className={`h-full rounded-full ${
-                        engpass?.key === stufe.key ? "bg-amber-500" : "bg-navy-700"
-                      }`}
-                      style={{
-                        width: `${stufe.wert > 0 ? Math.max((stufe.wert / groesste) * 100, 2) : 0}%`,
-                      }}
-                    />
-                  </div>
+                  <Fortschritt
+                    anteil={stufe.wert > 0 ? Math.max(stufe.wert / groesste, 0.02) : 0}
+                    ton={engpass?.key === stufe.key ? "warnung" : "info"}
+                    hoehe="kraeftig"
+                    className="mt-1.5"
+                  />
                 </li>
               ))}
             </ul>
 
             {engpass && (
-              <p className="mt-6 border-t border-slate-100 pt-4 text-sm text-slate-700">
+              <p className="mt-6 border-t border-line pt-4 text-sm text-ink-muted">
                 {/* Nicht kleinschreiben: "Engpass: abschlüsse" ist ein
                     Substantiv in Kleinschreibung und stand auf jeder
                     Trichter-Seite. */}
@@ -268,7 +265,7 @@ export default async function TrichterPage({
 
           {verlustSumme > 0 && (
             <section className={`${card} p-6 sm:p-7`}>
-              <h2 className="text-sm font-semibold text-slate-900">
+              <h2 className="text-sm font-semibold text-ink">
                 Woran es gescheitert ist
               </h2>
               <ul className="mt-4 space-y-3">
@@ -280,24 +277,22 @@ export default async function TrichterPage({
                     return (
                       <li key={zeile.lostReason}>
                         <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm text-slate-700">
+                          <span className="text-sm text-ink-muted">
                             {lostReasonLabels[zeile.lostReason as LostReason]}
                           </span>
-                          <span className="text-sm font-semibold tabular-nums text-slate-900">
+                          <span className="text-sm font-semibold tabular-nums text-ink">
                             {anzahl}
-                            <span className="ml-1.5 font-normal text-slate-400">
+                            <span className="ml-1.5 font-normal text-ink-soft">
                               · {quote(anzahl, verlustSumme)}
                             </span>
                           </span>
                         </div>
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className="h-full rounded-full bg-slate-400"
-                            style={{
-                              width: `${Math.max((anzahl / verlustSumme) * 100, 2)}%`,
-                            }}
-                          />
-                        </div>
+                        <Fortschritt
+                          anteil={Math.max(anzahl / verlustSumme, 0.02)}
+                          ton="neutral"
+                          hoehe="normal"
+                          className="mt-1.5"
+                        />
                       </li>
                     );
                   })}
@@ -309,10 +304,10 @@ export default async function TrichterPage({
 
       {schleifeZeigen && (
         <section className={`${card} p-6 sm:p-7`}>
-          <h2 className="text-sm font-semibold text-slate-900">
+          <h2 className="text-sm font-semibold text-ink">
             Füllt sich der Trichter selbst nach?
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Jeder gehaltene Termin ist eine Gelegenheit zu fragen. Ohne sie
             leert sich die Namensliste — mit ihr füllt sie sich aus der Arbeit.
           </p>
@@ -320,18 +315,18 @@ export default async function TrichterPage({
           <dl className="mt-5 grid gap-4 sm:grid-cols-3">
             <div>
               <dt className={kicker}>Gefragt</dt>
-              <dd className="mt-1 text-sm tabular-nums text-slate-900">
+              <dd className="mt-1 text-sm tabular-nums text-ink">
                 <span className="text-lg font-semibold">{gefragt}</span>
-                <span className="ml-2 text-xs text-slate-500">
+                <span className="ml-2 text-xs text-ink-muted">
                   von {gehalten} gehaltenen Terminen
                 </span>
               </dd>
             </div>
             <div>
               <dt className={kicker}>Namen daraus</dt>
-              <dd className="mt-1 text-sm tabular-nums text-slate-900">
+              <dd className="mt-1 text-sm tabular-nums text-ink">
                 <span className="text-lg font-semibold">{empfohlenGesamt}</span>
-                <span className="ml-2 text-xs text-slate-500">
+                <span className="ml-2 text-xs text-ink-muted">
                   {gefragt > 0
                     ? `${(empfohlenGesamt / gefragt).toFixed(1).replace(".", ",")} je Frage`
                     : "noch nicht gefragt"}
@@ -340,9 +335,9 @@ export default async function TrichterPage({
             </div>
             <div>
               <dt className={kicker}>Daraus geworden</dt>
-              <dd className="mt-1 text-sm tabular-nums text-slate-900">
+              <dd className="mt-1 text-sm tabular-nums text-ink">
                 <span className="text-lg font-semibold">{empfohlenGehalten}</span>
-                <span className="ml-2 text-xs text-slate-500">
+                <span className="ml-2 text-xs text-ink-muted">
                   Termine · {empfohlenAbschluss} Abschlüsse
                 </span>
               </dd>
@@ -350,7 +345,7 @@ export default async function TrichterPage({
           </dl>
 
           {gehalten > 0 && gefragt < gehalten && (
-            <p className="mt-5 border-t border-slate-100 pt-4 text-sm text-slate-700">
+            <p className="mt-5 border-t border-line pt-4 text-sm text-ink-muted">
               <span className="font-semibold">
                 {gehalten - gefragt}{" "}
                 {gehalten - gefragt === 1 ? "Termin" : "Termine"} ohne Frage.
@@ -360,7 +355,7 @@ export default async function TrichterPage({
           )}
 
           {multiplikatoren.length > 0 && (
-            <div className="mt-5 border-t border-slate-100 pt-4">
+            <div className="mt-5 border-t border-line pt-4">
               <p className={kicker}>Wer dir am meisten bringt · insgesamt</p>
               <ul className="mt-3 space-y-2">
                 {multiplikatoren.map((zeile) => (
@@ -370,20 +365,20 @@ export default async function TrichterPage({
                   >
                     <Link
                       href={`/contacts/${zeile.referredById}`}
-                      className="text-sm text-slate-700 hover:text-navy-700 hover:underline"
+                      className="text-sm text-ink-muted hover:text-navy-700 hover:underline"
                     >
                       {geberNamen.get(zeile.referredById!) ?? "Unbekannt"}
                     </Link>
-                    <span className="text-sm font-semibold tabular-nums text-slate-900">
+                    <span className="text-sm font-semibold tabular-nums text-ink">
                       {zeile._count._all ?? 0}
-                      <span className="ml-1.5 font-normal text-slate-400">
+                      <span className="ml-1.5 font-normal text-ink-soft">
                         {(zeile._count._all ?? 0) === 1 ? "Name" : "Namen"}
                       </span>
                     </span>
                   </li>
                 ))}
               </ul>
-              <p className="mt-3 text-xs text-slate-500">
+              <p className="mt-3 text-xs text-ink-muted">
                 Die ruft man wieder an. Wer einmal empfohlen hat, empfiehlt
                 wieder — vorausgesetzt, er erfährt, was daraus geworden ist.
               </p>

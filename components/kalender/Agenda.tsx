@@ -43,8 +43,8 @@ export function Agenda({
   if (tage.size === 0) {
     return (
       <div className={`${card} px-6 py-12 text-center`}>
-        <p className="text-sm font-medium text-slate-900">Nichts eingetragen</p>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="text-sm font-medium text-ink">Nichts eingetragen</p>
+        <p className="mt-1 text-sm text-ink-muted">
           Termine entstehen im Gespräch — der Knopf „Termin“ im{" "}
           <Link href="/namen" className="font-medium text-navy-600 hover:underline">
             Durchlauf
@@ -72,11 +72,11 @@ export function Agenda({
           <h2
             className={cn(
               "text-base font-semibold",
-              tag < heute ? "text-slate-400" : "text-slate-900"
+              tag < heute ? "text-ink-soft" : "text-ink"
             )}
           >
             {tagName(tag)}
-            <span className="ml-2 text-sm font-normal text-slate-400">{liste.length}</span>
+            <span className="ml-2 text-sm font-normal text-ink-soft">{liste.length}</span>
           </h2>
           <ul className="space-y-2">
             {liste.map((eintrag) => {
@@ -103,17 +103,17 @@ export function Agenda({
                     {eintrag.kontaktId ? (
                       <Link
                         href={`/contacts/${eintrag.kontaktId}`}
-                        className="block truncate text-sm font-semibold text-slate-900 hover:text-navy-700"
+                        className="block truncate text-sm font-semibold text-ink hover:text-navy-700"
                       >
                         {eintrag.titel}
                       </Link>
                     ) : (
-                      <p className="truncate text-sm font-semibold text-slate-900">
+                      <p className="truncate text-sm font-semibold text-ink">
                         {beschriftung(eintrag)}
                       </p>
                     )}
                     {(eintrag.zusatz || eintrag.quelleName) && (
-                      <p className="truncate text-xs text-slate-500">
+                      <p className="truncate text-xs text-ink-muted">
                         {[eintrag.quelleName && `aus ${eintrag.quelleName}`, eintrag.zusatz]
                           .filter(Boolean)
                           .join(" · ")}
@@ -136,7 +136,7 @@ export function Agenda({
                         href={`/kalender/${eintrag.kontaktId}.ics`}
                         aria-label={`Termin mit ${eintrag.titel} in den Kalender übernehmen`}
                         title="Einzeln in den Kalender des Handys übernehmen"
-                        className="flex min-h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-50 hover:text-navy-700"
+                        className="flex min-h-11 w-11 items-center justify-center rounded-lg text-ink-soft transition hover:bg-sunken hover:text-navy-700"
                       >
                         <CalendarCheckIcon className="h-4 w-4" />
                       </a>

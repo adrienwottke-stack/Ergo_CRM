@@ -308,6 +308,33 @@
   --color-teal-800: #9aece2;
   --color-teal-900: #c4f4ee;
 
+  /* Kalenderfarben: violet (Begleitung) und sky (Schulung) kippten hier
+     bisher gar nicht mit - Alt-Fehler, der erst auffiel, seit Dunkel
+     gleichwertig ist. Dieselbe Struktur wie die teal-Rampe direkt darueber:
+     50 dunkle getoente Flaeche, 400/500 kraeftige Mitteltoene, 700-900 helle
+     Textstufen. */
+  --color-violet-50: #110d24;
+  --color-violet-100: #181230;
+  --color-violet-200: #1f1743;
+  --color-violet-300: #2c1f5d;
+  --color-violet-400: #a78bfa;
+  --color-violet-500: #521fc5;
+  --color-violet-600: #773fd6;
+  --color-violet-700: #9b6ee2;
+  --color-violet-800: #ba9aec;
+  --color-violet-900: #d7c4f4;
+
+  --color-sky-50: #0d1b24;
+  --color-sky-100: #122430;
+  --color-sky-200: #173443;
+  --color-sky-300: #1f495d;
+  --color-sky-400: #38bdf8;
+  --color-sky-500: #1f91c5;
+  --color-sky-600: #3fa3d6;
+  --color-sky-700: #6eb9e2;
+  --color-sky-800: #9acfec;
+  --color-sky-900: #c4e2f4;
+
   /* Semantik - Milchglas wie im Hellen, nur dunkel getoent. */
   --color-canvas: #0a101c;
   --color-surface: rgba(23, 33, 51, 0.66);

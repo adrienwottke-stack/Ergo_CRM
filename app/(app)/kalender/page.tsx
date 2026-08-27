@@ -175,7 +175,7 @@ export default async function KalenderPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className={pageTitle}>Kalender</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             {imFenster.length === 0
               ? "Nichts in diesem Zeitraum."
               : `${imFenster.length} ${imFenster.length === 1 ? "Eintrag" : "Einträge"}.`}

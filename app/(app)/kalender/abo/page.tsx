@@ -54,7 +54,7 @@ export default async function AboPage() {
     <div className={`${columnNarrow} space-y-6`}>
       <div>
         <h1 className={pageTitle}>Kalender auf dem Handy</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           Einmal einrichten. Danach stehen deine Termine im Kalender deines
           Telefons — und damit auch in TimeTree.
         </p>
@@ -62,7 +62,7 @@ export default async function AboPage() {
 
       <section className={`${card} space-y-4 p-5`}>
         <h2 className={sectionTitle}>Deine Adresse</h2>
-        <p className="break-all rounded-lg bg-sunken px-3 py-2.5 font-mono text-xs text-slate-700">
+        <p className="break-all rounded-lg bg-sunken px-3 py-2.5 font-mono text-xs text-ink-muted">
           {adresse}
         </p>
         <QrCode text={webcal} />
@@ -76,7 +76,7 @@ export default async function AboPage() {
             </button>
           </form>
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-ink-muted">
           Wer diese Adresse hat, sieht deine Termine — sie ist der Schlüssel.
           „Neuen Link erzeugen“ macht den alten sofort tot; du musst das Abo
           danach überall neu einrichten.
@@ -87,8 +87,8 @@ export default async function AboPage() {
         <h2 className={sectionTitle}>Einrichten</h2>
 
         <div className="space-y-1.5">
-          <h3 className="text-sm font-semibold text-slate-900">iPhone</h3>
-          <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-600">
+          <h3 className="text-sm font-semibold text-ink">iPhone</h3>
+          <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-muted">
             <li>Den QR-Code oben mit der Kamera scannen — oder „Auf diesem Gerät abonnieren“ antippen.</li>
             <li>„Abonnieren“ bestätigen.</li>
             <li>TimeTree öffnen → Einstellungen → Kalender-Anzeige → den neuen Kalender einschalten.</li>
@@ -96,8 +96,8 @@ export default async function AboPage() {
         </div>
 
         <div className="space-y-1.5">
-          <h3 className="text-sm font-semibold text-slate-900">Android</h3>
-          <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-600">
+          <h3 className="text-sm font-semibold text-ink">Android</h3>
+          <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-muted">
             <li>
               Am Rechner{" "}
               <a
@@ -134,16 +134,16 @@ export default async function AboPage() {
 
       <section className={`${card} space-y-3 p-5`}>
         <h2 className={sectionTitle}>Kundennamen</h2>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-muted">
           Im Feed steht{" "}
           {namenAn ? (
-            <strong className="font-semibold text-slate-900">„Termin Anna Weber“</strong>
+            <strong className="font-semibold text-ink">„Termin Anna Weber“</strong>
           ) : (
-            <strong className="font-semibold text-slate-900">„Termin · Beratung“</strong>
+            <strong className="font-semibold text-ink">„Termin · Beratung“</strong>
           )}
           .
         </p>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink-muted">
           Der Grund für die Voreinstellung ohne Namen: Wer einen Termin aus dem
           Handy-Kalender von Hand in einen <em>geteilten</em> TimeTree-Kalender
           kopiert, macht den Namen für alle Mitglieder sichtbar.

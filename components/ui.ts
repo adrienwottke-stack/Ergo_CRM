@@ -109,7 +109,7 @@ export const filterPill = (active: boolean) =>
 export const segmentGruppe = "inline-flex items-center gap-0.5 rounded-full bg-sunken p-1";
 
 export const segmentKnopf = (aktiv: boolean) =>
-  `inline-flex min-h-9 items-center justify-center rounded-full px-3.5 text-sm font-medium transition${
+  `inline-flex min-h-11 items-center justify-center rounded-full px-3.5 text-sm font-medium transition${
     aktiv ? " bg-surface text-ink schatten-karte" : " text-ink-muted hover:text-ink"
   }`;
 
