@@ -55,7 +55,7 @@ function Hinweis({ titel, text }: { titel: string; text: string }) {
     <div className="mx-auto flex min-h-screen max-w-md items-center px-4">
       <div className={`${card} w-full p-8 text-center`}>
         <h1 className={pageTitle}>{titel}</h1>
-        <p className="mt-3 text-sm text-slate-600">{text}</p>
+        <p className="mt-3 text-sm text-ink-muted">{text}</p>
         <a href="/login" className="mt-6 inline-block text-sm font-medium text-navy-700 hover:underline">
           Zur Anmeldung
         </a>
@@ -148,9 +148,9 @@ export default async function EinladungPage({
         <div className="mx-auto flex min-h-screen max-w-md items-center px-4 py-10">
           <div className={`${card} w-full space-y-5 p-6 text-center sm:p-8`}>
             <h1 className={pageTitle}>Hier ist noch jemand angemeldet</h1>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-ink-muted">
               Auf diesem Handy läuft gerade das Konto von{" "}
-              <strong className="font-medium text-slate-800">{angemeldet.name}</strong>.
+              <strong className="font-medium text-ink">{angemeldet.name}</strong>.
               Deine Einladung führt in deinen eigenen Zugang – dafür muss dieses
               Konto zuerst raus.
             </p>
@@ -170,7 +170,7 @@ export default async function EinladungPage({
         <div className="w-full">
           <div className="mb-6 text-center">
             <h1 className={pageTitle}>Willkommen im Team</h1>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-ink-muted">
               {invite.leader.name} hat dich eingeladen. Leg dir hier deinen Zugang an –
               deine Kontakte gehören danach dir allein.
             </p>
@@ -180,7 +180,7 @@ export default async function EinladungPage({
             <input type="hidden" name="code" value={code} />
 
             {error && (
-              <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-600/10">
+              <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
                 {fehlertexte[error] ?? fehlertexte.invalid}
               </p>
             )}
@@ -196,7 +196,7 @@ export default async function EinladungPage({
                 autoComplete="name"
                 className={input}
               />
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-ink-soft">
                 So stehst du in der Rangliste.
               </p>
             </div>
@@ -218,7 +218,7 @@ export default async function EinladungPage({
                 ist im Zweifel das, was jemanden im Geschaeft haelt. */}
             <div>
               <label htmlFor="phone" className={label}>
-                Handynummer <span className="font-normal text-slate-400">(freiwillig)</span>
+                Handynummer <span className="font-normal text-ink-soft">(freiwillig)</span>
               </label>
               <input
                 id="phone"
@@ -229,7 +229,7 @@ export default async function EinladungPage({
                 autoComplete="tel"
                 className={input}
               />
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-ink-soft">
                 Damit {invite.leader.name.split(" ")[0]} dich anrufen kann, wenn es
                 hakt. Sonst niemand.
               </p>
@@ -255,10 +255,10 @@ export default async function EinladungPage({
             {/* Was hier steht, ist die Bedingung, unter der jemand zusagt.
                 Es muss deshalb vollstaendig sein und darf nichts weglassen,
                 was spaeter doch passiert - auch nicht das Unbequeme. */}
-            <p className="text-center text-xs leading-relaxed text-slate-500">
+            <p className="text-center text-xs leading-relaxed text-ink-soft">
               {invite.leader.name} sieht deine Aktivitätszahlen und deine Pipeline.
               In deinen ersten {NAMENSFENSTER_TAGE} Tagen zusätzlich die{" "}
-              <strong className="font-medium text-slate-600">Vornamen</strong> deiner
+              <strong className="font-medium text-ink-muted">Vornamen</strong> deiner
               Kontakte und was du mit ihnen gemacht hast — das ist die Starthilfe, und
               sie läuft danach von selbst aus. Deine Notizen, Telefonnummern und
               E-Mail-Adressen bleiben immer bei dir.
@@ -267,7 +267,7 @@ export default async function EinladungPage({
 
           {/* Nicht jeder Eingeladene ist neu: wer sein Konto schon hat und nur
               wieder hereinkommt, braucht die Anmeldung, kein zweites Konto. */}
-          <p className="mt-6 text-center text-sm text-slate-500">
+          <p className="mt-6 text-center text-sm text-ink-soft">
             Du hast schon einen Zugang?{" "}
             <a href="/login" className="font-medium text-navy-700 hover:underline">
               Hier anmelden

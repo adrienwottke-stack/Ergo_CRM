@@ -26,7 +26,7 @@ export default async function AvvSeite() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-6 px-5 py-10">
       <header className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-widest text-gold-400">
+        <p className="text-xs font-medium uppercase tracking-widest text-akzent">
           Fassung {AVV_VERSION} &middot; Stand {AVV_STAND}
         </p>
         <h1 className="text-2xl font-semibold">
@@ -47,7 +47,7 @@ export default async function AvvSeite() {
       <section
         aria-label="Volltext des Auftragsverarbeitungsvertrags"
         tabIndex={0}
-        className="h-[52vh] min-h-[280px] overflow-y-auto rounded-xl border border-white/15 bg-navy-950/60 p-5 text-sm leading-relaxed text-white/80 focus:outline-none focus:ring-2 focus:ring-gold-400"
+        className="glas-dunkel h-[52vh] min-h-[280px] overflow-y-auto rounded-2xl border border-white/10 p-5 text-sm leading-relaxed text-white/80 focus:outline-none focus:ring-2 focus:ring-akzent"
       >
         {AVV_ABSCHNITTE.map((abschnitt) => (
           <article key={abschnitt.titel} className="mb-5 last:mb-0">

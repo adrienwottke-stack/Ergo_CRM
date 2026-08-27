@@ -158,7 +158,7 @@ export default function NamenSprint({
             setPhase("lauf");
             setTimeout(() => eingabeRef.current?.focus(), 50);
           }}
-          className="min-h-14 w-full rounded-xl bg-gold-400 text-lg font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+          className="min-h-14 w-full rounded-xl bg-akzent text-lg font-bold text-white transition hover:bg-akzent-stark active:scale-[0.98]"
         >
           Start
         </button>
@@ -177,7 +177,7 @@ export default function NamenSprint({
     const stark = anzahl > SPRINT_VERGLEICH;
     return (
       <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
-        <p className="text-6xl font-bold tabular-nums text-gold-400">{anzahl}</p>
+        <p className="text-6xl font-bold tabular-nums text-akzent">{anzahl}</p>
         <div>
           <p className="text-xl font-semibold text-white">
             {anzahl === 1 ? "Name" : "Namen"} in {SPRINT_SEKUNDEN} Sekunden.
@@ -198,7 +198,7 @@ export default function NamenSprint({
         <button
           type="button"
           onClick={() => onDone(anzahl)}
-          className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+          className="min-h-12 w-full rounded-xl bg-akzent text-15 font-bold text-white transition hover:bg-akzent-stark active:scale-[0.98]"
         >
           Weiter
         </button>
@@ -215,7 +215,7 @@ export default function NamenSprint({
           {rest}
         </p>
         <div className="text-right">
-          <p className="text-3xl font-bold tabular-nums text-gold-400">{anzahl}</p>
+          <p className="text-3xl font-bold tabular-nums text-akzent">{anzahl}</p>
           <p className="text-xs text-slate-400">{anzahl === 1 ? "Name" : "Namen"}</p>
         </div>
       </div>
@@ -236,13 +236,13 @@ export default function NamenSprint({
             }
           }}
           onPaste={einfuegen}
-          className="min-h-14 w-full flex-1 rounded-xl border border-white/25 bg-white/5 px-4 text-lg text-white placeholder:text-slate-500 focus:border-gold-400 focus:outline-none"
+          className="min-h-14 w-full flex-1 rounded-xl border border-white/25 bg-white/5 px-4 text-lg text-white placeholder:text-slate-500 focus:border-akzent focus:outline-none"
         />
         <button
           type="button"
           onClick={eintragen}
           aria-label="Name eintragen"
-          className="min-h-14 w-14 shrink-0 rounded-xl bg-gold-400 text-2xl font-bold text-navy-950 active:scale-[0.95]"
+          className="min-h-14 w-14 shrink-0 rounded-xl bg-akzent text-2xl font-bold text-white active:scale-[0.95]"
         >
           +
         </button>

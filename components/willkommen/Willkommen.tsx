@@ -121,7 +121,7 @@ export default function Willkommen({
       <div className="flex items-center gap-3">
         <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10">
           <div
-            className="h-full rounded-full bg-gold-400 transition-all duration-500"
+            className="h-full rounded-full bg-akzent transition-all duration-500"
             style={{ width: `${Math.round((stufe / (akte.length - 1)) * 100)}%` }}
           />
         </div>
@@ -199,7 +199,7 @@ export default function Willkommen({
             <button
               type="button"
               onClick={ueberspringen}
-              className="min-h-14 w-full rounded-xl bg-gold-400 text-lg font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+              className="min-h-14 w-full rounded-xl bg-akzent text-lg font-bold text-white transition hover:bg-akzent-stark active:scale-[0.98]"
             >
               Zur Mannschaft
             </button>

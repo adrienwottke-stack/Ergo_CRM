@@ -7,10 +7,13 @@ import { rechne } from "@/lib/willkommen";
 // und darunter rechnen die eigenen Zahlen. Kein Satz ueberzeugt so gut wie
 // die eigene Zahl - diese Zielgruppe denkt in Einheiten.
 
+// Kein eigenes Glas je Kachel: drei geblurte Flaechen gleichzeitig sind mehr,
+// als das Blur-Budget je Akt hergibt (hoechstens zwei). Die drei Zahlen
+// teilen sich stattdessen EIN Glas-Panel, das die Gruppe traegt (siehe unten).
 function Zahl({ wert, einheit }: { wert: number; einheit: string }) {
   return (
-    <div className="rounded-2xl bg-white/5 px-4 py-4 text-center ring-1 ring-inset ring-white/10">
-      <p className="text-3xl font-bold tabular-nums text-gold-400">{wert}</p>
+    <div className="px-2 text-center">
+      <p className="text-3xl font-bold tabular-nums text-akzent">{wert}</p>
       <p className="mt-1 text-xs leading-tight text-slate-300">{einheit}</p>
     </div>
   );
@@ -48,7 +51,7 @@ export default function Hochrechnung({ onDone }: { onDone: () => void }) {
             step={5}
             value={namen}
             onChange={(event) => setNamen(Number(event.target.value))}
-            className="mt-2 w-full accent-gold-400"
+            className="mt-2 w-full accent-akzent"
           />
         </div>
         <div>
@@ -65,12 +68,12 @@ export default function Hochrechnung({ onDone }: { onDone: () => void }) {
             max={8}
             value={anrufe}
             onChange={(event) => setAnrufe(Number(event.target.value))}
-            className="mt-2 w-full accent-gold-400"
+            className="mt-2 w-full accent-akzent"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="glas-dunkel grid grid-cols-3 gap-2.5 rounded-2xl border border-white/10 p-4">
         <Zahl wert={ergebnis.gespraecheWoche} einheit="Gespräche pro Woche" />
         <Zahl wert={ergebnis.termineMonat} einheit="Termine im Monat" />
         <Zahl wert={ergebnis.abschluesseMonat} einheit="Abschlüsse im Monat" />
@@ -87,7 +90,7 @@ export default function Hochrechnung({ onDone }: { onDone: () => void }) {
       <button
         type="button"
         onClick={onDone}
-        className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+        className="min-h-12 w-full rounded-xl bg-akzent text-15 font-bold text-white transition hover:bg-akzent-stark active:scale-[0.98]"
       >
         Und wie komm ich an die Termine?
       </button>

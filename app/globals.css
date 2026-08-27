@@ -460,6 +460,26 @@
   --color-akzent-stark: #3d9aff;
 }
 
+/* Buehnen-Lichtflecken (Welle 7): dieselben blauen Lichtflecken wie der
+   Tapeten-Canvas (body::before), diesmal fest in den Bestand-Gradienten der
+   dauerhaft dunklen Layouts (Willkommen, AVV) eingebacken. Ein Element traegt
+   immer nur EIN "background-image" - zwei Utility-Klassen mit je einem
+   eigenen Gradienten wuerden sich nicht uebereinanderlegen, sondern die
+   zweite ersetzt die erste. Deshalb hier alle drei Ebenen (zwei Flecken,
+   ein linearer Verlauf) als eine einzige Deklaration, statt mit einem
+   zusaetzlichen ::before-Element zu arbeiten - das braeuchte einen eigenen
+   Stapelkontext, nur um denselben Effekt umstaendlicher zu erreichen.
+   Statisch, keine Animation - wie beim App-Canvas. Ersetzt dort, wo sie
+   verwendet wird, die drei Klassen "bg-gradient-to-b from-navy-950
+   via-navy-900 to-navy-800" (gleicher Verlauf, jetzt nur als CSS statt als
+   Tailwind-Utilities). */
+@utility buehne-flecken {
+  background-image:
+    radial-gradient(60rem 40rem at 12% -8%, rgb(10 132 255 / 0.12), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 12%, rgb(100 210 255 / 0.06), transparent 55%),
+    linear-gradient(to bottom, var(--color-navy-950), var(--color-navy-900) 50%, var(--color-navy-800));
+}
+
 html {
   /* Die ganze Oberflaeche haengt an dieser einen Zahl: Schrift, Abstaende,
      Radien und Spaltenbreiten rechnen in rem, also in Vielfachen davon.

@@ -8,7 +8,7 @@ export default function AvvLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="buehne min-h-dvh bg-gradient-to-b from-navy-950 via-navy-900 to-navy-800 text-white">
+    <div className="buehne buehne-flecken min-h-dvh text-white">
       {children}
     </div>
   );

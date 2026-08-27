@@ -11,7 +11,7 @@ function TeilenSymbol() {
     <svg
       viewBox="0 0 24 24"
       aria-hidden="true"
-      className="inline-block h-[1.15em] w-[1.15em] translate-y-[0.15em] fill-none stroke-amber-300"
+      className="inline-block h-[1.15em] w-[1.15em] translate-y-[0.15em] fill-none stroke-akzent"
       strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -40,7 +40,7 @@ export default function IphoneAnleitung() {
         </>
       }
     >
-      <ol className="space-y-4 rounded-2xl bg-white/5 p-5 ring-1 ring-inset ring-white/10">
+      <ol className="glas-dunkel space-y-4 rounded-2xl border border-white/10 p-5">
         <Schritt nummer={1}>
           Tippe unten in der Leiste auf <TeilenSymbol />
         </Schritt>

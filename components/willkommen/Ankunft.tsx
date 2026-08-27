@@ -90,7 +90,7 @@ export default function Ankunft({
               key={wert}
               type="button"
               onClick={() => zielWaehlen(wert)}
-              className="min-h-20 rounded-2xl border border-white/25 bg-white/5 text-3xl font-bold text-white transition hover:border-gold-400 hover:bg-white/10 active:scale-[0.95]"
+              className="min-h-20 rounded-2xl border border-white/25 bg-white/5 text-3xl font-bold text-white transition hover:border-akzent hover:bg-white/10 active:scale-[0.95]"
             >
               {wert}
             </button>
@@ -140,7 +140,7 @@ export default function Ankunft({
           type="button"
           disabled={pending}
           onClick={() => los(`/namen?liste=${track}`)}
-          className="min-h-14 w-full rounded-xl bg-gold-400 text-lg font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98] disabled:opacity-40"
+          className="min-h-14 w-full rounded-xl bg-akzent text-lg font-bold text-white transition hover:bg-akzent-stark active:scale-[0.98] disabled:opacity-40"
         >
           Zur Namensliste
         </button>

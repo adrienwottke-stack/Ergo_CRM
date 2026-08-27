@@ -37,7 +37,7 @@ function Schritt({
 }) {
   return (
     <li className="flex gap-3">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-900 text-xs font-semibold text-white">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-akzent text-xs font-semibold text-white">
         {nummer}
       </span>
       <span className="pt-0.5 text-sm leading-relaxed text-ink-muted">

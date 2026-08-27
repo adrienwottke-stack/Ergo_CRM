@@ -40,7 +40,7 @@ export default function AusInAppBrowser({ link }: { link: string }) {
       fuss={
         <>
           <p className="mb-2 font-medium text-white">Falls der Menüpunkt anders heißt:</p>
-          <p className="break-all rounded-lg bg-white/5 px-3 py-2 font-mono text-xs text-navy-200 ring-1 ring-inset ring-white/10">
+          <p className="glas-dunkel break-all rounded-2xl border border-white/10 px-3 py-2 font-mono text-xs text-navy-200">
             {link}
           </p>
           <p className="mt-2">
@@ -49,7 +49,7 @@ export default function AusInAppBrowser({ link }: { link: string }) {
         </>
       }
     >
-      <ol className="space-y-4 rounded-2xl bg-white/5 p-5 ring-1 ring-inset ring-white/10">
+      <ol className="glas-dunkel space-y-4 rounded-2xl border border-white/10 p-5">
         {apple ? (
           <>
             <Schritt nummer={1}>
@@ -76,7 +76,7 @@ export default function AusInAppBrowser({ link }: { link: string }) {
       <button
         type="button"
         onClick={kopieren}
-        className="mt-4 min-h-12 w-full rounded-xl bg-amber-300 px-6 text-15 font-semibold text-navy-950 transition hover:bg-amber-200 active:scale-[0.99]"
+        className="mt-4 min-h-12 w-full rounded-xl bg-akzent px-6 text-15 font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.99]"
       >
         {kopiert ? "Link kopiert" : "Link kopieren"}
       </button>

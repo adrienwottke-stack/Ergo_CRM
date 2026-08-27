@@ -85,7 +85,7 @@ export default function RanglisteMoment({ onDone }: { onDone: () => void }) {
             className={`animate-rise flex items-center justify-between rounded-xl px-4 py-3 ${
               zeile.istIch
                 ? "bg-gold-400 font-bold text-navy-950 ring-2 ring-gold-100"
-                : "bg-white/5 text-white ring-1 ring-inset ring-white/10"
+                : "bg-white/5 text-white"
             }`}
           >
             <span className="flex items-center gap-3">

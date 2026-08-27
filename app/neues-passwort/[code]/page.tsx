@@ -42,15 +42,15 @@ export default async function NeuesPasswortPage({
         <div className={`${card} p-8`}>
           <div className="flex flex-col items-center text-center">
             <LogoMark className="h-12 w-12" />
-            <h1 className="mt-4 text-xl font-semibold tracking-[-0.02em] text-slate-900">
+            <h1 className="mt-4 text-xl font-semibold tracking-[-0.02em] text-ink">
               Neues Passwort
             </h1>
             {gueltig ? (
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-ink-soft">
                 Für {reset!.user.name} · {reset!.user.email}
               </p>
             ) : (
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-ink-soft">
                 Dieser Link gilt nicht mehr.
               </p>
             )}
@@ -92,7 +92,7 @@ export default async function NeuesPasswortPage({
               {error && (
                 <p
                   role="alert"
-                  className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-600/10"
+                  className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700"
                 >
                   {fehlertexte[error] ?? fehlertexte.unbekannt}
                 </p>
@@ -104,15 +104,15 @@ export default async function NeuesPasswortPage({
               </button>
             </form>
           ) : (
-            <p className="mt-6 rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+            <p className="mt-6 rounded-lg bg-sunken px-3 py-2.5 text-sm text-ink-muted">
               Links gelten einen Tag und lassen sich nur einmal benutzen. Frag
               nach einem neuen — dann kommt sofort einer.
             </p>
           )}
         </div>
 
-        <p className="mt-4 text-center text-xs text-slate-400">
-          <Link href="/login" className="hover:text-slate-600 hover:underline">
+        <p className="mt-4 text-center text-xs text-ink-soft">
+          <Link href="/login" className="hover:text-ink-muted hover:underline">
             Zur Anmeldung
           </Link>
         </p>

@@ -68,7 +68,7 @@ export default function Schleuse({
           }
           fuss={
             <>
-              <p className="break-all rounded-lg bg-white/5 px-3 py-2 font-mono text-xs text-navy-200 ring-1 ring-inset ring-white/10">
+              <p className="glas-dunkel break-all rounded-2xl border border-white/10 px-3 py-2 font-mono text-xs text-navy-200">
                 {link}
               </p>
               {/* Der Rechner bleibt fuer die EINLADUNG zu - ein Konto entsteht
@@ -81,7 +81,7 @@ export default function Schleuse({
                 Du hast schon ein Konto?{" "}
                 <a
                   href="/login"
-                  className="font-medium text-amber-300 underline underline-offset-4 hover:text-amber-200"
+                  className="font-medium text-akzent underline underline-offset-4 hover:text-akzent-stark"
                 >
                   Hier am Rechner anmelden
                 </a>

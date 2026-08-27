@@ -8,7 +8,7 @@ export default async function QrCode({ text }: { text: string }) {
     type: "svg",
     margin: 1,
     errorCorrectionLevel: "M",
-    color: { dark: "#0a1628", light: "#ffffff" },
+    color: { dark: "#0a1f3e", light: "#ffffff" },
   });
 
   return (
