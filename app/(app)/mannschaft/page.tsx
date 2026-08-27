@@ -12,6 +12,7 @@ import {
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { type Signal } from "@/lib/signale";
 import Ampel from "@/components/Ampel";
+import MannschaftsMatrix from "@/components/MannschaftsMatrix";
 import Kennzahl from "@/components/Kennzahl";
 import Fortschritt from "@/components/Fortschritt";
 import { NAMENSFENSTER_TAGE } from "@/lib/einblick";
@@ -298,6 +299,17 @@ export default async function MannschaftPage({
           der Kontakte und was passiert ist. Bei allen anderen stehen dort Zahlen.
         </p>
       </div>
+
+      {/* --- Das Team-Cockpit ------------------------------------------------
+          Emils Wunsch fuer den Teamabend: Ampeln und Kernzahlen der ganzen
+          Mannschaft in einer dichten Zeile je Person, ganz oben, ohne durch
+          die Abschnitte darunter zu scrollen. Reine Anzeige derselben Daten,
+          die "Heute dran" & Co. weiter unten ohnehin schon laden. */}
+      <MannschaftsMatrix
+        personen={lage.leute}
+        einheiten={einheiten}
+        zeigeEinheiten={zeigeEinheiten}
+      />
 
       {!lage.fuehrtNiemanden && lage.gesamtstruktur && (
         <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
