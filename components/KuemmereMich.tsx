@@ -60,7 +60,7 @@ export default function KuemmereMich({
         subtitle={name}
       >
         <div className="space-y-4">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-ink-muted">
             Bis dahin ist Ruhe: {vorname} steht nicht mehr unter „Heute dran“. Am
             Stichtag steht die Sache auf deiner Heute-Liste — mit dem, was sich
             seitdem bewegt hat.
@@ -72,7 +72,7 @@ export default function KuemmereMich({
                 type="button"
                 disabled={pending}
                 onClick={() => vornehmen(frist.schluessel)}
-                className="flex min-h-12 w-full items-center rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-800 transition hover:border-navy-400 hover:bg-navy-50/50 disabled:opacity-50"
+                className="flex min-h-12 w-full items-center rounded-xl border border-line px-4 text-sm font-semibold text-ink transition hover:border-navy-400 hover:bg-navy-50/50 disabled:opacity-50"
               >
                 {frist.titel}
               </button>

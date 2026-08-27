@@ -32,20 +32,20 @@ export default function GuidePanel({
         onClick={() => setOpen((value) => !value)}
         className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left"
       >
-        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink">
           {open ? (
-            <ChevronDownIcon className="h-4 w-4 text-slate-400" />
+            <ChevronDownIcon className="h-4 w-4 text-ink-soft" />
           ) : (
-            <ChevronRightIcon className="h-4 w-4 text-slate-400" />
+            <ChevronRightIcon className="h-4 w-4 text-ink-soft" />
           )}
           {title}
         </span>
       </button>
 
       {open && (
-        <div className="space-y-4 border-t border-slate-100 px-4 py-4">
+        <div className="space-y-4 border-t border-line px-4 py-4">
           <GuideBody body={body} />
-          <div className="border-t border-slate-100 pt-4">
+          <div className="border-t border-line pt-4">
             <Einwandhilfe kind={kind} />
           </div>
         </div>

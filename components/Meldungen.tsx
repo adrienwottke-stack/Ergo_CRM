@@ -96,7 +96,7 @@ export default function Meldungen({ vapidKey }: { vapidKey: string }) {
 
   if (stand === "blockiert") {
     return (
-      <p className="rounded-xl bg-slate-100 px-4 py-3 text-xs text-slate-500">
+      <p className="rounded-xl bg-sunken px-4 py-3 text-xs text-ink-muted">
         Meldungen sind für diese Seite blockiert. Das lässt sich nur in den
         Einstellungen deines Browsers wieder freigeben.
       </p>

@@ -117,10 +117,10 @@ export default async function ErsteWoche({ user }: { user: User }) {
       {briefFaellig && (
         <section className={`${card} border-gold-400/50 bg-gold-100/30 p-5`}>
           <p className={kicker}>Von dir, an dich — Tag 1</p>
-          <blockquote className="mt-2 whitespace-pre-line text-15 leading-relaxed text-slate-800">
+          <blockquote className="mt-2 whitespace-pre-line text-15 leading-relaxed text-ink">
             „{user.whyLetter}“
           </blockquote>
-          <p className="mt-3 text-sm text-slate-600">
+          <p className="mt-3 text-sm text-ink-muted">
             Das hast du am ersten Tag geschrieben. Ein Anruf heute reicht, um
             wieder drin zu sein.
           </p>
@@ -134,7 +134,7 @@ export default async function ErsteWoche({ user }: { user: User }) {
             <form action={briefGelesen}>
               <button
                 type="submit"
-                className="min-h-11 px-2 text-sm font-medium text-slate-500 hover:text-slate-900"
+                className="min-h-11 px-2 text-sm font-medium text-ink-muted hover:text-ink"
               >
                 Gelesen
               </button>
@@ -145,10 +145,10 @@ export default async function ErsteWoche({ user }: { user: User }) {
 
       {wiedereinstieg && (
         <section className={`${card} p-5`}>
-          <p className="text-sm font-semibold text-slate-900">
+          <p className="text-sm font-semibold text-ink">
             Willkommen zurück.
           </p>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-ink-muted">
             {tageSeitAktivitaet} Tage nichts — passiert. Fangen wir klein an:
             ein Anruf heute.
           </p>
@@ -167,7 +167,7 @@ export default async function ErsteWoche({ user }: { user: User }) {
             <p className={kicker}>
               Deine Startwoche · Tag {Math.max(1, tageSeitStart + 1)} von 7
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-ink-muted">
               {geschafft} von {missionen.length} geschafft
             </p>
           </div>
@@ -179,24 +179,24 @@ export default async function ErsteWoche({ user }: { user: User }) {
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-11 font-bold ${
                     mission.fertig
                       ? "bg-emerald-500 text-white"
-                      : "bg-slate-100 text-slate-400"
+                      : "bg-sunken text-ink-soft"
                   }`}
                 >
                   {mission.fertig ? "✓" : ""}
                 </span>
                 <span
-                  className={mission.fertig ? "text-slate-500 line-through" : "text-slate-800"}
+                  className={mission.fertig ? "text-ink-muted line-through" : "text-ink"}
                 >
                   {mission.titel}
                 </span>
-                <span className="ml-auto text-xs tabular-nums text-slate-400">
+                <span className="ml-auto text-xs tabular-nums text-ink-soft">
                   {mission.stand}
                 </span>
               </li>
             ))}
           </ul>
           {herkunft?.stake && (
-            <p className="mt-3 rounded-lg bg-gold-100/50 px-3 py-2 text-sm text-slate-800">
+            <p className="mt-3 rounded-lg bg-gold-100/50 px-3 py-2 text-sm text-ink">
               Einsatz von {herkunft.leader.name}: <strong>{herkunft.stake}</strong>
             </p>
           )}
@@ -204,7 +204,7 @@ export default async function ErsteWoche({ user }: { user: User }) {
       )}
 
       {pledgeLaeuft && (
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-muted">
           Dein Versprechen: <strong>{user.pledgeTarget} Termine in 30 Tagen</strong>{" "}
           · {pledgeGeschafft} geschafft · noch {30 - (pledgeTage ?? 0)}{" "}
           {30 - (pledgeTage ?? 0) === 1 ? "Tag" : "Tage"}.
@@ -220,10 +220,10 @@ export default async function ErsteWoche({ user }: { user: User }) {
           }`}
         >
           <p className={kicker}>Tag 30 · Die Abrechnung</p>
-          <p className="mt-2 text-lg font-semibold text-slate-900">
+          <p className="mt-2 text-lg font-semibold text-ink">
             {pledgeGeschafft} von {user.pledgeTarget} Terminen.
           </p>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-ink-muted">
             {pledgeGeschafft >= (user.pledgeTarget ?? 0)
               ? "Versprechen gehalten. Setz dir das nächste — eine Stufe höher."
               : "Nicht die Zahl, die du wolltest. Aber eine ehrliche. Die nächsten 30 Tage laufen ab jetzt."}
@@ -231,7 +231,7 @@ export default async function ErsteWoche({ user }: { user: User }) {
           <form action={abrechnungGesehen} className="mt-3">
             <button
               type="submit"
-              className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-surface px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-surface px-4 text-sm font-medium text-ink transition hover:bg-sunken"
             >
               Gesehen
             </button>

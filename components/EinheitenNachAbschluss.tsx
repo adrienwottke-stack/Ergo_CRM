@@ -101,7 +101,7 @@ export default function EinheitenNachAbschluss() {
       subtitle={name}
     >
       <div className="space-y-4">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-muted">
           Wie viele Einheiten sind das? Jetzt eingetragen, solange die Zahl noch
           im Kopf ist.
         </p>
@@ -130,16 +130,16 @@ export default function EinheitenNachAbschluss() {
             type="button"
             onClick={() => void buchen()}
             disabled={!menge.trim() || laeuft}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-fest-erfolg px-4 text-sm font-semibold text-white transition hover:bg-fest-erfolg-stark active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-35 disabled:active:scale-100"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-fest-erfolg px-4 text-sm font-semibold text-white transition hover:bg-fest-erfolg-stark active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-35 disabled:active:scale-100"
           >
             {laeuft ? "…" : "Eintragen"}
           </button>
         </div>
 
-        {fehler && <p className="text-[13px] text-red-700">{fehler}</p>}
+        {fehler && <p className="text-13 text-red-700">{fehler}</p>}
 
-        <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="text-xs text-slate-500">
+        <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
+          <p className="text-xs text-ink-muted">
             Geht auch später — unter Wettbewerb › Einheiten.
           </p>
           <button type="button" onClick={schliessen} className={btnGhost}>

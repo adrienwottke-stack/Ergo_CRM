@@ -40,7 +40,7 @@ function Schritt({
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-900 text-xs font-semibold text-white">
         {nummer}
       </span>
-      <span className="pt-0.5 text-sm leading-relaxed text-slate-700">
+      <span className="pt-0.5 text-sm leading-relaxed text-ink-muted">
         {children}
       </span>
     </li>
@@ -57,7 +57,7 @@ function Schritte({ children }: { children: React.ReactNode }) {
 
 /** Hebt ein Wort hervor, das der Nutzer auf dem Bildschirm suchen soll. */
 function Wort({ children }: { children: React.ReactNode }) {
-  return <strong className="font-medium text-slate-900">{children}</strong>;
+  return <strong className="font-medium text-ink">{children}</strong>;
 }
 
 export default function AppInstallieren() {
@@ -117,7 +117,7 @@ export default function AppInstallieren() {
         onClick={() => setOffen(true)}
         title="Ergo CRM als App auf diesem Rechner"
         aria-label="Ergo CRM als App auf diesem Rechner"
-        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-navy-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-400"
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent"
       >
         <AppFensterIcon className="h-4.5 w-4.5" />
       </button>
@@ -134,11 +134,11 @@ export default function AppInstallieren() {
       >
         {fertig ? (
           <div className="space-y-4">
-            <p className="flex items-center gap-2 text-sm font-medium text-slate-900">
+            <p className="flex items-center gap-2 text-sm font-medium text-ink">
               <CheckIcon className="h-4 w-4 text-fest-erfolg" />
               Ergo CRM ist installiert.
             </p>
-            <p className="text-sm leading-relaxed text-slate-600">
+            <p className="text-sm leading-relaxed text-ink-muted">
               Du findest es ab jetzt neben deinen anderen Programmen. Dieser Tab
               darf zu — angemeldet bleibst du dort trotzdem.
             </p>
@@ -152,7 +152,7 @@ export default function AppInstallieren() {
           </div>
         ) : (
           <div className="space-y-5">
-            <p className="text-sm leading-relaxed text-slate-600">
+            <p className="text-sm leading-relaxed text-ink-muted">
               Eigenes Fenster ohne Adressleiste, ein Symbol bei deinen
               Programmen, und Meldungen erreichen dich auch dann, wenn gerade
               kein Browser offen ist. Deine Anmeldung nimmt die App mit.
@@ -199,7 +199,7 @@ export default function AppInstallieren() {
                     Ergo CRM startest du ab jetzt über das Symbol im Dock.
                   </Schritt>
                 </Schritte>
-                <p className="text-xs leading-relaxed text-slate-500">
+                <p className="text-xs leading-relaxed text-ink-muted">
                   Safari zeigt „Zum Dock hinzufügen“ ab macOS Sonoma. Ist dein
                   Mac älter, bleib im Tab — bis auf die Meldungen ändert sich
                   nichts.
@@ -223,7 +223,7 @@ export default function AppInstallieren() {
             )}
 
             {weg === "firefox" && (
-              <p className="rounded-xl border border-line bg-sunken p-4 text-sm leading-relaxed text-slate-600">
+              <p className="rounded-xl border border-line bg-sunken p-4 text-sm leading-relaxed text-ink-muted">
                 Firefox kann Web-Apps nicht installieren. Arbeite hier im Tab
                 weiter — oder öffne Ergo CRM einmal in Safari oder Chrome, dann
                 steht an dieser Stelle die Anleitung.
@@ -231,7 +231,7 @@ export default function AppInstallieren() {
             )}
 
             {weg === "andere" && (
-              <p className="rounded-xl border border-line bg-sunken p-4 text-sm leading-relaxed text-slate-600">
+              <p className="rounded-xl border border-line bg-sunken p-4 text-sm leading-relaxed text-ink-muted">
                 Dein Browser verrät uns nicht, wie das hier geht. Such im Menü
                 nach „Installieren“ oder „Zum Dock hinzufügen“. Findest du
                 nichts, bleibt der Tab — der kann alles außer Meldungen.

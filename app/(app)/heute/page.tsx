@@ -45,10 +45,10 @@ const kurzDatum = new Intl.DateTimeFormat("de-DE", {
 // denselben grauen Rahmen - ob sie seit einer Woche liegt oder erst naechsten
 // Freitag ansteht, sah gleich aus. Die Kante beantwortet das, bevor man liest.
 const kanteJeFaelligkeit: Record<DueState, string> = {
-  overdue: "border-l-4 border-l-red-400",
-  today: "border-l-4 border-l-navy-400",
-  week: "border-l-4 border-l-slate-200",
-  later: "border-l-4 border-l-slate-200",
+  overdue: "border-l-4 border-l-red-500",
+  today: "border-l-4 border-l-amber-400",
+  week: "border-l-4 border-l-line",
+  later: "border-l-4 border-l-line",
 };
 
 export default async function HeutePage() {
@@ -257,7 +257,7 @@ export default async function HeutePage() {
             className="mt-1.5 h-2.5 w-2.5 shrink-0 animate-halo rounded-full bg-red-500"
           />
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-slate-900">
+            <span className="block text-sm font-semibold text-ink">
               {brauchenDich.length === 1
                 ? `${brauchenDich[0]!.name} braucht dich`
                 : brauchenDich.length === 2
@@ -266,13 +266,13 @@ export default async function HeutePage() {
                       brauchenDich.length - 2
                     } weitere brauchen dich`}
             </span>
-            <span className="mt-0.5 block text-sm text-slate-600">
+            <span className="mt-0.5 block text-sm text-ink-muted">
               {brauchenDich.length === 1
                 ? fuehrungsSchritt(brauchenDich[0]!)
                 : "Aus deiner Mannschaft. In der Übersicht steht, was jeweils ansteht."}
             </span>
           </span>
-          <span aria-hidden className="mt-0.5 shrink-0 text-slate-400">
+          <span aria-hidden className="mt-0.5 shrink-0 text-ink-soft">
             <ChevronRightIcon className="h-5 w-5" />
           </span>
         </Link>
@@ -282,7 +282,7 @@ export default async function HeutePage() {
           Liste, aus der man erst auswaehlen muss. */}
       <div className={`${card} p-5 sm:p-6`}>
         {openCount === 0 ? (
-          <p className="text-base font-semibold text-slate-900">
+          <p className="text-base font-semibold text-ink">
             Nichts offen – alles abgearbeitet.
           </p>
         ) : (
@@ -295,7 +295,7 @@ export default async function HeutePage() {
                 wert={anrufeHeute > 0 ? anrufeHeute : openCount}
                 className="text-4xl font-bold tracking-[-0.02em] tabular-nums text-navy-700"
               />
-              <span className="text-base font-semibold text-slate-900">
+              <span className="text-base font-semibold text-ink">
                 {anrufeHeute > 0
                   ? `${anrufeHeute === 1 ? "Anruf" : "Anrufe"} heute`
                   : `${openCount === 1 ? "Schritt" : "Schritte"} heute`}
@@ -323,7 +323,7 @@ export default async function HeutePage() {
                 />
               </div>
             ) : (
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-ink-muted">
                 Der Reihe nach von oben.
               </p>
             )}
@@ -422,7 +422,7 @@ export default async function HeutePage() {
               Launch-Tag und fuer alle, die ihn weggeklickt haben. */}
           <Link
             href="/willkommen"
-            className="text-xs font-medium text-slate-400 hover:text-navy-700 hover:underline"
+            className="text-xs font-medium text-ink-soft hover:text-navy-700 hover:underline"
           >
             Wie das hier gedacht ist — der Start, nochmal
           </Link>
@@ -433,13 +433,13 @@ export default async function HeutePage() {
           .map((group) => (
             <section key={group.key} className="space-y-3">
               <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-base font-semibold text-slate-900">
+                <h2 className="text-base font-semibold text-ink">
                   {group.title}
-                  <span className="ml-2 text-sm font-normal text-slate-400">
+                  <span className="ml-2 text-sm font-normal text-ink-soft">
                     {group.rows.length + aufgabenJe[group.key].length}
                   </span>
                 </h2>
-                <span className="text-xs text-slate-500">{group.hint}</span>
+                <span className="text-xs text-ink-muted">{group.hint}</span>
               </div>
 
               <ul className="space-y-3">
@@ -478,7 +478,7 @@ export default async function HeutePage() {
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <Link
                           href={`/contacts/${contact.id}`}
-                          className="text-sm font-semibold text-slate-900 hover:text-navy-700"
+                          className="text-sm font-semibold text-ink hover:text-navy-700"
                         >
                           {contact.name}
                         </Link>
@@ -503,7 +503,7 @@ export default async function HeutePage() {
                           withTime={hasTimeOfDay(contact.nextStepAt!)}
                         />
                         {contact.nextStepNote && (
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-ink-muted">
                             {contact.nextStepNote}
                           </span>
                         )}
@@ -513,7 +513,7 @@ export default async function HeutePage() {
                       {(contact.activities[0] ||
                         contact.note ||
                         herkunftAusQuelle(contact.source)) && (
-                        <div className="mt-2 space-y-0.5 border-l-2 border-slate-100 pl-2.5">
+                        <div className="mt-2 space-y-0.5 border-l-2 border-line pl-2.5">
                           {/* Zuerst die Herkunft: der Unterschied zwischen
                               einem kalten und einem warmen Anruf steht in
                               diesem einen Satz. */}
@@ -523,8 +523,8 @@ export default async function HeutePage() {
                             </p>
                           )}
                           {contact.activities[0] && (
-                            <p className="line-clamp-2 text-xs text-slate-500">
-                              <span className="text-slate-400">
+                            <p className="line-clamp-2 text-xs text-ink-muted">
+                              <span className="text-ink-soft">
                                 Zuletzt {kurzDatum.format(contact.activities[0].date)}:
                               </span>{" "}
                               {contact.activities[0].text}
@@ -538,7 +538,7 @@ export default async function HeutePage() {
                         </div>
                       )}
 
-                      <div className="mt-3 border-t border-slate-100 pt-3">
+                      <div className="mt-3 border-t border-line pt-3">
                         <QuickRowActions
                           contact={lite}
                           istAnruf={contact.nextStepType === "ANRUF"}
@@ -556,13 +556,13 @@ export default async function HeutePage() {
       {orphans.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-900">
+            <h2 className="text-base font-semibold text-ink">
               Ohne nächsten Schritt
-              <span className="ml-2 text-sm font-normal text-slate-400">
+              <span className="ml-2 text-sm font-normal text-ink-soft">
                 {orphans.length}
               </span>
             </h2>
-            <span className="text-xs text-slate-500">Fällt sonst durchs Raster</span>
+            <span className="text-xs text-ink-muted">Fällt sonst durchs Raster</span>
           </div>
           <ul className="space-y-3">
             {orphans.slice(0, 25).map((contact) => (
@@ -573,7 +573,7 @@ export default async function HeutePage() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <Link
                     href={`/contacts/${contact.id}`}
-                    className="text-sm font-semibold text-slate-900 hover:text-navy-700"
+                    className="text-sm font-semibold text-ink hover:text-navy-700"
                   >
                     {contact.name}
                   </Link>
@@ -586,7 +586,7 @@ export default async function HeutePage() {
                     <StageBadge stage={contact.stage} outcome={contact.outcome} />
                   </div>
                 </div>
-                <div className="mt-3 border-t border-slate-100 pt-3">
+                <div className="mt-3 border-t border-line pt-3">
                   <QuickRowActions
                     contact={{
                       id: contact.id,
@@ -611,7 +611,7 @@ export default async function HeutePage() {
             ))}
           </ul>
           {orphans.length > 25 && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-ink-muted">
               … und {orphans.length - 25} weitere. Die Liste rückt nach, sobald
               die ersten einen Schritt haben.
             </p>
