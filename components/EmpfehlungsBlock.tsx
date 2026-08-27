@@ -83,8 +83,8 @@ function Frageblock({
 
   return (
     <div>
-      <p className="mb-1 text-13 font-medium text-slate-700">{frage}</p>
-      <p className="mb-2 text-xs text-slate-500">{hinweis}</p>
+      <p className="mb-1 text-13 font-medium text-ink-muted">{frage}</p>
+      <p className="mb-2 text-xs text-ink-muted">{hinweis}</p>
 
       <div className="space-y-2">
         {zeilen.map((zeile, index) => {
@@ -153,9 +153,9 @@ function Frageblock({
             onChange={(event) => setAngekuendigt(event.target.checked)}
             className="h-4 w-4"
           />
-          <span className="text-13 text-slate-700">
+          <span className="text-13 text-ink-muted">
             {geberName.split(" ")[0]} sagt ihnen Bescheid
-            <span className="block text-xs text-slate-500">
+            <span className="block text-xs text-ink-muted">
               Erstanruf rückt auf morgen, er bekommt die Nachfrage
             </span>
           </span>
@@ -195,7 +195,7 @@ export default function EmpfehlungsBlock({ geberName }: { geberName: string }) {
             onClick={() => setPartnerOffen(true)}
             className="flex min-h-11 w-full items-center gap-1.5 text-left text-13 font-medium text-navy-600"
           >
-            <ChevronRightIcon className="h-4 w-4 text-slate-400" />
+            <ChevronRightIcon className="h-4 w-4 text-ink-soft" />
             Auch nach Partnern fragen
           </button>
         )}
@@ -205,12 +205,12 @@ export default function EmpfehlungsBlock({ geberName }: { geberName: string }) {
         <button
           type="button"
           onClick={() => setHilfeOffen((value) => !value)}
-          className="flex min-h-11 w-full items-center gap-1.5 text-left text-13 font-medium text-slate-600"
+          className="flex min-h-11 w-full items-center gap-1.5 text-left text-13 font-medium text-ink-muted"
         >
           {hilfeOffen ? (
-            <ChevronDownIcon className="h-4 w-4 text-slate-400" />
+            <ChevronDownIcon className="h-4 w-4 text-ink-soft" />
           ) : (
-            <ChevronRightIcon className="h-4 w-4 text-slate-400" />
+            <ChevronRightIcon className="h-4 w-4 text-ink-soft" />
           )}
           Wie frage ich?
         </button>
@@ -220,10 +220,10 @@ export default function EmpfehlungsBlock({ geberName }: { geberName: string }) {
             {/* Zuerst die Szenen: sie sind der Grund, aus dem jemand die Hilfe
                 ueberhaupt aufklappt. Der volle Leitfaden steht darunter. */}
             <div className="rounded-xl bg-sunken px-3 py-3">
-              <p className="text-11 font-semibold uppercase tracking-wider text-slate-500">
+              <p className="text-11 font-semibold uppercase tracking-wider text-ink-muted">
                 „Mir fällt gerade keiner ein“
               </p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-ink-muted">
                 Nicht nach Schubladen fragen, nach Bildern. Eine Frage, dann
                 warten.
               </p>

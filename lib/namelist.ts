@@ -35,17 +35,17 @@ export type RatingPalette = {
 
 export const ratingPalette: Record<ContactRating, RatingPalette> = {
   A: {
-    pill: "bg-emerald-50 text-emerald-800 ring-emerald-600/20",
+    pill: "bg-emerald-50 text-emerald-800",
     chip: "bg-emerald-600 text-white",
     dot: "bg-emerald-500",
   },
   B: {
-    pill: "bg-amber-50 text-amber-800 ring-amber-600/20",
+    pill: "bg-amber-50 text-amber-800",
     chip: "bg-amber-500 text-white",
     dot: "bg-amber-500",
   },
   C: {
-    pill: "bg-slate-100 text-slate-700 ring-slate-500/20",
+    pill: "bg-slate-100 text-slate-700",
     chip: "bg-slate-400 text-white",
     dot: "bg-slate-400",
   },

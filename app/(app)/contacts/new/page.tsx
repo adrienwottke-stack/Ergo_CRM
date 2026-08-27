@@ -10,7 +10,7 @@ export default function NewContactPage() {
       <div>
         <Link
           href="/namen"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Zur Namensliste

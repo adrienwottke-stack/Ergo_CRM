@@ -47,9 +47,7 @@ export const LOST_CHIPS: { label: string; reason: string }[] = [
 
 const chip = (active: boolean) =>
   `inline-flex min-h-11 items-center rounded-full px-3.5 text-sm font-medium transition ${
-    active
-      ? "bg-akzent text-white"
-      : "border border-slate-300 bg-surface text-slate-600 hover:border-slate-400"
+    active ? "bg-akzent text-white" : "bg-sunken text-ink-muted hover:text-ink"
   }`;
 
 // Termin in zwei Tipps: Tag antippen, Uhrzeit antippen, speichern. Der
@@ -74,7 +72,7 @@ export function AppointmentDialog({
     <Modal open={open} onClose={onClose} title="Termin vereinbart" subtitle={name}>
       <div className="space-y-4">
         <div>
-          <p className="mb-2 text-13 font-medium text-slate-600">Tag</p>
+          <p className="mb-2 text-13 font-medium text-ink-muted">Tag</p>
           <div className="flex flex-wrap gap-2">
             {DAY_CHIPS.map((entry) => {
               const value = inDays(entry.offset);
@@ -93,7 +91,7 @@ export function AppointmentDialog({
         </div>
 
         <div>
-          <p className="mb-2 text-13 font-medium text-slate-600">Uhrzeit</p>
+          <p className="mb-2 text-13 font-medium text-ink-muted">Uhrzeit</p>
           <div className="flex flex-wrap gap-2">
             {TIME_CHIPS.map((value) => (
               <button
@@ -109,7 +107,7 @@ export function AppointmentDialog({
         </div>
 
         <label className="block">
-          <span className="text-13 font-medium text-slate-600">
+          <span className="text-13 font-medium text-ink-muted">
             Oder genau eintragen
           </span>
           <input
@@ -174,7 +172,7 @@ export function AppointmentHeldDialog({
     {
       wert: "kein_abschluss",
       text: "Kein Abschluss",
-      stil: "border border-slate-300 bg-surface text-slate-700 hover:bg-slate-50",
+      stil: "border border-line-strong bg-surface text-ink-muted hover:bg-sunken",
     },
   ];
 
@@ -184,8 +182,8 @@ export function AppointmentHeldDialog({
         <div className="space-y-5">
           <EmpfehlungsBlock geberName={name} />
 
-          <div className="border-t border-slate-100 pt-4">
-            <p className="mb-2 text-13 font-medium text-slate-600">
+          <div className="border-t border-line pt-4">
+            <p className="mb-2 text-13 font-medium text-ink-muted">
               Und? Was kam raus?
             </p>
             <div className="grid gap-2 sm:grid-cols-3">
@@ -201,7 +199,7 @@ export function AppointmentHeldDialog({
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-ink-muted">
               Auch keine Empfehlung ist eine Antwort — die Frage gilt dann als
               gestellt und steht morgen nicht wieder da.
             </p>
@@ -237,7 +235,7 @@ export function ChoiceDialog({
             type="button"
             disabled={pending}
             onClick={choice.onPick}
-            className="flex min-h-14 w-full items-center rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-800 transition hover:border-navy-400 hover:bg-navy-50/50 disabled:opacity-50"
+            className="flex min-h-14 w-full items-center rounded-full bg-sunken px-4 text-sm font-semibold text-ink-muted transition hover:bg-akzent hover:text-white disabled:opacity-50"
           >
             {choice.label}
           </button>

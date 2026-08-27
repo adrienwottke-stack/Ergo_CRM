@@ -151,7 +151,7 @@ export default function PersonAufnehmen({
             />
           </div>
 
-          <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-slate-700">
+          <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-muted">
             <input
               type="checkbox"
               name="mitEinladung"
@@ -214,7 +214,7 @@ export function EinladungNachreichen({
       {code ? (
         <LinkZeile code={code} herkunft={herkunft} />
       ) : (
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-muted">
           {name} steht in der Struktur, hat aber noch keine offene Einladung.
         </p>
       )}

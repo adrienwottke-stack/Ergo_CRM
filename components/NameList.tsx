@@ -32,6 +32,7 @@ import {
   XIcon,
 } from "@/components/icons";
 import { card, chip, input } from "@/components/ui";
+import Fortschritt from "@/components/Fortschritt";
 import { liegtLabel } from "@/lib/liegenbleiber";
 
 export type NameEntry = {
@@ -282,19 +283,14 @@ export default function NameList({
           bleibt bei 100 %, weitere Namen sind willkommen. */}
       <div className={`${card} space-y-2 p-4`}>
         <div className="flex items-baseline justify-between">
-          <span className="text-sm font-semibold text-slate-900">
+          <span className="text-sm font-semibold text-ink">
             {total} von {NAME_TARGET} Namen
           </span>
-          <span className="text-xs font-medium text-slate-500">
+          <span className="text-xs font-medium text-ink-muted">
             {total >= NAME_TARGET ? "Ziel erreicht" : `${percent} %`}
           </span>
         </div>
-        <div className="h-[3px] w-full overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-navy-700 transition-all duration-300"
-            style={{ width: `${percent}%` }}
-          />
-        </div>
+        <Fortschritt anteil={percent / 100} ton="info" hoehe="duenn" />
       </div>
 
       {/* Was gerade umgezogen ist, und der Weg zurueck. Bewusst im Fluss der
@@ -423,7 +419,7 @@ export default function NameList({
                   {liegen === 1
                     ? "Ein Name liegt seit Tagen."
                     : `${liegen} Namen liegen seit Tagen.`}{" "}
-                  <span className="font-normal text-slate-500">
+                  <span className="font-normal text-ink-muted">
                     Anrufen oder von der Liste nehmen.
                   </span>
                 </p>
@@ -434,7 +430,7 @@ export default function NameList({
           {/* Der Einstieg ins Umhaengen von vielen. Steht bewusst klein ueber
               der Liste: der Normalfall ist Anrufen, nicht Sortieren. */}
           <div className="flex min-h-11 items-center justify-between gap-3">
-            <p className="text-13 font-semibold text-slate-500">
+            <p className="text-13 font-semibold text-ink-muted">
               {auswaehlend
                 ? `${gewaehlt} von ${auswaehlbar.length} ausgewählt`
                 : `${open.length} offen`}
@@ -500,10 +496,10 @@ export default function NameList({
 
       {open.length === 0 && total === 0 && (
         <div className={`${card} px-6 py-12 text-center`}>
-          <p className="text-sm font-medium text-slate-900">
+          <p className="text-sm font-medium text-ink">
             Noch keine Namen auf der Liste
           </p>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
+          <p className="mx-auto mt-2 max-w-sm text-sm text-ink-muted">
             Schreib erst alle Namen auf, die dir einfallen – einstufen und
             anrufen kommt danach. Wer beim Sammeln über Details nachdenkt,
             kommt nicht auf {NAME_TARGET}.
@@ -529,22 +525,22 @@ export default function NameList({
               <CheckIcon className="h-4 w-4" />
               Geschafft · {done.length}
             </span>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-ink-soft">
               {showDone ? "Zuklappen" : "Anzeigen"}
             </span>
           </button>
           {showDone && (
-            <ul className="divide-y divide-slate-100 border-t border-slate-100">
+            <ul className="divide-y divide-line border-t border-line">
               {done.map((entry) => (
                 <li key={entry.id}>
                   <Link
                     href={`/contacts/${entry.id}`}
                     className="flex min-h-14 items-center justify-between gap-3 px-4 hover:bg-emerald-50/40"
                   >
-                    <span className="text-sm font-medium text-slate-900">
+                    <span className="text-sm font-medium text-ink">
                       {entry.name}
                     </span>
-                    <span className="shrink-0 text-xs text-slate-500">
+                    <span className="shrink-0 text-xs text-ink-muted">
                       {entry.appointmentLabel ?? "im CRM"}
                     </span>
                   </Link>
@@ -562,22 +558,22 @@ export default function NameList({
             onClick={() => setShowLost((value) => !value)}
             className="flex min-h-14 w-full items-center justify-between px-4 text-left"
           >
-            <span className="text-sm font-semibold text-slate-600">
+            <span className="text-sm font-semibold text-ink-muted">
               Raus · {lost.length}
             </span>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-ink-soft">
               {showLost ? "Zuklappen" : "Anzeigen"}
             </span>
           </button>
           {showLost && (
-            <ul className="divide-y divide-slate-100 border-t border-slate-100">
+            <ul className="divide-y divide-line border-t border-line">
               {lost.map((entry) => (
                 <li
                   key={entry.id}
                   className="flex min-h-14 items-center justify-between gap-3 px-4"
                 >
-                  <span className="text-sm text-slate-500">{entry.name}</span>
-                  <span className="shrink-0 text-xs text-slate-400">
+                  <span className="text-sm text-ink-muted">{entry.name}</span>
+                  <span className="shrink-0 text-xs text-ink-soft">
                     {entry.lostLabel ?? "–"}
                   </span>
                 </li>
@@ -591,7 +587,12 @@ export default function NameList({
           Seite - bei siebzehn Namen scrollt man beim Auswaehlen nach unten. */}
       {auswaehlend && (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4">
-          <div className="buehne pointer-events-auto flex w-full max-w-md items-center gap-2 rounded-xl bg-navy-950 py-2 pl-3 pr-2 text-white shadow-lg">
+          {/* Kein "buehne" mehr, dieselbe Mechanik wie die Undo-Leiste
+              (components/UndoBar.tsx): dauerhaft dunkles Glas statt einer
+              satten Navy-Flaeche, deshalb feste helle Textfarben statt der
+              Tokens "ink"/"ink-soft" - die wuerden im Hellmodus dunkel und
+              auf der dunklen Pille verschwinden. */}
+          <div className="glas-dunkel pointer-events-auto flex w-full max-w-md items-center gap-2 rounded-full py-2 pl-3 pr-2 text-white schatten-pop">
             <button
               type="button"
               disabled={gewaehlt === 0}
@@ -603,7 +604,9 @@ export default function NameList({
                   `${gewaehlt} ${gewaehlt === 1 ? "Name steht" : "Namen stehen"} jetzt auf ${listKindLabels[ziel]}.`
                 )
               }
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gold-400 px-3 text-sm font-semibold text-navy-950 transition hover:bg-gold-100 disabled:opacity-40"
+              // Feste helle Akzentfarbe statt des Tokens "akzent" - dieselbe
+              // Begruendung wie beim Aktionsknopf der Undo-Leiste.
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold text-[#6cb2ff] transition hover:bg-white/10 disabled:opacity-40"
             >
               <ArrowRightIcon className="h-4 w-4" />
               {listKindLabels[ziel]}
@@ -619,7 +622,7 @@ export default function NameList({
                   `${gewaehlt} ${gewaehlt === 1 ? "Name ist" : "Namen sind"} von der Liste.`
                 )
               }
-              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-3 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full px-3 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
             >
               Von der Liste
             </button>
@@ -627,7 +630,7 @@ export default function NameList({
               type="button"
               onClick={() => setAuswahl(null)}
               aria-label="Auswahl beenden"
-              className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white"
+              className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white"
             >
               <XIcon className="h-4.5 w-4.5" />
             </button>
@@ -693,17 +696,17 @@ function NameRow({
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-semibold ${
               gewaehlt
                 ? "bg-akzent text-white"
-                : "border border-dashed border-slate-300 text-slate-400"
+                : "border border-dashed border-line-strong text-ink-soft"
             }`}
           >
             {gewaehlt ? <CheckIcon className="h-5 w-5" /> : (entry.rating ?? "–")}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-slate-900">
+            <span className="block truncate text-sm font-semibold text-ink">
               {entry.name}
             </span>
             {entry.phone && (
-              <span className="block truncate text-sm text-slate-500">
+              <span className="block truncate text-sm text-ink-muted">
                 {entry.phone}
               </span>
             )}
@@ -728,7 +731,7 @@ function NameRow({
         className={`mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-semibold transition active:scale-95 ${
           palette
             ? palette.chip
-            : "border border-dashed border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600"
+            : "border border-dashed border-line-strong text-ink-soft hover:border-line-strong hover:text-ink-muted"
         }`}
       >
         {entry.rating ?? "–"}
@@ -736,7 +739,7 @@ function NameRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-semibold text-slate-900">
+          <p className="truncate text-sm font-semibold text-ink">
             {entry.name}
           </p>
           {/* Die Plakette statt einer Umsortierung: die Liste bleibt in
@@ -763,10 +766,10 @@ function NameRow({
               }
               if (event.key === "Escape") setEditingPhone(false);
             }}
-            className="mt-1 w-full max-w-48 rounded-md border border-slate-300 px-2 py-1 text-sm"
+            className="mt-1 w-full max-w-48 rounded-md border border-line-strong px-2 py-1 text-sm"
           />
         ) : entry.phone ? (
-          <p className="truncate text-sm text-slate-500">{entry.phone}</p>
+          <p className="truncate text-sm text-ink-muted">{entry.phone}</p>
         ) : (
           <button
             type="button"
@@ -785,7 +788,7 @@ function NameRow({
         onClick={onMove}
         aria-label={`${entry.name} auf die Liste ${listKindLabels[ziel]} schieben`}
         title={`Auf ${listKindLabels[ziel]} schieben`}
-        className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-500 transition hover:bg-navy-50 hover:text-navy-700"
+        className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-ink-muted transition hover:bg-navy-50 hover:text-navy-700"
       >
         <ArrowRightIcon className="h-3.5 w-3.5" />
         {listKindLabels[ziel]}
@@ -796,7 +799,7 @@ function NameRow({
         onClick={onDrop}
         aria-label={`${entry.name} von der Liste nehmen`}
         title="Von der Liste nehmen (Kontakt bleibt erhalten)"
-        className="flex h-11 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-50 hover:text-slate-500"
+        className="flex h-11 w-8 shrink-0 items-center justify-center rounded-lg text-ink-soft transition hover:bg-sunken hover:text-ink-muted"
       >
         <XIcon className="h-4.5 w-4.5" />
       </button>

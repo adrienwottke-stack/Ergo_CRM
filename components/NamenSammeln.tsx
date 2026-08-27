@@ -30,6 +30,7 @@ import {
   PlusIcon,
 } from "@/components/icons";
 import { btnPrimary, card, input, kicker } from "@/components/ui";
+import Fortschritt from "@/components/Fortschritt";
 
 export default function NamenSammeln({
   kind,
@@ -125,7 +126,7 @@ export default function NamenSammeln({
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
           <CheckIcon className="h-6 w-6" />
         </span>
-        <h2 className="mt-4 text-lg font-semibold text-slate-900">
+        <h2 className="mt-4 text-lg font-semibold text-ink">
           {neueNamen.length === 0
             ? "Keine neuen Namen"
             : `${neueNamen.length} ${neueNamen.length === 1 ? "Name" : "Namen"} dazu`}
@@ -137,7 +138,7 @@ export default function NamenSammeln({
             Liste, auf der gesammelt wurde. Wie viele auf der anderen schon
             liegen, weiss diese Seite nicht - und eine geratene Zahl ist
             schlimmer als keine. */}
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           {verschoben
             ? `Sie liegen jetzt auf deiner ${listKindListLabels[liste]}.`
             : neueNamen.length === 0
@@ -159,7 +160,7 @@ export default function NamenSammeln({
               <PhoneIcon className="h-4 w-4" />
               Nummern nachtragen
             </Link>
-            <p className="mt-2 max-w-xs text-xs text-slate-400">
+            <p className="mt-2 max-w-xs text-xs text-ink-soft">
               Ohne Nummer kein Anruf. Geht am schnellsten am Stück — ein Name,
               ein Feld.
             </p>
@@ -175,7 +176,7 @@ export default function NamenSammeln({
             zwanzig Namen in den falschen Reiter getippt hat. */}
         {ids.length > 0 && (
           <div className="mt-6 w-full rounded-lg bg-sunken px-4 py-3 text-left">
-            <p className="text-13 text-slate-600">
+            <p className="text-13 text-ink-muted">
               {verschoben
                 ? "Umgehängt. Hier ist der Weg zurück, falls es doch die andere war."
                 : `Falsche Liste? Die ${ids.length} Namen dieser Runde ziehen in einem Zug um.`}
@@ -198,7 +199,7 @@ export default function NamenSammeln({
           {verschoben && (
             <Link
               href={`/namen/sammeln?liste=${liste}`}
-              className="min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
+              className="min-h-11 text-sm font-medium text-ink-muted hover:text-navy-700 hover:underline"
             >
               Weiter sammeln
             </Link>
@@ -211,7 +212,7 @@ export default function NamenSammeln({
                 setIds([]);
                 setStufe(0);
               }}
-              className="min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
+              className="min-h-11 text-sm font-medium text-ink-muted hover:text-navy-700 hover:underline"
             >
               Noch eine Runde
             </button>
@@ -219,7 +220,7 @@ export default function NamenSammeln({
           {neueNamen.length > 0 && (
             <Link
               href={`/namen?liste=${liste}`}
-              className="min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
+              className="min-h-11 text-sm font-medium text-ink-muted hover:text-navy-700 hover:underline"
             >
               Zur Namensliste
             </Link>
@@ -235,7 +236,7 @@ export default function NamenSammeln({
     <div className="space-y-5">
       {/* Fortschritt: er soll sehen, dass das hier endlich ist. */}
       <div>
-        <div className="flex items-baseline justify-between text-xs font-medium text-slate-500">
+        <div className="flex items-baseline justify-between text-xs font-medium text-ink-muted">
           <span>
             Szene {stufe + 1} von {STUETZEN_ANZAHL}
           </span>
@@ -243,12 +244,12 @@ export default function NamenSammeln({
             {gesamt} von {NAME_TARGET} Namen
           </span>
         </div>
-        <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-navy-700 transition-all duration-300"
-            style={{ width: `${Math.round(((stufe + 1) / STUETZEN_ANZAHL) * 100)}%` }}
-          />
-        </div>
+        <Fortschritt
+          anteil={(stufe + 1) / STUETZEN_ANZAHL}
+          ton="info"
+          hoehe="duenn"
+          className="mt-1.5"
+        />
       </div>
 
       <div className={`${card} space-y-4 p-5`}>
@@ -260,7 +261,7 @@ export default function NamenSammeln({
         <div className="flex items-start justify-between gap-3 border-b border-line pb-3">
           <div className="min-w-0">
             <p className={kicker}>{listKindListLabels[kind]}</p>
-            <p className="mt-0.5 text-13 font-medium text-slate-700">
+            <p className="mt-0.5 text-13 font-medium text-ink-muted">
               {listKindHints[kind]}
             </p>
           </div>
@@ -278,13 +279,13 @@ export default function NamenSammeln({
         </div>
 
         <div>
-          <h2 className="text-xl font-semibold tracking-[-0.01em] text-slate-900">
+          <h2 className="text-xl font-semibold tracking-[-0.01em] text-ink">
             {stuetze!.titel}
           </h2>
           <ul className="mt-3 space-y-1.5">
             {stuetze!.fragen.map((frage) => (
-              <li key={frage} className="flex gap-2 text-sm text-slate-600">
-                <span aria-hidden className="text-slate-300">
+              <li key={frage} className="flex gap-2 text-sm text-ink-muted">
+                <span aria-hidden className="text-ink-soft">
                   —
                 </span>
                 {frage}
@@ -320,7 +321,7 @@ export default function NamenSammeln({
         {hinweis && <p className="text-xs font-medium text-amber-700">{hinweis}</p>}
 
         {dieseRunde.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 border-t border-slate-100 pt-3">
+          <div className="flex flex-wrap gap-1.5 border-t border-line pt-3">
             {dieseRunde.map((name, index) => (
               <span
                 key={`${name}-${index}`}
@@ -339,7 +340,7 @@ export default function NamenSammeln({
             type="button"
             onClick={() => setStufe((wert) => wert - 1)}
             aria-label="Eine Szene zurück"
-            className="inline-flex min-h-14 items-center justify-center rounded-xl px-3 text-slate-400 transition hover:text-slate-700"
+            className="inline-flex min-h-14 items-center justify-center rounded-xl px-3 text-ink-soft transition hover:text-ink-muted"
           >
             <ArrowLeftIcon className="h-5 w-5" />
           </button>
@@ -353,7 +354,7 @@ export default function NamenSammeln({
         </button>
       </div>
 
-      <p className="text-center text-xs text-slate-400">
+      <p className="text-center text-xs text-ink-soft">
         Nummern und Einstufung kommen später auf der Liste
       </p>
     </div>

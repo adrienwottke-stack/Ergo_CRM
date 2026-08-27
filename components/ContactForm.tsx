@@ -79,7 +79,7 @@ export default async function ContactForm({
         />
       </div>
 
-      <div className="flex justify-end border-t border-slate-100 pt-5">
+      <div className="flex justify-end border-t border-line pt-5">
         <SubmitButton label={submitLabel} />
       </div>
     </form>

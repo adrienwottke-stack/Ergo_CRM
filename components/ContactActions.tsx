@@ -11,13 +11,13 @@ import { CheckIcon, PhoneIcon } from "@/components/icons";
 
 // Alle Tap-Ziele mindestens 44 px hoch – das Board wird am Handy bedient.
 const action =
-  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 text-13 font-medium transition";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3 text-13 font-medium transition";
 
 const variants = {
   call: `${action} bg-emerald-50 text-emerald-700 hover:bg-emerald-100`,
   done: `${action} bg-akzent text-white hover:bg-akzent-stark`,
-  stage: `${action} border border-slate-300 bg-surface text-slate-700 hover:bg-slate-50`,
-  soft: `${action} bg-slate-100 text-slate-600 hover:bg-slate-200`,
+  stage: `${action} border border-line-strong bg-surface text-ink hover:bg-sunken`,
+  soft: `${action} bg-sunken text-ink-muted hover:bg-line`,
   danger: `${action} text-red-600 hover:bg-red-50`,
 };
 

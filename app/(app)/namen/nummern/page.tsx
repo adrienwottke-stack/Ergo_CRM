@@ -71,13 +71,13 @@ export default async function NummernPage({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className={pageTitle}>Nummern nachtragen</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             {listKindLabels[kind]} · ohne Nummer kein Anruf
           </p>
         </div>
         <Link
           href={`/namen?liste=${kind}`}
-          className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
+          className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
         >
           <XIcon className="h-4 w-4" />
           Beenden

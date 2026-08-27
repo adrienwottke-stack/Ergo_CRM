@@ -1,7 +1,7 @@
 import type { ContactStage, Outcome } from "@/lib/generated/prisma/enums";
 import { contactStageLabels, contactStagePalette } from "@/lib/pipeline";
 
-const lostPalette = "bg-slate-100 text-slate-600 ring-slate-500/15";
+const lostPalette = "bg-slate-100 text-slate-600";
 const lostDot = "bg-slate-400";
 
 // Phase und Ausgang in einem Chip: bei Absagen bleibt die Phase sichtbar,

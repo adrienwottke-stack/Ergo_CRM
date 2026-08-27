@@ -26,12 +26,12 @@ export default function Einwandhilfe({ kind }: { kind: ListKind }) {
       {einwaende.map((einwand, index) => {
         const auf = offen === index;
         return (
-          <div key={einwand.satz} className="overflow-hidden rounded-lg bg-slate-50">
+          <div key={einwand.satz} className="overflow-hidden rounded-lg bg-sunken">
             <button
               type="button"
               onClick={() => setOffen(auf ? null : index)}
               aria-expanded={auf}
-              className="flex min-h-11 w-full items-center px-3 text-left text-sm font-medium text-slate-800"
+              className="flex min-h-11 w-full items-center px-3 text-left text-sm font-medium text-ink"
             >
               {einwand.satz}
             </button>
@@ -40,7 +40,7 @@ export default function Einwandhilfe({ kind }: { kind: ListKind }) {
                 <p className="rounded-lg border-l-[3px] border-emerald-400 bg-emerald-50 px-3 py-2 text-15 font-medium leading-snug text-emerald-950">
                   {antwortAuf(einwand)}
                 </p>
-                <p className="text-xs leading-relaxed text-slate-500">
+                <p className="text-xs leading-relaxed text-ink-muted">
                   {einwand.begruendung}
                 </p>
               </div>

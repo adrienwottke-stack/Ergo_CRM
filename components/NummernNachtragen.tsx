@@ -17,6 +17,7 @@ import { ratingLabels, ratingPalette } from "@/lib/namelist";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
 import { ArrowRightIcon, CheckIcon, PhoneIcon } from "@/components/icons";
 import { btnPrimary, btnSecondary, card, input } from "@/components/ui";
+import Fortschritt from "@/components/Fortschritt";
 
 export type NummerEintrag = {
   id: string;
@@ -88,12 +89,12 @@ export default function NummernNachtragen({
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
           <CheckIcon className="h-6 w-6" />
         </span>
-        <h2 className="mt-4 text-lg font-semibold text-slate-900">
+        <h2 className="mt-4 text-lg font-semibold text-ink">
           {items.length === 0
             ? "Alle Namen haben eine Nummer"
             : `${erfasst} ${erfasst === 1 ? "Nummer" : "Nummern"} eingetragen`}
         </h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           {anrufbar > 0
             ? `${anrufbar} ${anrufbar === 1 ? "Name ist" : "Namen sind"} jetzt anrufbar.`
             : "Ohne Nummer geht kein Durchlauf. Schau in dein Handy — Kontakte, WhatsApp, Anrufliste."}
@@ -113,7 +114,7 @@ export default function NummernNachtragen({
         {anrufbar > 0 && (
           <Link
             href={`/namen?liste=${kind}`}
-            className="mt-3 min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
+            className="mt-3 min-h-11 text-sm font-medium text-ink-muted hover:text-navy-700 hover:underline"
           >
             Später — zur Liste
           </Link>
@@ -130,7 +131,7 @@ export default function NummernNachtragen({
   return (
     <div className="space-y-5">
       <div>
-        <div className="flex items-baseline justify-between text-xs font-medium text-slate-500">
+        <div className="flex items-baseline justify-between text-xs font-medium text-ink-muted">
           <span>
             Name {index + 1} von {items.length}
           </span>
@@ -138,12 +139,7 @@ export default function NummernNachtragen({
             {erfasst} {erfasst === 1 ? "Nummer" : "Nummern"}
           </span>
         </div>
-        <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-navy-700 transition-all duration-300"
-            style={{ width: `${percent}%` }}
-          />
-        </div>
+        <Fortschritt anteil={percent / 100} ton="info" hoehe="duenn" className="mt-1.5" />
       </div>
 
       <div className={`${card} space-y-4 p-5`}>
@@ -156,10 +152,10 @@ export default function NummernNachtragen({
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <h2 className="text-2xl font-semibold leading-tight tracking-tight text-slate-900">
+            <h2 className="text-2xl font-semibold leading-tight tracking-tight text-ink">
               {aktuell.name}
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs text-ink-muted">
               {aktuell.herkunft ??
                 (aktuell.rating ? ratingLabels[aktuell.rating] : "Nicht eingestuft")}
             </p>
@@ -185,7 +181,7 @@ export default function NummernNachtragen({
             }}
             className={`${input} mt-0 text-lg tabular-nums`}
           />
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-ink-soft">
             Aus deinem Handy: Kontakte, WhatsApp, Anrufliste.
           </p>
         </div>
@@ -209,7 +205,7 @@ export default function NummernNachtragen({
         </button>
       </div>
 
-      <p className="text-center text-xs text-slate-400">
+      <p className="text-center text-xs text-ink-soft">
         Übersprungene Namen bleiben auf der Liste — nur eben ohne Anruf.
       </p>
     </div>

@@ -32,7 +32,7 @@ export default async function EditContactPage({
       <div>
         <Link
           href={`/contacts/${contact.id}`}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Zurück zu {contact.name}
@@ -48,7 +48,7 @@ export default async function EditContactPage({
       <section className={`${card} border-red-200/70 p-6`}>
         <p className={kicker}>Gefahrenzone</p>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
-          <p className="max-w-sm text-sm text-slate-600">
+          <p className="max-w-sm text-sm text-ink-muted">
             Kontakt mitsamt Aktivitäten entfernen. Nicht rückgängig zu
             machen.
           </p>
