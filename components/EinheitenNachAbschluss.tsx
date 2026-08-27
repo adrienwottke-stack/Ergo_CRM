@@ -31,6 +31,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { einheitSchnellBuchen } from "@/app/(team)/einheiten/actions";
 import Modal from "@/components/Modal";
+import EinheitenHilfe from "@/components/EinheitenHilfe";
 import { btnGhost, cn, inputBlank } from "@/components/ui";
 
 const ABSCHLUSS_EVENT = "crm:abschluss";
@@ -101,10 +102,13 @@ export default function EinheitenNachAbschluss() {
       subtitle={name}
     >
       <div className="space-y-4">
-        <p className="text-sm text-ink-muted">
-          Wie viele Einheiten sind das? Jetzt eingetragen, solange die Zahl noch
-          im Kopf ist.
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm text-ink-muted">
+            Wie viele Einheiten sind das? Jetzt eingetragen, solange die Zahl
+            noch im Kopf ist.
+          </p>
+          <EinheitenHilfe />
+        </div>
 
         <div className="flex items-center gap-2">
           <input

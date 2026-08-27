@@ -75,15 +75,28 @@ async function buchen(
   return true;
 }
 
-/** Eine Meldung: Menge, Tag, optional eine Notiz. */
-export async function einheitenBuchen(formData: FormData) {
+/**
+ * Eine Meldung: Menge, Tag, optional eine Notiz - das Formular auf /einheiten.
+ *
+ * Nimmt die drei Felder einzeln entgegen statt FormData: die Seite ruft diese
+ * Aktion aus einer kleinen Client-Insel heraus direkt auf (kein
+ * `useActionState`-Praezedenzfall im Projekt, Hausmuster stattdessen wie bei
+ * einheitSchnellBuchen unten) und braucht den Rueckgabewert, um eine
+ * Fehleingabe sichtbar zu machen - vorher verschwand ein Tippfehler
+ * kommentarlos, weil das Formular das buchen()-Ergebnis verwarf
+ * (docs/emil-feedback-plan.md, AP-03).
+ */
+export async function einheitenBuchen(
+  mengeRoh: string,
+  tagRoh: string,
+  notizRoh: string
+): Promise<{ ok: true } | { ok: false; fehler: string }> {
   const user = await requireUser();
-  await buchen(
-    user.id,
-    feld(formData, "menge"),
-    feld(formData, "tag"),
-    feld(formData, "notiz")
-  );
+  const gebucht = await buchen(user.id, mengeRoh, tagRoh, notizRoh);
+  if (!gebucht) {
+    return { ok: false, fehler: "Das war keine Zahl. Zum Beispiel: 12,5" };
+  }
+  return { ok: true };
 }
 
 /**

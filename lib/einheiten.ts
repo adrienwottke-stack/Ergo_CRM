@@ -36,6 +36,7 @@ import { ebene, elternIdVon, strukturKonten } from "@/lib/struktur";
 export const BUCHUNG_MAX = 100_000 * 100;
 
 const zahlFormat = new Intl.NumberFormat("de-DE", {
+  minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
@@ -44,7 +45,7 @@ export function formatEinheiten(hundertstel: number): string {
 }
 
 /**
- * "3,5" | "3.5" | "1.000" | "1.234,75" | "-12" -> Hundertstel.
+ * "3,5" | "3.5" | "1.000" | "1.234,75" | "1 000,50" | "-12" -> Hundertstel.
  * null, wenn es keine Zahl ist.
  *
  * DER PUNKT IST ZWEIDEUTIG, und zwar auf eine teure Art: in "1.234,75" trennt
@@ -52,14 +53,32 @@ export function formatEinheiten(hundertstel: number): string {
  * Unterschied ein Faktor 1000 - "1.000" als 1,00 zu lesen waere die Art
  * Fehler, die niemand mehr findet.
  *
- * Zwei Regeln, in dieser Reihenfolge:
+ * Drei Regeln, in dieser Reihenfolge:
  *   1. Steht ein Komma da, sind alle Punkte Tausendertrenner.
  *   2. Ohne Komma gilt eine Dreiergruppierung ("1.000", "12.500.000") als
  *      Tausendertrennung. Alles andere ("3.5", "12.50") ist ein Dezimalpunkt.
+ *   3. Ein Leerzeichen zaehlt NUR als Tausendertrenner, wenn er eine
+ *      vollstaendige Dreiergruppe bildet ("1 000", "1 000,50") - genau wie
+ *      beim Punkt in Regel 2. Jedes andere Ziffer-Leerzeichen-Muster
+ *      ("32 67") ist ein Tippfehler und kein Tausendertrenner: fruehrer
+ *      verschwand das Leerzeichen kommentarlos, und aus "32 67" wurde still
+ *      3267,00 - Faktor 100 daneben. NBSP (U+00A0) und schmales Leerzeichen
+ *      (U+202F), wie sie beim Einfuegen einer Zahl aus einer anderen App
+ *      mitkommen koennen, zaehlen dabei wie ein normales Leerzeichen.
  */
 export function parseEinheiten(roh: string): number | null {
-  const sauber = roh.trim().replace(/\s/g, "");
-  if (!sauber) return null;
+  const platzNormalisiert = roh.replace(/[\u00a0\u202f]/g, " ").trim();
+  if (!platzNormalisiert) return null;
+
+  let sauber = platzNormalisiert;
+  if (sauber.includes(" ")) {
+    // Nur eine vollstaendige Dreiergruppierung ist ein Tausendertrenner -
+    // alles andere ist ein Fehler und wird NICHT stillschweigend
+    // zusammengezogen (siehe Regel 3 oben).
+    if (!/^-?\d{1,3}( \d{3})+(,\d+)?$/.test(sauber)) return null;
+    sauber = sauber.replace(/ /g, "");
+  }
+
   const tausendergruppiert = /^-?\d{1,3}(\.\d{3})+$/.test(sauber);
   const normalisiert =
     sauber.includes(",") || tausendergruppiert

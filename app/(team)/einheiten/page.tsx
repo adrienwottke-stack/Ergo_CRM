@@ -12,8 +12,9 @@ import {
 import { merkeNutzung, schalter } from "@/lib/features";
 import WettbewerbNav from "@/components/WettbewerbNav";
 import Fortschritt from "@/components/Fortschritt";
+import EinheitenEintragen from "@/components/EinheitenEintragen";
+import EinheitenHilfe from "@/components/EinheitenHilfe";
 import {
-  btnPrimary,
   btnSecondary,
   card,
   input,
@@ -24,7 +25,7 @@ import {
   td,
   th,
 } from "@/components/ui";
-import { buchungLoeschen, einheitenBuchen, standSpeichern } from "./actions";
+import { buchungLoeschen, standSpeichern } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -185,63 +186,12 @@ export default async function EinheitenPage() {
         </div>
       )}
 
-      {/* --- Eintragen ------------------------------------------------------ */}
-      <form action={einheitenBuchen} className={`${card} space-y-5 p-6 sm:p-8`}>
-        <div>
-          <h2 className={sectionTitle}>Einheiten eintragen</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Was dazugekommen ist. Ein Storno trägst du mit Minus ein
-            (&bdquo;-12,5&ldquo;).
-          </p>
-        </div>
-        <div className="grid gap-5 sm:grid-cols-3">
-          <div>
-            <label htmlFor="menge" className={label}>
-              Einheiten
-            </label>
-            <input
-              id="menge"
-              name="menge"
-              type="text"
-              inputMode="decimal"
-              placeholder="z. B. 12,5"
-              required
-              className={input}
-            />
-          </div>
-          <div>
-            <label htmlFor="tag" className={label}>
-              Tag
-            </label>
-            <input
-              id="tag"
-              name="tag"
-              type="date"
-              defaultValue={heute}
-              max={heute}
-              className={input}
-            />
-          </div>
-          <div>
-            <label htmlFor="notiz" className={label}>
-              Notiz (optional)
-            </label>
-            <input
-              id="notiz"
-              name="notiz"
-              type="text"
-              maxLength={120}
-              placeholder="z. B. BU Schmidt"
-              className={input}
-            />
-          </div>
-        </div>
-        <div className="flex justify-end border-t border-slate-100 pt-5">
-          <button type="submit" className={btnPrimary}>
-            Speichern
-          </button>
-        </div>
-      </form>
+      {/* --- Eintragen ------------------------------------------------------
+          Kleine Client-Insel statt eines <form action>: sie zeigt den
+          Rueckgabewert der Server-Aktion an, statt eine Fehleingabe
+          kommentarlos verschwinden zu lassen (docs/emil-feedback-plan.md,
+          AP-03). */}
+      <EinheitenEintragen heute={heute} />
 
       {/* --- Karrierestufe und Startbestand --------------------------------------
           Steht offen, solange keine Stufe eingetragen ist - ohne sie ist die
@@ -279,9 +229,12 @@ export default async function EinheitenPage() {
               </p>
             </div>
             <div>
-              <label htmlFor="einheitenStart" className={label}>
-                Einheiten vor der App
-              </label>
+              <span className="flex items-center gap-1.5">
+                <label htmlFor="einheitenStart" className={label}>
+                  Einheiten vor der App
+                </label>
+                <EinheitenHilfe />
+              </span>
               <input
                 id="einheitenStart"
                 name="einheitenStart"

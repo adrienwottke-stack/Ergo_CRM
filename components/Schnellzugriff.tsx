@@ -46,6 +46,7 @@ import { suchlauf } from "@/app/wegweiserAction";
 import type { SchnellStand } from "@/lib/stats";
 import { sucheImWegweiser, type WegweiserEintrag } from "@/lib/wegweiser";
 import Modal from "@/components/Modal";
+import EinheitenHilfe from "@/components/EinheitenHilfe";
 import {
   ArrowRightIcon,
   CalendarCheckIcon,
@@ -445,8 +446,9 @@ export default function Schnellzugriff({
                 /einheiten - hier zaehlt der heutige Tag. */}
             <div className="mt-4 border-t border-line pt-4">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-13 font-medium text-ink-muted">
+                <span className="flex items-center gap-1.5 text-13 font-medium text-ink-muted">
                   Einheiten eintragen
+                  <EinheitenHilfe />
                 </span>
                 <span className="text-13 text-ink-muted">
                   {stand === null ? (
