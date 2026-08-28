@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { FALLBACK_ABSENDER } from "@/lib/willkommen";
+import { formatEinheiten } from "@/lib/einheiten";
 import Willkommen from "@/components/willkommen/Willkommen";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +93,12 @@ export default async function WillkommenPage() {
       sozialbeweis={sozialbeweis}
       namenVorhanden={namenVorhanden}
       schonFertig={user.onboardingDoneAt !== null}
+      karrierestufe={user.karrierestufe}
+      // Leer statt "0,00" fuer den unbelegten Standardwert - dasselbe
+      // ?-lasse-leer-Muster wie im echten Formular (einheiten/page.tsx).
+      einheitenStartVorbelegt={
+        user.einheitenStart ? formatEinheiten(user.einheitenStart) : ""
+      }
     />
   );
 }

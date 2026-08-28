@@ -23,6 +23,7 @@ import EinwandTest from "@/components/willkommen/EinwandTest";
 import BriefAkt from "@/components/willkommen/BriefAkt";
 import NamenSprint from "@/components/willkommen/NamenSprint";
 import Einstufung from "@/components/willkommen/Einstufung";
+import Karrierestufe from "@/components/willkommen/Karrierestufe";
 import RanglisteMoment from "@/components/willkommen/RanglisteMoment";
 import Ankunft from "@/components/willkommen/Ankunft";
 import { FuehrungsKarten, EinladenAkt } from "@/components/willkommen/FuehrungsAkte";
@@ -43,6 +44,8 @@ export default function Willkommen({
   sozialbeweis,
   namenVorhanden,
   schonFertig,
+  karrierestufe,
+  einheitenStartVorbelegt,
 }: {
   vorname: string;
   einlader: string;
@@ -52,6 +55,10 @@ export default function Willkommen({
   sozialbeweis: Sozialbeweis;
   namenVorhanden: number;
   schonFertig: boolean;
+  /** Bereits eingetragene Stufe - meist null, ausser beim erneuten Durchlauf (AP-12). */
+  karrierestufe: number | null;
+  /** Fertig formatiert ("120,50") oder leer - siehe app/(willkommen)/willkommen/page.tsx. */
+  einheitenStartVorbelegt: string;
 }) {
   const router = useRouter();
   const akte: readonly string[] = leaderFlow ? LEADER_AKTE : AKTE;
@@ -169,6 +176,15 @@ export default function Willkommen({
           />
         )}
         {akt === "einstufung" && <Einstufung onDone={weiter} />}
+        {/* AP-12: laeuft in AKTE UND LEADER_AKTE - eine Bedingung reicht,
+            die Stufe fragt sich fuer Mitglieder wie Fuehrungskraefte gleich. */}
+        {akt === "karrierestufe" && (
+          <Karrierestufe
+            karrierestufe={karrierestufe}
+            einheitenStartVorbelegt={einheitenStartVorbelegt}
+            onDone={weiter}
+          />
+        )}
         {akt === "rangliste" && <RanglisteMoment onDone={weiter} />}
         {akt === "ankunft" && (
           <Ankunft
