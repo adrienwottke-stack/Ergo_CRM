@@ -26,12 +26,14 @@ import { elternIdVon } from "@/lib/struktur";
 import { schalter } from "@/lib/features";
 import {
   einheitenFuerStruktur,
+  fokusProzentsatz,
   formatEinheiten,
   produktionsmonat,
   traegtZahlen,
 } from "@/lib/einheiten";
 import {
   card,
+  chip,
   filterPill,
   flaeche,
   kicker,
@@ -193,18 +195,53 @@ export default async function MannschaftPage({
   // nebeneinander statt hintereinander.
   const lage = await mannschaftsLage(user);
   const alle = [lage.ich, ...lage.baum];
-  const [aeste, einheitenAn, einheiten] = await Promise.all([
+  const [aeste, einheitenAn, einheiten, fokusProzent] = await Promise.all([
     astVergleich(user.id),
     schalter("einheiten"),
     einheitenFuerStruktur(
       alle.map((person) => ({ id: person.id, path: person.path })),
       produktionsmonat(berlinToday())
     ),
+    // Der Fokus-Prozentsatz der Einheitenaufteilung (AP-06, D4): admin-
+    // pflegbar in der Werkstatt, Platzhalter 50 %, solange nichts eingetragen
+    // ist. Reine Konfig-Lesung, keine zweite Berechnung der Anteile selbst.
+    fokusProzentsatz(),
   ]);
   const heuteStart = dayToUtcDate(berlinToday()).getTime();
   // Derselbe Schalter wie auf /einheiten: sonst laesst sich die Sichtbarkeit an
   // einer Stelle abschalten und an der anderen nicht.
   const zeigeEinheiten = einheitenAn.einheiten && traegtZahlen(einheiten);
+
+  // Woher die Einheiten kommen (AP-06): der Anteil jedes DIREKTEN Astes an
+  // der eigenen Struktur-Summe. "Struktur-Summe" ist bewusst der Eintrag des
+  // Betrachters selbst (astMonat von "ich") - astMonat traegt durch die
+  // Faltung in einheitenFuerStruktur() schon alles unter "ich" zusammen mit
+  // der eigenen Zahl. Basis ist der MONAT, nicht Gesamt (Plan, Abschnitt 7,
+  // Punkt 3): Gesamt ist Biografie und wuerde denselben Ast jeden Monat
+  // gleich dominant zeigen. Keine neue Abfrage - reine Arithmetik auf der
+  // bereits geladenen `einheiten`-Map.
+  const strukturMonat = einheiten.get(lage.ich.id)?.astMonat ?? 0;
+  function astAnteil(person: Mannschaftsperson): number | null {
+    // Nur direkte Aeste bekommen einen Anteil - Emils Frage zielt auf die
+    // Struktur unter der eigenen Fuehrungskraft, nicht auf Koepfe tiefer im
+    // Baum. Ohne Umsatz diesen Monat gibt es zudem nichts zu verteilen: eine
+    // 0/0-Rechnung waere keine Auskunft, sondern ein Darstellungsfehler.
+    if (!person.istDirekt || strukturMonat <= 0) return null;
+    const astMonat = einheiten.get(person.id)?.astMonat ?? 0;
+    // Gekappt auf 0-1: ein Storno kann einen Ast rechnerisch negativ oder
+    // (durch Gegenbuchungen anderswo) ueber 100 % der Struktur-Summe treiben
+    // - beides waere kein Anteil mehr, den ein Balken sinnvoll zeigen kann.
+    return Math.max(0, Math.min(1, astMonat / strukturMonat));
+  }
+  // Der dominante Ast, wenn einer den Fokus-Prozentsatz reisst. "liegt UEBER"
+  // (Plan-Wortlaut) ist strikt groesser als, nicht ab-gleich. Bei mehreren
+  // Aesten ueber der Schwelle gewinnt der groesste: "Fokus liegt auf X" nennt
+  // eine Person, keine Liste.
+  const fokusAst = alle
+    .filter((person) => person.istDirekt)
+    .map((person) => ({ person, anteil: astAnteil(person) ?? 0 }))
+    .filter((eintrag) => eintrag.anteil * 100 > fokusProzent)
+    .sort((a, b) => b.anteil - a.anteil)[0];
 
   const rot = lage.dringend.filter((person) => person.ampel === "rot");
   const gelb = lage.dringend.filter((person) => person.ampel === "gelb");
@@ -732,20 +769,32 @@ export default async function MannschaftPage({
               {produktionsmonat(berlinToday()).label} · selbst gemeldet
             </span>
           </div>
+          {/* Emils zweiter Satz zu den Einheiten: "Einheitenaufteilung, eine
+              Struktur erfuellt die 50%, damit du siehst, wo der Fokus drauf
+              liegt" (AP-06). Reine Anzeige, keine Sperre - siehe Plan,
+              Abschnitt 6. */}
+          {fokusAst && (
+            <p className={chip("warnung")}>
+              Fokus liegt auf {fokusAst.person.name} (
+              {Math.round(fokusAst.anteil * 100)} %)
+            </p>
+          )}
           <div className={`${card} overflow-x-auto`}>
-            <table className="w-full min-w-140 text-left text-sm">
+            <table className="w-full min-w-160 text-left text-sm">
               <thead className="border-b border-line/80 bg-sunken/60">
                 <tr>
                   <th className={th}>Name</th>
                   <th className={`${th} text-right`}>Eigene</th>
                   <th className={`${th} text-right`}>Team</th>
                   <th className={`${th} text-right`}>Zusammen</th>
+                  <th className={`${th} text-right`}>Anteil (Monat)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {alle.map((person) => {
                   const zahlen = einheiten.get(person.id);
                   if (!zahlen) return null;
+                  const anteil = astAnteil(person);
                   return (
                     <tr
                       key={person.id}
@@ -782,6 +831,26 @@ export default async function MannschaftPage({
                           ? "—"
                           : formatEinheiten(zahlen.astGesamt)}
                       </td>
+                      {/* Nur direkte Aeste bekommen einen Anteil - siehe
+                          astAnteil() weiter oben. */}
+                      <td className={`${td} text-right`}>
+                        {anteil === null ? (
+                          <span className="text-ink-soft">—</span>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2">
+                            <Fortschritt
+                              anteil={anteil}
+                              ton={anteil * 100 > fokusProzent ? "warnung" : "info"}
+                              hoehe="normal"
+                              className="w-16"
+                              beschriftung={`${person.name}: ${Math.round(anteil * 100)} Prozent der Struktur-Summe`}
+                            />
+                            <span className="w-10 shrink-0 tabular-nums text-ink-muted">
+                              {Math.round(anteil * 100)} %
+                            </span>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -791,7 +860,9 @@ export default async function MannschaftPage({
           <p className={kicker}>
             Einheiten trägt jeder selbst ein. „Team&ldquo; ist alles unter der
             Person, über alle Ebenen — sie zählen in keiner Rangliste mit, und
-            auf die Karrierestufe zählen nur die eigenen.
+            auf die Karrierestufe zählen nur die eigenen. Der Anteil zeigt
+            direkte Äste im Verhältnis zur eigenen Struktur-Summe im laufenden
+            Monat — reine Anzeige, keine Sperre.
           </p>
         </section>
       )}

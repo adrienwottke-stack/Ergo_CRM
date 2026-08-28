@@ -22,10 +22,11 @@ import {
   KARRIERESTUFE_MAX,
   KARRIERESTUFE_MIN,
   alleSchwellen,
+  fokusProzentsatz,
   formatEinheiten,
 } from "@/lib/einheiten";
 import { einstellungenStehen } from "@/lib/einstellungen";
-import { schalten, schwellenSpeichern } from "./actions";
+import { fokusProzentsatzSpeichern, schalten, schwellenSpeichern } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,7 @@ export default async function WerkstattPage() {
     ohneTreffer,
     schwellen,
     einstellungenDa,
+    fokusProzent,
   ] = await Promise.all([
     prisma.feature.findMany({ orderBy: { titel: "asc" } }),
     prisma.featureUse.findMany({
@@ -94,13 +96,16 @@ export default async function WerkstattPage() {
         take: 25,
       })
       .catch(() => []),
-    // Die Stufen-Schwellen (AP-07). Beide Aufrufe teilen sich EINE Abfrage:
-    // lib/einstellungen.ts liest die Tabelle je Anfrage genau einmal. Der
-    // Faenger gegen die noch nicht deployte Migration steckt schon dort -
-    // alleSchwellen() faellt dann auf den Platzhalter zurueck, und
-    // einstellungenDa sagt es dem Admin, bevor er tippt.
+    // Die Stufen-Schwellen (AP-07) und der Fokus-Prozentsatz der
+    // Einheitenaufteilung (AP-06). Alle drei Aufrufe teilen sich EINE
+    // Abfrage: lib/einstellungen.ts liest die Tabelle "Einstellung" je
+    // Anfrage genau einmal. Der Faenger gegen die noch nicht deployte
+    // Migration steckt schon dort - alleSchwellen()/fokusProzentsatz()
+    // fallen dann auf den Platzhalter zurueck, und einstellungenDa sagt es
+    // dem Admin, bevor er tippt.
     alleSchwellen(),
     einstellungenStehen(),
+    fokusProzentsatz(),
   ]);
 
   const kopfZahl = new Map<string, Set<string>>();
@@ -321,6 +326,70 @@ export default async function WerkstattPage() {
           ein Feld nach dem Übernehmen wieder auf dem alten Wert, war die
           Eingabe keine Zahl — dann bleibt die gespeicherte Schwelle stehen,
           statt stillschweigend zu verschwinden.
+        </p>
+      </div>
+
+      {/* --- Einheitenaufteilung: der Fokus-Prozentsatz ----------------------
+          Emils zweiter Satz zu den Einheiten: "Einheitenaufteilung, eine
+          Struktur erfuellt die 50%, damit du siehst, wo der Fokus drauf
+          liegt" (docs/emil-feedback-plan.md, AP-06). Eigener Block statt
+          eines weiteren Feldes oben bei den Karrierestufen-Schwellen: die
+          beiden Zahlen beantworten verschiedene Fragen (Befoerderung vs.
+          Struktur-Konzentration) und sollen sich in der Werkstatt nicht
+          vermischen, so wenig wie ihre Codestellen es tun. */}
+      <div className={`${card} p-5 sm:p-6`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className={sectionTitle}>Einheitenaufteilung</h2>
+          <span className="text-xs text-ink-muted">Fokus-Marker auf /mannschaft</span>
+        </div>
+        <p className="mt-2 max-w-2xl text-sm text-ink-muted">
+          Ab wie viel Prozent der eigenen Struktur-Summe (laufender
+          Produktionsmonat) ein direkter Ast als Fokus gilt und in der
+          Einheiten-Tabelle auf /mannschaft den Marker „Fokus liegt auf
+          …&ldquo; bekommt. Reine Anzeige — nichts wird gesperrt.
+        </p>
+
+        {!einstellungenDa && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-13 text-amber-800">
+            Die Tabelle steht auf dieser Datenbank noch nicht — die Migration
+            läuft beim nächsten Deploy mit. Bis dahin gilt der Platzhalter aus
+            dem Code (50 %), und Eintragen geht hier noch nicht.
+          </p>
+        )}
+
+        <form
+          action={fokusProzentsatzSpeichern}
+          className="mt-4 flex flex-wrap items-center gap-3"
+        >
+          <label htmlFor="fokus-prozentsatz" className="text-sm font-medium text-ink">
+            Fokus-Prozentsatz
+          </label>
+          <input
+            id="fokus-prozentsatz"
+            name="fokus-prozentsatz"
+            type="text"
+            inputMode="numeric"
+            defaultValue={fokusProzent}
+            aria-label="Fokus-Prozentsatz der Einheitenaufteilung"
+            className={cn(inputBlank, "w-24 tabular-nums")}
+          />
+          <span className="text-sm text-ink-soft">%</span>
+          <button
+            type="submit"
+            disabled={!einstellungenDa}
+            className={cn(
+              btnSecondary,
+              "disabled:cursor-not-allowed disabled:opacity-40"
+            )}
+          >
+            Übernehmen
+          </button>
+        </form>
+
+        <p className="mt-4 text-xs text-ink-muted">
+          Platzhalter, bis Emil liefert: 50 % (docs/emil-feedback-plan.md,
+          Abschnitt 7, Punkt 2). Leer lassen und übernehmen setzt wieder auf
+          diesen Platzhalter zurück.
         </p>
       </div>
 

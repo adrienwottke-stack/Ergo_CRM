@@ -567,3 +567,36 @@ export function traegtZahlen(
   }
   return false;
 }
+
+// --- Fokus-Marker: der Prozentsatz der Einheitenaufteilung ------------------
+// Emils zweiter Satz zu den Einheiten: "Einheitenaufteilung, eine Struktur
+// erfuellt die 50%, damit du siehst, wo der Fokus drauf liegt"
+// (docs/emil-feedback-plan.md, AP-06). Anders als bei den Karrierestufen-
+// Schwellen gibt es hier nur EINE Zahl, keine Reihe je Stufe - sonst
+// derselbe Weg wie schwelleFuer() oben: erst die Tabelle "Einstellung", sonst
+// der Platzhalter. Die 50 sind ein angenommener Default (Plan, Abschnitt 7,
+// Punkt 2), bis Emil seine eigene Zahl schickt.
+
+/** Der Schluessel des Fokus-Prozentsatzes in der Tabelle "Einstellung". */
+export const FOKUS_PROZENTSATZ_SCHLUESSEL = "fokus-prozentsatz";
+
+/** Der Platzhalter, solange kein eigener Wert eingetragen ist. */
+export const FOKUS_PROZENTSATZ_STANDARD = 50;
+
+/**
+ * Ab wie viel Prozent der Struktur-Summe ein direkter Ast als Fokus gilt.
+ *
+ * Dasselbe Muster wie schwelleFuer(): fehlt die Tabelle (Migration
+ * unterwegs) oder steht kein gueltiger Wert drin, gilt der Platzhalter. Eine
+ * 0 oder eine Zahl ueber 100 waere kein Prozentsatz, sondern ein Tippfehler -
+ * und faellt deshalb genauso zurueck wie ein fehlender Eintrag.
+ */
+export async function fokusProzentsatz(): Promise<number> {
+  const werte = await einstellungen();
+  if (werte === null) return FOKUS_PROZENTSATZ_STANDARD;
+  const prozent = ganzzahl(werte.get(FOKUS_PROZENTSATZ_SCHLUESSEL));
+  if (prozent === null || prozent <= 0 || prozent > 100) {
+    return FOKUS_PROZENTSATZ_STANDARD;
+  }
+  return prozent;
+}

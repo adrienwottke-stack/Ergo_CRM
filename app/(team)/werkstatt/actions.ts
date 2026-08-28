@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import {
+  FOKUS_PROZENTSATZ_SCHLUESSEL,
   KARRIERESTUFE_MAX,
   KARRIERESTUFE_MIN,
   parseEinheiten,
   schwellenSchluessel,
 } from "@/lib/einheiten";
-import { einstellungSetzen } from "@/lib/einstellungen";
+import { einstellungSetzen, ganzzahl } from "@/lib/einstellungen";
 import type { FeatureState } from "@/lib/generated/prisma/enums";
 
 const zustaende: FeatureState[] = ["TEST", "LAEUFT", "AUS", "ABGERISSEN"];
@@ -78,4 +79,41 @@ export async function schwellenSpeichern(formData: FormData) {
   revalidatePath("/werkstatt");
   revalidatePath("/einheiten");
   revalidatePath("/heute");
+}
+
+// Der Fokus-Prozentsatz der Einheitenaufteilung (docs/emil-feedback-plan.md,
+// AP-06 und D4). Emils Satz: "Einheitenaufteilung, eine Struktur erfuellt die
+// 50%, damit du siehst, wo der Fokus drauf liegt" - die 50 sind der
+// angenommene Default (Plan, Abschnitt 7, Punkt 2), bis Emil seine eigene
+// Zahl schickt.
+//
+// EIN Feld statt einer Reihe wie beim Schwellen-Formular oben: es gibt nur
+// einen Prozentsatz, keinen je Karrierestufe.
+//
+// Ein leeres Feld heisst hier NICHT "keine Pruefung mehr" (anders als eine
+// leere Schwelle oben) - fuer den Fokus-Marker gibt es keinen sinnvollen
+// "aus"-Zustand, nur einen Prozentsatz. Leer und Uebernehmen loescht die
+// Zeile und faellt auf den Platzhalter (50 %) zurueck.
+export async function fokusProzentsatzSpeichern(formData: FormData) {
+  await requireAdmin();
+
+  const roh = formData.get("fokus-prozentsatz");
+  if (typeof roh !== "string") return;
+
+  if (!roh.trim()) {
+    await einstellungSetzen(FOKUS_PROZENTSATZ_SCHLUESSEL, null);
+    revalidatePath("/werkstatt");
+    revalidatePath("/mannschaft");
+    return;
+  }
+
+  // Nur eine ganze Zahl zwischen 1 und 100 ist ein Prozentsatz - alles
+  // andere laesst den gespeicherten Wert in Ruhe, statt ihn mit Muell zu
+  // ueberschreiben (dieselbe Regel wie bei den Schwellen oben).
+  const prozent = ganzzahl(roh);
+  if (prozent === null || prozent <= 0 || prozent > 100) return;
+  await einstellungSetzen(FOKUS_PROZENTSATZ_SCHLUESSEL, String(prozent));
+
+  revalidatePath("/werkstatt");
+  revalidatePath("/mannschaft");
 }
