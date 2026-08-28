@@ -22,6 +22,7 @@ const HILFE_TEXT =
 
 const KARTEN_BREITE = 260;
 const RAND = 8;
+const ABSTAND = 8;
 
 export default function EinheitenHilfe() {
   const id = useId();
@@ -35,21 +36,44 @@ export default function EinheitenHilfe() {
 
   useEffect(() => setMounted(true), []);
 
+  // Misst die Karte und klappt sie nach oben, wenn unten kein Platz mehr ist.
+  //
+  // Am Handy ist das der Normalfall und nicht die Ausnahme: der Knopf sitzt im
+  // Schnellzugriff-Panel und im Abschluss-Modal im unteren Bildschirmdrittel,
+  // und eine nur nach unten geoeffnete Karte rutscht dort unter den Rand -
+  // fixed positioniert, also ohne die Chance, sie hochzuscrollen.
+  //
+  // Die Hoehe kommt aus der schon gerenderten Karte (sie steht beim ersten
+  // Durchgang unsichtbar da, siehe unten), nicht aus einer Schaetzung: der
+  // Text bricht je nach Schriftgroesse auf zwei bis vier Zeilen um.
   const positionieren = useCallback(() => {
     const knopf = knopfRef.current;
     if (!knopf) return;
     const rect = knopf.getBoundingClientRect();
-    setPosition({
-      top: rect.bottom + 8,
-      left: Math.min(
-        Math.max(RAND, rect.left + rect.width / 2 - KARTEN_BREITE / 2),
-        window.innerWidth - KARTEN_BREITE - RAND
-      ),
-    });
+    const hoehe = karteRef.current?.offsetHeight ?? 0;
+
+    const platzUnten = window.innerHeight - rect.bottom - ABSTAND - RAND;
+    const nachOben =
+      hoehe > 0 && platzUnten < hoehe && rect.top - ABSTAND - RAND >= hoehe;
+
+    const top = nachOben ? rect.top - ABSTAND - hoehe : rect.bottom + ABSTAND;
+    const left = Math.min(
+      Math.max(RAND, rect.left + rect.width / 2 - KARTEN_BREITE / 2),
+      window.innerWidth - KARTEN_BREITE - RAND
+    );
+
+    // Denselben Stand zurueckgeben statt eines neuen Objekts: der Effekt
+    // unten haengt an `position` und liefe sonst im Kreis.
+    setPosition((alt) =>
+      alt && alt.top === top && alt.left === left ? alt : { top, left }
+    );
   }, []);
 
   useEffect(() => {
-    if (!offen) return;
+    if (!offen) {
+      setPosition((alt) => (alt === null ? alt : null));
+      return;
+    }
     positionieren();
 
     const aussenklick = (event: MouseEvent) => {
@@ -75,7 +99,11 @@ export default function EinheitenHilfe() {
       window.removeEventListener("resize", positionieren);
       window.removeEventListener("scroll", positionieren, true);
     };
-  }, [offen, positionieren]);
+    // `position` haengt bewusst mit drin: beim ersten Durchgang steht die
+    // Karte noch unsichtbar da und ist noch nicht gemessen. Der zweite
+    // Durchgang misst sie und setzt sie endgueltig; danach gibt
+    // positionieren() denselben Stand zurueck und es ist Ruhe.
+  }, [offen, position, positionieren]);
 
   return (
     <>
@@ -86,19 +114,32 @@ export default function EinheitenHilfe() {
         aria-label="Wo finde ich meine Einheiten?"
         aria-expanded={offen}
         aria-controls={id}
-        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sunken text-11 font-semibold text-ink-muted transition hover:bg-line hover:text-ink"
+        className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sunken text-11 font-semibold text-ink-muted transition hover:bg-line hover:text-ink"
       >
         ?
+        {/* Die Trefferflaeche, 44 Pixel wie ueberall sonst im Haus - als
+            Ueberlagerung und nicht als groesserer Knopf, damit der Punkt
+            optisch 20 Pixel klein bleibt und keine Label-Zeile auseinander
+            zieht. Am Handy ist der sichtbare Kreis sonst kaum zu treffen,
+            und danebengegriffen oeffnet das Label die Tastatur. */}
+        <span aria-hidden className="absolute -inset-3" />
       </button>
 
       {offen &&
         mounted &&
-        position &&
         createPortal(
           <div
             id={id}
             ref={karteRef}
-            style={{ top: position.top, left: position.left, width: KARTEN_BREITE }}
+            style={{
+              top: position?.top ?? 0,
+              left: position?.left ?? 0,
+              width: KARTEN_BREITE,
+              // Erst messen, dann zeigen: der erste Durchgang rendert die
+              // Karte unsichtbar, damit positionieren() ihre echte Hoehe
+              // kennt und weiss, ob sie nach oben klappen muss.
+              visibility: position ? undefined : "hidden",
+            }}
             className="glas-stark fixed z-[60] rounded-xl border border-line p-3 text-13 leading-snug text-ink schatten-pop"
           >
             {HILFE_TEXT}
