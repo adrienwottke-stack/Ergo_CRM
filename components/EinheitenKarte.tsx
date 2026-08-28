@@ -98,15 +98,20 @@ export default function EinheitenKarte({
         <EinheitenHilfe />
       </div>
 
+      {/* text-2xl am Handy, erst ab sm die vollen 30 Pixel: bei 375 px bleiben
+          je Spalte rund 143 Pixel, und ein fuenfstelliger Gesamtstand
+          ("12.345,67") braucht in tabular-nums mehr als das. min-w-0 dazu,
+          weil Grid-Spalten sonst auf "auto" stehen und die Karte aufdruecken,
+          statt umzubrechen - genau der erfahrene Nutzer saehe es zuerst. */}
       <div className="mt-3 grid grid-cols-2 gap-4">
-        <div>
-          <p className="text-3xl font-bold tabular-nums tracking-[-0.02em] text-navy-700">
+        <div className="min-w-0">
+          <p className="text-2xl font-bold tabular-nums tracking-[-0.02em] text-navy-700 sm:text-3xl">
             {monatStand}
           </p>
           <p className="mt-0.5 text-xs text-ink-soft">{monatLabel}</p>
         </div>
-        <div>
-          <p className="text-3xl font-bold tabular-nums tracking-[-0.02em] text-ink">
+        <div className="min-w-0">
+          <p className="text-2xl font-bold tabular-nums tracking-[-0.02em] text-ink sm:text-3xl">
             {gesamtStand}
           </p>
           <p className="mt-0.5 text-xs text-ink-soft">Gesamt</p>
