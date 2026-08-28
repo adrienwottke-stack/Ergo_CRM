@@ -65,15 +65,24 @@ export type NameEntry = {
 // untereinander. Deshalb stehen die Klassen hier oben und nicht an drei
 // Stellen im JSX.
 //
-// Am Handy (375 px, der Normalfall) ist die Breite der ganze Kampf. Nachgemessen
-// bei 375 px: 32 px Naehe + 103 px Name + 90 px Nummer + 36 px Liegt + 64 px
+// Am Handy (375 px, der Normalfall) ist die Breite der ganze Kampf. Gerechnet
+// bei 375 px: 44 px Naehe + 89 px Name + 89 px Nummer + 36 px Liegt + 68 px
 // Aktionen, ohne dass die Seite seitlich scrollt. Die Nummer bekommt genug fuer
 // elf Tabellenziffern - eine abgeschnittene Handynummer waere wertlos -, der
-// Name nimmt den Rest und kuerzt bei Bedarf mit Auslassungspunkten. Ab sm wird
-// jede Spalte breiter (ab 640 px passt auch der laengste Name ungekuerzt) und
-// der Schiebe-Knopf bekommt seine Beschriftung zurueck.
+// Name kuerzt bei Bedarf mit Auslassungspunkten. Ab sm wird jede Spalte breiter
+// (ab 640 px passt auch der laengste Name ungekuerzt) und der Schiebe-Knopf
+// bekommt seine Beschriftung zurueck.
+//
+// Naehe stand hier zuerst auf 2rem und die Aktionen auf 4rem. Beides war zu
+// schmal: der Einstufungs-Knopf - die meistbenutzte Aktion der Seite - war beim
+// Umbau vom Kartenstapel zur Tabelle von 44 auf 32 Pixel Breite geschrumpft,
+// und die beiden Aktionsknoepfe lagen ohne einen Pixel Abstand nebeneinander,
+// obwohl sie Verschiedenes tun. Die 16 Pixel dafuer nimmt der Name: Name und
+// Nummer stehen jetzt auf 1fr statt 1.15fr zu 1fr, damit die Nummer ihre
+// Breite behaelt. Ein gekuerzter Name ist noch erkennbar, eine gekuerzte
+// Nummer ist wertlos.
 const RASTER =
-  "grid-cols-[2rem_minmax(0,1.15fr)_minmax(0,1fr)_2.25rem_4rem] sm:grid-cols-[2.75rem_minmax(0,1.5fr)_minmax(0,1fr)_5.75rem_7.75rem]";
+  "grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1fr)_2.25rem_4.25rem] sm:grid-cols-[2.75rem_minmax(0,1.5fr)_minmax(0,1fr)_5.75rem_7.75rem]";
 
 // Im Auswahlmodus fallen die beiden Aktionsspalten weg - dort wird nicht
 // einzeln geschoben, sondern unten im Stapel. Der gewonnene Platz geht an
@@ -988,7 +997,11 @@ function NameRow({
 
           {/* Umhaengen und herunternehmen. Wohin der Pfeil schiebt, steht am
               Handy im Spaltenkopf darueber und ab sm zusaetzlich am Knopf. */}
-          <span role="cell" className="flex items-center justify-end">
+          {/* gap-1 zwischen den beiden: sie lagen am Handy ohne einen Pixel
+              Abstand nebeneinander, und sie tun Verschiedenes - schieben und
+              herunternehmen. Die vier Pixel passen in die Spalte, ohne dass
+              einer der Knoepfe schmaler wird. */}
+          <span role="cell" className="flex items-center justify-end gap-1 sm:gap-0">
             <button
               type="button"
               onClick={onMove}
