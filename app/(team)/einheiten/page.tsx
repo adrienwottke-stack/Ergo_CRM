@@ -4,6 +4,7 @@ import { berlinToday, dayDisplayFormat } from "@/lib/dates";
 import {
   KARRIERESTUFE_MAX,
   KARRIERESTUFE_MIN,
+  eigenerVerlauf,
   formatEinheiten,
   ladeEinheiten,
   produktionsmonat,
@@ -14,6 +15,7 @@ import SeitenKopf from "@/components/SeitenKopf";
 import Fortschritt from "@/components/Fortschritt";
 import EinheitenEintragen from "@/components/EinheitenEintragen";
 import EinheitenHilfe from "@/components/EinheitenHilfe";
+import VerlaufsChart from "@/components/VerlaufsChart";
 import {
   btnSecondary,
   card,
@@ -42,7 +44,7 @@ export default async function EinheitenPage() {
   const user = await requireUser();
   const heute = berlinToday();
 
-  const [seite, person, an, team] = await Promise.all([
+  const [seite, person, an, team, verlauf] = await Promise.all([
     ladeEinheiten(
       {
         id: user.id,
@@ -58,6 +60,7 @@ export default async function EinheitenPage() {
     }),
     schalter("einheiten"),
     teamEinheiten(user.id, produktionsmonat(heute)),
+    eigenerVerlauf(user.id),
   ]);
 
   const buchungen = await prisma.einheitenbuchung.findMany({
@@ -139,6 +142,29 @@ export default async function EinheitenPage() {
             </p>
           )}
         </div>
+      </div>
+
+      {/* --- Der Verlauf ----------------------------------------------------
+          Emils "Erfolgsdiagramm, wie so ETF-Chart"
+          (docs/emil-feedback-plan.md, AP-08). Steht bewusst DIREKT unter den
+          beiden Zahlen: die Kurve endet auf demselben Wert, der eine Karte
+          weiter oben als "Eigeneinheiten insgesamt" steht - nebeneinander
+          kann man das nachsehen, drei Abschnitte weiter unten nicht mehr.
+          Beide Zahlen entstehen aus derselben Rechnung (einheitenStart plus
+          alle Buchungen), nur einmal als Summe und einmal als Weg dorthin. */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className={sectionTitle}>Dein Verlauf</h2>
+          <span className="text-xs text-ink-muted">
+            tippen und halten zum Ablesen
+          </span>
+        </div>
+        <VerlaufsChart
+          sockel={user.einheitenStart}
+          tage={verlauf}
+          heute={heute}
+          monatStart={monat.start.toISOString().slice(0, 10)}
+        />
       </div>
 
       {/* --- Was das Team darunter geschrieben hat ---------------------------

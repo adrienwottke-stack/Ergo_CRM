@@ -35,19 +35,20 @@ import { ebene, elternIdVon, strukturKonten } from "@/lib/struktur";
 // Gespeichert wird eine ganze Zahl: 350 = 3,50 Einheiten. Kein Decimal - das
 // ist bei Prisma eine Klasseninstanz und ueberlebt die Grenze zu einer
 // Client-Komponente nicht. Diese Datei ist die einzige Stelle, an der aus
-// "3,5" eine 350 wird und zurueck.
+// "3,5" eine 350 wird - der Weg IN die Datenbank. Der Weg heraus (350 ->
+// "3,50") steht seit AP-08 in lib/einheitenAnzeige.ts und wird hier
+// weitergereicht; auch er gibt es nur einmal, nur eben eine Datei weiter,
+// weil er auch im Browser gebraucht wird. Siehe direkt bei formatEinheiten.
 
 /** Hoechstbetrag einer einzelnen Buchung. Alles darueber ist ein Tippfehler. */
 export const BUCHUNG_MAX = 100_000 * 100;
 
-const zahlFormat = new Intl.NumberFormat("de-DE", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-export function formatEinheiten(hundertstel: number): string {
-  return zahlFormat.format(hundertstel / 100);
-}
+// Die Anzeigerichtung (350 -> "3,50") liegt seit AP-08 eine Datei weiter, in
+// lib/einheitenAnzeige.ts, und wird von dort weitergereicht: diese Datei
+// importiert Prisma, und components/VerlaufsChart.tsx rechnet seine Kurve im
+// Browser. Fuer jede Aufrufstelle bleibt es derselbe Import wie bisher - die
+// Begruendung steht im Kopf der anderen Datei.
+export { formatEinheiten } from "@/lib/einheitenAnzeige";
 
 /**
  * "3,5" | "3.5" | "1.000" | "1.234,75" | "1 000,50" | "-12" -> Hundertstel.
@@ -332,6 +333,60 @@ export async function eigenerGesamtstand(
     _sum: { hundertstel: true },
   });
   return einheitenStart + (summe._sum.hundertstel ?? 0);
+}
+
+// --- Der eigene Verlauf -----------------------------------------------------
+// Emils Satz dazu: "Diagramm Einheiten -> alles: Tagesdurchschnitt, wie viel
+// pro Woche, Erfolgsdiagramm. Wie so ETF-Chart, ueber Woche, Monat, 6 Monate,
+// Jahr und Insgesamt" (docs/emil-feedback-plan.md, AP-08).
+
+/** Ein Kalendertag mit seiner Nettosumme, in Hundertsteln. */
+export type Verlaufstag = {
+  /** "2026-08-28" - der Berliner Kalendertag, wie ihn `tag` speichert. */
+  tag: string;
+  /** Summe aller Buchungen dieses Tages. NEGATIV heisst: Storni ueberwiegen. */
+  hundertstel: number;
+};
+
+/**
+ * Die eigenen Tagessummen - die dritte kleine Schwester von ladeEinheiten().
+ *
+ * Eine Abfrage, ein groupBy auf `tag` (Praezedenz: dailyLog.groupBy in
+ * lib/fuehrung.ts). Der Index [userId, tag] traegt genau diesen Zugriff.
+ *
+ * BEWUSST OHNE ZEITRAUM-FILTER, obwohl der Chart fuenf Zeitraeume anbietet.
+ * Zwei Gruende, die beide in dieselbe Richtung zeigen:
+ *
+ * 1. "Gesamt" ist einer der fuenf Umschalter - die ganze Historie muss also
+ *    ohnehin einmal ueber die Leitung.
+ * 2. Jeder KUERZERE Zeitraum braucht seinen Sockel, und der ist die Summe von
+ *    allem DAVOR. Ein Filter auf die Woche wuerde also eine zweite Abfrage
+ *    nach sich ziehen, nur um zu erfahren, wo die Woche anfaengt.
+ *
+ * Der Umschalter kostet damit keinen Serverweg: der Browser hat alle fuenf
+ * Zeitraeume schon in der Hand und schneidet sie sich selbst zurecht. Eine
+ * Zeile je Tag MIT Buchung, nicht je Tag - wer zwei Jahre lang jede Woche
+ * einmal eintraegt, hat rund hundert davon.
+ *
+ * Ohne einheitenStart, wie eigenerMonatsstand(): den Sockel haelt die
+ * Aufrufstelle ueber requireUser() ohnehin schon in der Hand.
+ */
+export async function eigenerVerlauf(userId: string): Promise<Verlaufstag[]> {
+  const zeilen = await prisma.einheitenbuchung.groupBy({
+    by: ["tag"],
+    where: { userId },
+    _sum: { hundertstel: true },
+    orderBy: { tag: "asc" },
+  });
+
+  // `tag` steht als UTC-Mitternacht in der Datenbank, die ersten zehn Zeichen
+  // der ISO-Form sind damit genau der Berliner Kalendertag. Als Zeichenkette
+  // und nicht als Date, weil beides ueber die Grenze zur Client-Komponente
+  // muss und ein Datum dort ohnehin wieder als Zeichenkette ankaeme.
+  return zeilen.map((zeile) => ({
+    tag: zeile.tag.toISOString().slice(0, 10),
+    hundertstel: zeile._sum.hundertstel ?? 0,
+  }));
 }
 
 /**
