@@ -506,12 +506,19 @@ export default function VerlaufsChart({
       </div>
 
       {/* --- Die drei Zahlen daneben -------------------------------------- */}
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <KennzahlKachel
-          wert={`${veraenderung > 0 ? "+" : ""}${formatEinheiten(veraenderung)}`}
-          bezeichnung="im Zeitraum"
-          ton={veraenderung > 0 ? "erfolg" : veraenderung < 0 ? "gefahr" : "neutral"}
-        />
+      {/* Am Handy nimmt die Leitzahl die ganze erste Reihe, die beiden
+          Durchschnitte teilen sich die zweite. Zu dritt nebeneinander blieben
+          bei 375 px rund 72 Pixel Innenraum je Kachel - "+1.234,50" braucht in
+          tabular-nums das Anderthalbfache und liefe aus der Kachel heraus. Ab
+          sm stehen wieder alle drei in einer Reihe. */}
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="col-span-2 sm:col-span-1">
+          <KennzahlKachel
+            wert={`${veraenderung > 0 ? "+" : ""}${formatEinheiten(veraenderung)}`}
+            bezeichnung="im Zeitraum"
+            ton={veraenderung > 0 ? "erfolg" : veraenderung < 0 ? "gefahr" : "neutral"}
+          />
+        </div>
         <KennzahlKachel wert={formatEinheiten(proTag)} bezeichnung="je Tag" />
         <KennzahlKachel wert={formatEinheiten(proWoche)} bezeichnung="je Woche" />
       </div>
