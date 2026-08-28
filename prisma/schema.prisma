@@ -750,6 +750,35 @@ model Suchbegriff {
   @@index([day])
 }
 
+// --- Einstellungen ----------------------------------------------------------
+// Was der BETRIEB festlegt und nicht der Code (docs/emil-feedback-plan.md, D4):
+// die Schwellen der Karrierestufen, spaeter der Fokus-Prozentsatz der
+// Einheitenaufteilung und die Ampel-Kriterien. Gepflegt in der Werkstatt, vom
+// Admin, ohne Deploy - genau das war Emils Satz: "soll dann selbst eintragbar
+// sein".
+//
+// Im Muster von Feature.key: ein sprechender Schluessel als @id, kein
+// kuenstlicher. "schwelle.1" ist die Schwelle, die auf Karrierestufe 1 bis zur
+// naechsten fehlt - der Schluessel sagt selbst, was er meint, und zwei Zeilen
+// fuer dieselbe Sache kann es nicht geben.
+//
+// DER WERT STEHT ALS TEXT DA, obwohl hier Zahlen liegen. Das ist die bewusste
+// Gegenrechnung: EINE Tabelle fuer alles Konfigurierbare statt einer neuen
+// Tabelle und einer neuen Migration je Wert. Ein typisiertes
+// StufenSchwelle(stufe, hundertstel) haette die Schwellen sauber gedeckt und
+// den Fokus-Prozentsatz aus AP-06 schon wieder nicht - und D4 nennt drei
+// solche Werte, nicht einen. Gelesen und geschrieben wird ausschliesslich
+// ueber lib/einstellungen.ts; dort steht die einzige Stelle, an der aus dem
+// Text wieder eine Zahl wird.
+model Einstellung {
+  schluessel String @id
+  wert       String
+
+  // Wer gedreht hat, steht bewusst nicht dabei: die Werkstatt ist der Admin,
+  // einen zweiten gibt es nicht. Wann, reicht.
+  geaendertAt DateTime @default(now()) @updatedAt
+}
+
 // Gemeinsamer Block: 25 Minuten, alle gleichzeitig. Gezaehlt wird ueber
 // DailyLog.createdAt im Fenster - kein zweiter Zaehler, der auseinanderlaufen
 // kann.

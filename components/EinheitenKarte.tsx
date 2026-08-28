@@ -24,7 +24,7 @@ import Link from "next/link";
 import { einheitSchnellBuchen } from "@/app/(team)/einheiten/actions";
 import Fortschritt from "@/components/Fortschritt";
 import EinheitenHilfe from "@/components/EinheitenHilfe";
-import { card, cn, inputBlank, kicker } from "@/components/ui";
+import { card, cn, flaeche, inputBlank, kicker } from "@/components/ui";
 import { ChevronRightIcon } from "@/components/icons";
 
 /**
@@ -121,13 +121,30 @@ export default function EinheitenKarte({
             hoehe="kraeftig"
             beschriftung={`${gesamtStand} von ${schwelle} Einheiten`}
           />
-          <p className="mt-2 text-xs text-ink-muted">
-            {geschafft
-              ? `${schwelle} sind geschafft — trag deine neue Karrierestufe ein.`
-              : `${gesamtStand} von ${schwelle}${
-                  naechsteStufe !== null ? ` bis Karrierestufe ${naechsteStufe}` : ""
-                }`}
-          </p>
+          {/* Der Feier-Moment (AP-07). Bis hierhin stand "geschafft" als graue
+              Fussnote da, in derselben Schriftgroesse wie "noch 120,00 bis
+              Karrierestufe 2" - der Unterschied zwischen fast und geschafft war
+              nicht zu sehen. Jetzt eine getoente Flaeche im Haus-Ton "erfolg",
+              derselben Tonleiter wie der Balken darueber: EIN Signal, kein
+              zweites daneben. */}
+          {geschafft ? (
+            <div className={cn(flaeche("erfolg"), "mt-3 px-3.5 py-3")}>
+              <p className="text-sm font-semibold text-emerald-800">
+                Geschafft — {schwelle} Einheiten stehen.
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-700">
+                {naechsteStufe !== null
+                  ? `Trag deine Karrierestufe ${naechsteStufe} ein.`
+                  : "Trag deine neue Karrierestufe ein."}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-ink-muted">
+              {`${gesamtStand} von ${schwelle}${
+                naechsteStufe !== null ? ` bis Karrierestufe ${naechsteStufe}` : ""
+              }`}
+            </p>
+          )}
         </div>
       )}
 

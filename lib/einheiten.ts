@@ -18,12 +18,17 @@
 //    den Aufbau - und die gesamte Punktehistorie waere rueckwirkend eine
 //    andere. Dieselbe Ueberlegung wie bei der Anwesenheit, die deshalb kein
 //    sechster QuotaType wurde.
-// 3. ALLES, WAS SPAETER ANDERS SEIN KOENNTE, STEHT ALS EINE KONSTANTE HIER.
-//    Der Schnitt des Produktionsmonats und die Schwelle zu Karrierestufe 2 sind
-//    Fragen an die Praxis, nicht an den Code.
+// 3. ALLES, WAS SPAETER ANDERS SEIN KOENNTE, STEHT AN EINER STELLE. Der
+//    Schnitt des Produktionsmonats steht als Konstante hier. Die SCHWELLEN der
+//    Karrierestufen stehen seit AP-07 nicht mehr im Code: sie liegen in der
+//    Tabelle "Einstellung" und werden in der Werkstatt gepflegt
+//    (docs/emil-feedback-plan.md, D4). Was unten noch als Konstante steht, ist
+//    nur der Platzhalter, mit dem die Anzeige weiterlaeuft, solange die
+//    Tabelle fehlt.
 
 import { prisma } from "@/lib/prisma";
 import { addDays, addMonths, berlinToday, dayToUtcDate } from "@/lib/dates";
+import { einstellungen, ganzzahl } from "@/lib/einstellungen";
 import { ebene, elternIdVon, strukturKonten } from "@/lib/struktur";
 
 // --- Rechnen in Hundertsteln ------------------------------------------------
@@ -156,10 +161,18 @@ export const KARRIERESTUFE_MIN = 1;
 export const KARRIERESTUFE_MAX = 6;
 
 /**
- * Was es bis zur naechsten Karrierestufe braucht, in Hundertsteln.
+ * Der PLATZHALTER, solange die Tabelle "Einstellung" nicht da ist.
+ *
+ * Bis AP-07 war das hier die Wahrheit ueber die Schwellen. Jetzt ist es der
+ * Rueckfall fuer genau einen Fall: die Migration liegt committet im Repo, ist
+ * aber noch nicht deployt (siehe schwelleFuer). Danach zaehlt nur noch, was in
+ * der Werkstatt steht.
  *
  * Die 500 stehen schon in docs/recruiting-plan.md ("nach ~500 Einheiten besteht
- * der Alltag aus Rekrutierung") und sind dort als offener Punkt markiert.
+ * der Alltag aus Rekrutierung") und sind dort als offener Punkt markiert -
+ * ebenso in docs/emil-feedback-plan.md, Abschnitt 7, Punkt 1. TODO-Emil: seine
+ * echten Werte traegt der Admin selbst ein, ohne dass jemand diese Datei
+ * anfasst.
  *
  * Fuer Karrierestufe 2 aufwaerts steht hier ABSICHTLICH nichts: eine erfundene
  * Schwelle ist schlimmer als keine, weil sie jemandem sagt, er sei fast da.
@@ -169,9 +182,55 @@ export const SCHWELLEN: Record<number, number> = {
   1: 500 * 100,
 };
 
-export function schwelleFuer(karrierestufe: number | null): number | null {
+/** Der Schluessel einer Schwelle in der Tabelle "Einstellung": "schwelle.1". */
+export function schwellenSchluessel(karrierestufe: number): string {
+  return `schwelle.${karrierestufe}`;
+}
+
+/**
+ * Alle hinterlegten Schwellen: Karrierestufe -> Hundertstel.
+ *
+ * Erst die Tabelle, dann der Platzhalter. Der Unterschied, auf den es dabei
+ * ankommt: eine ANTWORTENDE Tabelle ohne Zeile fuer eine Stufe heisst "fuer
+ * diese Stufe gibt es keine Schwelle" - da faellt nichts auf die Konstante
+ * zurueck, sonst koennte der Admin die 500 nie wieder loswerden. Nur eine
+ * Tabelle, die gar nicht antwortet (Migration unterwegs), laesst den
+ * Platzhalter gelten.
+ *
+ * Was keine positive ganze Zahl ist, faellt raus: eine 0 waere keine Schwelle,
+ * sondern eine Division durch null im Fortschrittsbalken.
+ */
+export async function alleSchwellen(): Promise<Map<number, number>> {
+  const werte = await einstellungen();
+  if (werte === null) {
+    return new Map(
+      Object.entries(SCHWELLEN).map(([stufe, hundertstel]) => [
+        Number(stufe),
+        hundertstel,
+      ])
+    );
+  }
+
+  const schwellen = new Map<number, number>();
+  for (let stufe = KARRIERESTUFE_MIN; stufe <= KARRIERESTUFE_MAX; stufe++) {
+    const hundertstel = ganzzahl(werte.get(schwellenSchluessel(stufe)));
+    if (hundertstel !== null && hundertstel > 0) schwellen.set(stufe, hundertstel);
+  }
+  return schwellen;
+}
+
+/**
+ * Was der eigenen Karrierestufe bis zur naechsten fehlt, in Hundertsteln.
+ *
+ * Seit AP-07 async, weil die Zahl aus der Datenbank kommt und nicht mehr aus
+ * dem Code. Die Abfrage dahinter ist je Anfrage gecacht (lib/einstellungen.ts),
+ * mehrere Aufrufer auf einer Seite kosten also eine Abfrage, nicht drei.
+ */
+export async function schwelleFuer(
+  karrierestufe: number | null
+): Promise<number | null> {
   if (karrierestufe === null) return null;
-  return SCHWELLEN[karrierestufe] ?? null;
+  return (await alleSchwellen()).get(karrierestufe) ?? null;
 }
 
 export function istKarrierestufe(wert: number): boolean {
@@ -366,7 +425,7 @@ export async function ladeEinheiten(
     monat,
     ich: staende.find((stand) => stand.istDu)!,
     runde: betrachter.karrierestufe === null ? [] : staende,
-    schwelle: schwelleFuer(betrachter.karrierestufe),
+    schwelle: await schwelleFuer(betrachter.karrierestufe),
   };
 }
 

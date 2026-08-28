@@ -70,7 +70,10 @@ export default async function EinheitenPage() {
 
   const { ich, monat, schwelle } = seite;
   const offen = schwelle === null ? null : schwelle - ich.gesamt;
-  const naechsteStufe = user.karrierestufe === null ? null : user.karrierestufe + 1;
+  const naechsteStufe =
+    user.karrierestufe === null || user.karrierestufe >= KARRIERESTUFE_MAX
+      ? null
+      : user.karrierestufe + 1;
 
   return (
     <div className="space-y-8">

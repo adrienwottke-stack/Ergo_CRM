@@ -18,6 +18,7 @@ import { liegtLabel, liegtSeit } from "@/lib/liegenbleiber";
 import { herkunftAusQuelle } from "@/lib/empfehlungen";
 import { faelligeAufgaben, fuehrungsSchritt, mannschaftsLage } from "@/lib/fuehrung";
 import {
+  KARRIERESTUFE_MAX,
   eigenerGesamtstand,
   eigenerMonatsstand,
   formatEinheiten,
@@ -168,10 +169,15 @@ export default async function HeutePage() {
   ]);
 
   // Schwellen-Fortschritt (AP-02): misst den GESAMT-Stand, nicht den Monat -
-  // schwelleFuer bleibt hier bewusst synchron (lib/einheiten.ts); ein
-  // spaeteres Paket zieht diesen Aufrufer beim Async-Umbau mit um.
-  const einheitenSchwelle = schwelleFuer(user.karrierestufe);
-  const naechsteKarrierestufe = user.karrierestufe === null ? null : user.karrierestufe + 1;
+  // und die Schwelle kommt seit AP-07 aus der Werkstatt statt aus einer
+  // Konstante, deshalb hier ein await. Bewusst NICHT im Promise.all oben: die
+  // Abfrage dahinter ist je Anfrage gecacht (lib/einstellungen.ts) und liest
+  // eine Handvoll Zeilen - dafuer lohnt es nicht, den Block umzubauen.
+  const einheitenSchwelle = await schwelleFuer(user.karrierestufe);
+  const naechsteKarrierestufe =
+    user.karrierestufe === null || user.karrierestufe >= KARRIERESTUFE_MAX
+      ? null
+      : user.karrierestufe + 1;
 
   // Emil oeffnet die App morgens im Auto und landet hier - nicht auf
   // /mannschaft. Bis hierhin erfuhr er von einem stillen Partner erst, wenn er
