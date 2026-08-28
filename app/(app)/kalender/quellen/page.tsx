@@ -139,11 +139,18 @@ export default async function QuellenPage({
               </div>
 
               {quelle.letzterFehler && (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
-                  {quelle.letzterFehler}
-                  {!quelle.aktiv &&
-                    " Nach drei Fehlläufen wurde die Quelle stillgelegt, damit TimeTree das Konto nicht sperrt. „Jetzt holen“ startet sie wieder."}
-                </p>
+                <div className="space-y-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">
+                  <p>{quelle.letzterFehler}</p>
+                  <p className="text-red-800/80">
+                    {quelle.aktiv
+                      ? `Fehllauf ${quelle.fehlerZaehler} von 3 in Folge — beim dritten wird die Quelle automatisch stillgelegt, damit TimeTree das Konto nicht sperrt.`
+                      : "Nach drei Fehlläufen in Folge wurde die Quelle automatisch stillgelegt, damit TimeTree das Konto nicht sperrt. „Jetzt holen“ startet sie wieder."}
+                  </p>
+                  <p className="text-red-800/80">
+                    Meldest du dich bei TimeTree über Apple oder Google an statt mit E-Mail
+                    und Passwort, funktioniert diese Anbindung grundsätzlich nicht.
+                  </p>
+                </div>
               )}
 
               <div className="flex flex-wrap items-center gap-3">
