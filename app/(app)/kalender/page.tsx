@@ -21,7 +21,6 @@ import {
   shell,
   btnPrimary,
   btnSecondary,
-  btnGhost,
   flaeche,
   punkt,
 } from "@/components/ui";
@@ -295,6 +294,10 @@ export default async function KalenderPage({
               }`}
           </p>
 
+          {/* Beide Knoepfe tragen ihre 44 Pixel selbst: "Jetzt nachsehen" stand
+              vorher auf btnGhost, und das ist reiner Text ohne Mindesthoehe -
+              rund 20 Pixel Trefferflaeche an genau der Stelle, an der am Handy
+              getippt wird. */}
           {syncZustand.gestoerte.length > 0 ? (
             <Link
               href="/kalender/quellen"
@@ -305,7 +308,7 @@ export default async function KalenderPage({
             </Link>
           ) : (
             <form action={jetztAbgleichen}>
-              <button type="submit" className={btnGhost}>
+              <button type="submit" className={`${btnSecondary} shrink-0`}>
                 Jetzt nachsehen
               </button>
             </form>
