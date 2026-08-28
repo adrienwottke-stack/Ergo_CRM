@@ -31,7 +31,7 @@ import {
   UndoIcon,
   XIcon,
 } from "@/components/icons";
-import { card, chip, input, inputBlank } from "@/components/ui";
+import { card, chip, cn, input, inputBlank } from "@/components/ui";
 import Fortschritt from "@/components/Fortschritt";
 import { liegtLabel } from "@/lib/liegenbleiber";
 
@@ -47,6 +47,70 @@ export type NameEntry = {
   /** Tage ohne Fortschritt, sobald die Schwelle gerissen ist - sonst null. */
   liegtTage: number | null;
 };
+
+// --- Das Spaltenraster ------------------------------------------------------
+//
+// Die offene Liste ist eine Tabelle, kein Kartenstapel: eine Zeile pro Name,
+// 44 px hoch, Spalten stehen untereinander, der Kopf bleibt beim Scrollen
+// stehen. Vorher war jede Zeile eine eigene Karte von 72 px - bei zwanzig
+// Namen dreimal scrollen, ohne je zwei Nummern untereinander zu sehen.
+//
+// Gebaut als CSS-Raster und NICHT als <table>: eine Tabellenzeile darf kein
+// Knopf sein, und im Auswahlmodus ist genau das der Fall (die ganze Zeile ist
+// die Trefferflaeche). Die Tabellen-Semantik liefern die ARIA-Rollen
+// (table/row/columnheader/cell) - fuer Screenreader ist es damit eine Tabelle,
+// fuers Auge auch, und die Zeile bleibt trotzdem frei formbar.
+//
+// Kopf und Zeilen teilen sich EIN Raster, sonst stehen die Spalten nicht
+// untereinander. Deshalb stehen die Klassen hier oben und nicht an drei
+// Stellen im JSX.
+//
+// Am Handy (375 px, der Normalfall) ist die Breite der ganze Kampf. Nachgemessen
+// bei 375 px: 32 px Naehe + 103 px Name + 90 px Nummer + 36 px Liegt + 64 px
+// Aktionen, ohne dass die Seite seitlich scrollt. Die Nummer bekommt genug fuer
+// elf Tabellenziffern - eine abgeschnittene Handynummer waere wertlos -, der
+// Name nimmt den Rest und kuerzt bei Bedarf mit Auslassungspunkten. Ab sm wird
+// jede Spalte breiter (ab 640 px passt auch der laengste Name ungekuerzt) und
+// der Schiebe-Knopf bekommt seine Beschriftung zurueck.
+const RASTER =
+  "grid-cols-[2rem_minmax(0,1.15fr)_minmax(0,1fr)_2.25rem_4rem] sm:grid-cols-[2.75rem_minmax(0,1.5fr)_minmax(0,1fr)_5.75rem_7.75rem]";
+
+// Im Auswahlmodus fallen die beiden Aktionsspalten weg - dort wird nicht
+// einzeln geschoben, sondern unten im Stapel. Der gewonnene Platz geht an
+// Name und Nummer.
+const RASTER_AUSWAHL =
+  "grid-cols-[2.75rem_minmax(0,1.15fr)_minmax(0,1fr)_2.25rem] sm:grid-cols-[3rem_minmax(0,1.5fr)_minmax(0,1fr)_5.75rem]";
+
+/** Die Zeile selbst: dicht, aber mit vollen 44 px Tippflaeche. */
+const ZEILE = "grid min-h-11 items-center gap-x-0.5 px-1 sm:gap-x-2 sm:px-3";
+
+/** Spaltenueberschrift - klein, ruhig, in Versalien wie die Tabellen der App. */
+const KOPF = "truncate text-10 font-semibold uppercase tracking-wide text-ink-soft";
+
+// Die Kopfzeile klebt unter der App-Kopfzeile: 3.5rem Leiste + 2.75rem
+// Navigation, dazu das Polster fuer die Statusleiste am Handy. Lieber eine
+// Idee zu wenig als zu viel - waere der Wert zu gross, blitzten scrollende
+// Zeilen in der Luecke durch; ist er zu klein, schiebt sich der Kopf unter die
+// App-Leiste (z-20) und niemand sieht es.
+const KOPFZEILE = cn(
+  "sticky z-10 grid min-h-9 items-center gap-x-0.5 rounded-t-2xl border-b border-line px-1 sm:gap-x-2 sm:px-3",
+  "glas-stark top-[calc(6.25rem_+_env(safe-area-inset-top))]"
+);
+
+/**
+ * Zebra und Auswahl-Ton als sich AUSSCHLIESSENDE Klassen, nicht als
+ * `even:`-Variante plus Ueberschreibung.
+ *
+ * Nachgemessen: zwei Hintergrund-Klassen mit derselben Variante entscheiden
+ * nicht nach der Reihenfolge im String, sondern nach der im erzeugten
+ * Stylesheet - `even:bg-sunken` gewann gegen `even:bg-navy-50`, und damit war
+ * jede zweite ausgewaehlte Zeile nicht mehr als ausgewaehlt zu erkennen.
+ * Dieselbe Falle wie bei `input`/`inputBlank` in components/ui.ts.
+ */
+function zeilenTon(index: number, gewaehlt: boolean) {
+  if (gewaehlt) return "bg-navy-50";
+  return index % 2 === 1 ? "bg-sunken" : "";
+}
 
 // Optimistische Aenderungen: 20 Namen hintereinander eintippen darf nicht auf
 // den Server warten, und der Buchstabe muss sofort umspringen.
@@ -141,6 +205,8 @@ export default function NameList({
   const gewaehlt = auswahl?.size ?? 0;
   const alleGewaehlt = auswaehlbar.length > 0 && gewaehlt === auswaehlbar.length;
   const auswaehlend = auswahl !== null;
+
+  const raster = auswaehlend ? RASTER_AUSWAHL : RASTER;
 
   // Der Streifen verschwindet von selbst - dasselbe Fenster wie beim
   // Rueckgaengig der Gespraechsergebnisse, damit es sich gleich anfuehlt.
@@ -411,7 +477,7 @@ export default function NameList({
                 </Link>
               )}
 
-              {/* Zaehlt, was die Plaketten unten einzeln zeigen. Ohne diese
+              {/* Zaehlt, was die Spalte "Liegt" unten einzeln zeigt. Ohne diese
                   Zeile muesste man zwanzig Namen absuchen, um zu merken, dass
                   sechs davon liegen. */}
               {liegen > 0 && (
@@ -462,35 +528,93 @@ export default function NameList({
             )}
           </div>
 
-          <ul className="space-y-2">
-            {open.map((entry) => (
-              <NameRow
-                key={entry.id}
-                entry={entry}
-                ziel={ziel}
-                auswaehlend={auswaehlend}
-                gewaehlt={auswahl?.has(entry.id) ?? false}
-                onToggle={() => umschalten(entry.id)}
-                onCycleRating={() => cycleRating(entry)}
-                onMove={() =>
-                  schieben(
-                    [entry.id],
-                    kind,
-                    ziel,
-                    `${entry.name} steht jetzt auf ${listKindLabels[ziel]}.`
-                  )
-                }
-                onDrop={() =>
-                  schieben(
-                    [entry.id],
-                    kind,
-                    null,
-                    `${entry.name} ist von der Liste.`
-                  )
-                }
-              />
-            ))}
-          </ul>
+          {/* Die Tabelle. KEIN overflow-x am Rahmen: das waere ein eigener
+              Scroll-Container, und daran klebt der Kopf dann statt am Fenster.
+              Deshalb passen die Spalten am Handy in die Breite, statt seitlich
+              wegzulaufen. Aus demselben Grund auch kein overflow-hidden fuer
+              die Ecken - die runden Kanten sitzen an Kopf und letzter Zeile. */}
+          <div
+            role="table"
+            aria-label={`Offene Namen auf ${listKindLabels[kind]}`}
+            className={card}
+          >
+            <div role="row" className={cn(KOPFZEILE, raster)}>
+              {auswaehlend ? (
+                <span role="columnheader" className="flex justify-center">
+                  <CheckIcon className="h-3.5 w-3.5 text-ink-soft" />
+                  <span className="sr-only">Auswahl</span>
+                </span>
+              ) : (
+                <span
+                  role="columnheader"
+                  title="Nähe: A enger Kreis, B Bekannte, C lose Kontakte"
+                  className={cn(KOPF, "text-center")}
+                >
+                  Nähe
+                </span>
+              )}
+              <span role="columnheader" className={KOPF}>
+                Name
+              </span>
+              <span role="columnheader" className={KOPF}>
+                Nummer
+              </span>
+              <span
+                role="columnheader"
+                title="Tage ohne Fortschritt"
+                className={cn(KOPF, "text-right")}
+              >
+                Liegt
+              </span>
+              {!auswaehlend && (
+                // Titel-Schreibweise statt Versalien: hier steht ein
+                // Listenname, kein Spaltentyp. Und dieser Kopf traegt die
+                // Auskunft, die vorher an jedem einzelnen Pfeil klebte -
+                // wohin der Knopf schiebt. Genau dafuer ist ein Tabellenkopf
+                // da, und weil er stehen bleibt, steht sie immer ueber dem
+                // Knopf, den man gerade drueckt.
+                <span
+                  role="columnheader"
+                  className="flex items-center justify-end gap-1 truncate text-10 font-semibold text-ink-soft"
+                >
+                  <ArrowRightIcon className="hidden h-3 w-3 sm:block" />
+                  <span className="truncate">{listKindLabels[ziel]}</span>
+                </span>
+              )}
+            </div>
+
+            <ul role="rowgroup">
+              {open.map((entry, index) => (
+                <NameRow
+                  key={entry.id}
+                  entry={entry}
+                  ziel={ziel}
+                  raster={raster}
+                  index={index}
+                  auswaehlend={auswaehlend}
+                  gewaehlt={auswahl?.has(entry.id) ?? false}
+                  onToggle={() => umschalten(entry.id)}
+                  onCycleRating={() => cycleRating(entry)}
+                  onMove={() =>
+                    schieben(
+                      [entry.id],
+                      kind,
+                      ziel,
+                      `${entry.name} steht jetzt auf ${listKindLabels[ziel]}.`
+                    )
+                  }
+                  onDrop={() =>
+                    schieben(
+                      [entry.id],
+                      kind,
+                      null,
+                      `${entry.name} ist von der Liste.`
+                    )
+                  }
+                />
+              ))}
+            </ul>
+          </div>
         </>
       )}
 
@@ -646,6 +770,8 @@ export default function NameList({
 function NameRow({
   entry,
   ziel,
+  raster,
+  index,
   auswaehlend,
   gewaehlt,
   onCycleRating,
@@ -656,6 +782,10 @@ function NameRow({
   entry: NameEntry;
   /** Die andere Liste - Beschriftung des Schiebe-Knopfes. */
   ziel: ListKind;
+  /** Dasselbe Spaltenraster wie der Kopf - sonst stehen die Spalten schief. */
+  raster: string;
+  /** Nur fuer den Zebra-Streifen. */
+  index: number;
   auswaehlend: boolean;
   gewaehlt: boolean;
   onCycleRating: () => void;
@@ -679,79 +809,141 @@ function NameRow({
     });
   };
 
-  // Im Auswahlmodus ist die ganze Zeile der Knopf: bei siebzehn Namen trifft
-  // niemand siebzehnmal ein Kaestchen von zwanzig Pixeln.
+  // Die Liegt-Plakette statt einer Umsortierung: die Liste bleibt in
+  // Eingabe-Reihenfolge, damit beim Einstufen keine Zeile unter dem Finger
+  // wegspringt. Am Handy nur die Zahl in einem roten Punkt - "liegt 12 Tage"
+  // passt dort in keine Spalte, die Zahl unter der Ueberschrift "Liegt" sagt
+  // dasselbe. Ab sm steht der ganze Satz da.
+  const liegt =
+    entry.liegtTage === null ? null : (
+      <>
+        {/* Die blosse Zahl im roten Punkt - unter der Ueberschrift "Liegt"
+            sagt sie dasselbe wie der Satz. Fuer die Vorlesehilfe steht der
+            Satz daneben, deshalb ist der Punkt selbst aria-hidden: sonst
+            hoerte man ihn zweimal. */}
+        <span
+          aria-hidden
+          title={liegtLabel(entry.liegtTage)}
+          className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-50 px-1 text-10 font-semibold tabular-nums text-red-700 sm:hidden"
+        >
+          {entry.liegtTage}
+        </span>
+        <span className="sr-only sm:hidden">{liegtLabel(entry.liegtTage)}</span>
+        {/* Das Umschalten liegt am UMSCHLAG, nicht an der Plakette selbst:
+            `chip()` bringt sein eigenes `inline-flex` mit, und zwei
+            display-Klassen am selben Element entscheiden nach der Reihenfolge
+            im Stylesheet - nachgemessen gewann `inline-flex` gegen `hidden`,
+            die Plakette stand also auch am Handy da und trieb die Zeile auf
+            54 px. */}
+        <span className="hidden sm:block">
+          <span className={cn(chip("gefahr"), "tabular-nums")}>
+            {liegtLabel(entry.liegtTage)}
+          </span>
+        </span>
+      </>
+    );
+
+  // Im Auswahlmodus ist die ganze Zeile die Trefferflaeche: bei siebzehn Namen
+  // trifft niemand siebzehnmal ein Kaestchen von zwanzig Pixeln. Der Knopf in
+  // der ersten Spalte macht dasselbe fuer Tastatur und Screenreader - sein
+  // Klick blubbert an die Zeile, deshalb hat er bewusst KEINEN eigenen
+  // onClick (sonst zaehlte ein Tipp doppelt).
   if (auswaehlend) {
     return (
-      <li>
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-pressed={gewaehlt}
-          className={`${card} flex min-h-16 w-full items-center gap-3 p-3 text-left transition ${
-            gewaehlt ? "ring-2 ring-akzent" : ""
-          }`}
-        >
-          <span
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-semibold ${
-              gewaehlt
-                ? "bg-akzent text-white"
-                : "border border-dashed border-line-strong text-ink-soft"
-            }`}
+      <li
+        role="row"
+        onClick={onToggle}
+        className={cn(
+          ZEILE,
+          raster,
+          "cursor-pointer transition last:rounded-b-2xl",
+          zeilenTon(index, gewaehlt)
+        )}
+      >
+        <span role="cell" className="flex justify-center">
+          <button
+            type="button"
+            aria-pressed={gewaehlt}
+            aria-label={`${entry.name} auswählen`}
+            className="flex h-11 w-full items-center justify-center"
           >
-            {gewaehlt ? <CheckIcon className="h-5 w-5" /> : (entry.rating ?? "–")}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-ink">
-              {entry.name}
+            <span
+              className={cn(
+                "flex h-7 w-7 items-center justify-center rounded-full text-13 font-semibold",
+                gewaehlt
+                  ? "bg-akzent text-white"
+                  : "border border-dashed border-line-strong text-ink-soft"
+              )}
+            >
+              {gewaehlt ? <CheckIcon className="h-4 w-4" /> : (entry.rating ?? "–")}
             </span>
-            {entry.phone && (
-              <span className="block truncate text-sm text-ink-muted">
-                {entry.phone}
-              </span>
-            )}
-          </span>
-        </button>
+          </button>
+        </span>
+        <span role="cell" className="truncate text-13 font-semibold text-ink">
+          {entry.name}
+        </span>
+        <span
+          role="cell"
+          className="truncate text-13 tabular-nums text-ink-muted"
+        >
+          {entry.phone}
+        </span>
+        <span role="cell" className="flex items-center justify-end">
+          {liegt}
+        </span>
       </li>
     );
   }
 
   return (
-    <li className={`${card} flex min-h-16 items-center gap-2 p-3`}>
-      {/* Ein Tipp zykelt – → A → B → C → –. Kein Menü, kein Dialog. */}
-      <button
-        type="button"
-        onClick={onCycleRating}
-        aria-label={
-          entry.rating
-            ? `Einstufung ${entry.rating} (${ratingLabels[entry.rating]}) ändern`
-            : "Einstufen"
-        }
-        title={entry.rating ? ratingHints[entry.rating] : "Einstufen"}
-        className={`mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-semibold transition active:scale-95 ${
-          palette
-            ? palette.chip
-            : "border border-dashed border-line-strong text-ink-soft hover:border-line-strong hover:text-ink-muted"
-        }`}
-      >
-        {entry.rating ?? "–"}
-      </button>
+    <li
+      role="row"
+      className={cn(ZEILE, raster, "last:rounded-b-2xl", zeilenTon(index, false))}
+    >
+      {/* Ein Tipp zykelt – → A → B → C → –. Kein Menü, kein Dialog. Der Knopf
+          ist 44 px hoch wie die ganze Zeile, der farbige Punkt darin ist nur
+          das Auge davon. */}
+      <span role="cell" className="flex justify-center">
+        <button
+          type="button"
+          onClick={onCycleRating}
+          aria-label={
+            entry.rating
+              ? `Einstufung ${entry.rating} (${ratingLabels[entry.rating]}) ändern`
+              : "Einstufen"
+          }
+          title={entry.rating ? ratingHints[entry.rating] : "Einstufen"}
+          className="flex h-11 w-full items-center justify-center transition active:scale-95"
+        >
+          <span
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-full text-13 font-semibold transition",
+              palette
+                ? palette.chip
+                : "border border-dashed border-line-strong text-ink-soft hover:text-ink-muted"
+            )}
+          >
+            {entry.rating ?? "–"}
+          </span>
+        </button>
+      </span>
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-semibold text-ink">
-            {entry.name}
-          </p>
-          {/* Die Plakette statt einer Umsortierung: die Liste bleibt in
-              Eingabe-Reihenfolge, damit beim Einstufen keine Zeile unter dem
-              Finger wegspringt. */}
-          {entry.liegtTage !== null && (
-            <span className={`${chip("gefahr")} shrink-0`}>
-              {liegtLabel(entry.liegtTage)}
-            </span>
-          )}
-        </div>
-        {editingPhone ? (
+      <span
+        role="cell"
+        title={entry.name}
+        className="truncate text-13 font-semibold text-ink"
+      >
+        {entry.name}
+      </span>
+
+      {editingPhone ? (
+        // Beim Eintippen macht die Zeile Platz: das Feld nimmt sich alle
+        // Spalten bis zum Rand und ist damit am Handy 194 statt 90 px breit.
+        // In 90 px kann niemand eine Telefonnummer pruefen, und die beiden
+        // Knoepfe rechts sind in genau diesem Moment nicht gefragt - sie sind
+        // zurueck, sobald das Feld schliesst (Enter, Escape oder ein Tipp
+        // daneben).
+        <span role="cell" aria-colspan={3} className="col-span-3">
           <input
             type="tel"
             autoFocus
@@ -766,43 +958,60 @@ function NameRow({
               }
               if (event.key === "Escape") setEditingPhone(false);
             }}
-            className={`${inputBlank} mt-1 max-w-48`}
+            className={cn(inputBlank, "text-13 tabular-nums")}
           />
-        ) : entry.phone ? (
-          <p className="truncate text-sm text-ink-muted">{entry.phone}</p>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setEditingPhone(true)}
-            className="text-sm font-medium text-navy-600 hover:underline"
-          >
-            + Nummer
-          </button>
-        )}
-      </div>
+        </span>
+      ) : (
+        <>
+          <span role="cell" className="min-w-0">
+            {entry.phone ? (
+              <span
+                title={entry.phone}
+                className="block truncate text-13 tabular-nums text-ink-muted"
+              >
+                {entry.phone}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingPhone(true)}
+                className="flex h-11 w-full items-center text-13 font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
+              >
+                + Nummer
+              </button>
+            )}
+          </span>
 
-      {/* Ein Tipp haengt den Namen um. Das Ziel steht dran, weil ein blosser
-          Pfeil nicht sagt, wohin. */}
-      <button
-        type="button"
-        onClick={onMove}
-        aria-label={`${entry.name} auf die Liste ${listKindLabels[ziel]} schieben`}
-        title={`Auf ${listKindLabels[ziel]} schieben`}
-        className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-ink-muted transition hover:bg-navy-50 hover:text-navy-700"
-      >
-        <ArrowRightIcon className="h-3.5 w-3.5" />
-        {listKindLabels[ziel]}
-      </button>
+          <span role="cell" className="flex items-center justify-end">
+            {liegt}
+          </span>
 
-      <button
-        type="button"
-        onClick={onDrop}
-        aria-label={`${entry.name} von der Liste nehmen`}
-        title="Von der Liste nehmen (Kontakt bleibt erhalten)"
-        className="flex h-11 w-8 shrink-0 items-center justify-center rounded-lg text-ink-soft transition hover:bg-sunken hover:text-ink-muted"
-      >
-        <XIcon className="h-4.5 w-4.5" />
-      </button>
+          {/* Umhaengen und herunternehmen. Wohin der Pfeil schiebt, steht am
+              Handy im Spaltenkopf darueber und ab sm zusaetzlich am Knopf. */}
+          <span role="cell" className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={onMove}
+              aria-label={`${entry.name} auf die Liste ${listKindLabels[ziel]} schieben`}
+              title={`Auf ${listKindLabels[ziel]} schieben`}
+              className="inline-flex h-11 w-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-navy-50 hover:text-navy-700 sm:w-auto sm:gap-1 sm:px-2 sm:text-11 sm:font-semibold"
+            >
+              <ArrowRightIcon className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+              <span className="hidden sm:inline">{listKindLabels[ziel]}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onDrop}
+              aria-label={`${entry.name} von der Liste nehmen`}
+              title="Von der Liste nehmen (Kontakt bleibt erhalten)"
+              className="flex h-11 w-7 items-center justify-center rounded-lg text-ink-soft transition hover:bg-sunken hover:text-ink-muted sm:w-8"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
+          </span>
+        </>
+      )}
     </li>
   );
 }
