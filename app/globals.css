@@ -533,16 +533,16 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(60rem 40rem at 12% -8%, rgb(0 122 255 / 0.1), transparent 60%),
-    radial-gradient(50rem 36rem at 100% 12%, rgb(90 200 250 / 0.09), transparent 55%),
-    radial-gradient(70rem 50rem at 45% 110%, rgb(88 86 214 / 0.07), transparent 60%);
+    radial-gradient(60rem 40rem at 12% -8%, rgb(0 122 255 / 0.24), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 12%, rgb(90 200 250 / 0.2), transparent 55%),
+    radial-gradient(70rem 50rem at 45% 110%, rgb(88 86 214 / 0.16), transparent 60%);
 }
 
 .dark body::before {
   background:
-    radial-gradient(60rem 40rem at 12% -8%, rgb(10 132 255 / 0.13), transparent 60%),
-    radial-gradient(50rem 36rem at 100% 12%, rgb(100 210 255 / 0.07), transparent 55%),
-    radial-gradient(70rem 50rem at 45% 110%, rgb(94 92 230 / 0.1), transparent 60%);
+    radial-gradient(60rem 40rem at 12% -8%, rgb(10 132 255 / 0.28), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 12%, rgb(100 210 255 / 0.16), transparent 55%),
+    radial-gradient(70rem 50rem at 45% 110%, rgb(94 92 230 / 0.22), transparent 60%);
 }
 
 ::selection {
