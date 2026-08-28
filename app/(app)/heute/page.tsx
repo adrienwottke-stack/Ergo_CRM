@@ -35,7 +35,8 @@ import Postfach from "@/components/Postfach";
 import NummerHinterlegen from "@/components/NummerHinterlegen";
 import EinheitenKarte from "@/components/EinheitenKarte";
 import TerminFrageKarte, { type TerminFrage } from "@/components/TerminFrageKarte";
-import { card, chip, flaeche } from "@/components/ui";
+import Ampel from "@/components/Ampel";
+import { card, cardInteractive, chip, flaeche } from "@/components/ui";
 import SeitenKopf from "@/components/SeitenKopf";
 import LeerZustand from "@/components/LeerZustand";
 import ZahlHoch from "@/components/ZahlHoch";
@@ -180,6 +181,23 @@ export default async function HeutePage() {
       ? await Promise.all([mannschaftsLage(user), faelligeAufgaben(user.id)])
       : [null, []];
   const brauchenDich = lage?.dringend.filter((person) => person.ampel === "rot") ?? [];
+
+  // AP-05: der ruhige Gegenpart zum Banner unten - "wie steht die Struktur
+  // INSGESAMT", nicht nur "wer ist gerade rot". Reines Zaehlen ueber die
+  // ohnehin geladene `lage`, keine zweite Abfrage, keine zweite Rechnung.
+  // Ausgetretene zaehlen nicht mehr mit - dasselbe Prinzip wie bei
+  // lib/fuehrung.ts, wo `dringend`/`ruhend` Ausgetretene ebenfalls aus der
+  // Ampel-Betrachtung herausnehmen. `null` heisst hier "fuehrt niemanden" und
+  // haelt die Stufe-1-Ansicht unveraendert.
+  const struktur = lage
+    ? lage.leute.reduce(
+        (acc, person) => {
+          if (!person.ausgetreten) acc[person.ampel]++;
+          return acc;
+        },
+        { grau: 0, gruen: 0, gelb: 0, rot: 0 }
+      )
+    : null;
 
   // Faellige Fuehrungsaufgaben gehoeren in dieselben Gruppen wie die
   // Kundenschritte - eine Fuehrungskraft hat EINE Liste. Was ueberfaellig ist,
@@ -355,6 +373,59 @@ export default async function HeutePage() {
           </span>
           <span aria-hidden className="mt-0.5 shrink-0 text-ink-soft">
             <ChevronRightIcon className="h-5 w-5" />
+          </span>
+        </Link>
+      )}
+
+      {/* AP-05: die Struktur in einer Zeile - unabhaengig davon, ob gerade
+          jemand rot ist. Das Banner darueber bleibt DER Alarm (eigene Farbe,
+          eigenes Gewicht, pulst); diese Zeile ist bewusst leiser gehalten
+          (Kartenfarbe wie jede andere Karte, kein Puls) und damit der
+          neutrale Gesamtüberblick, den Emil fuer Fuehrungskraefte wollte.
+          Steht nur da, wenn `gefuehrte > 0` - wer niemanden fuehrt, sieht
+          hier exakt nichts Neues. */}
+      {struktur && (
+        <Link
+          href="/mannschaft"
+          className={`${cardInteractive} flex items-center gap-3 px-4 py-3 sm:px-5 sm:py-3.5`}
+        >
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span className="font-medium text-ink-muted">Deine Struktur:</span>
+            <span className="inline-flex items-center gap-1.5 font-semibold tabular-nums text-ink">
+              <Ampel ampel="gruen" variante="punkt" />
+              {struktur.gruen}
+            </span>
+            <span aria-hidden className="text-ink-soft">
+              ·
+            </span>
+            <span className="inline-flex items-center gap-1.5 font-semibold tabular-nums text-ink">
+              <Ampel ampel="gelb" variante="punkt" />
+              {struktur.gelb}
+            </span>
+            <span aria-hidden className="text-ink-soft">
+              ·
+            </span>
+            <span className="inline-flex items-center gap-1.5 font-semibold tabular-nums text-ink">
+              <Ampel ampel="rot" variante="punkt" />
+              {struktur.rot}
+            </span>
+            {/* Platzhalter sind keine schlechte Ampel, sondern gar keine -
+                deshalb eigenes Wort statt einer vierten stummen Zahl neben
+                Rot, mit der sie sonst verschmelzen wuerden. */}
+            {struktur.grau > 0 && (
+              <>
+                <span aria-hidden className="text-ink-soft">
+                  ·
+                </span>
+                <span className="inline-flex items-center gap-1.5 tabular-nums text-ink-soft">
+                  <Ampel ampel="grau" variante="punkt" />
+                  {struktur.grau} wartet
+                </span>
+              </>
+            )}
+          </span>
+          <span aria-hidden className="shrink-0 text-ink-soft">
+            <ChevronRightIcon className="h-4 w-4" />
           </span>
         </Link>
       )}
