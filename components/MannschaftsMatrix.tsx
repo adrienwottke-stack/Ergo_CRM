@@ -27,12 +27,18 @@ export default function MannschaftsMatrix({
   personen,
   einheiten,
   zeigeEinheiten,
+  kurz,
 }: {
   /** Die Mannschaft ohne den Betrachter selbst - eine Fuehrungskraft fuehrt
    *  sich nicht selbst, siehe "Dein eigenes Geschaeft" weiter unten. */
   personen: Mannschaftsperson[];
   einheiten: Map<string, EinheitenAufteilung>;
   zeigeEinheiten: boolean;
+  /** Vorfuehr-Kuerzel je Namen (Lagebild-Plan, Bauschritt 3b) - eine einzige,
+   *  kollisionssaubere Map, von mannschaft/page.tsx ueber ALLE GP-Namen der
+   *  Seite gerechnet. Ohne Map (kein Aufrufer reicht sie durch) faellt
+   *  GpName auf einfache, nicht kollisionsaufgeloeste Initialen zurueck. */
+  kurz?: Map<string, string>;
 }) {
   // Ausgetretene brauchen keine Fuehrung mehr - eine rote Ampel bei jemandem,
   // der laengst weg ist, waere eine falsche Auskunft. Dasselbe Prinzip wie bei
@@ -176,10 +182,9 @@ export default function MannschaftsMatrix({
                         {/* GpName statt blossem Text: laeuft der Vorfuehr-
                             Schalter (Namen -> Initialen fuers Zeigen vor
                             fremden Beratern), macht die Matrix von allein mit.
-                            Ohne kurz-Prop rechnet GpName einfache Initialen -
-                            die kollisionssaubere Server-Map reicht die
-                            Mannschafts-Seite spaeter durch. */}
-                        <GpName name={person.name} />
+                            kurz kommt als kollisionssaubere Server-Map von
+                            mannschaft/page.tsx durch. */}
+                        <GpName name={person.name} kurz={kurz?.get(person.name)} />
                       </Link>
                     </span>
                   </td>

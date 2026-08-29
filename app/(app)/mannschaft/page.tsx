@@ -35,6 +35,12 @@ import {
   type StufenStand,
 } from "@/lib/einheiten";
 import VerlaufsChart from "@/components/VerlaufsChart";
+import { initialenKuerzel } from "@/lib/vorfuehren";
+import VorfuehrProvider from "@/components/VorfuehrProvider";
+import VorfuehrSchalter from "@/components/VorfuehrSchalter";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
+import { VorfuehrHinweis } from "@/components/GriffKarte";
+import GpName from "@/components/GpName";
 import {
   card,
   chip,
@@ -78,30 +84,36 @@ function SignalZeile({ signal }: { signal: Signal }) {
  * Die Uebersicht beantwortet "wo fange ich an" - die Antwort ist ein Name, und
  * ab da will man wissen, was dort los ist. Ohne diesen Griff endet die Fuehrung
  * bei der Ampel: man sieht, DASS es hakt, aber nie, WORAN.
+ *
+ * `kurz` optional: der Link bleibt auf /mannschaft/[id] bestehen (die
+ * Detailseite selbst kennt den Vorfuehr-Schalter nicht - v1-Grenze), nur der
+ * sichtbare/aria-Name wechselt ueber GpName.
  */
 function NameLink({
   person,
   klasse,
+  kurz,
 }: {
   person: Mannschaftsperson;
   klasse: string;
+  kurz?: string;
 }) {
   return (
     <Link
       href={`/mannschaft/${person.id}`}
       className={`${klasse} rounded transition hover:text-navy-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600`}
     >
-      {person.name}
+      <GpName name={person.name} kurz={kurz} />
     </Link>
   );
 }
 
 /** „über Jonathan" – ohne das sieht eine Ebene-3-Zeile aus wie eine eigene. */
-function UeberChip({ person }: { person: Mannschaftsperson }) {
+function UeberChip({ person, kurz }: { person: Mannschaftsperson; kurz?: string }) {
   if (!person.ueber) return null;
   return (
     <span className="rounded-full bg-sunken px-2 py-0.5 text-11 font-medium text-ink-muted">
-      über {person.ueber}
+      über <GpName name={person.ueber} kurz={kurz} />
     </span>
   );
 }
@@ -112,13 +124,25 @@ function UeberChip({ person }: { person: Mannschaftsperson }) {
  * Bis hierhin schrieb die Fuehrungskraft ins Leere: die Nachricht ging raus
  * und sie erfuhr nie, ob sie ankam. Ein Wort, kein Verlauf.
  */
-function Gelesen({ person, klasse = "" }: { person: Mannschaftsperson; klasse?: string }) {
+function Gelesen({
+  person,
+  klasse = "",
+  kurz,
+}: {
+  person: Mannschaftsperson;
+  klasse?: string;
+  kurz?: string;
+}) {
   if (person.gelesen === null) return null;
   return (
     <span className={`text-xs text-ink-soft ${klasse}`}>
-      {person.gelesen
-        ? `${person.vorname} hat deine Nachricht gelesen.`
-        : "Deine Nachricht ist noch ungelesen."}
+      {person.gelesen ? (
+        <>
+          <GpName name={person.vorname} kurz={kurz} /> hat deine Nachricht gelesen.
+        </>
+      ) : (
+        "Deine Nachricht ist noch ungelesen."
+      )}
     </span>
   );
 }
@@ -358,10 +382,30 @@ export default async function MannschaftPage({
       .map((person) => ({ id: person.id, name: person.name, istDu: false })),
   ];
 
+  // Vorfuehr-Kuerzel (Lagebild-Plan, Bauschritt 3b): EINE kollisionssaubere
+  // Map fuer die GANZE Seite, nicht je Abschnitt - initialenKuerzel() braucht
+  // dafuer die Vereinigungsmenge aller GP-Namen auf einmal, sonst koennte
+  // z. B. "M. W." in der Einheiten-Tabelle etwas anderes bedeuten als in
+  // "Heute dran". `alle` (= Betrachter + eigener Baum) deckt Einheiten-
+  // Tabelle, Heute dran, Du kuemmerst dich, Hakt-brennt-aber-nicht und den
+  // Fokus-Chip ab. `aeste.aeste` sind dagegen die GESCHWISTER unter derselben
+  // Fuehrung (astVergleich() fragt Geschwister ab, nicht den eigenen Ast) -
+  // die koennen ausserhalb von `alle` liegen und kommen fuer den Ast-Vergleich
+  // eigens dazu. Kunden-/Kontaktnamen tauchen in keiner der beiden Listen auf.
+  const kurzMap = initialenKuerzel([
+    ...alle.map((person) => person.name),
+    ...(aeste?.aeste.map((ast) => ast.name) ?? []),
+  ]);
+
   return (
+    <VorfuehrProvider>
     <div className="space-y-6">
       <div>
-        <h1 className={pageTitle}>Mannschaft</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className={pageTitle}>Mannschaft</h1>
+          <VorfuehrSchalter />
+        </div>
+        <VorfuehrHinweis />
         <p className="mt-1 text-sm text-ink-muted">
           {lage.fuehrtNiemanden
             ? "Sobald jemand unter dir hängt, steht hier, wer dich braucht."
@@ -385,6 +429,7 @@ export default async function MannschaftPage({
         personen={lage.leute}
         einheiten={einheiten}
         zeigeEinheiten={zeigeEinheiten}
+        kurz={kurzMap}
       />
 
       {lage.fuehrtNiemanden && lage.gesamtstruktur && (
@@ -447,7 +492,11 @@ export default async function MannschaftPage({
                       ast.istMeiner ? "font-semibold text-ink" : "text-ink-muted"
                     }`}
                   >
-                    {ast.istMeiner ? "Deine Leute" : ast.name}
+                    {ast.istMeiner ? (
+                      "Deine Leute"
+                    ) : (
+                      <GpName name={ast.name} kurz={kurzMap.get(ast.name)} />
+                    )}
                   </span>
                   {/* Die Balken wachsen nacheinander ein - der Vergleich
                       liest sich dadurch als Rangfolge, nicht als Tabelle. */}
@@ -493,9 +542,16 @@ export default async function MannschaftPage({
                   }`}
                 >
                   <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                    <NameLink person={person} klasse="text-base font-semibold text-ink" />
+                    <NameLink
+                      person={person}
+                      klasse="text-base font-semibold text-ink"
+                      kurz={kurzMap.get(person.name)}
+                    />
                     <Ampel ampel={person.ampel} variante="text" />
-                    <UeberChip person={person} />
+                    <UeberChip
+                      person={person}
+                      kurz={person.ueber ? kurzMap.get(person.ueber) : undefined}
+                    />
                     <Merkmale person={person} />
                   </div>
                   <p className="mt-1.5 text-sm font-medium text-ink">{oben.titel}</p>
@@ -537,7 +593,7 @@ export default async function MannschaftPage({
                         className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-13 font-medium text-ink-muted transition hover:bg-sunken hover:text-ink"
                       >
                         <PhoneIcon className="h-4 w-4" />
-                        {person.vorname} anrufen
+                        <GpName name={person.vorname} kurz={kurzMap.get(person.name)} /> anrufen
                       </a>
                     )}
                     {/* Der eine Tipp, nach dem dieser Fall morgen nicht wieder
@@ -549,7 +605,11 @@ export default async function MannschaftPage({
                       anlass={oben.schluessel}
                     />
                   </div>
-                  <Gelesen person={person} klasse="mt-2 block" />
+                  <Gelesen
+                    person={person}
+                    klasse="mt-2 block"
+                    kurz={kurzMap.get(person.name)}
+                  />
                   {/* Die Karte muss allein tragen. Wer erst weiterblaettern
                       muss, um zu wissen ob "still" auch "leer" heisst, ruft
                       unvorbereitet an. */}
@@ -581,8 +641,15 @@ export default async function MannschaftPage({
             {lage.ruhend.map((person) => (
               <li key={person.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-2">
                 <Ampel ampel={person.ampel} variante="punkt" groesse="klein" />
-                <NameLink person={person} klasse="text-sm font-medium text-ink" />
-                <UeberChip person={person} />
+                <NameLink
+                  person={person}
+                  klasse="text-sm font-medium text-ink"
+                  kurz={kurzMap.get(person.name)}
+                />
+                <UeberChip
+                  person={person}
+                  kurz={person.ueber ? kurzMap.get(person.ueber) : undefined}
+                />
                 <span className="text-sm text-ink-muted">
                   {person.signale[0]?.titel ?? "läuft"}
                 </span>
@@ -615,9 +682,15 @@ export default async function MannschaftPage({
                 className="flex flex-wrap items-baseline gap-x-2 py-2 text-sm"
               >
                 <span aria-hidden className="h-2 w-2 shrink-0 self-center rounded-full bg-amber-400" />
-                <NameLink person={person} klasse="font-medium text-ink" />
+                <NameLink
+                  person={person}
+                  klasse="font-medium text-ink"
+                  kurz={kurzMap.get(person.name)}
+                />
                 {person.ueber && (
-                  <span className="text-xs text-ink-soft">über {person.ueber}</span>
+                  <span className="text-xs text-ink-soft">
+                    über <GpName name={person.ueber} kurz={kurzMap.get(person.ueber)} />
+                  </span>
                 )}
                 <span className="text-ink-muted">{person.signale[0]!.titel}</span>
               </li>
@@ -629,8 +702,16 @@ export default async function MannschaftPage({
       {/* --- Die ganze Struktur ---------------------------------------------
           Baumreihenfolge, Direkte prominent, Tiefe eingerueckt und mit dem
           Namen der Fuehrungskraft davor. Wer hier steht, ist bereits oben
-          abgehandelt - das hier ist zum Nachsehen, nicht zum Entscheiden. */}
+          abgehandelt - das hier ist zum Nachsehen, nicht zum Entscheiden.
+
+          Beim Vorfuehren KOMPLETT ausgeblendet statt halb verdeckt (siehe
+          components/VorfuehrVerdeckt.tsx): Organigramm und Liste zeigen
+          Namen tief im Markup ohne GpName - dieser Bauschritt stellt nur die
+          page-eigenen Namens-Stellen um, nicht Organigramm.tsx selbst. Die
+          Links auf /mannschaft/[id] bleiben unveraendert bestehen (die
+          Detailseite ist v1-Grenze, siehe NameLink oben). */}
       {!lage.fuehrtNiemanden && (
+        <VorfuehrVerdeckt hinweis="Beim Vorführen ausgeblendet — der Strukturbaum zeigt Klarnamen.">
         <section className="space-y-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h2 className={kicker}>
@@ -793,6 +874,7 @@ export default async function MannschaftPage({
           </ul>
           )}
         </section>
+        </VorfuehrVerdeckt>
       )}
 
       {/* --- Verlauf deiner Struktur ------------------------------------------
@@ -838,8 +920,12 @@ export default async function MannschaftPage({
               Abschnitt 6. */}
           {fokusAst && (
             <p className={chip("warnung")}>
-              Fokus liegt auf {fokusAst.person.name} (
-              {Math.round(fokusAst.anteil * 100)} %)
+              Fokus liegt auf{" "}
+              <GpName
+                name={fokusAst.person.name}
+                kurz={kurzMap.get(fokusAst.person.name)}
+              />{" "}
+              ({Math.round(fokusAst.anteil * 100)} %)
             </p>
           )}
           {/* min-w-160 erzwang 640 Pixel, der Inhalt braucht aber nur 474 -
@@ -877,7 +963,11 @@ export default async function MannschaftPage({
                             paddingLeft: `${Math.min(person.tiefe, 3) * 12}px`,
                           }}
                         >
-                          {person.istDu ? "Du" : person.name}
+                          {person.istDu ? (
+                            "Du"
+                          ) : (
+                            <GpName name={person.name} kurz={kurzMap.get(person.name)} />
+                          )}
                         </span>
                       </td>
                       {/* Bei einem Platzhalter ist "0,00" keine Auskunft,
@@ -985,5 +1075,6 @@ export default async function MannschaftPage({
         Nummern, E-Mail-Adressen und Berufe nie.
       </p>
     </div>
+    </VorfuehrProvider>
   );
 }
