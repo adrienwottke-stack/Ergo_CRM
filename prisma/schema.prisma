@@ -184,8 +184,9 @@ model Contact {
   referredBy   Contact?  @relation("Empfehlung", fields: [referredById], references: [id], onDelete: SetNull)
   referrals    Contact[] @relation("Empfehlung")
 
-  activities  Activity[]
-  stageEvents StageEvent[]
+  activities   Activity[]
+  stageEvents  StageEvent[]
+  kandidaturen Kandidatur[]
 
   @@index([ownerId, updatedAt])
   @@index([ownerId, nextStepAt])
@@ -206,7 +207,15 @@ model StageEvent {
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  // Gesetzt, wenn das Ereignis zu einer Kandidatur gehoert (Aufbau-Trichter,
+  // docs/recruiting-plan.md §6). Ab Tag 1 mitgeschrieben: die Historie laesst
+  // sich billig anlegen und nie nachtragen. Cascade wie beim Contact - loescht
+  // jemand die Kandidatur, nimmt sie ihre Historie mit.
+  kandidaturId String?
+  kandidatur   Kandidatur? @relation(fields: [kandidaturId], references: [id], onDelete: Cascade)
+
   @@index([contactId, at])
+  @@index([kandidaturId, at])
 }
 
 model User {
@@ -350,6 +359,13 @@ model User {
   // zeigt den Namen sonst allen Mitgliedern. Wer Namen will, schaltet sie frei.
   feedNamen Boolean @default(false)
 
+  // Der Schluessel des teilbaren Struktur-Berichts (docs/adr/0002): dieselbe
+  // Bauart wie feedToken - undurchsichtiges Zufallswort, zurueckziehbar durch
+  // Erneuern. NULL = noch nie einen Berichts-Link erzeugt. Der Bericht zeigt
+  // ausschliesslich indexierte Verlaeufe und Zaehlwerte, nie Kundendaten und
+  // nie absolute Einheiten.
+  berichtToken String? @unique
+
   termine         Termin[]
   kalenderquellen Kalenderquelle[]
 
@@ -361,6 +377,8 @@ model User {
   invites              Invite[]       @relation("Einladender")
   invite               Invite?        @relation("Eingeloest")
   platzhalterEinladung Invite?        @relation("Platzhalter")
+  kandidaturen         Kandidatur[]
+  geworbenAus          Kandidatur?    @relation("Geworben")
 
   @@index([leaderId])
   @@index([path])
@@ -464,9 +482,72 @@ model Invite {
 
   createdAt DateTime @default(now())
 
-  angekommene User[] @relation("Herkunft")
+  angekommene User[]      @relation("Herkunft")
+  kandidatur  Kandidatur?
 
   @@index([leaderId, createdAt])
+}
+
+// --- Aufbau: die Kandidatur (docs/recruiting-plan.md, §6) ---------------------
+// Der Mensch bleibt ein Contact - Name und Nummer stehen laengst in der
+// Namensliste, und eine zweite Tabelle mit demselben Menschen waere eine zweite
+// Wahrheit bei der Telefonnummer. Alles BEWERBERSPEZIFISCHE liegt hier: Motiv,
+// Situation, Verlauf, Ablehnungsgrund. Diese Tabelle taucht in KEINEM
+// Kundenexport auf (lib/export.ts laesst sie bewusst aus) und ersetzt das
+// geplante Modell "Recruit" aus docs/struktur-plan.md §6.
+
+enum KandidaturPhase {
+  KONTAKT
+  ANGESPROCHEN
+  INFO_VEREINBART
+  INFO_GEHALTEN
+  ENTSCHEIDUNG
+  ZUSAGE
+  GESTARTET
+}
+
+model Kandidatur {
+  id        String  @id @default(cuid())
+  contactId String // die Person steht weiter im Contact
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  ownerId   String // der Werbende
+  owner     User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  phase      KandidaturPhase @default(KONTAKT)
+  outcome    Outcome         @default(OFFEN)
+  lostReason LostReason?
+
+  // Was im Gespraech wirklich zaehlt - und was in KEINEN Kundenexport gehoert.
+  motiv     String? // "will raus aus dem Lager"
+  situation String? // Beruf, Zeitfenster, Familie
+
+  nextStepType NextStepType?
+  nextStepAt   DateTime?
+  nextStepNote String?
+
+  // Beim Zusage-Knopf erzeugt: die Kandidatur haelt ihre Einladung fest, damit
+  // "eingeloest" ohne Suche ablesbar ist. SetNull, nicht Cascade - eine
+  // zurueckgenommene Einladung loescht keinen Bewerbungs-Verlauf.
+  inviteId String? @unique
+  invite   Invite? @relation(fields: [inviteId], references: [id], onDelete: SetNull)
+
+  // Die Naht zur Mannschaft: aus diesem Bewerber wurde dieses Konto.
+  becameUserId String? @unique
+  becameUser   User?   @relation("Geworben", fields: [becameUserId], references: [id], onDelete: SetNull)
+
+  // Gegen doppelte Wettbewerbspunkte, dieselbe Bauart wie die drei Stempel am
+  // Contact: jeder Punkt faellt genau einmal je Kandidatur.
+  talkLoggedAt      DateTime?
+  activatedLoggedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stageEvents StageEvent[]
+
+  @@index([ownerId, nextStepAt])
+  @@index([ownerId, phase, outcome])
+  @@index([contactId])
 }
 
 // Was die Fuehrungskraft sich vorgenommen hat (docs/struktur-plan.md, 5).
@@ -1097,4 +1178,30 @@ model RueckmeldungAudio {
   typ   String
   ms    Int
   bytes Int
+}
+
+// --- Anfrage von aussen -------------------------------------------------------
+// Was auf der oeffentlichen Seite /anfrage abgeschickt wird: ein Berater, der
+// das Cockpit gesehen hat und einen Zugang will. Kein Konto, keine Session -
+// deshalb steht hier Freitext statt einer Beziehung.
+//
+// BEWUSST OHNE Relation auf User oder Person: die Anfrage kommt von jemandem,
+// den die Instanz nicht kennt, und sie soll den spaeteren Mandanten-Umbau
+// nicht verteuern - eine Tabelle ohne Kanten laesst sich jedem Mandanten
+// zuschlagen oder global lassen, ohne dass eine Abfrage bricht.
+model Anfrage {
+  id String @id @default(cuid())
+
+  name    String
+  // Freitext statt getrennter Felder: Handynummer, E-Mail, Instagram - was der
+  // Absender eben dalassen will. Eine Pflicht-E-Mail waere die erste Huerde.
+  kontakt String
+  // Woher er kommt / was er will. Ueberspringbar.
+  nachricht String?
+
+  gesehenAt  DateTime?
+  erledigtAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([createdAt])
 }

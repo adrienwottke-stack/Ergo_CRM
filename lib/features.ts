@@ -41,7 +41,18 @@ export type ArenaKey =
   // steht in der Kopfzeile und damit ueberall. Bleibt die Zahl bei null, war
   // Suchen nicht das Problem - dann hilft nur, die Funktion dorthin zu
   // bringen, wo sie gebraucht wird, statt sie auffindbar zu machen.
-  | "wegweiser";
+  | "wegweiser"
+  // --- Multiplikations-Runde (Plan 29.08.2026) -------------------------------
+  // Der eine Bildschirm fuer den woechentlichen Teamtermin (Beamer/Handy).
+  | "teamabend"
+  // Der Aufbau-Trichter: Kandidatur-Karte am Kontakt, Zusage-Knopf erzeugt die
+  // Einladung (docs/recruiting-plan.md, Bauabschnitt 1).
+  | "aufbau"
+  // Der teilbare Struktur-Bericht je Fuehrungskraft (docs/adr/0002).
+  | "bericht"
+  // Die oeffentliche Anfrage-Seite. Der Schalter sitzt an der Server-Action
+  // UND an der Seite: AUS heisst, es kommt nichts mehr an.
+  | "anfrage";
 
 // Eine Abfrage je Anfrage, danach beantwortet der Cache alle weiteren Fragen.
 export const featureStates = cache(async (): Promise<Map<string, FeatureState>> => {
