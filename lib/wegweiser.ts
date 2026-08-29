@@ -298,6 +298,69 @@ export const WEGWEISER: WegweiserEintrag[] = [
     synonyme: ["storno", "stufen", "titel", "abzeichen", "freischalten"],
   },
 
+  // --- Multiplikations-Runde (29.08.2026) ----------------------------------
+  {
+    id: "teamabend",
+    titel: "Teamabend zeigen",
+    href: "/teamabend",
+    bereich: "Wettbewerb",
+    synonyme: [
+      "beamer",
+      "teamtermin",
+      "teammeeting",
+      "wochenstart",
+      "montagsrunde",
+      "praesentieren",
+      "vorfuehren",
+    ],
+  },
+  {
+    id: "bericht-link",
+    titel: "Berichts-Link erzeugen",
+    href: "/mannschaft/bericht",
+    bereich: "Mannschaft",
+    synonyme: [
+      "bericht",
+      "strukturbericht",
+      "report",
+      "nach oben",
+      "direktion",
+      "fk runde",
+      "teilen",
+      "vorzeigen",
+    ],
+  },
+  {
+    id: "kandidat-fuehren",
+    titel: "Kandidaten führen",
+    href: "/namen",
+    bereich: "Namen",
+    synonyme: [
+      "kandidatur",
+      "bewerber",
+      "aufbau",
+      "zusage",
+      "infogespraech",
+      "geschaeftspartner werben",
+    ],
+  },
+  {
+    id: "daten-exportieren",
+    titel: "Daten exportieren",
+    href: "/konto/export",
+    bereich: "Konto",
+    synonyme: [
+      "export",
+      "dsgvo",
+      "auskunft",
+      "sicherung",
+      "backup",
+      "herunterladen",
+      "csv",
+      "mitnehmen",
+    ],
+  },
+
   // --- Nur der Admin -------------------------------------------------------
   {
     id: "team-verwalten",
