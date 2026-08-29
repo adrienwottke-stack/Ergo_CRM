@@ -648,6 +648,96 @@ export async function einheitenFuerStruktur(
   return aufteilung;
 }
 
+// --- Der Team-Verlauf als Index ---------------------------------------------
+// Der Proof nach aussen (Teamabend, Berichts-Link, FK-Runde): die Kurve des
+// ganzen Teams - aber NIE in Einheiten, sondern als Index mit Start = 100.
+//
+// DIE HARTE REGEL DAZU: indexiert wird SERVERSEITIG. Ueber die Grenze zur
+// Client-Komponente gehen ausschliesslich {tag, index}-Paare. Wuerde der
+// Browser aus Absolutwerten selbst indexieren, stuenden die Absolutwerte im
+// Seiten-Payload - und genau die sollen das Haus nicht verlassen
+// (Entscheidung 9 im Multiplikations-Plan: nur indexierte Verlaeufe).
+//
+// Die Aufrufer geben die ids ausdruecklich mit (FK-Bericht: strukturKonten,
+// Teamabend: die aktiven Konten der Instanz). BEWUSST kein implizites "alle"
+// hier drin - eine Instanz-Abfrage mehr waere ein Stein mehr, den der spaetere
+// Mandanten-Umbau umdrehen muss.
+
+/** Ein Punkt der Indexkurve: Berliner Kalendertag und Indexstand (100 = Start). */
+export type Indexpunkt = { tag: string; index: number };
+
+/**
+ * Die Tagessummen MEHRERER Konten in einem: dieselbe Abfrage wie
+ * eigenerVerlauf(), nur ueber eine id-Liste. Eine Zeile je Tag mit Buchung.
+ */
+export async function teamVerlauf(ids: string[]): Promise<Verlaufstag[]> {
+  if (ids.length === 0) return [];
+  const zeilen = await prisma.einheitenbuchung.groupBy({
+    by: ["tag"],
+    where: { userId: { in: ids } },
+    _sum: { hundertstel: true },
+    orderBy: { tag: "asc" },
+  });
+  return zeilen.map((zeile) => ({
+    tag: zeile.tag.toISOString().slice(0, 10),
+    hundertstel: zeile._sum.hundertstel ?? 0,
+  }));
+}
+
+/** Die Summe der Startbestaende - der Sockel, auf dem die Team-Kurve steht. */
+export async function teamSockel(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const konten = await prisma.user.findMany({
+    where: { id: { in: ids } },
+    select: { einheitenStart: true },
+  });
+  return konten.reduce((summe, konto) => summe + konto.einheitenStart, 0);
+}
+
+/**
+ * Aus Sockel und Tagessummen die Indexkurve: Basis ist der Stand am Tag VOR
+ * `vonTag`, jeder Punkt traegt stand/basis * 100 mit einer Nachkommastelle.
+ *
+ * Reine Funktion, absichtlich ohne Prisma: das Rechenwerk laesst sich pruefen,
+ * ohne eine Datenbank zu beruehren.
+ *
+ * Drei Raender, alle bewusst:
+ * - Basis <= 0 -> leere Kurve. Ein Index auf negativer Basis wuerde bei jedem
+ *   Zuwachs FALLEN; besser ein Leerzustand als eine Kurve, die luegt.
+ * - Der 100er-Anker liegt einen Tag VOR `vonTag` - dieselbe Ueberlegung wie in
+ *   VerlaufsChart: eine Buchung am ersten Tag soll sichtbar hochfahren, nicht
+ *   den Startpunkt ueberschreiben.
+ * - Der letzte Punkt liegt IMMER auf `bisTag`, auch ohne Buchung an dem Tag -
+ *   sonst endete die Kurve mitten im Monat und saehe abgerissen aus.
+ */
+export function indexiere(
+  sockel: number,
+  tage: Verlaufstag[],
+  vonTag: string,
+  bisTag: string
+): Indexpunkt[] {
+  let basis = sockel;
+  for (const eintrag of tage) {
+    if (eintrag.tag < vonTag) basis += eintrag.hundertstel;
+  }
+  if (basis <= 0) return [];
+
+  const ankerTag = addDays(dayToUtcDate(vonTag), -1).toISOString().slice(0, 10);
+  const punkte: Indexpunkt[] = [{ tag: ankerTag, index: 100 }];
+  let stand = basis;
+  for (const eintrag of tage) {
+    if (eintrag.tag < vonTag || eintrag.tag > bisTag) continue;
+    stand += eintrag.hundertstel;
+    punkte.push({ tag: eintrag.tag, index: Math.round((stand / basis) * 1000) / 10 });
+  }
+
+  const letzter = punkte[punkte.length - 1]!;
+  if (letzter.tag < bisTag) {
+    punkte.push({ tag: bisTag, index: letzter.index });
+  }
+  return punkte;
+}
+
 /** Ob irgendwo eine Zahl steht - sonst braucht die Aufstellung gar nicht erst
  *  auf den Bildschirm. */
 export function traegtZahlen(
