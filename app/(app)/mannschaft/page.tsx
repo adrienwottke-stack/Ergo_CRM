@@ -753,8 +753,15 @@ export default async function MannschaftPage({
               {Math.round(fokusAst.anteil * 100)} %)
             </p>
           )}
+          {/* min-w-160 erzwang 640 Pixel, der Inhalt braucht aber nur 474 -
+              die restlichen 166 waren Leerraum, in den man am Handy
+              hineinwischen konnte, als wuerde die Seite auseinanderfallen.
+              Eine Mindestbreite soll verhindern, dass Spalten zusammenklappen,
+              nicht Platz erfinden, den niemand fuellt. 26rem liegt unter der
+              gemessenen Inhaltsbreite: die Tabelle ist so breit, wie sie sein
+              muss, und rechts endet sie mit ihrer letzten Spalte. */}
           <div className={`${card} overflow-x-auto`}>
-            <table className="w-full min-w-160 text-left text-sm">
+            <table className="w-full min-w-[26rem] text-left text-sm">
               <thead className="border-b border-line/80 bg-sunken/60">
                 <tr>
                   <th className={th}>Name</th>

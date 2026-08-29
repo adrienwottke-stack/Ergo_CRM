@@ -153,8 +153,13 @@ export default async function WerkstattPage() {
         </span>
       </Link>
 
+      {/* min-w-180 erzwang 720 Pixel fuer 458 Pixel Inhalt - 262 Pixel
+          Leerraum, in den man am Handy hineinwischen konnte. Die
+          Mindestbreite soll Spalten vor dem Zusammenklappen schuetzen, nicht
+          Platz erfinden. Gemessen bei 375 px, wie bei den beiden Tabellen auf
+          /mannschaft. */}
       <div className={`${card} overflow-x-auto`}>
-        <table className="w-full min-w-180 text-left text-sm">
+        <table className="w-full min-w-[26rem] text-left text-sm">
           <thead className="border-b border-line/80 bg-sunken/60">
             <tr>
               <th className={th}>Baustein</th>
