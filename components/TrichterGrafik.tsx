@@ -65,11 +65,25 @@ export type TrichterStufe = {
 // Uebergangszeile sitzt). BREITE und HOEHE sind ein Rechenraster, keine
 // Pixelangabe - das SVG wird per CSS auf die Kartenbreite und eine feste
 // Hoehe gezogen (preserveAspectRatio="none"), wie im Verlauf.
+// Die Verjuengung ist bewusst flach: Sie muss als Trichter lesbar sein UND
+// unten noch "Termine gehalten" samt Zahl tragen. Ein spitzer Trichter sieht
+// als Zeichnung besser aus, draengt die Beschriftung am Handy aber aus der
+// Form heraus - dann steht der Text neben der Grafik statt darin, und genau
+// das war an der ersten Fassung das Problem.
 const BREITE = 360;
 const SEG_H = 64;
-const GAP_H = 28;
-const HALBBREITEN = [170, 136, 104, 76, 58] as const;
+const GAP_H = 30;
+const HALBBREITEN = [172, 148, 126, 108, 94] as const;
 const HOEHE = 4 * SEG_H + 3 * GAP_H;
+
+/**
+ * Die Deckkraft einer Stufe - hier steckt die Menge, nie in der Form.
+ *
+ * Nach oben gedeckelt: auf der vollsten Stufe steht heller Text auf der
+ * Fuellung, und bei voller Deckkraft verliert er den Kontrast. Der Abstand
+ * zwischen leer (0.14) und voll (0.60) reicht zum Vergleichen voellig.
+ */
+const fuellung = (anteil: number) => 0.14 + 0.46 * anteil;
 
 /** Ein Trapez von (yOben, halbOben) nach (yUnten, halbUnten), um die
  *  Mittelachse gespiegelt. Mit halbOben === halbUnten wird daraus ein
@@ -115,7 +129,11 @@ export default function TrichterGrafik({ stufen }: { stufen: TrichterStufe[] }) 
 
   return (
     <div>
-      <div className="relative h-84 w-full sm:h-96">
+      {/* Breite gedeckelt und mittig: ueber die volle Kartenbreite gezogen
+          (preserveAspectRatio="none") wird aus dem Trichter ein Stapel flacher
+          Baender, und Beschriftung und Zahl stehen meterweit auseinander. Am
+          Handy greift der Deckel nicht - dort ist w-full ohnehin schmaler. */}
+      <div className="relative mx-auto h-[22rem] w-full max-w-lg sm:h-96">
         <svg
           viewBox={`0 0 ${BREITE} ${HOEHE}`}
           preserveAspectRatio="none"
@@ -129,7 +147,7 @@ export default function TrichterGrafik({ stufen }: { stufen: TrichterStufe[] }) 
             // Zuschlag beim Antippen kommt oben drauf, nicht anstelle -
             // sonst wuerde eine leere Stufe beim Auswaehlen unveraendert
             // schwach bleiben, obwohl sie gerade im Fokus steht.
-            const basis = 0.15 + 0.65 * stufe.anteil + (istGewaehlt ? 0.15 : 0);
+            const basis = fuellung(stufe.anteil) + (istGewaehlt ? 0.15 : 0);
             // Das Engpass-Segment ist die Botschaft der Grafik. Steht die
             // Stufe bei 0, waere es mit der Grundfuellung praktisch
             // unsichtbar - und der Puls dimmt sie zusaetzlich. Deshalb hier
@@ -161,7 +179,7 @@ export default function TrichterGrafik({ stufen }: { stufen: TrichterStufe[] }) 
                 key={`luecke-${i}`}
                 d={trapezPfad(band.yOben, band.yUnten, band.halb, band.halb)}
                 fill="currentColor"
-                fillOpacity={0.15 + 0.65 * stufeDanach.anteil}
+                fillOpacity={fuellung(stufeDanach.anteil)}
               />
             );
           })}
@@ -175,6 +193,10 @@ export default function TrichterGrafik({ stufen }: { stufen: TrichterStufe[] }) 
           if (!band) return null;
           const naechste = stufen[i + 1];
           const gapBand = GAP_BAENDER[i];
+          // Die Zeile endet an der Trichterkante, nicht am Kartenrand -
+          // bemessen an der SCHMALSTEN Stelle des Segments (der Unterkante),
+          // damit sie auf ihrer ganzen Hoehe innerhalb der Form bleibt.
+          const rand = `${((BREITE / 2 - band.halbUnten) / BREITE) * 100}%`;
           return (
             <Fragment key={stufe.key}>
               <button
@@ -187,36 +209,45 @@ export default function TrichterGrafik({ stufen }: { stufen: TrichterStufe[] }) 
                 style={{
                   top: `${(band.yOben / HOEHE) * 100}%`,
                   height: `${((band.yUnten - band.yOben) / HOEHE) * 100}%`,
+                  left: rand,
+                  right: rand,
                   animationDelay: `${i * 90}ms`,
                 }}
-                className="animate-rise absolute inset-x-0 flex min-h-11 items-center justify-between rounded-lg px-4 text-left transition hover:bg-sunken/40 focus-visible:relative focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent"
+                className="animate-rise absolute flex min-h-11 items-center justify-between gap-2 rounded-lg px-3 text-left transition hover:bg-sunken/40 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent"
               >
-                <span className="text-sm font-medium text-ink">{stufe.titel}</span>
-                <span className="text-base font-semibold tabular-nums text-ink">
+                <span className="truncate text-sm font-medium text-ink">
+                  {stufe.titel}
+                </span>
+                <span className="shrink-0 text-base font-semibold tabular-nums text-ink">
                   {stufe.wert}
                 </span>
               </button>
 
               {naechste?.uebergang && gapBand && (
                 <div
-                  className="pointer-events-none absolute inset-x-0 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 px-2 text-center"
+                  className="pointer-events-none absolute inset-x-0 flex justify-center px-2"
                   style={{
                     top: `${((gapBand.yOben + gapBand.yUnten) / 2 / HOEHE) * 100}%`,
                     transform: "translateY(-50%)",
                   }}
                 >
-                  <span className="text-xs font-semibold tabular-nums text-ink">
-                    {naechste.uebergang.quote}
+                  {/* Eigener Grund unter der Naht-Zeile. Ohne ihn steht sie je
+                      nach Trichterbreite halb auf der Form und halb daneben -
+                      am Handy der Hauptgrund, warum die Grafik unruhig wirkte. */}
+                  <span className="flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full border border-line bg-surface px-3 py-1">
+                    <span className="text-xs font-semibold tabular-nums text-ink">
+                      {naechste.uebergang.quote}
+                    </span>
+                    <span className="text-11 text-ink-soft">
+                      Team {naechste.uebergang.teamQuote}
+                    </span>
+                    <span className={cn(chip("neutral"), "tabular-nums")}>
+                      {naechste.uebergang.dropOff}
+                    </span>
+                    {naechste.uebergang.engpass && (
+                      <span className={chip("gefahr")}>Engpass</span>
+                    )}
                   </span>
-                  <span className="text-11 text-ink-soft">
-                    Team {naechste.uebergang.teamQuote}
-                  </span>
-                  <span className={cn(chip("neutral"), "tabular-nums")}>
-                    {naechste.uebergang.dropOff}
-                  </span>
-                  {naechste.uebergang.engpass && (
-                    <span className={chip("gefahr")}>Engpass</span>
-                  )}
                 </div>
               )}
             </Fragment>
