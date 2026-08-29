@@ -25,7 +25,7 @@ export interface SchnellStand {
   punkte: number;
   serie: number;
   /**
-   * Einheiten im laufenden Produktionsmonat - fertig formatiert ("12,5").
+   * Einheiten im laufenden Produktionsmonat - fertig formatiert ("12,50").
    *
    * Steht hier, obwohl eine Einheit kein Wettbewerbspunkt ist und in keiner
    * Rangliste auftaucht: das Schnellfenster traegt sie seit
@@ -34,7 +34,7 @@ export interface SchnellStand {
    * zwei Tabellen kommen.
    *
    * Als Text und nicht als Zahl, damit das Umrechnen von Hundertsteln in
-   * "12,5" die einzige Stelle bleibt, die es kennt (lib/einheiten.ts). Ein
+   * "12,50" die einzige Stelle bleibt, die es kennt (lib/einheiten.ts). Ein
    * Client-Baustein duerfte diese Datei gar nicht laden - sie haengt an Prisma.
    */
   einheitenMonat: string;

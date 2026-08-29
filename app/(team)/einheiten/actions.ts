@@ -15,6 +15,7 @@ import {
   eigenerGesamtstand,
   eigenerMonatsstand,
   formatEinheiten,
+  hatZweiNachkommastellen,
   istKarrierestufe,
   parseEinheiten,
 } from "@/lib/einheiten";
@@ -38,6 +39,27 @@ function neuRechnen() {
 }
 
 /**
+ * Was an einer Mengeneingabe nicht stimmt - oder null, wenn sie taugt.
+ *
+ * Sitzt vor buchen() und nicht darin, weil buchen() nur ja oder nein
+ * zurueckgibt: der Unterschied zwischen "das war keine Zahl" und "da fehlen
+ * die Nachkommastellen" ist genau der, den der Eintragende braucht, um es
+ * beim zweiten Versuch richtig zu machen.
+ *
+ * Kein "use server"-Export: die Datei exportiert ausschliesslich async
+ * Funktionen (Hausregel), diese hier bleibt datei-intern.
+ */
+function mengenFehler(roh: string): string | null {
+  const hundertstel = parseEinheiten(roh);
+  if (hundertstel === null) return "Das war keine Zahl. Zum Beispiel: 12,50";
+  if (hundertstel === 0) return "Null Einheiten gibt es nicht.";
+  if (!hatZweiNachkommastellen(roh)) {
+    return "Einheiten haben immer zwei Nachkommastellen: 12,50 statt 12,5 — und 300,00 statt 300.";
+  }
+  return null;
+}
+
+/**
  * Der eine Schreibweg fuer eine Buchung.
  *
  * Steht als eigene Funktion da, seit die Einheiten auch aus dem Schnellfenster
@@ -54,6 +76,10 @@ async function buchen(
   const hundertstel = parseEinheiten(mengeRoh);
   // 0 ist keine Buchung, sondern ein Fehlgriff im Formular.
   if (hundertstel === null || hundertstel === 0) return false;
+  // Zwei Nachkommastellen, ohne Ausnahme: "300" ist keine Kurzform fuer
+  // "300,00", sondern eine halbe Angabe. Die Pruefung sitzt hier und nicht in
+  // parseEinheiten - hier gibt es einen Fehlertext, der beim Nutzer ankommt.
+  if (!hatZweiNachkommastellen(mengeRoh)) return false;
 
   const heute = berlinToday();
   const gewuenscht = tagRoh && isValidDay(tagRoh) ? tagRoh : heute;
@@ -93,9 +119,11 @@ export async function einheitenBuchen(
   notizRoh: string
 ): Promise<{ ok: true } | { ok: false; fehler: string }> {
   const user = await requireUser();
+  const fehler = mengenFehler(mengeRoh);
+  if (fehler) return { ok: false, fehler };
   const gebucht = await buchen(user.id, mengeRoh, tagRoh, notizRoh);
   if (!gebucht) {
-    return { ok: false, fehler: "Das war keine Zahl. Zum Beispiel: 12,5" };
+    return { ok: false, fehler: "Das war keine Zahl. Zum Beispiel: 12,50" };
   }
   return { ok: true };
 }
@@ -111,7 +139,7 @@ export async function einheitenBuchen(
  * stehen und nicht die erhofften. Dasselbe Muster wie beim Schnellzaehler
  * (quickLogAction.ts).
  *
- * Beide Staende kommen fertig formatiert zurueck ("12,5") und nicht als
+ * Beide Staende kommen fertig formatiert zurueck ("12,50") und nicht als
  * Hundertstel: lib/einheiten.ts bleibt die einzige Stelle, die das Umrechnen
  * kennt, und ein Client-Baustein duerfte sie gar nicht laden - sie haengt an
  * Prisma.
@@ -124,9 +152,12 @@ export async function einheitSchnellBuchen(
 > {
   const user = await requireUser();
 
+  const fehler = mengenFehler(mengeRoh);
+  if (fehler) return { ok: false, fehler };
+
   const gebucht = await buchen(user.id, mengeRoh, "", notizRoh);
   if (!gebucht) {
-    return { ok: false, fehler: "Das war keine Zahl. Zum Beispiel: 12,5" };
+    return { ok: false, fehler: "Das war keine Zahl. Zum Beispiel: 12,50" };
   }
 
   const [monat, gesamt] = await Promise.all([

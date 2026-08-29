@@ -183,7 +183,7 @@ export default function EinheitenKarte({
               void buchen();
             }
           }}
-          placeholder="12,5"
+          placeholder="12,50"
           aria-label="Einheiten eintragen"
           className={cn(inputBlank, "flex-1 tabular-nums")}
         />

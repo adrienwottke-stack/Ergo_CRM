@@ -127,7 +127,7 @@ export default function EinheitenNachAbschluss() {
               }
             }}
             aria-label="Einheiten"
-            placeholder="12,5"
+            placeholder="12,50"
             className={cn(inputBlank, "flex-1 tabular-nums")}
           />
           <button

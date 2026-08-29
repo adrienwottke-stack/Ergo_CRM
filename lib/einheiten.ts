@@ -51,8 +51,13 @@ export const BUCHUNG_MAX = 100_000 * 100;
 export { formatEinheiten } from "@/lib/einheitenAnzeige";
 
 /**
- * "3,5" | "3.5" | "1.000" | "1.234,75" | "1 000,50" | "-12" -> Hundertstel.
- * null, wenn es keine Zahl ist.
+ * "3,5" | "3.5" | "1.000" | "1.234,75" | "1 000,50" | "-12" -> "3.5" | "1000"
+ * | "1234.75" | "-12", also dieselbe Zahl in Punktschreibweise. null, wenn es
+ * keine Zahl ist.
+ *
+ * Die gemeinsame Vorstufe von parseEinheiten (macht Hundertstel daraus) und
+ * hatZweiNachkommastellen (zaehlt die Stellen). Beide muessen die Trennzeichen
+ * gleich lesen - stuenden die Regeln zweimal da, liefen sie auseinander.
  *
  * DER PUNKT IST ZWEIDEUTIG, und zwar auf eine teure Art: in "1.234,75" trennt
  * er Tausender, in "3.5" die Nachkommastelle. Bei einer Karrierezahl ist der
@@ -72,7 +77,7 @@ export { formatEinheiten } from "@/lib/einheitenAnzeige";
  *      (U+202F), wie sie beim Einfuegen einer Zahl aus einer anderen App
  *      mitkommen koennen, zaehlen dabei wie ein normales Leerzeichen.
  */
-export function parseEinheiten(roh: string): number | null {
+function normalisiereZahl(roh: string): string | null {
   const platzNormalisiert = roh.replace(/[\u00a0\u202f]/g, " ").trim();
   if (!platzNormalisiert) return null;
 
@@ -91,9 +96,40 @@ export function parseEinheiten(roh: string): number | null {
       ? sauber.replace(/\./g, "").replace(",", ".")
       : sauber;
   if (!/^-?\d+(\.\d+)?$/.test(normalisiert)) return null;
+  return normalisiert;
+}
+
+export function parseEinheiten(roh: string): number | null {
+  const normalisiert = normalisiereZahl(roh);
+  if (normalisiert === null) return null;
   const wert = Math.round(Number(normalisiert) * 100);
   if (!Number.isFinite(wert)) return null;
   return Math.max(-BUCHUNG_MAX, Math.min(BUCHUNG_MAX, wert));
+}
+
+/**
+ * Stehen GENAU zwei Nachkommastellen da?
+ *
+ * Eine Einheit hat zwei Nachkommastellen, immer. "300" ist deshalb keine
+ * bequeme Kurzform fuer "300,00", sondern eine unfertige Angabe: niemand
+ * weiss, ob die Stellen vergessen wurden oder ob wirklich glatt 300,00
+ * gemeint waren. Wer sie hinschreibt, hat hingesehen.
+ *
+ * Geprueft wird am ROHTEXT und nicht am Ergebnis von parseEinheiten - "12,5"
+ * und "12,50" ergeben dieselben 1250 Hundertstel, unterscheiden sich also
+ * nur davor. Die Trennzeichen-Regeln von oben gelten dabei unveraendert:
+ * in "1.000" trennt der Punkt Tausender, das sind null Nachkommastellen.
+ *
+ * BEWUSST NICHT in parseEinheiten selbst: standSpeichern (Einheiten vor der
+ * App) und schwellenSpeichern (Werkstatt) verwerfen ein null stumm. Waere
+ * die Regel dort eingebaut, verschwaende eine Eingabe wieder kommentarlos -
+ * genau das, was AP-03 abgestellt hat. Die Regel gilt am Eintragen, wo ein
+ * Fehlertext ankommt.
+ */
+export function hatZweiNachkommastellen(roh: string): boolean {
+  const normalisiert = normalisiereZahl(roh);
+  if (normalisiert === null) return false;
+  return /\.\d{2}$/.test(normalisiert);
 }
 
 // --- Der Produktionsmonat ---------------------------------------------------

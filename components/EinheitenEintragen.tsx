@@ -83,7 +83,7 @@ export default function EinheitenEintragen({ heute }: { heute: string }) {
             name="menge"
             type="text"
             inputMode="decimal"
-            placeholder="z. B. 12,5"
+            placeholder="z. B. 12,50"
             required
             value={menge}
             onChange={(event) => {
