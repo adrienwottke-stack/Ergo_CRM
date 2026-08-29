@@ -26,8 +26,8 @@ import Fortschritt from "@/components/Fortschritt";
 import NachrichtSenden from "@/components/NachrichtSenden";
 import Postfach from "@/components/Postfach";
 import Feed from "@/components/Feed";
-import { FlameIcon, TrophyIcon } from "@/components/icons";
-import { btnPrimary, btnSecondary, card, kicker, pageTitle, sectionTitle } from "@/components/ui";
+import { FlameIcon, MonitorIcon, TrophyIcon } from "@/components/icons";
+import { btnGhost, btnPrimary, btnSecondary, card, kicker, pageTitle, sectionTitle } from "@/components/ui";
 import { sprintStarten } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -257,6 +257,16 @@ export default async function ArenaPage() {
               </li>
             ))}
           </ul>
+
+          {/* Der Weg auf den grossen Bildschirm - derselbe Stand, ohne die
+              persoenliche Zuspitzung, fuers Projizieren im Teamtermin. */}
+          <Link
+            href="/teamabend"
+            className={`${btnGhost} mt-4 inline-flex items-center gap-1.5`}
+          >
+            <MonitorIcon className="h-4 w-4" />
+            Teamabend zeigen
+          </Link>
         </div>
       )}
 
