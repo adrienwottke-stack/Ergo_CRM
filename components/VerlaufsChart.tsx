@@ -127,11 +127,18 @@ const vollDatumFormat = new Intl.DateTimeFormat("de-DE", {
 /** Ab wie vielen Tagen die Achse Monate statt Tagen nennt. */
 const MONATSACHSE_AB = 100;
 
+/** Der Fussnoten-Text der eigenen Kurve auf /einheiten - Default, wenn kein
+ *  Aufrufer eine eigene Erklaerung mitgibt (z. B. die Struktur-Kurve auf
+ *  /mannschaft, die einen anderen Sockel-Sachverhalt erklaeren muss). */
+const FUSSNOTE_STANDARD =
+  "Kumuliert, inklusive deiner Einheiten vor der App. Ein Storno zieht die Kurve nach unten — so, wie er auch deinen Stand zieht.";
+
 export default function VerlaufsChart({
   sockel,
   tage,
   heute,
   monatStart,
+  fussnote,
 }: {
   /** `einheitenStart` in Hundertsteln: der Stand vor der ersten Buchung. */
   sockel: number;
@@ -142,6 +149,10 @@ export default function VerlaufsChart({
   /** Erster Tag des laufenden Produktionsmonats, "2026-08-01". Kommt fertig
    *  vom Server, weil produktionsmonat() neben Prisma steht. */
   monatStart: string;
+  /** Text unter den drei Kennzahlen. Default = der Erklaertext der eigenen
+   *  Kurve; ein Aufrufer mit anderem Sockel (z. B. eine ganze Struktur statt
+   *  einer Person) gibt seinen eigenen mit. */
+  fussnote?: string;
 }) {
   const [zeitraum, setZeitraum] = useState<Zeitraum>("monat");
   // Index in `punkte`, waehrend ein Finger oder Zeiger auf der Kurve liegt.
@@ -523,10 +534,7 @@ export default function VerlaufsChart({
         <KennzahlKachel wert={formatEinheiten(proWoche)} bezeichnung="je Woche" />
       </div>
 
-      <p className="mt-3 text-xs text-ink-muted">
-        Kumuliert, inklusive deiner Einheiten vor der App. Ein Storno zieht die
-        Kurve nach unten — so, wie er auch deinen Stand zieht.
-      </p>
+      <p className="mt-3 text-xs text-ink-muted">{fussnote ?? FUSSNOTE_STANDARD}</p>
     </div>
   );
 }
