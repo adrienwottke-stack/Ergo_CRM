@@ -738,6 +738,38 @@ export function indexiere(
   return punkte;
 }
 
+/**
+ * Alle aktiven Konten der Instanz mit Zugang - die id-Liste fuer die
+ * Team-Kurve des Teamabends. Platzhalter und Ausgetretene bleiben draussen,
+ * wie in der Stufenrunde.
+ *
+ * INSTANZWEITE ABFRAGE: beim Mandanten-Umbau (docs/adr/0003) bekommt sie
+ * einen Mandanten-Filter. Absichtlich in lib/ und mit diesem Kommentar,
+ * damit die spaetere mandantId-Suche sie findet.
+ */
+export async function aktiveKonten(): Promise<string[]> {
+  const konten = await prisma.user.findMany({
+    where: { deactivatedAt: null, passwordHash: { not: null } },
+    select: { id: true },
+  });
+  return konten.map((konto) => konto.id);
+}
+
+/**
+ * Die fertige Indexkurve fuer eine id-Liste: Sockel und Tagessummen laden,
+ * ab dem ersten Buchungstag indexieren, bis heute ziehen. DER eine Weg, auf
+ * dem eine Kurve dieser Konten nach draussen geht - Aufrufer bekommen nie
+ * Absolutwerte in die Hand.
+ */
+export async function indexkurveFuer(
+  ids: string[],
+  heute: string
+): Promise<Indexpunkt[]> {
+  const [sockel, tage] = await Promise.all([teamSockel(ids), teamVerlauf(ids)]);
+  if (tage.length === 0) return [];
+  return indexiere(sockel, tage, tage[0]!.tag, heute);
+}
+
 /** Ob irgendwo eine Zahl steht - sonst braucht die Aufstellung gar nicht erst
  *  auf den Bildschirm. */
 export function traegtZahlen(
