@@ -31,7 +31,14 @@ import {
 } from "@/lib/rueckmeldung";
 import type { Anliegen, Stimmung } from "@/lib/generated/prisma/enums";
 
-export default function RueckmeldungGeben() {
+export default function RueckmeldungGeben({
+  // Wohin die Meldung geht - kommt aus der Schale (Vorname des Admin-Kontos).
+  // Vorher stand "Adrien" fest im Text: in jeder weiteren Instanz haette die
+  // Meldung damit den Falschen versprochen.
+  empfaenger = "den Admin",
+}: {
+  empfaenger?: string;
+}) {
   const pfad = usePathname();
 
   const [offen, setOffen] = useState(false);
@@ -224,7 +231,8 @@ export default function RueckmeldungGeben() {
               {/* Ohne Beschoenigung. Wer glaubt, anonym zu schreiben, und es
                   dann nicht ist, sagt beim naechsten Mal gar nichts mehr. */}
               <p className="text-center text-xs text-ink-muted">
-                Geht nur an Adrien — mit deinem Namen, damit er nachfragen kann.
+                Geht nur an {empfaenger} — mit deinem Namen, damit Nachfragen
+                möglich sind.
               </p>
             </div>
           </div>

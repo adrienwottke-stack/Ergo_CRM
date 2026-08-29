@@ -64,8 +64,10 @@ export default async function WillkommenPage() {
     }),
   ]);
 
-  // Ohne Einladung (Admin, Altkonten) spricht die direkte Fuehrungskraft -
-  // und ganz ohne die der Fallback aus dem Drehbuch.
+  // Ohne Einladung (Admin, Altkonten) spricht die direkte Fuehrungskraft, ohne
+  // die der Admin dieser Instanz - und erst ganz ohne beides der Fallback aus
+  // dem Drehbuch. Vorher endete die Kette direkt in der Konstante: in jeder
+  // weiteren Instanz haette dann ein fremder Name gesprochen.
   const einlader =
     herkunft?.leader.name ??
     (user.leaderId
@@ -74,8 +76,16 @@ export default async function WillkommenPage() {
             where: { id: user.leaderId },
             select: { name: true },
           })
-        )?.name ?? FALLBACK_ABSENDER
-      : FALLBACK_ABSENDER);
+        )?.name
+      : null) ??
+    (
+      await prisma.user.findFirst({
+        where: { role: "ADMIN", deactivatedAt: null, id: { not: user.id } },
+        orderBy: { createdAt: "asc" },
+        select: { name: true },
+      })
+    )?.name ??
+    FALLBACK_ABSENDER;
 
   const sozialbeweis = await sozialbeweisFuer(user.id, user.leaderId);
 

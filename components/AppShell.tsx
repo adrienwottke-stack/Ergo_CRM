@@ -1,4 +1,6 @@
+import { cache } from "react";
 import { logout } from "@/app/login/actions";
+import { prisma } from "@/lib/prisma";
 import { Wordmark } from "@/components/Logo";
 import NavLinks, { type NavLink } from "@/components/NavLinks";
 import UndoBar from "@/components/UndoBar";
@@ -54,6 +56,22 @@ export function navigationFuer(user: User): NavLink[] {
   ];
 }
 
+// Wohin eine Rueckmeldung geht: der Vorname des aeltesten aktiven Admin-Kontos.
+// Vorher stand "Adrien" fest im Beschriftungstext - in jeder weiteren Instanz
+// dieser Anwendung haette die Meldung damit den Falschen versprochen. cache():
+// eine Abfrage je Anfrage, egal wie oft die Schale rendert.
+const rueckmeldungsEmpfaenger = cache(async (): Promise<string> => {
+  const admin = await prisma.user
+    .findFirst({
+      where: { role: "ADMIN", deactivatedAt: null },
+      orderBy: { createdAt: "asc" },
+      select: { name: true },
+    })
+    .catch(() => null);
+  const vorname = admin?.name.trim().split(/\s+/)[0];
+  return vorname && vorname.length > 0 ? vorname : "den Admin";
+});
+
 export default async function AppShell({
   user,
   children,
@@ -65,7 +83,10 @@ export default async function AppShell({
   // Ein Schalter, eine Abfrage, auf jeder Seite. Sie steht hier und nicht im
   // Schnellzugriff selbst: der ist eine Client-Komponente und kann die
   // Feature-Tabelle nicht lesen.
-  const { wegweiser: wegweiserAn } = await schalter("wegweiser");
+  const [{ wegweiser: wegweiserAn }, empfaenger] = await Promise.all([
+    schalter("wegweiser"),
+    rueckmeldungsEmpfaenger(),
+  ]);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -95,7 +116,7 @@ export default async function AppShell({
                 und an derselben Stelle statt als zweites Symbol daneben. */}
             <Schnellzugriff istAdmin={user.role === "ADMIN"} wegweiserAn={wegweiserAn} />
             {/* Nur am Rechner und nur im Browser-Tab: das Symbol erklaert, wie
-                Ergo CRM hier in ein eigenes Fenster kommt. Am Handy erscheint
+                das Cockpit hier in ein eigenes Fenster kommt. Am Handy erscheint
                 es nie - dort ist die Installation Pflicht und laengst
                 erledigt, bevor jemand diese Kopfzeile ueberhaupt sieht. */}
             <AppInstallieren />
@@ -104,7 +125,7 @@ export default async function AppShell({
                 Aufmerksamkeit von allen - auch von denen, die nie etwas melden
                 wollen (docs/audit-kernmodell.md, 5.14). Und kein schwebender
                 Knopf unten rechts: dort liegt bereits die Undo-Leiste. */}
-            <RueckmeldungGeben />
+            <RueckmeldungGeben empfaenger={empfaenger} />
             <ThemaSchalter />
             <form action={logout}>
               {/* Am Handy nur das Symbol – der Text sprengt sonst die Kopfzeile. */}
