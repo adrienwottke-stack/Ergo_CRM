@@ -1,9 +1,17 @@
 import Link from "next/link";
-import type { Mannschaftsperson } from "@/lib/fuehrung";
+import { RUECKBLICK_TAGE, type Mannschaftsperson } from "@/lib/fuehrung";
 import { formatEinheiten, type EinheitenAufteilung } from "@/lib/einheiten";
 import type { Ampel as AmpelWert } from "@/lib/signale";
 import Ampel from "@/components/Ampel";
-import { card, kicker, td, th } from "@/components/ui";
+import GpName from "@/components/GpName";
+import { card, cn, kicker, td, th } from "@/components/ui";
+
+const TAG_MS = 24 * 60 * 60 * 1000;
+
+/** Volle Tage seit einem Zeitpunkt - fuer die Still-seit-Spalte. */
+function tageSeit(datum: Date): number {
+  return Math.max(0, Math.floor((Date.now() - datum.getTime()) / TAG_MS));
+}
 
 // Das Team-Cockpit: eine dichte Zeile pro Person statt einer Rechnung, die
 // sich über Abschnitte verteilt. Genau das wollte Emil fuer den Teamabend -
@@ -78,7 +86,7 @@ export default function MannschaftsMatrix({
           Unschaerfe darunter - derselbe Griff, mit dem die Namen-Tabelle ihren
           Kopf stehen laesst (components/NameList.tsx). */}
       <div className={`${card} overflow-x-auto`}>
-        <table className="w-full min-w-[30rem] text-left text-sm">
+        <table className="w-full min-w-[34rem] text-left text-sm">
           <thead className="border-b border-line/80 bg-sunken/60">
             <tr>
               <th
@@ -107,6 +115,14 @@ export default function MannschaftsMatrix({
               <th className={`${th} text-right`}>
                 <span className="sm:hidden">Punkte</span>
                 <span className="hidden sm:inline">Punkte (Woche)</span>
+              </th>
+              {/* "Wer kippt": die Tage seit der letzten Aktivitaet, als Zahl.
+                  Die Ampel sagt DASS es hakt, diese Spalte sagt SEIT WANN -
+                  genau die Auskunft, mit der eine Fuehrungskraft entscheidet,
+                  wen sie heute zuerst anruft. */}
+              <th className={`${th} text-right`}>
+                <span className="sm:hidden">Still</span>
+                <span className="hidden sm:inline">Still seit</span>
               </th>
             </tr>
           </thead>
@@ -137,6 +153,8 @@ export default function MannschaftsMatrix({
               <td className={`${td} text-right font-semibold tabular-nums text-ink`}>
                 {summe.punkte}
               </td>
+              {/* Eine Summe ueber "Tage still" waere keine Auskunft. */}
+              <td className={`${td} text-right text-ink-soft`}>—</td>
             </tr>
             {zeilen.map((person) => {
               const zahlen = einheiten.get(person.id);
@@ -155,7 +173,13 @@ export default function MannschaftsMatrix({
                         href={`/mannschaft/${person.id}`}
                         className="-my-2.5 flex min-h-11 items-center rounded py-2.5 transition hover:text-navy-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600"
                       >
-                        {person.name}
+                        {/* GpName statt blossem Text: laeuft der Vorfuehr-
+                            Schalter (Namen -> Initialen fuers Zeigen vor
+                            fremden Beratern), macht die Matrix von allein mit.
+                            Ohne kurz-Prop rechnet GpName einfache Initialen -
+                            die kollisionssaubere Server-Map reicht die
+                            Mannschafts-Seite spaeter durch. */}
+                        <GpName name={person.name} />
                       </Link>
                     </span>
                   </td>
@@ -181,6 +205,26 @@ export default function MannschaftsMatrix({
                   )}
                   <td className={`${td} text-right tabular-nums font-semibold text-ink`}>
                     {person.platzhalter ? "—" : person.werte.punkteWoche}
+                  </td>
+                  {/* Rot nur, wenn das Stille-Signal wirklich steht - die
+                      Grenze dafuer kommt aus der Werkstatt (Ampel-Kriterien),
+                      nicht aus einer zweiten Zahl hier. "60+" heisst: im
+                      ganzen Rueckblick nichts (lib/fuehrung.ts,
+                      RUECKBLICK_TAGE). */}
+                  <td
+                    className={cn(
+                      td,
+                      "text-right tabular-nums",
+                      person.signale.some((signal) => signal.schluessel === "stille")
+                        ? "font-semibold text-red-600"
+                        : "text-ink-muted"
+                    )}
+                  >
+                    {person.platzhalter
+                      ? "—"
+                      : person.werte.letzteAktivitaet
+                        ? `${tageSeit(person.werte.letzteAktivitaet)} T`
+                        : `${RUECKBLICK_TAGE}+ T`}
                   </td>
                 </tr>
               );
