@@ -813,3 +813,290 @@ export async function fokusProzentsatz(): Promise<number> {
   }
   return prozent;
 }
+
+// --- Das Lagebild: Struktur-Verlauf, Monatsvergleich, Stufenstand ----------
+// Bauschritt 1 des Lagebild-Plans: Emil (FK) soll auf /heute sofort sehen,
+// was bei seinen Leuten los ist. Vier Bausteine, die /heute (FK-Zweig) und
+// der neue Verlaufs-Abschnitt auf /mannschaft brauchen.
+
+/** Sockel und Tagessummen der ganzen eigenen Struktur - siehe strukturVerlauf. */
+export type StrukturVerlauf = { sockel: number; tage: Verlaufstag[] };
+
+/**
+ * Die Tagessummen des GANZEN eigenen Astes, sich selbst eingeschlossen -
+ * dieselben Konten wie teamEinheiten() ermittelt, nur ohne den Ausschluss der
+ * eigenen Zeile und als Verlauf statt als eine Zahl.
+ *
+ * INVARIANTE, siehe scripts/lagebild-probe.mjs: sockel + Summe aller
+ * tage[].hundertstel == astGesamt der eigenen Zeile aus einheitenFuerStruktur
+ * == "Du und dein Team zusammen" auf /einheiten. Eine Bedeutung, drei
+ * Anzeigen, eine Rechnungsbasis - weicht eine ab, glaubt niemand mehr den
+ * anderen beiden.
+ *
+ * Sockel und Tagessummen kommen aus teamSockel()/teamVerlauf() weiter unten
+ * (Team-Verlauf-als-Index) - dieselben zwei Abfragen ueber eine id-Liste,
+ * hier nur mit den Konten des EIGENEN Astes gefuettert. Bewusst kein eigenes
+ * groupBy daneben: "eine Kurve, ein Weg zu ihren Rohdaten" gilt unabhaengig
+ * davon, ob das Ergebnis hinterher indexiert oder - wie hier - absolut
+ * weitergereicht wird.
+ */
+export async function strukturVerlauf(userId: string): Promise<StrukturVerlauf> {
+  const konten = await strukturKonten(userId);
+  const [sockel, tage] = await Promise.all([teamSockel(konten), teamVerlauf(konten)]);
+  return { sockel, tage };
+}
+
+const MS_TAG = 86_400_000;
+
+/** "Juli" - Monatsname ohne Jahr, fuer die Vormonats-Beschriftung der
+ *  Delta-Zeile. monatsFormat weiter oben traegt zusaetzlich das Jahr. */
+const monatsNameFormat = new Intl.DateTimeFormat("de-DE", {
+  month: "long",
+  timeZone: "UTC",
+});
+
+/**
+ * Das Fenster fuer einen fairen Vormonatsvergleich "bis zum selben Tag":
+ * Vormonatsanfang bis zum kleineren aus (gleicher Tag im Monat,
+ * Vormonatsende) - ein Monatsletzter hat im Vormonat nicht immer ein
+ * Gegenstueck (31.08. hat im Februar-Vormonat-Fall nur einen 28./29.).
+ *
+ * Gemeinsamer Kern von monatsVergleich() und monatsDeltaJe(): beide MUESSEN
+ * dasselbe Fenster meinen, sonst widerspricht die Direkten-Liste der
+ * Kopf-Karte darueber.
+ */
+function vormonatsFenster(heute: string) {
+  const monat = produktionsmonat(heute);
+  const heuteDatum = dayToUtcDate(heute);
+  const tagImMonat = Math.round((heuteDatum.getTime() - monat.start.getTime()) / MS_TAG) + 1;
+
+  const start = addMonths(monat.start, -1);
+  const ende = addDays(monat.start, -1);
+  const gekapptesBis = addDays(start, tagImMonat - 1);
+  const bis = gekapptesBis.getTime() < ende.getTime() ? gekapptesBis : ende;
+
+  return { monat, heuteDatum, tagImMonat, start, bis };
+}
+
+export type Monatsvergleich = {
+  /** Buchungssumme im laufenden Produktionsmonat bis heute. Ohne Sockel. */
+  laufend: number;
+  /** Dieselbe Summe im Vormonat, gekappt auf denselben Tag im Monat. */
+  vormonat: number;
+  delta: number;
+  /** 1-basiert: der wievielte Tag des laufenden Produktionsmonats heute ist. */
+  tagImMonat: number;
+  /** "Juli" - fuer eine Zeile wie "... im August, Juli bis hierhin: ...". */
+  vormonatLabel: string;
+};
+
+/**
+ * Laufender Monat gegen Vormonat, fair bis zum selben Tag - reine Funktion
+ * auf dem Ergebnis von strukturVerlauf(), keine eigene Abfrage.
+ */
+export function monatsVergleich(tage: Verlaufstag[], heute: string): Monatsvergleich {
+  const { monat, heuteDatum, tagImMonat, start, bis } = vormonatsFenster(heute);
+
+  let laufend = 0;
+  let vormonat = 0;
+  for (const eintrag of tage) {
+    const datum = dayToUtcDate(eintrag.tag);
+    if (datum.getTime() >= monat.start.getTime() && datum.getTime() <= heuteDatum.getTime()) {
+      laufend += eintrag.hundertstel;
+    }
+    if (datum.getTime() >= start.getTime() && datum.getTime() <= bis.getTime()) {
+      vormonat += eintrag.hundertstel;
+    }
+  }
+
+  return {
+    laufend,
+    vormonat,
+    delta: laufend - vormonat,
+    tagImMonat,
+    vormonatLabel: monatsNameFormat.format(start),
+  };
+}
+
+/** Ast-Summe im laufenden Monat und im gekappten Vormonatsfenster, je Kopf. */
+export type MonatsDelta = { astMonat: number; astVormonat: number };
+
+/**
+ * Fuer JEDEN uebergebenen Kopf: die Ast-Summe (eigen + alles darunter, das
+ * auch in `personen` steht) im laufenden Monat bis heute, und dieselbe Summe
+ * im Vormonatsfenster aus vormonatsFenster() - DASSELBE Fenster wie
+ * monatsVergleich(), sonst widerspricht sich die Direkten-Liste mit der
+ * Kopf-Karte darueber.
+ *
+ * Faltung wie einheitenFuerStruktur(): absteigend nach Tiefe sortiert ist ein
+ * Knoten immer fertig, bevor seine Fuehrungskraft an die Reihe kommt.
+ */
+export async function monatsDeltaJe(
+  personen: { id: string; path: string }[],
+  heute: string
+): Promise<Map<string, MonatsDelta>> {
+  const ergebnis = new Map<string, MonatsDelta>(
+    personen.map((person) => [person.id, { astMonat: 0, astVormonat: 0 }])
+  );
+  if (personen.length === 0) return ergebnis;
+
+  const { monat, heuteDatum, start, bis } = vormonatsFenster(heute);
+  const ids = personen.map((person) => person.id);
+
+  const [laufendZeilen, vormonatZeilen] = await Promise.all([
+    prisma.einheitenbuchung.groupBy({
+      by: ["userId"],
+      where: { userId: { in: ids }, tag: { gte: monat.start, lte: heuteDatum } },
+      _sum: { hundertstel: true },
+    }),
+    prisma.einheitenbuchung.groupBy({
+      by: ["userId"],
+      where: { userId: { in: ids }, tag: { gte: start, lte: bis } },
+      _sum: { hundertstel: true },
+    }),
+  ]);
+
+  for (const zeile of laufendZeilen) {
+    const eintrag = ergebnis.get(zeile.userId);
+    if (eintrag) eintrag.astMonat = zeile._sum.hundertstel ?? 0;
+  }
+  for (const zeile of vormonatZeilen) {
+    const eintrag = ergebnis.get(zeile.userId);
+    if (eintrag) eintrag.astVormonat = zeile._sum.hundertstel ?? 0;
+  }
+
+  const vonUntenNachOben = [...personen].sort((a, b) => ebene(b.path) - ebene(a.path));
+  for (const person of vonUntenNachOben) {
+    const elternId = elternIdVon(person.path);
+    const oben = elternId ? ergebnis.get(elternId) : null;
+    const meins = ergebnis.get(person.id);
+    if (!oben || !meins) continue;
+    oben.astMonat += meins.astMonat;
+    oben.astVormonat += meins.astVormonat;
+  }
+
+  return ergebnis;
+}
+
+/** Karrierestufe, Eigengesamt und die Schwelle der Stufe - je Kopf. `stufe`
+ *  und `schwelle` sind null, wenn keine Karrierestufe eingetragen ist. */
+export type StufenStand = {
+  stufe: number | null;
+  eigenGesamt: number;
+  schwelle: number | null;
+};
+
+/** Reine Gesamtsumme je Konto, ohne Monatsspalte - die einspurige Schwester
+ *  von buchungssummenJe() fuer Aufrufer, die nur den Gesamtstand brauchen und
+ *  keine zweite Abfrage fuer eine ungenutzte Monatszahl bezahlen wollen. */
+async function gesamtSummenJe(ids: string[]): Promise<Map<string, number>> {
+  const summen = new Map<string, number>(ids.map((id) => [id, 0]));
+  if (ids.length === 0) return summen;
+
+  const zeilen = await prisma.einheitenbuchung.groupBy({
+    by: ["userId"],
+    where: { userId: { in: ids } },
+    _sum: { hundertstel: true },
+  });
+  for (const zeile of zeilen) summen.set(zeile.userId, zeile._sum.hundertstel ?? 0);
+  return summen;
+}
+
+/**
+ * Karrierestufe, Eigengesamt und Schwelle fuer jedes uebergebene Konto.
+ *
+ * NUR EIGENEINHEITEN (Hausregel): auf die Karrierestufe zaehlt, was jemand
+ * selbst geschrieben hat, nicht sein Team - dieselbe Grenze wie bei
+ * eigenerGesamtstand() oben, hier nur fuer mehrere Koepfe auf einmal.
+ *
+ * Platzhalter und Ausgetretene fallen direkt in der Abfrage heraus - beides
+ * ist am Konto selbst erkennbar (Muster: ladeEinheiten oben). Ein Aufrufer
+ * muss ids also nicht vorher selbst saeubern.
+ *
+ * alleSchwellen() liegt hinter React cache() (lib/einstellungen.ts) und wird
+ * hier trotzdem nur einmal aufgerufen, nicht je Konto in einer Schleife.
+ */
+export async function stufenStandJe(ids: string[]): Promise<Map<string, StufenStand>> {
+  const ergebnis = new Map<string, StufenStand>();
+  if (ids.length === 0) return ergebnis;
+
+  const [konten, schwellen] = await Promise.all([
+    prisma.user.findMany({
+      where: { id: { in: ids }, deactivatedAt: null, passwordHash: { not: null } },
+      select: { id: true, karrierestufe: true, einheitenStart: true },
+    }),
+    alleSchwellen(),
+  ]);
+  const gebucht = await gesamtSummenJe(konten.map((konto) => konto.id));
+
+  for (const konto of konten) {
+    ergebnis.set(konto.id, {
+      stufe: konto.karrierestufe,
+      eigenGesamt: konto.einheitenStart + (gebucht.get(konto.id) ?? 0),
+      schwelle: konto.karrierestufe === null ? null : (schwellen.get(konto.karrierestufe) ?? null),
+    });
+  }
+
+  return ergebnis;
+}
+
+/**
+ * Ab welchem Anteil der Schwelle jemand als "kurz davor" gilt - ein
+ * angenommener Platzhalter fuer die erste Anzeige der Schwellen-Zeile.
+ * NACH DEM ERSTEN ECHTEN MONAT AN DER PRAXIS JUSTIEREN: Schwellen immer gegen
+ * echte Zahlen setzen, nie gegen Bauchgefuehl (dieselbe Lektion wie bei
+ * SCHWELLEN oben).
+ */
+export const KNAPP_AB = 0.8;
+
+/** Ein Kopf kurz vor oder an der Schwelle einer Karrierestufe. */
+export type StufenGriffSchwelle = {
+  userId: string;
+  stufe: number;
+  eigenGesamt: number;
+  schwelle: number;
+};
+
+/** Ein Kopf ohne eingetragene Karrierestufe. */
+export type StufenGriffFehlt = { userId: string };
+
+/**
+ * Aus der Stufen-Karte die drei Faelle fuer die Schwellen-Zeile im Lagebild:
+ * kurz vor der Schwelle, Schwelle erreicht, Karrierestufe fehlt.
+ *
+ * Reine Ableitung - keine Datenbank, kein IO. Draussen bleibt, wer keine
+ * Auskunft geben kann: Stufe MAX (keine naechste Schwelle) und Stufe ohne
+ * hinterlegte Schwelle (siehe der Kommentar an SCHWELLEN - eine erfundene
+ * Schwelle waere schlimmer als keine). Platzhalter und Ausgetretene stehen
+ * ueblicherweise schon nicht in der Karte, weil stufenStandJe() sie am Konto
+ * selbst herausfiltert - fuettert ein Aufrufer die Map trotzdem mit fremden
+ * Ids, ist das seine Sache und nicht die dieser Funktion.
+ */
+export function stufenGriffe(stand: Map<string, StufenStand>): {
+  knapp: StufenGriffSchwelle[];
+  erreicht: StufenGriffSchwelle[];
+  fehlt: StufenGriffFehlt[];
+} {
+  const knapp: StufenGriffSchwelle[] = [];
+  const erreicht: StufenGriffSchwelle[] = [];
+  const fehlt: StufenGriffFehlt[] = [];
+
+  for (const [userId, eintrag] of stand) {
+    if (eintrag.stufe === null) {
+      fehlt.push({ userId });
+      continue;
+    }
+    if (eintrag.stufe === KARRIERESTUFE_MAX || eintrag.schwelle === null) continue;
+
+    const griff: StufenGriffSchwelle = {
+      userId,
+      stufe: eintrag.stufe,
+      eigenGesamt: eintrag.eigenGesamt,
+      schwelle: eintrag.schwelle,
+    };
+    if (eintrag.eigenGesamt >= eintrag.schwelle) erreicht.push(griff);
+    else if (eintrag.eigenGesamt >= KNAPP_AB * eintrag.schwelle) knapp.push(griff);
+  }
+
+  return { knapp, erreicht, fehlt };
+}

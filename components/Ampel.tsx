@@ -29,6 +29,7 @@ export default function Ampel({
   ampel,
   variante = "beides",
   groesse = "normal",
+  ruhig = false,
   className,
 }: {
   ampel: AmpelWert;
@@ -40,6 +41,13 @@ export default function Ampel({
    */
   variante?: "beides" | "punkt" | "text";
   groesse?: keyof typeof groessen;
+  /**
+   * true: der rote Punkt pulst nicht. Fuer Listen mit mehreren roten
+   * Ampeln (z. B. die Direkten-Liste im Lagebild) - die Ein-Puls-Regel
+   * erlaubt pro Bildschirm nur EINEN pulsenden Punkt, alle anderen bleiben
+   * ruhig.
+   */
+  ruhig?: boolean;
   className?: string;
 }) {
   const punkt = variante !== "text" && (
@@ -49,8 +57,9 @@ export default function Ampel({
         "shrink-0 rounded-full ring-2 ring-surface",
         groessen[groesse],
         ampelFarben[ampel],
-        // Nur der rote Zustand bewegt sich. Alles andere waere Unruhe.
-        ampel === "rot" && "animate-halo"
+        // Nur der rote Zustand bewegt sich, und auch der nur, wenn er nicht
+        // ausdruecklich ruhig gestellt ist. Alles andere waere Unruhe.
+        ampel === "rot" && !ruhig && "animate-halo"
       )}
     />
   );
