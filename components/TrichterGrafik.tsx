@@ -129,9 +129,14 @@ export default function TrichterGrafik({ stufen }: { stufen: TrichterStufe[] }) 
             // Zuschlag beim Antippen kommt oben drauf, nicht anstelle -
             // sonst wuerde eine leere Stufe beim Auswaehlen unveraendert
             // schwach bleiben, obwohl sie gerade im Fokus steht.
+            const basis = 0.15 + 0.65 * stufe.anteil + (istGewaehlt ? 0.15 : 0);
+            // Das Engpass-Segment ist die Botschaft der Grafik. Steht die
+            // Stufe bei 0, waere es mit der Grundfuellung praktisch
+            // unsichtbar - und der Puls dimmt sie zusaetzlich. Deshalb hier
+            // eine eigene Untergrenze, damit das Rot wirklich leuchtet.
             const deckkraft = Math.min(
               1,
-              0.15 + 0.65 * stufe.anteil + (istGewaehlt ? 0.15 : 0)
+              stufe.uebergang?.engpass ? Math.max(basis, 0.45) : basis
             );
             return (
               <path
