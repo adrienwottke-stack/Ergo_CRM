@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
+import { istAn, merkeNutzung } from "@/lib/features";
+import { kandidaturKarteSelect, type KandidaturKarteDaten } from "@/lib/kandidatur";
 import {
   berlinToday,
   dueState,
@@ -14,6 +18,8 @@ import StageBadge from "@/components/StageBadge";
 import NextStepBadge, { formatDue } from "@/components/NextStepBadge";
 import ContactActions from "@/components/ContactActions";
 import DeleteContactButton from "@/components/DeleteContactButton";
+import KandidaturKarte from "@/components/KandidaturKarte";
+import QrCode from "@/components/schleuse/QrCode";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import { contactStageHints, lostReasonLabels } from "@/lib/pipeline";
 import { activityTypeLabels } from "@/lib/labels";
@@ -78,6 +84,38 @@ export default async function ContactDetailPage({
 
   if (!contact) {
     notFound();
+  }
+
+  // Aufbau-Trichter (docs/recruiting-plan.md, §2.1): die Kandidatur-Karte
+  // erscheint NUR, wenn der Kontakt auf der Recruiting-Liste steht - Position
+  // statt Rolle, kein zweiter Modus-Schalter. Der Baustein-Schalter kommt
+  // trotzdem oben drauf: AUS heisst, hier taucht nichts auf.
+  const zeigtAufbau =
+    contact.listKinds.includes("RECRUITING") && (await istAn("aufbau"));
+
+  let kandidatur: KandidaturKarteDaten | null = null;
+  let herkunft = "";
+  let qrCode: ReactNode = null;
+  if (zeigtAufbau) {
+    const [gefundeneKandidatur, kopfzeilen, person] = await Promise.all([
+      prisma.kandidatur.findFirst({
+        where: { contactId: contact.id, ownerId: user.id, outcome: "OFFEN" },
+        select: kandidaturKarteSelect,
+      }),
+      headers(),
+      // Weich statt requireUserPerson: eine fehlende Zaehlstelle darf diese
+      // Seite nicht zum Absturz bringen (Regel 2, lib/features.ts).
+      prisma.person.findUnique({ where: { userId: user.id }, select: { id: true } }),
+    ]);
+    kandidatur = gefundeneKandidatur;
+    herkunft = `${kopfzeilen.get("x-forwarded-proto") ?? "http"}://${kopfzeilen.get("host") ?? ""}`;
+    // Die Herkunft kommt vom Server, nicht aus window.location - sonst zeigt
+    // der erste Frame einen halben Link (dasselbe Muster wie in
+    // app/(app)/einladen/page.tsx und components/PersonAufnehmen.tsx).
+    if (kandidatur?.invite) {
+      qrCode = <QrCode text={`${herkunft}/einladung/${kandidatur.invite.code}`} />;
+    }
+    await merkeNutzung("aufbau", person?.id ?? null);
   }
 
   const today = berlinToday();
@@ -175,6 +213,19 @@ export default async function ContactDetailPage({
           <ContactActions contact={lite} />
         </div>
       </section>
+
+      {/* Aufbau-Trichter: nur fuer Kontakte auf der Recruiting-Liste, gut
+          sichtbar direkt unter dem Verkaufs-Schritt, aber ohne ihn zu
+          verdraengen - Verkauf bleibt fuer jeden Kontakt der erste Block. */}
+      {zeigtAufbau && (
+        <KandidaturKarte
+          contactId={contact.id}
+          contactName={contact.name}
+          kandidatur={kandidatur}
+          herkunft={herkunft}
+          qrCode={qrCode}
+        />
+      )}
 
       {/* Was vor einem Anruf zaehlt - mehr nicht. Alles Weitere stand hier
           frueher, weil es das Feld gab, nicht weil es jemand braucht. */}
