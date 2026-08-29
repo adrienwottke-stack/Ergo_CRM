@@ -385,11 +385,16 @@ export default async function EinheitenPage() {
                   <span className="text-xs tabular-nums text-ink-muted">
                     {dayDisplayFormat.format(buchung.tag)}
                   </span>
+                  {/* Nachgemessen bei 375 px: 48 x 16 Pixel. Ein Loeschknopf,
+                      kleiner als eine Fingerkuppe, direkt neben dem Datum -
+                      und dahinter ein deleteMany ohne Rueckweg. Die 44 Pixel
+                      kommen als Polster mit negativem Rand, damit die Zeile
+                      nicht hoeher wird. */}
                   <form action={buchungLoeschen}>
                     <input type="hidden" name="buchungId" value={buchung.id} />
                     <button
                       type="submit"
-                      className="text-xs font-medium text-ink-muted transition hover:text-red-600"
+                      className="-my-3.5 inline-flex min-h-11 items-center py-3.5 text-xs font-medium text-ink-muted transition hover:text-red-600"
                     >
                       Löschen
                     </button>
