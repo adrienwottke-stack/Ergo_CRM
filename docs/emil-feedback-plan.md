@@ -225,6 +225,8 @@ Basis: Branch `redesign/liquid-glass`, Commit `07b9798` (sichert den Wegweiser-S
 
 **Fertig wenn:** Der eigene Verlauf steht über alle fünf Zeiträume, funktioniert in beiden Themes, und `package.json` ist unverändert.
 
+**Nachtrag 29.08.2026 — die zweite Ausbaustufe ist gebaut (Lagebild-Plan):** Struktur-Kurve auf /mannschaft (Abschnitt „Verlauf deiner Struktur", Anker `#verlauf`, `strukturVerlauf()` in `lib/einheiten.ts`, Commits `ff43ccf`+`6869bc9`) und der FK-Erstblick „Lagebild" auf /heute (`327e3f7`: Ampel-Bilanz + Gesamtstand mit Vormonats-Delta und MiniVerlauf + Schwellen-Zeile, Griff-Karten, Direkten-Liste; ersetzt dort die AP-05-Zeile und das rote Banner). Dazu Stufen-Spalte in der Mannschafts-Einheiten-Tabelle und der Vorführ-Schalter (Namen→Initialen) auf /heute und /mannschaft (`b60f15a`, `d976277`, `7fc37a3`). Die Serie „neue GP" über `User.startedAt` am Struktur-Chart bleibt als dritte Ausbaustufe offen.
+
 ### AP-09 — Namen-Liste als dichte Tabelle
 
 **Anlass:** „Namen (Tab) muss übersichtlicher sein! Am besten Tabelle, muss auf einer Seite sein. Keine Excel, sondern geil."

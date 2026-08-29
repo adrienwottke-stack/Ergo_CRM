@@ -38,6 +38,20 @@ Ein Deployment mit eigener Datenbank. Heute gilt: eine Instanz = eine Struktur, 
 **Mandant**:
 Zielbild, noch nicht gebaut: eine abgegrenzte Struktur innerhalb einer gemeinsamen Instanz, die von anderen Mandanten nichts sieht. Bis dahin ist „Mandant" kein Wort der Oberfläche.
 
+### Führung
+
+**Lagebild**:
+Der Erstblick der Führungskraft beim Öffnen — Ampel-Bilanz der eigenen Struktur, Gesamtstand mit Richtung, wer kurz vor der nächsten Karrierestufe steht, danach die Fälle, die heute einen Griff brauchen. Eine Arbeitsliste mit Kopf, keine Auswertung; „Reporting" ist im Cockpit kein Wort der Oberfläche.
+
+**Gesamtstand**:
+Einheiten vor der App plus alles seither Gebuchte. Für eine Struktur gilt: eine Bedeutung, drei Anzeigen — Lagebild-Kopf, „Zusammen" in der Mannschaft, „Du und dein Team zusammen" bei den Einheiten — und eine Rechnungsbasis; weicht eine ab, glaubt niemand mehr den anderen beiden.
+
+**Verlauf**:
+Die kumulierte Einheiten-Kurve über die Zeit — die eigene auf der Einheiten-Seite, die der Struktur in der Mannschaft. Vor dem ersten App-Tag läuft sie flach, weil der Startbestand kein Datum trägt. Ein Storno zieht sie nach unten.
+
+**Vorführen**:
+Der Schalter fürs Zeigen vor Fremden: alle Namen der eigenen Leute werden zu Initialen, Zahlen und Kurven bleiben echt. Gilt je Browser-Tab und wird nie gespeichert.
+
 ### Aufbau
 
 **Kandidatur**:
