@@ -29,8 +29,12 @@ import {
   fokusProzentsatz,
   formatEinheiten,
   produktionsmonat,
+  stufenStandJe,
+  strukturVerlauf,
   traegtZahlen,
+  type StufenStand,
 } from "@/lib/einheiten";
+import VerlaufsChart from "@/components/VerlaufsChart";
 import {
   card,
   chip,
@@ -38,6 +42,7 @@ import {
   flaeche,
   kicker,
   pageTitle,
+  sectionTitle,
   td,
   th,
 } from "@/components/ui";
@@ -164,6 +169,27 @@ function Merkmale({ person }: { person: Mannschaftsperson }) {
   );
 }
 
+/**
+ * Der Text der Stufen-Spalte in der Einheiten-Tabelle.
+ *
+ * `stand` fehlt fuer Platzhalter und Ausgetretene - stufenStandJe() filtert
+ * beide schon am Konto heraus (siehe lib/einheiten.ts), hier bleibt dafuer
+ * nur der Gedankenstrich. Bewusst kompakt ("2 · 92 %" ohne Zusatztext): die
+ * Spalte steht in einer Tabelle, die gerade erst gegen erzwungene Breite am
+ * Handy repariert wurde.
+ */
+function stufenZelle(stand: StufenStand | undefined) {
+  if (!stand) return "—";
+  if (stand.stufe === null) return <span className="text-ink-soft">fehlt</span>;
+  if (stand.schwelle === null) return `${stand.stufe} — ohne Schwelle`;
+  // "erreicht" faellt mit derselben Grenze wie stufenGriffe() (>=), sonst
+  // widerspraeche sich die Tabelle der Schwellen-Zeile andernorts im
+  // Lagebild.
+  if (stand.eigenGesamt >= stand.schwelle) return `${stand.stufe} geschafft`;
+  const prozent = Math.floor((stand.eigenGesamt / stand.schwelle) * 100);
+  return `${stand.stufe} · ${prozent} %`;
+}
+
 /** Was in einem Kasten steht - eine Zeile, mehr passt nicht hinein. */
 function kopfzeile(person: Mannschaftsperson): string {
   if (person.platzhalter) {
@@ -211,6 +237,19 @@ export default async function MannschaftPage({
   // Derselbe Schalter wie auf /einheiten: sonst laesst sich die Sichtbarkeit an
   // einer Stelle abschalten und an der anderen nicht.
   const zeigeEinheiten = einheitenAn.einheiten && traegtZahlen(einheiten);
+
+  // Verlauf-Kurve und Stufen-Spalte (Bauschritt 3 des Lagebild-Plans): beide
+  // Abfragen laufen nur, wenn der Einheiten-Schalter ueberhaupt an ist -
+  // sonst zahlt eine Struktur ohne das Feature fuer zwei Abfragen, die nie
+  // gerendert werden. Der volle Sicht-Guard (zeigeEinheiten, inklusive
+  // traegtZahlen) bleibt dem bestehenden Tabellen-Abschnitt vorbehalten und
+  // steht erst nach diesem Await fest.
+  const [strukturverlauf, stufenstand] = einheitenAn.einheiten
+    ? await Promise.all([
+        strukturVerlauf(user.id),
+        stufenStandJe(alle.map((person) => person.id)),
+      ])
+    : [null, null];
 
   // Woher die Einheiten kommen (AP-06): der Anteil jedes DIREKTEN Astes an
   // der eigenen Struktur-Summe. "Struktur-Summe" ist bewusst der Eintrag des
@@ -756,6 +795,30 @@ export default async function MannschaftPage({
         </section>
       )}
 
+      {/* --- Verlauf deiner Struktur ------------------------------------------
+          Direkt ueber der Einheiten-Tabelle, mit demselben Guard. Der Endwert
+          der Kurve ist dieselbe Zahl wie die Zelle "Zusammen" der eigenen
+          Zeile in der Tabelle darunter - beide kommen aus derselben
+          Rechnungsbasis (strukturVerlauf() bzw. einheitenFuerStruktur(),
+          Invariante siehe Kommentar an strukturVerlauf in lib/einheiten.ts). */}
+      {zeigeEinheiten && strukturverlauf && (
+        <section id="verlauf" className="scroll-mt-24 space-y-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className={sectionTitle}>Verlauf deiner Struktur</h2>
+            <span className="text-xs text-ink-muted">
+              tippen und halten zum Ablesen
+            </span>
+          </div>
+          <VerlaufsChart
+            sockel={strukturverlauf.sockel}
+            tage={strukturverlauf.tage}
+            heute={berlinToday()}
+            monatStart={produktionsmonat(berlinToday()).start.toISOString().slice(0, 10)}
+            fussnote="Kumuliert über deine ganze Struktur, inklusive der Einheiten von vor der App — die stehen als eine Zahl ohne Datum, davor läuft die Kurve flach. Ein Storno zieht die Kurve nach unten."
+          />
+        </section>
+      )}
+
       {/* --- Einheiten in der Struktur ---------------------------------------
           Die Zahl, in der der Betrieb rechnet - hier je Kopf aufgeschluesselt.
           "Eigen" ist, was jemand selbst gemeldet hat, "Team" alles unter ihm.
@@ -794,6 +857,7 @@ export default async function MannschaftPage({
                   <th className={`${th} text-right`}>Eigene</th>
                   <th className={`${th} text-right`}>Team</th>
                   <th className={`${th} text-right`}>Zusammen</th>
+                  <th className={`${th} text-right`}>Stufe</th>
                   <th className={`${th} text-right`}>Anteil (Monat)</th>
                 </tr>
               </thead>
@@ -838,6 +902,12 @@ export default async function MannschaftPage({
                           ? "—"
                           : formatEinheiten(zahlen.astGesamt)}
                       </td>
+                      {/* Platzhalter und Ausgetretene stehen nicht in der
+                          Map (stufenStandJe() filtert sie am Konto heraus) -
+                          stufenZelle() zeigt fuer sie den Gedankenstrich. */}
+                      <td className={`${td} text-right tabular-nums text-ink-muted`}>
+                        {stufenZelle(stufenstand?.get(person.id))}
+                      </td>
                       {/* Nur direkte Aeste bekommen einen Anteil - siehe
                           astAnteil() weiter oben. */}
                       <td className={`${td} text-right`}>
@@ -869,7 +939,9 @@ export default async function MannschaftPage({
             Person, über alle Ebenen — sie zählen in keiner Rangliste mit, und
             auf die Karrierestufe zählen nur die eigenen. Der Anteil zeigt
             direkte Äste im Verhältnis zur eigenen Struktur-Summe im laufenden
-            Monat — reine Anzeige, keine Sperre.
+            Monat — reine Anzeige, keine Sperre. Die Karrierestufe trägt jeder
+            selbst ein; ohne Eintrag steht hier &bdquo;fehlt&ldquo; — kein
+            Vorwurf, ein Anlass.
           </p>
         </section>
       )}
