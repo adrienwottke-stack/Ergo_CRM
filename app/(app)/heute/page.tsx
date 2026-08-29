@@ -16,15 +16,29 @@ import {
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
 import { liegtLabel, liegtSeit } from "@/lib/liegenbleiber";
 import { herkunftAusQuelle } from "@/lib/empfehlungen";
-import { faelligeAufgaben, fuehrungsSchritt, mannschaftsLage } from "@/lib/fuehrung";
+import {
+  faelligeAufgaben,
+  fuehrungsSchritt,
+  mannschaftsLage,
+  type Mannschaftsperson,
+} from "@/lib/fuehrung";
 import {
   KARRIERESTUFE_MAX,
   eigenerGesamtstand,
   eigenerMonatsstand,
   formatEinheiten,
+  monatsDeltaJe,
+  monatsVergleich,
   produktionsmonat,
   schwelleFuer,
+  stufenGriffe,
+  stufenStandJe,
+  strukturVerlauf,
+  type Verlaufstag,
 } from "@/lib/einheiten";
+import { strukturKonten } from "@/lib/struktur";
+import { schalter } from "@/lib/features";
+import { initialenKuerzel } from "@/lib/vorfuehren";
 import FuehrungsAufgabe from "@/components/FuehrungsAufgabe";
 import StageBadge from "@/components/StageBadge";
 import NextStepBadge from "@/components/NextStepBadge";
@@ -36,13 +50,18 @@ import Postfach from "@/components/Postfach";
 import NummerHinterlegen from "@/components/NummerHinterlegen";
 import EinheitenKarte from "@/components/EinheitenKarte";
 import TerminFrageKarte, { type TerminFrage } from "@/components/TerminFrageKarte";
-import Ampel from "@/components/Ampel";
-import { card, cardInteractive, chip, flaeche } from "@/components/ui";
+import { card, chip, flaeche, kicker as kickerStil } from "@/components/ui";
 import SeitenKopf from "@/components/SeitenKopf";
+import VorfuehrProvider from "@/components/VorfuehrProvider";
+import VorfuehrSchalter from "@/components/VorfuehrSchalter";
+import GpName from "@/components/GpName";
+import LageKopf, { type SchwellenZeile, type TeamPuls } from "@/components/LageKopf";
+import GriffKarte, { VorfuehrHinweis, type GriffPerson } from "@/components/GriffKarte";
+import DirektenListe, { type DirektenZeile, type DirektenStufe } from "@/components/DirektenListe";
 import LeerZustand from "@/components/LeerZustand";
 import ZahlHoch from "@/components/ZahlHoch";
 import { KennzahlKachel } from "@/components/Kennzahl";
-import { CheckIcon, ChevronRightIcon, PhoneIcon, SparkIcon } from "@/components/icons";
+import { CheckIcon, PhoneIcon, SparkIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +70,38 @@ const kurzDatum = new Intl.DateTimeFormat("de-DE", {
   month: "2-digit",
   timeZone: "Europe/Berlin",
 });
+
+// "August" ohne Jahr - fuer die Team-Puls-Delta-Zeile im Lagebild
+// ("... im August"). produktionsmonat().label traegt zusaetzlich das Jahr,
+// das braucht diese eine Zeile nicht.
+const monatsNameFormat = new Intl.DateTimeFormat("de-DE", {
+  month: "long",
+  timeZone: "UTC",
+});
+
+/**
+ * Die kumulierte Kurve fuer MiniVerlauf im Lagebild: NUR der laufende
+ * Produktionsmonat, Startpunkt ist der Stand bei Monatsbeginn (Sockel plus
+ * alles davor), Endwert ist der Gesamtstand von heute - siehe LageKopf,
+ * Zeile 2. Reine Funktion auf dem Ergebnis von strukturVerlauf(), keine
+ * eigene Abfrage (Praezedenz: monatsVergleich/monatsDeltaJe in lib/einheiten.ts).
+ */
+function monatsKurve(sockel: number, tage: Verlaufstag[], monatStart: Date, bis: Date): number[] {
+  let basis = sockel;
+  for (const eintrag of tage) {
+    if (dayToUtcDate(eintrag.tag).getTime() < monatStart.getTime()) basis += eintrag.hundertstel;
+  }
+  const werte = [basis];
+  let stand = basis;
+  for (const eintrag of tage) {
+    const zeit = dayToUtcDate(eintrag.tag).getTime();
+    if (zeit >= monatStart.getTime() && zeit <= bis.getTime()) {
+      stand += eintrag.hundertstel;
+      werte.push(stand);
+    }
+  }
+  return werte;
+}
 
 // Dringlichkeit als Kante links an der Karte. Vorher hatte jede Zeile
 // denselben grauen Rahmen - ob sie seit einer Woche liegt oder erst naechsten
@@ -181,21 +232,21 @@ export default async function HeutePage() {
 
   // Emil oeffnet die App morgens im Auto und landet hier - nicht auf
   // /mannschaft. Bis hierhin erfuhr er von einem stillen Partner erst, wenn er
-  // von sich aus nachsah. Eine Zeile, nicht mehr: wer, und der naechste Schritt.
+  // von sich aus nachsah. Das Lagebild darunter beantwortet das jetzt in
+  // einem Kopf statt in einem Banner - siehe unten. `lage` bleibt der EINE
+  // Weg dahin: kein zweiter mannschaftsLage()-Aufruf irgendwo auf der Seite.
   const [lage, aufgaben] =
     gefuehrte > 0
       ? await Promise.all([mannschaftsLage(user), faelligeAufgaben(user.id)])
       : [null, []];
-  const brauchenDich = lage?.dringend.filter((person) => person.ampel === "rot") ?? [];
 
-  // AP-05: der ruhige Gegenpart zum Banner unten - "wie steht die Struktur
-  // INSGESAMT", nicht nur "wer ist gerade rot". Reines Zaehlen ueber die
-  // ohnehin geladene `lage`, keine zweite Abfrage, keine zweite Rechnung.
-  // Ausgetretene zaehlen nicht mehr mit - dasselbe Prinzip wie bei
-  // lib/fuehrung.ts, wo `dringend`/`ruhend` Ausgetretene ebenfalls aus der
-  // Ampel-Betrachtung herausnehmen. `null` heisst hier "fuehrt niemanden" und
-  // haelt die Stufe-1-Ansicht unveraendert.
-  const struktur = lage
+  // AP-05: "wie steht die Struktur INSGESAMT", nicht nur "wer ist gerade
+  // rot". Reines Zaehlen ueber die ohnehin geladene `lage`, keine zweite
+  // Abfrage, keine zweite Rechnung - und die Ampel wird hier NICHT neu
+  // hergeleitet, sie steht schon an person.ampel (ampelVon hat entschieden).
+  // Ausgetretene zaehlen nicht mehr mit. `null` heisst "fuehrt niemanden" und
+  // haelt den Nicht-FK-Zweig unveraendert.
+  const bilanz = lage
     ? lage.leute.reduce(
         (acc, person) => {
           if (!person.ausgetreten) acc[person.ampel]++;
@@ -204,6 +255,213 @@ export default async function HeutePage() {
         { grau: 0, gruen: 0, gelb: 0, rot: 0 }
       )
     : null;
+
+  // --- Das Lagebild: die neuen Bausteine aus b60f15a zusammensetzen --------
+  // Nur im FK-Zweig geladen (lage !== null) - der Nicht-FK-Zweig zahlt exakt
+  // null zusaetzliche Abfragen, kein zusaetzliches Markup.
+  let einheitenAn = false;
+  let puls: TeamPuls | null = null;
+  let schwellenZeile: SchwellenZeile | null = null;
+  let griffPersonen: GriffPerson[] = [];
+  let griffGesamt = 0;
+  let gelbAlle: Mannschaftsperson[] = [];
+  let direktenZeilen: DirektenZeile[] = [];
+  // Fuer die Fussnote der Direkten-Liste - unabhaengig vom Einheiten-Schalter
+  // gerechnet (die Fussnote selbst zeigt sich nur mit Schalter, aber die
+  // beiden Labels sollen dafuer nicht extra dupliziert werden).
+  let monatLabel = "";
+  let vormonatLabel = "";
+  // Fuer die Gelb-Zeile unten (die einzige Stelle, die GpName direkt im JSX
+  // braucht statt ueber eine fertige Props-Liste wie Griff-Karte/Direkten-Liste).
+  let kuerzel = new Map<string, string>();
+
+  if (lage) {
+    // Direkte NICHT aus lage.leute/baum ableiten: die zeigen beim Admin seit
+    // ADR 0004 die GANZE Instanz statt des eigenen Astes (lib/fuehrung.ts,
+    // sichtbarkeit(betrachter, "ALLE")). "Direkt" ist unabhaengig davon immer
+    // dieselbe absolute Frage - leaderId === user.id - und wird deshalb hier
+    // eigens gestellt.
+    //
+    // Der EIGENE Ast mit Pfaden, ueber alle Ebenen, sich selbst
+    // eingeschlossen: dieselbe Population wie strukturVerlauf() (naemlich
+    // strukturKonten(), also OHNE Ausgetretene) - nur so zaehlen die
+    // Ast-Deltas unten und der Gesamtstand oben zur selben Zahl zusammen
+    // (die Invariante aus lib/einheiten.ts, Abschnitt "Das Lagebild").
+    const [direkteKonten, astKonten, verlauf, schalterWerte] = await Promise.all([
+      prisma.user.findMany({
+        where: { leaderId: user.id, deactivatedAt: null },
+        select: { id: true },
+      }),
+      strukturKonten(user.id).then((ids) =>
+        prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, path: true } })
+      ),
+      strukturVerlauf(user.id),
+      schalter("einheiten"),
+    ]);
+    einheitenAn = schalterWerte.einheiten;
+    const direkteIds = direkteKonten.map((konto) => konto.id);
+
+    // Haengt am Ergebnis der beiden Abfragen oben (Astliste, direkte Ids) -
+    // kann deshalb nicht im selben Promise.all stehen.
+    const [deltaJe, stufenJe] = await Promise.all([
+      monatsDeltaJe(
+        astKonten.map((konto) => ({ id: konto.id, path: konto.path })),
+        today
+      ),
+      stufenStandJe(direkteIds),
+    ]);
+
+    const vergleich = monatsVergleich(verlauf.tage, today);
+    monatLabel = monatsNameFormat.format(produktionsmonat(today).start);
+    vormonatLabel = vergleich.vormonatLabel;
+    const gesamtstand =
+      verlauf.sockel + verlauf.tage.reduce((summe, tag) => summe + tag.hundertstel, 0);
+
+    if (einheitenAn) {
+      puls = {
+        gesamtstand,
+        monatLabel,
+        vormonatLabel: vergleich.vormonatLabel,
+        laufend: vergleich.laufend,
+        vormonat: vergleich.vormonat,
+        delta: vergleich.delta,
+        verlaufWerte: monatsKurve(
+          verlauf.sockel,
+          verlauf.tage,
+          produktionsmonat(today).start,
+          dayToUtcDate(today)
+        ),
+        traegtZahlen: gesamtstand !== 0 || verlauf.tage.length > 0,
+      };
+    }
+
+    // Server rechnet EINMAL die Vorfuehr-Kuerzel fuer jeden Namen, der im
+    // Lagebild ueberhaupt vorkommen kann - GpName bekommt dann nur noch
+    // {name, kurz} und muss selbst nichts mehr wissen. lage.leute deckt
+    // dabei auch jedes "ueber X" ab: wer tiefer im eigenen Ast steht, haengt
+    // an einer Fuehrungskraft, die selbst ebenfalls im eigenen Ast steht.
+    kuerzel = initialenKuerzel(lage.leute.map((person) => person.name));
+    const kurzFuer = (name: string) => kuerzel.get(name) ?? name;
+
+    // Direkte fuer die Direkten-Liste UND die Schwellen-Zeile: aus lage.leute
+    // gefiltert (istDirekt ist eine absolute Frage, unabhaengig vom
+    // Sichtbarkeits-Umfang) - nicht aus astKonten, das traegt keine
+    // Signale/Ampeln. Ausgetretene Direkte gehoeren nicht mehr in die
+    // Arbeitsliste von heute.
+    const direktePersonen = lage.leute.filter(
+      (person) => person.istDirekt && !person.ausgetreten
+    );
+    const namenJeDirekt = new Map(direktePersonen.map((person) => [person.id, person]));
+
+    if (einheitenAn) {
+      const griffe = stufenGriffe(stufenJe);
+      if (griffe.knapp.length > 0) {
+        const erster = griffe.knapp[0]!;
+        const person = namenJeDirekt.get(erster.userId);
+        if (person) {
+          schwellenZeile = {
+            art: "knapp",
+            id: erster.userId,
+            name: person.name,
+            kurz: kurzFuer(person.name),
+            stufe: erster.stufe,
+            rest: erster.schwelle - erster.eigenGesamt,
+            prozent: Math.round((erster.eigenGesamt / erster.schwelle) * 100),
+            weitere: griffe.knapp.length - 1,
+          };
+        }
+      } else if (griffe.erreicht.length > 0) {
+        const erster = griffe.erreicht[0]!;
+        const person = namenJeDirekt.get(erster.userId);
+        if (person) {
+          schwellenZeile = {
+            art: "erreicht",
+            id: erster.userId,
+            name: person.name,
+            kurz: kurzFuer(person.name),
+            stufe: erster.stufe,
+          };
+        }
+      } else if (griffe.fehlt.length > 0) {
+        schwellenZeile = { art: "fehlt", anzahl: griffe.fehlt.length };
+      }
+    }
+
+    // Griff-Karten: exakt dieselbe Auswahl wie das bisherige rote Banner
+    // (lage.dringend nach ampel==="rot"), damit die Alarm-Abdeckung nicht
+    // enger wird. lage.dringend schliesst Ausgetretene und Ruhende bereits
+    // aus (lib/fuehrung.ts: auffaellig filtert !ausgetreten, dringend filtert
+    // !betreuung?.ruht) - hier kommt keine zweite Filterung mehr dazu.
+    const rotDringend = lage.dringend.filter((person) => person.ampel === "rot");
+    griffGesamt = rotDringend.length;
+    griffPersonen = rotDringend.slice(0, 3).map((person) => ({
+      id: person.id,
+      name: person.name,
+      kurz: kurzFuer(person.name),
+      vorname: person.vorname,
+      ueber: person.ueber,
+      ueberKurz: person.ueber ? kurzFuer(person.ueber) : null,
+      fuehrt: person.fuehrt,
+      telefon: person.telefon,
+      titel: person.signale[0]?.titel ?? "Läuft.",
+      schritt: fuehrungsSchritt(person),
+      anlass: person.signale[0]?.schluessel,
+    }));
+
+    gelbAlle = lage.dringend.filter((person) => person.ampel === "gelb");
+
+    // Die Direkten-Liste: Ast-EH und Karrierestufe nur mit Einheiten-Schalter,
+    // Platzhalter bleiben in jedem Fall getrennt - kein Balken, kein Delta,
+    // nie in einer Summe.
+    direktenZeilen = direktePersonen.map((person) => {
+      const delta = einheitenAn ? deltaJe.get(person.id) : undefined;
+      const astMonat = delta?.astMonat ?? 0;
+      const astVormonat = delta?.astVormonat ?? 0;
+      const deltaWert = astMonat - astVormonat;
+
+      const stand = einheitenAn ? stufenJe.get(person.id) : undefined;
+      let stufe: DirektenStufe | null = null;
+      if (einheitenAn && !person.platzhalter) {
+        if (!stand || stand.stufe === null) stufe = { art: "fehlt" };
+        else if (stand.schwelle === null) {
+          stufe = { art: "ohneSchwelle", stufe: stand.stufe };
+        } else if (stand.eigenGesamt >= stand.schwelle) {
+          stufe = { art: "erreicht", stufe: stand.stufe };
+        } else {
+          stufe = {
+            art: "fortschritt",
+            stufe: stand.stufe,
+            prozent: Math.round((stand.eigenGesamt / stand.schwelle) * 100),
+          };
+        }
+      }
+
+      return {
+        id: person.id,
+        name: person.name,
+        kurz: kurzFuer(person.name),
+        ampel: person.ampel,
+        fuehrt: person.fuehrt,
+        platzhalter: person.platzhalter,
+        eingeladen: person.eingeladen,
+        signalTitel:
+          !person.platzhalter && person.ampel !== "gruen"
+            ? (person.signale[0]?.titel ?? null)
+            : null,
+        ehText:
+          einheitenAn && !person.platzhalter
+            ? person.fuehrt > 0
+              ? `Ast ${formatEinheiten(astMonat)}`
+              : formatEinheiten(astMonat)
+            : null,
+        deltaText:
+          einheitenAn && !person.platzhalter
+            ? `${deltaWert >= 0 ? "+" : ""}${formatEinheiten(deltaWert)} vs. ${vergleich.vormonatLabel}`
+            : null,
+        stufe,
+      };
+    });
+  }
 
   // Faellige Fuehrungsaufgaben gehoeren in dieselben Gruppen wie die
   // Kundenschritte - eine Fuehrungskraft hat EINE Liste. Was ueberfaellig ist,
@@ -304,7 +562,7 @@ export default async function HeutePage() {
 
   return (
     <div className="space-y-6">
-      <SeitenKopf kicker="Beraterbereich" titel="Heute" />
+      <SeitenKopf kicker={lage ? "Führung" : "Beraterbereich"} titel="Heute" />
 
       {/* Was jemand geschrieben hat, steht vor der Arbeit - es dauert zehn
           Sekunden und ist der Grund, warum sich das Werkzeug nach Mannschaft
@@ -321,8 +579,102 @@ export default async function HeutePage() {
         />
       )}
 
+      {/* Das Lagebild (Lagebild-Plan): eine Fuehrungskraft soll beim Oeffnen
+          ZUERST sehen, was bei ihren Leuten los ist - erst danach das eigene
+          Geschaeft. Nutzer-Entscheidung aus dem Plan, dieselbe Haltung wie
+          beim frueheren "braucht dich"-Banner ("ein stiller Partner kostet
+          mehr als ein liegengebliebener Anruf"), jetzt mit einem Kopf statt
+          einem Banner - der Puls zieht auf die erste Griff-Karte um.
+          Nicht-FK sieht ab hier exakt nichts Neues, `lage` ist dann null. */}
+      {lage && (
+        <VorfuehrProvider>
+          <div className="flex items-center justify-between gap-3">
+            <p className={kickerStil}>Lagebild</p>
+            <VorfuehrSchalter />
+          </div>
+          <VorfuehrHinweis />
+
+          <LageKopf
+            bilanz={bilanz!}
+            einheitenAn={einheitenAn}
+            puls={puls}
+            schwellenZeile={schwellenZeile}
+          />
+
+          {griffPersonen.length > 0 && (
+            <GriffKarte personen={griffPersonen} gesamt={griffGesamt} />
+          )}
+
+          {gelbAlle.length > 0 && (
+            <Link
+              href="/mannschaft"
+              className={`${flaeche("warnung")} block px-4 py-3 transition hover:schatten-hoch sm:px-5`}
+            >
+              <span className="text-sm text-amber-900">
+                Bei{" "}
+                {gelbAlle.length === 1 ? (
+                  <GpName
+                    name={gelbAlle[0]!.vorname}
+                    kurz={kuerzel.get(gelbAlle[0]!.name) ?? gelbAlle[0]!.vorname}
+                  />
+                ) : gelbAlle.length === 2 ? (
+                  <>
+                    <GpName
+                      name={gelbAlle[0]!.vorname}
+                      kurz={kuerzel.get(gelbAlle[0]!.name) ?? gelbAlle[0]!.vorname}
+                    />{" "}
+                    und{" "}
+                    <GpName
+                      name={gelbAlle[1]!.vorname}
+                      kurz={kuerzel.get(gelbAlle[1]!.name) ?? gelbAlle[1]!.vorname}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <GpName
+                      name={gelbAlle[0]!.vorname}
+                      kurz={kuerzel.get(gelbAlle[0]!.name) ?? gelbAlle[0]!.vorname}
+                    />
+                    ,{" "}
+                    <GpName
+                      name={gelbAlle[1]!.vorname}
+                      kurz={kuerzel.get(gelbAlle[1]!.name) ?? gelbAlle[1]!.vorname}
+                    />{" "}
+                    und {gelbAlle.length - 2} weiteren
+                  </>
+                )}{" "}
+                hakt es — zur Mannschaft
+              </span>
+            </Link>
+          )}
+
+          {griffPersonen.length === 0 && gelbAlle.length === 0 && (
+            <div className={`${flaeche("erfolg")} px-4 py-3 sm:px-5`}>
+              <p className="text-sm text-emerald-900">
+                Niemand braucht dich heute — alle laufen. Deine eigene Liste ist
+                unten dran.
+              </p>
+            </div>
+          )}
+
+          <DirektenListe
+            personen={direktenZeilen}
+            einheitenAn={einheitenAn}
+            monatLabel={monatLabel}
+            vormonatLabel={vormonatLabel}
+          />
+        </VorfuehrProvider>
+      )}
+
+      {/* Fuehrung zuerst, eigenes Geschaeft darunter (siehe Kommentar oben am
+          Lagebild) - der Kicker macht diesen Schnitt fuer eine Fuehrungskraft
+          sichtbar. Ohne eigene Leute faengt die Seite unveraendert direkt mit
+          der Einheiten-Karte an. */}
+      {lage && <h2 className={kickerStil}>Dein eigenes Geschäft</h2>}
+
       {/* AP-02: das Dashboard, das Emil wollte - Zahlen und Eintragen ganz
-          oben, nicht unter Wettbewerb. Nach dem Postfach: der Aufmacher der
+          oben, nicht unter Wettbewerb. Bei einer Fuehrungskraft direkt nach
+          dem Lagebild, sonst direkt nach dem Postfach: der Aufmacher der
           Seite bleibt Mensch, gleich danach die eigene Zahl. Immer da, keine
           Bedingung - ein Dashboard-Baustein ist keine Meldung. */}
       <EinheitenKarte
@@ -335,9 +687,9 @@ export default async function HeutePage() {
       />
 
       {/* AP-10: die proaktive Frage nach einem vergangenen Termin - noch vor
-          dem FK-Banner und dem Tagespensum. Sonst haette sie sich in der
-          Liste weiter unten versteckt, und genau das war Emils Anlass:
-          "du musst eintragen", nicht "du koenntest, wenn du scrollst". */}
+          dem Tagespensum. Sonst haette sie sich in der Liste weiter unten
+          versteckt, und genau das war Emils Anlass: "du musst eintragen",
+          nicht "du koenntest, wenn du scrollst". */}
       <TerminFrageKarte fragen={terminFragen} />
 
       {/* Fragt genau einmal und verschwindet danach fuer immer. Es gibt
@@ -345,95 +697,6 @@ export default async function HeutePage() {
           darauf ist ein Bildschirm zu viel. */}
       {meineFuehrung && (
         <NummerHinterlegen fuehrungskraft={meineFuehrung.name.split(" ")[0] ?? meineFuehrung.name} />
-      )}
-
-      {/* Fuehrung zuerst, eigenes Geschaeft darunter: ein stiller Partner
-          kostet mehr als ein liegengebliebener Anruf. Steht nur da, wenn
-          wirklich jemand rot ist - sonst waere es Tapete. */}
-      {brauchenDich.length > 0 && (
-        <Link
-          href="/mannschaft"
-          className={`${flaeche("gefahr")} flex items-start gap-3 p-4 transition hover:schatten-hoch sm:p-5`}
-        >
-          {/* Der einzige Punkt der Anwendung, der pulst. Wer wartet, wartet
-              nicht still. */}
-          <span
-            aria-hidden
-            className="mt-1.5 h-2.5 w-2.5 shrink-0 animate-halo rounded-full bg-red-500"
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-ink">
-              {brauchenDich.length === 1
-                ? `${brauchenDich[0]!.name} braucht dich`
-                : brauchenDich.length === 2
-                  ? `${brauchenDich[0]!.vorname} und ${brauchenDich[1]!.vorname} brauchen dich`
-                  : `${brauchenDich[0]!.vorname}, ${brauchenDich[1]!.vorname} und ${
-                      brauchenDich.length - 2
-                    } weitere brauchen dich`}
-            </span>
-            <span className="mt-0.5 block text-sm text-ink-muted">
-              {brauchenDich.length === 1
-                ? fuehrungsSchritt(brauchenDich[0]!)
-                : "Aus deiner Mannschaft. In der Übersicht steht, was jeweils ansteht."}
-            </span>
-          </span>
-          <span aria-hidden className="mt-0.5 shrink-0 text-ink-soft">
-            <ChevronRightIcon className="h-5 w-5" />
-          </span>
-        </Link>
-      )}
-
-      {/* AP-05: die Struktur in einer Zeile - unabhaengig davon, ob gerade
-          jemand rot ist. Das Banner darueber bleibt DER Alarm (eigene Farbe,
-          eigenes Gewicht, pulst); diese Zeile ist bewusst leiser gehalten
-          (Kartenfarbe wie jede andere Karte, kein Puls) und damit der
-          neutrale Gesamtüberblick, den Emil fuer Fuehrungskraefte wollte.
-          Steht nur da, wenn `gefuehrte > 0` - wer niemanden fuehrt, sieht
-          hier exakt nichts Neues. */}
-      {struktur && (
-        <Link
-          href="/mannschaft"
-          className={`${cardInteractive} flex items-center gap-3 px-4 py-3 sm:px-5 sm:py-3.5`}
-        >
-          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <span className="font-medium text-ink-muted">Deine Struktur:</span>
-            <span className="inline-flex items-center gap-1.5 font-semibold tabular-nums text-ink">
-              <Ampel ampel="gruen" variante="punkt" />
-              {struktur.gruen}
-            </span>
-            <span aria-hidden className="text-ink-soft">
-              ·
-            </span>
-            <span className="inline-flex items-center gap-1.5 font-semibold tabular-nums text-ink">
-              <Ampel ampel="gelb" variante="punkt" />
-              {struktur.gelb}
-            </span>
-            <span aria-hidden className="text-ink-soft">
-              ·
-            </span>
-            <span className="inline-flex items-center gap-1.5 font-semibold tabular-nums text-ink">
-              <Ampel ampel="rot" variante="punkt" />
-              {struktur.rot}
-            </span>
-            {/* Platzhalter sind keine schlechte Ampel, sondern gar keine -
-                deshalb eigenes Wort statt einer vierten stummen Zahl neben
-                Rot, mit der sie sonst verschmelzen wuerden. */}
-            {struktur.grau > 0 && (
-              <>
-                <span aria-hidden className="text-ink-soft">
-                  ·
-                </span>
-                <span className="inline-flex items-center gap-1.5 tabular-nums text-ink-soft">
-                  <Ampel ampel="grau" variante="punkt" />
-                  {struktur.grau} wartet
-                </span>
-              </>
-            )}
-          </span>
-          <span aria-hidden className="shrink-0 text-ink-soft">
-            <ChevronRightIcon className="h-4 w-4" />
-          </span>
-        </Link>
       )}
 
       {/* Beim Oeffnen steht da, was heute zu tun ist - als Zahl, nicht als
