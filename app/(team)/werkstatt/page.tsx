@@ -16,7 +16,7 @@ import {
   th,
   type Ton,
 } from "@/components/ui";
-import { MegafonIcon } from "@/components/icons";
+import { BellIcon, MegafonIcon } from "@/components/icons";
 import { OFFENE_STAENDE } from "@/lib/rueckmeldung";
 import {
   KARRIERESTUFE_MAX,
@@ -79,6 +79,7 @@ export default async function WerkstattPage() {
     einstellungenDa,
     fokusProzent,
     kriterien,
+    offeneAnfragen,
   ] = await Promise.all([
     prisma.feature.findMany({ orderBy: { titel: "asc" } }),
     prisma.featureUse.findMany({
@@ -116,6 +117,7 @@ export default async function WerkstattPage() {
     // Die Ampel-Kriterien (D4, dritter Wert) - teilt sich dieselbe eine
     // Einstellung-Abfrage wie die beiden darueber.
     ampelKriterien(),
+    prisma.anfrage.count({ where: { erledigtAt: null } }),
   ]);
 
   const kopfZahl = new Map<string, Set<string>>();
@@ -160,6 +162,27 @@ export default async function WerkstattPage() {
         </span>
         <span className={cn(chip(offeneMeldungen > 0 ? "gefahr" : "neutral"), "ml-auto")}>
           {offeneMeldungen} offen
+        </span>
+      </Link>
+
+      {/* Was von AUSSEN kommt: die oeffentliche Anfrage-Seite (/anfrage). Der
+          Unterschied zur Rueckmeldung eine Karte hoeher: dort spricht das
+          Team, hier klopft jemand an, der noch gar nicht drin ist. */}
+      <Link
+        href="/werkstatt/anfragen"
+        className={cn(cardInteractive, "flex items-center gap-3 p-4")}
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-50 text-navy-600">
+          <BellIcon className="h-5 w-5" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-ink">Anfragen von außen</span>
+          <span className="block text-13 text-ink-muted">
+            Wer über /anfrage einen Zugang will.
+          </span>
+        </span>
+        <span className={cn(chip(offeneAnfragen > 0 ? "info" : "neutral"), "ml-auto")}>
+          {offeneAnfragen} offen
         </span>
       </Link>
 
