@@ -4,14 +4,26 @@
 // (Initialen, vom Server via lib/vorfuehren.ts vorgerechnet), solange der
 // Vorfuehr-Schalter an ist - sonst den echten Namen (Lagebild-Plan).
 //
-// Die Kuerzel rechnet die Server-Seite, nicht diese Komponente:
-// initialenKuerzel() braucht die ganze Namensliste auf einmal, um
-// Kollisionen zu erkennen - eine einzelne GpName-Instanz kennt nur sich
-// selbst.
+// Die Kuerzel rechnet idealerweise die Server-Seite: initialenKuerzel()
+// braucht die ganze Namensliste auf einmal, um Kollisionen zu erkennen -
+// eine einzelne GpName-Instanz kennt nur sich selbst.
+//
+// `kurz` ist trotzdem optional: Aufrufer ohne Server-Map (z. B. die
+// MannschaftsMatrix, bis die Mannschafts-Seite die Map durchreicht) bekommen
+// einfache Initialen ohne Kollisionsaufloesung - zwei "M. W." nebeneinander
+// sind beim Vorfuehren verschmerzbar, ein echter Name waere es nicht.
 
 import { useVorfuehren } from "@/components/VorfuehrProvider";
 
-export default function GpName({ name, kurz }: { name: string; kurz: string }) {
+/** "Marc Weber" -> "M. W." - der Fallback ohne Kollisionsaufloesung. */
+function einfacheInitialen(name: string): string {
+  const teile = name.trim().split(/\s+/).filter(Boolean);
+  if (teile.length === 0) return "—";
+  return teile.map((teil) => `${teil[0]}.`).join(" ");
+}
+
+export default function GpName({ name, kurz }: { name: string; kurz?: string }) {
   const { aktiv } = useVorfuehren();
-  return <>{aktiv ? kurz : name}</>;
+  if (!aktiv) return <>{name}</>;
+  return <>{kurz ?? einfacheInitialen(name)}</>;
 }
