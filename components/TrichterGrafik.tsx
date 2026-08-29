@@ -4,25 +4,26 @@
 //
 // Vier Festlegungen, die den Rest erklaeren (Vorlage: components/VerlaufsChart.tsx):
 //
-// 1. DIE FORM STEHT FEST, DIE FUELLUNG TRAEGT DIE ZAHL. Die vier Trapeze und
-//    ihre drei Verbindungsstuecke haben immer dieselbe Geometrie - egal ob
-//    eine Stufe bei 0 oder bei 400 steht. Waere die Form selbst die Auskunft
-//    (schmaler = weniger), saehe der Trichter am ersten Arbeitstag wie kaputt
-//    aus, und zwei Berater mit unterschiedlich viel Volumen waeren nicht mehr
-//    vergleichbar - der eine haette einen Pfeil, der andere ein Fass. Die
-//    Menge steckt stattdessen allein in `fillOpacity` (0.15 + 0.65 * anteil)
-//    und in der Zahl daneben. Bei anteil 0 bleibt eine Mindestfuellung von
-//    0.15 - der Trichter kollabiert nicht bei Nullen.
+// 1. DIE BREITE IST DIE AUSSAGE. Jedes Band ist so breit wie seine Zahl im
+//    Verhaeltnis zur groessten Stufe - die Schraege zwischen zwei Baendern IST
+//    die Quote. Ein Trichter, dessen Stufen alle gleich breit sind, zeigt
+//    nichts; man muss sehen, wo es eng wird. Damit ein leeres Band nicht auf
+//    Null zusammenfaellt, gibt es eine Mindestbreite (HALB_MIN): eine Spitze,
+//    die man noch sieht, aber nicht mehr verwechselt.
+//    FOLGE DARAUS: Die Beschriftung kann nicht mehr im Band stehen - bei
+//    6 Anrufen auf 0 Abschluesse ist das unterste Band schmaler als das Wort
+//    "Abschluesse". Sie steht deshalb MITTIG auf der Trichterachse: dort wirkt
+//    sie bei jeder Breite gesetzt statt danebengerutscht, und die Zahl darf
+//    gross werden.
 // 2. KEINE SCHRIFT, KEIN HEX IN DER ZEICHNUNG. Dieselbe Ueberlegung wie im
 //    Verlauf: Text im SVG skaliert falsch, und ein Hex-Wert wuerde den
 //    Dunkelmodus nicht mitbekommen. Jede Farbe kommt ueber `currentColor` von
 //    einer Tailwind-Textklasse (text-akzent, text-red-500), jede Beschriftung
 //    steht als HTML ueber der Zeichnung.
-// 3. HTML UND SVG TEILEN SICH DIESELBEN KONSTANTEN. Die Positionen der
-//    tippbaren Reihen werden nicht geschaetzt, sondern aus genau denselben
-//    Zahlen gerechnet, die auch die Pfade zeichnen (STUFEN_BAENDER,
-//    GAP_BAENDER). Zwei getrennte Rechnungen liefen frueher oder spaeter
-//    auseinander.
+// 3. HTML UND SVG TEILEN SICH DIESELBE RECHNUNG. Die Positionen der tippbaren
+//    Reihen werden nicht geschaetzt, sondern aus genau denselben Baendern
+//    gelesen, die auch die Pfade zeichnen (`baender`, `naehte`). Zwei getrennte
+//    Rechnungen liefen frueher oder spaeter auseinander.
 // 4. EIN TIPP OEFFNET EIN PANEL, ER NAVIGIERT NICHT WEG. Wer wissen will,
 //    woran eine Stufe hakt, soll es unter der Grafik lesen koennen, ohne die
 //    Uebersicht zu verlassen - Titel, Wert, Hinweis, eigene Quote gegen Team,
@@ -51,7 +52,7 @@ export type TrichterStufe = {
   key: string;
   titel: string;
   wert: number;
-  /** wert / groesste. Bestimmt NUR die Fuellung - nie die Form, siehe Kopf. */
+  /** wert / groesste (0..1). Bestimmt die BREITE des Bandes - siehe Kopf, Punkt 1. */
   anteil: number;
   hinweis: string;
   /** null nur bei der ersten Stufe - sie hat keine Vorstufe, aus der sich
@@ -65,25 +66,23 @@ export type TrichterStufe = {
 // Uebergangszeile sitzt). BREITE und HOEHE sind ein Rechenraster, keine
 // Pixelangabe - das SVG wird per CSS auf die Kartenbreite und eine feste
 // Hoehe gezogen (preserveAspectRatio="none"), wie im Verlauf.
-// Die Verjuengung ist bewusst flach: Sie muss als Trichter lesbar sein UND
-// unten noch "Termine gehalten" samt Zahl tragen. Ein spitzer Trichter sieht
-// als Zeichnung besser aus, draengt die Beschriftung am Handy aber aus der
-// Form heraus - dann steht der Text neben der Grafik statt darin, und genau
-// das war an der ersten Fassung das Problem.
 const BREITE = 360;
 const SEG_H = 64;
 const GAP_H = 30;
-const HALBBREITEN = [172, 148, 126, 108, 94] as const;
 const HOEHE = 4 * SEG_H + 3 * GAP_H;
 
-/**
- * Die Deckkraft einer Stufe - hier steckt die Menge, nie in der Form.
- *
- * Nach oben gedeckelt: auf der vollsten Stufe steht heller Text auf der
- * Fuellung, und bei voller Deckkraft verliert er den Kontrast. Der Abstand
- * zwischen leer (0.14) und voll (0.60) reicht zum Vergleichen voellig.
- */
-const fuellung = (anteil: number) => 0.14 + 0.46 * anteil;
+// Die groesste Stufe fuellt die Breite fast aus, die kleinste behaelt eine
+// sichtbare Spitze. HALB_MIN ist keine Kosmetik: ohne sie waere eine Stufe auf
+// 0 gar nicht mehr da, und der Trichter endete im Nichts statt in einem
+// erkennbaren "hier kommt nichts an".
+const HALB_MAX = 172;
+const HALB_MIN = 24;
+
+/** Halbe Bandbreite einer Stufe - HIER steckt die Menge (siehe Kopf, Punkt 1). */
+function halbFuer(anteil: number): number {
+  const sicher = Math.max(0, Math.min(1, anteil));
+  return HALB_MIN + (HALB_MAX - HALB_MIN) * sicher;
+}
 
 /** Ein Trapez von (yOben, halbOben) nach (yUnten, halbUnten), um die
  *  Mittelachse gespiegelt. Mit halbOben === halbUnten wird daraus ein
@@ -104,22 +103,36 @@ function trapezPfad(
   ].join(" ");
 }
 
-const STUFEN_BAENDER = [0, 1, 2, 3].map((i) => {
-  const yOben = i * (SEG_H + GAP_H);
-  return {
-    yOben,
-    yUnten: yOben + SEG_H,
-    halbOben: HALBBREITEN[i],
-    halbUnten: HALBBREITEN[i + 1],
-  };
-});
-
-const GAP_BAENDER = [0, 1, 2].map((i) => {
-  const yOben = i * (SEG_H + GAP_H) + SEG_H;
-  return { yOben, yUnten: yOben + GAP_H, halb: HALBBREITEN[i + 1] };
-});
+/**
+ * Aus den Stufen die Geometrie: je Stufe ein Trapez von der eigenen Breite auf
+ * die der naechsten Stufe, dazwischen die Naht als Rechteck in genau dieser
+ * naechsten Breite. So ist die Schraege eines Bandes die Quote zur Folgestufe -
+ * und die Zeichnung bleibt ein durchgehender Umriss ohne Absatz.
+ *
+ * Die unterste Stufe hat keine Folgestufe und laeuft deshalb gerade aus: sie
+ * ist der Auffang, nicht der naechste Verlust.
+ */
+function geometrieVon(stufen: TrichterStufe[]) {
+  const kanten = stufen.map((stufe) => halbFuer(stufe.anteil));
+  const letzte = kanten[kanten.length - 1] ?? HALB_MIN;
+  const baender = stufen.map((_, i) => {
+    const yOben = i * (SEG_H + GAP_H);
+    return {
+      yOben,
+      yUnten: yOben + SEG_H,
+      halbOben: kanten[i] ?? HALB_MIN,
+      halbUnten: kanten[i + 1] ?? letzte,
+    };
+  });
+  const naehte = stufen.slice(0, -1).map((_, i) => {
+    const yOben = i * (SEG_H + GAP_H) + SEG_H;
+    return { yOben, yUnten: yOben + GAP_H, halb: kanten[i + 1] ?? letzte };
+  });
+  return { baender, naehte };
+}
 
 export default function TrichterGrafik({ stufen }: { stufen: TrichterStufe[] }) {
+  const { baender, naehte } = geometrieVon(stufen);
   // Welche Stufe gerade aufgeklappt ist - antippen toggelt, nur eine auf
   // einmal.
   const [ausgewaehlt, setAusgewaehlt] = useState<string | null>(null);
@@ -140,28 +153,20 @@ export default function TrichterGrafik({ stufen }: { stufen: TrichterStufe[] }) 
           aria-hidden="true"
           className="block h-full w-full text-akzent"
         >
-          {STUFEN_BAENDER.map((band, i) => {
+          {baender.map((band, i) => {
             const stufe = stufen[i];
             if (!stufe) return null;
             const istGewaehlt = stufe.key === ausgewaehlt;
-            // Zuschlag beim Antippen kommt oben drauf, nicht anstelle -
-            // sonst wuerde eine leere Stufe beim Auswaehlen unveraendert
-            // schwach bleiben, obwohl sie gerade im Fokus steht.
-            const basis = fuellung(stufe.anteil) + (istGewaehlt ? 0.15 : 0);
-            // Das Engpass-Segment ist die Botschaft der Grafik. Steht die
-            // Stufe bei 0, waere es mit der Grundfuellung praktisch
-            // unsichtbar - und der Puls dimmt sie zusaetzlich. Deshalb hier
-            // eine eigene Untergrenze, damit das Rot wirklich leuchtet.
-            const deckkraft = Math.min(
-              1,
-              stufe.uebergang?.engpass ? Math.max(basis, 0.45) : basis
-            );
+            // Gleichmaessige Fuellung: Die Menge steht schon in der Breite.
+            // Wuerde die Deckkraft dasselbe noch einmal sagen, waeren die
+            // unteren Stufen doppelt bestraft - schmal UND blass, also kaum
+            // noch zu sehen.
             return (
               <path
                 key={stufe.key}
                 d={trapezPfad(band.yOben, band.yUnten, band.halbOben, band.halbUnten)}
                 fill="currentColor"
-                fillOpacity={deckkraft}
+                fillOpacity={istGewaehlt ? 0.7 : 0.5}
                 stroke={istGewaehlt ? "currentColor" : "none"}
                 strokeWidth={istGewaehlt ? 2 : 0}
                 vectorEffect="non-scaling-stroke"
@@ -169,34 +174,27 @@ export default function TrichterGrafik({ stufen }: { stufen: TrichterStufe[] }) 
               />
             );
           })}
-          {GAP_BAENDER.map((band, i) => {
-            // Die Luecke faerbt sich wie die Stufe, in die sie muendet - ein
-            // durchgehender Verlauf statt eines Bruchs an der Naht.
-            const stufeDanach = stufen[i + 1];
-            if (!stufeDanach) return null;
-            return (
-              <path
-                key={`luecke-${i}`}
-                d={trapezPfad(band.yOben, band.yUnten, band.halb, band.halb)}
-                fill="currentColor"
-                fillOpacity={fuellung(stufeDanach.anteil)}
-              />
-            );
-          })}
+          {naehte.map((naht, i) => (
+            // Die Naht faerbt sich wie die Stufe, in die sie muendet - ein
+            // durchgehender Umriss statt eines Bruchs an der Kante.
+            <path
+              key={`naht-${i}`}
+              d={trapezPfad(naht.yOben, naht.yUnten, naht.halb, naht.halb)}
+              fill="currentColor"
+              fillOpacity={0.5}
+              className={cn(stufen[i + 1]?.uebergang?.engpass && "text-red-500")}
+            />
+          ))}
         </svg>
 
         {/* HTML-Overlay: vier tippbare Reihen, dazwischen drei
             Uebergangszeilen. Alles ausser den Knoepfen pointer-events-none -
             siehe Festlegung 2 im Kopf. */}
         {stufen.map((stufe, i) => {
-          const band = STUFEN_BAENDER[i];
+          const band = baender[i];
           if (!band) return null;
           const naechste = stufen[i + 1];
-          const gapBand = GAP_BAENDER[i];
-          // Die Zeile endet an der Trichterkante, nicht am Kartenrand -
-          // bemessen an der SCHMALSTEN Stelle des Segments (der Unterkante),
-          // damit sie auf ihrer ganzen Hoehe innerhalb der Form bleibt.
-          const rand = `${((BREITE / 2 - band.halbUnten) / BREITE) * 100}%`;
+          const gapBand = naehte[i];
           return (
             <Fragment key={stufe.key}>
               <button
@@ -209,16 +207,12 @@ export default function TrichterGrafik({ stufen }: { stufen: TrichterStufe[] }) 
                 style={{
                   top: `${(band.yOben / HOEHE) * 100}%`,
                   height: `${((band.yUnten - band.yOben) / HOEHE) * 100}%`,
-                  left: rand,
-                  right: rand,
                   animationDelay: `${i * 90}ms`,
                 }}
-                className="animate-rise absolute flex min-h-11 items-center justify-between gap-2 rounded-lg px-3 text-left transition hover:bg-sunken/40 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent"
+                className="animate-rise absolute inset-x-0 flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg px-3 text-center transition hover:bg-sunken/25 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent"
               >
-                <span className="truncate text-sm font-medium text-ink">
-                  {stufe.titel}
-                </span>
-                <span className="shrink-0 text-base font-semibold tabular-nums text-ink">
+                <span className="text-xs font-medium text-ink-muted">{stufe.titel}</span>
+                <span className="text-2xl leading-none font-semibold tabular-nums text-ink">
                   {stufe.wert}
                 </span>
               </button>
