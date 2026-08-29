@@ -15,13 +15,13 @@ import { ebene, elternIdVon } from "@/lib/struktur";
 import { berlinToday, dayToUtcDate, startOfMonth, startOfWeek } from "@/lib/dates";
 import { quotaTypePoints } from "@/lib/labels";
 import {
-  SCHWELLEN,
   ampelVon,
   dringlichkeit,
   signaleFuer,
   type Ampel,
   type Signal,
 } from "@/lib/signale";
+import { ampelKriterien } from "@/lib/ampelKriterien";
 import { starterpassStand } from "@/lib/starterpass";
 import { einblickFuer, type Einblick } from "@/lib/einblick";
 import { statusVon } from "@/lib/einladung";
@@ -233,8 +233,12 @@ export async function mannschaftsLage(betrachter: {
   const heuteStart = dayToUtcDate(heute);
   const wochenStart = startOfWeek(heute);
   const monatsStart = startOfMonth(heute);
-  const vierzehnTage = new Date(Date.now() - SCHWELLEN.terminFensterTage * TAG_MS);
-  const dreissigTage = new Date(Date.now() - SCHWELLEN.empfehlungTage * TAG_MS);
+  // Die Kriterien kommen seit der Multiplikations-Runde aus der Werkstatt
+  // (lib/ampelKriterien.ts); ohne Eintrag gilt weiter der Platzhalter aus
+  // lib/signale.ts. Einmal je Lage geladen, gilt fuer Zeitfenster UND Signale.
+  const schwellen = await ampelKriterien();
+  const vierzehnTage = new Date(Date.now() - schwellen.terminFensterTage * TAG_MS);
+  const dreissigTage = new Date(Date.now() - schwellen.empfehlungTage * TAG_MS);
   const rueckblick = new Date(Date.now() - RUECKBLICK_TAGE * TAG_MS);
   // Eine Abfrage fuer drei Zeitfenster: ab dem fruehesten holen, danach in
   // JavaScript in Woche / 14 Tage / Monat einsortieren.
@@ -538,21 +542,24 @@ export async function mannschaftsLage(betrachter: {
     const platzhalter = person.passwordHash === null;
     const angekommen = person.onboardingDoneAt !== null;
     const tageDabei = person.startedAt ? tageSeit(person.startedAt) : null;
-    const signale = signaleFuer({
-      platzhalter,
-      tageSeitAktivitaet: w.letzteAktivitaet ? tageSeit(w.letzteAktivitaet) : null,
-      termineVereinbart14: w.vereinbart14,
-      termineGehalten14: w.gehalten14,
-      termineGehaltenMonat: w.gehaltenMonat,
-      abschluesseMonat: w.abschluesseMonat,
-      abschluesseGesamt: w.abschluesseGesamt,
-      tageDabei,
-      angekommen,
-      pipelineSichtbar,
-      kontakteInAkquise: w.inAkquise,
-      ueberfaelligeSchritte: w.ueberfaellig,
-      termineOhneEmpfehlung: w.termineOhneEmpfehlung,
-    });
+    const signale = signaleFuer(
+      {
+        platzhalter,
+        tageSeitAktivitaet: w.letzteAktivitaet ? tageSeit(w.letzteAktivitaet) : null,
+        termineVereinbart14: w.vereinbart14,
+        termineGehalten14: w.gehalten14,
+        termineGehaltenMonat: w.gehaltenMonat,
+        abschluesseMonat: w.abschluesseMonat,
+        abschluesseGesamt: w.abschluesseGesamt,
+        tageDabei,
+        angekommen,
+        pipelineSichtbar,
+        kontakteInAkquise: w.inAkquise,
+        ueberfaelligeSchritte: w.ueberfaellig,
+        termineOhneEmpfehlung: w.termineOhneEmpfehlung,
+      },
+      schwellen
+    );
     // Der Starterpass steht nur bei frisch Gestarteten und nur, solange er
     // nicht durch ist. Danach waere er eine Zeile, die nichts mehr sagt.
     const seitStart = person.onboardingDoneAt ? tageSeit(person.onboardingDoneAt) : null;

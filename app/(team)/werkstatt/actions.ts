@@ -11,6 +11,7 @@ import {
   schwellenSchluessel,
 } from "@/lib/einheiten";
 import { einstellungSetzen, ganzzahl } from "@/lib/einstellungen";
+import { AMPEL_FELDER } from "@/lib/ampelKriterien";
 import type { FeatureState } from "@/lib/generated/prisma/enums";
 
 const zustaende: FeatureState[] = ["TEST", "LAEUFT", "AUS", "ABGERISSEN"];
@@ -94,6 +95,38 @@ export async function schwellenSpeichern(formData: FormData) {
 // leere Schwelle oben) - fuer den Fokus-Marker gibt es keinen sinnvollen
 // "aus"-Zustand, nur einen Prozentsatz. Leer und Uebernehmen loescht die
 // Zeile und faellt auf den Platzhalter (50 %) zurueck.
+// Emils Ampel-Kriterien, ohne Deploy (docs/emil-feedback-plan.md, D4 und
+// Abschnitt 7, Punkt 4). Dieselben drei Festlegungen wie beim
+// Schwellen-Formular oben: leeres Feld loescht die Zeile (zurueck auf den
+// Platzhalter aus lib/signale.ts), nur eine Zahl im Sinnbereich wird
+// gespeichert, und was keine ist, laesst die gespeicherte Zeile in Ruhe.
+export async function ampelKriterienSpeichern(formData: FormData) {
+  await requireAdmin();
+
+  for (const eintrag of AMPEL_FELDER) {
+    const roh = formData.get(`ampel-${eintrag.feld}`);
+    if (typeof roh !== "string") continue;
+
+    if (!roh.trim()) {
+      await einstellungSetzen(eintrag.schluessel, null);
+      continue;
+    }
+
+    const zahl = ganzzahl(roh);
+    if (zahl === null) continue;
+    if (eintrag.prozent) {
+      if (zahl < 1 || zahl > 100) continue;
+    } else if (zahl < (eintrag.nullErlaubt ? 0 : 1)) {
+      continue;
+    }
+    await einstellungSetzen(eintrag.schluessel, String(zahl));
+  }
+
+  revalidatePath("/werkstatt");
+  revalidatePath("/mannschaft");
+  revalidatePath("/heute");
+}
+
 export async function fokusProzentsatzSpeichern(formData: FormData) {
   await requireAdmin();
 

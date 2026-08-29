@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
-import { SCHWELLEN } from "@/lib/signale";
+import { ampelKriterien } from "@/lib/ampelKriterien";
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
 import { pushEingerichtet, sendeMeldung } from "@/lib/push";
 import {
@@ -76,7 +76,11 @@ export async function GET(request: NextRequest) {
 
   const heute = berlinToday();
   const heuteStart = dayToUtcDate(heute);
-  const stilleGrenze = new Date(Date.now() - SCHWELLEN.stilleTage * TAG_MS);
+  // Dieselben Kriterien wie in der Mannschafts-Ampel (Werkstatt-Werte, sonst
+  // Platzhalter) - der Morgen-Anstoss darf nicht bei anderen Zahlen anschlagen
+  // als die Seite, auf die er zeigt.
+  const schwellen = await ampelKriterien();
+  const stilleGrenze = new Date(Date.now() - schwellen.stilleTage * TAG_MS);
 
   const [konten, faellig, offeneNamen, aktivHeute, termineHeute, liegende] =
     await Promise.all([
@@ -294,7 +298,7 @@ export async function GET(request: NextRequest) {
   // einen Konflikt.
   const nameVon = new Map(konten.map((konto) => [konto.id, konto.name]));
   const kontoVon = new Map(konten.map((konto) => [konto.id, konto]));
-  const ankunftGrenze = new Date(Date.now() - SCHWELLEN.ankunftFristTage * TAG_MS);
+  const ankunftGrenze = new Date(Date.now() - schwellen.ankunftFristTage * TAG_MS);
 
   const auffaellig = (konto: (typeof konten)[number]): string | null => {
     // Wer den Start nie beendet hat, ist der haeufigste stille Abgang - und

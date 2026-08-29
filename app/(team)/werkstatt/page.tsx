@@ -26,7 +26,13 @@ import {
   formatEinheiten,
 } from "@/lib/einheiten";
 import { einstellungenStehen } from "@/lib/einstellungen";
-import { fokusProzentsatzSpeichern, schalten, schwellenSpeichern } from "./actions";
+import { AMPEL_FELDER, ampelAnzeigewert, ampelKriterien } from "@/lib/ampelKriterien";
+import {
+  ampelKriterienSpeichern,
+  fokusProzentsatzSpeichern,
+  schalten,
+  schwellenSpeichern,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +78,7 @@ export default async function WerkstattPage() {
     schwellen,
     einstellungenDa,
     fokusProzent,
+    kriterien,
   ] = await Promise.all([
     prisma.feature.findMany({ orderBy: { titel: "asc" } }),
     prisma.featureUse.findMany({
@@ -106,6 +113,9 @@ export default async function WerkstattPage() {
     alleSchwellen(),
     einstellungenStehen(),
     fokusProzentsatz(),
+    // Die Ampel-Kriterien (D4, dritter Wert) - teilt sich dieselbe eine
+    // Einstellung-Abfrage wie die beiden darueber.
+    ampelKriterien(),
   ]);
 
   const kopfZahl = new Map<string, Set<string>>();
@@ -395,6 +405,80 @@ export default async function WerkstattPage() {
           Platzhalter, bis Emil liefert: 50 % (docs/emil-feedback-plan.md,
           Abschnitt 7, Punkt 2). Leer lassen und übernehmen setzt wieder auf
           diesen Platzhalter zurück.
+        </p>
+      </div>
+
+      {/* --- Ampel-Kriterien -------------------------------------------------
+          Der dritte D4-Wert (docs/emil-feedback-plan.md, Abschnitt 7,
+          Punkt 4): ab wann die Mannschafts-Ampel gelb oder rot zeigt. Bis
+          hierhin standen die Zahlen als Konstante in lib/signale.ts; jetzt
+          sind sie Platzhalter, und was hier steht, gewinnt - fuer die Matrix,
+          fuer /heute und fuer den Morgen-Anstoss gleichermassen
+          (lib/ampelKriterien.ts liest, beide Aufrufer rechnen damit). */}
+      <div className={`${card} p-5 sm:p-6`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className={sectionTitle}>Ampel-Kriterien</h2>
+          <span className="text-xs text-ink-muted">Frühwarnung auf /mannschaft</span>
+        </div>
+        <p className="mt-2 max-w-2xl text-sm text-ink-muted">
+          Ab welchen Zahlen ein Signal anspringt. Ein leeres Feld heißt: zurück
+          auf den Platzhalter aus dem Code. Die Ampel fällt nie aus — sie
+          rechnet höchstens wieder mit den alten Zahlen.
+        </p>
+
+        {!einstellungenDa && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-13 text-amber-800">
+            Die Tabelle steht auf dieser Datenbank noch nicht — die Migration
+            läuft beim nächsten Deploy mit. Bis dahin gelten die Platzhalter
+            aus dem Code, und Eintragen geht hier noch nicht.
+          </p>
+        )}
+
+        <form action={ampelKriterienSpeichern} className="mt-4 space-y-3">
+          {AMPEL_FELDER.map((eintrag) => (
+            <div
+              key={eintrag.feld}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1"
+            >
+              <label
+                htmlFor={`ampel-${eintrag.feld}`}
+                className="w-56 shrink-0 text-sm font-medium text-ink"
+              >
+                {eintrag.label}
+              </label>
+              <input
+                id={`ampel-${eintrag.feld}`}
+                name={`ampel-${eintrag.feld}`}
+                type="text"
+                inputMode="numeric"
+                defaultValue={ampelAnzeigewert(kriterien, eintrag)}
+                aria-label={eintrag.label}
+                className={cn(inputBlank, "w-24 tabular-nums")}
+              />
+              <span className="min-w-0 flex-1 text-xs text-ink-soft">
+                {eintrag.hinweis}
+              </span>
+            </div>
+          ))}
+          <div className="flex justify-end border-t border-line pt-4">
+            <button
+              type="submit"
+              disabled={!einstellungenDa}
+              className={cn(
+                btnSecondary,
+                "disabled:cursor-not-allowed disabled:opacity-40"
+              )}
+            >
+              Übernehmen
+            </button>
+          </div>
+        </form>
+
+        <p className="mt-4 text-xs text-ink-muted">
+          Nur ganze Zahlen; die Quote in Prozent (1–100). Steht ein Feld nach
+          dem Übernehmen wieder auf dem alten Wert, war die Eingabe keine
+          gültige Zahl — dann bleibt der gespeicherte Wert stehen, statt still
+          überschrieben zu werden.
         </p>
       </div>
 

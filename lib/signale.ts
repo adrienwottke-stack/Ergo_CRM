@@ -6,8 +6,12 @@
 //    Aufgaben verwandelt, hat nach zwei Wochen zweihundert davon und schaut
 //    nie wieder hin. Aus einem Signal wird erst dann etwas, wenn die
 //    Fuehrungskraft es antippt.
-// 2. Die Schwellwerte stehen hier oben an einer Stelle. Nach dem ersten echten
-//    Monat wird daran geschraubt, und dann will man nicht im Code suchen.
+// 2. Die Schwellwerte stehen hier oben an einer Stelle - als PLATZHALTER.
+//    Seit der Multiplikations-Runde pflegt sie der Admin in der Werkstatt
+//    (Tabelle "Einstellung", gelesen ueber lib/ampelKriterien.ts): Emils
+//    Ampel-Kriterien sind eine Frage an die Praxis, nicht an den Code (D4).
+//    Diese Datei bleibt absichtlich rein und prisma-frei - signaleFuer nimmt
+//    die Schwellen als Parameter und faellt ohne ihn auf die Konstante zurueck.
 // 3. Ein Signal, das bei einem Konto vom dritten Tag losgeht, verbrennt die
 //    ganze Ampel. Wer einmal "Lange gar nichts" bei jemandem gelesen hat, der
 //    vorgestern eingeladen wurde, glaubt der Farbe danach nicht mehr. Deshalb
@@ -32,6 +36,9 @@ export const SCHWELLEN = {
   // haeufigste stille Abgang ueberhaupt: eingeladen, nie gestartet.
   ankunftFristTage: 2,
 };
+
+/** Die Form der Kriterien - dieselbe fuer Konstante und Werkstatt-Werte. */
+export type AmpelSchwellen = typeof SCHWELLEN;
 
 export type Schwere = "rot" | "gelb";
 
@@ -88,7 +95,13 @@ function termine(anzahl: number): string {
   return `${anzahl} ${anzahl === 1 ? "Termin" : "Termine"}`;
 }
 
-export function signaleFuer(e: SignalEingabe): Signal[] {
+export function signaleFuer(
+  e: SignalEingabe,
+  // Der Parameter ist die Werkstatt-Fassung (lib/ampelKriterien.ts); ohne ihn
+  // gilt der Platzhalter oben. Bewusst KEIN Prisma-Import hier - die Datei
+  // soll sich ohne Datenbank durchdenken und pruefen lassen.
+  s: AmpelSchwellen = SCHWELLEN
+): Signal[] {
   const signale: Signal[] = [];
 
   // Ein Platzhalter schweigt vollstaendig - vor allem anderen, noch vor der
@@ -105,7 +118,7 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
   const tageDabei = e.tageDabei;
   // Frisch eingeladen: alles ausser der Ankunft schweigt. Sonst steht bei
   // jedem Neuen am zweiten Tag eine rote Ampel mit drei Vorwuerfen.
-  const frisch = tageDabei !== null && tageDabei < SCHWELLEN.schonungstage;
+  const frisch = tageDabei !== null && tageDabei < s.schonungstage;
 
   // Der haeufigste stille Abgang im Strukturvertrieb: eingeladen, Konto
   // angelegt, Start nie zu Ende gebracht. Das sieht in jeder Zahlenspalte aus
@@ -119,10 +132,10 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
           ? "Gerade erst dazugekommen"
           : `Seit ${dauer(wartet)} dabei, Start nie beendet`,
       schritt:
-        wartet <= SCHWELLEN.ankunftFristTage
+        wartet <= s.ankunftFristTage
           ? "Kurz anrufen und den Start gemeinsam durchgehen. Dauert drei Minuten."
           : "Nicht schreiben — anrufen. Wer hier hängen bleibt, meldet sich nie von selbst.",
-      schwere: wartet <= SCHWELLEN.ankunftFristTage ? "gelb" : "rot",
+      schwere: wartet <= s.ankunftFristTage ? "gelb" : "rot",
     });
     // Alles Weitere waere eine Auswertung eines Kontos, das nie gearbeitet hat.
     return signale;
@@ -132,7 +145,7 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
   // voraus, nicht schlechte Zahlen.
   if (
     !frisch &&
-    (e.tageSeitAktivitaet === null || e.tageSeitAktivitaet >= SCHWELLEN.stilleTage)
+    (e.tageSeitAktivitaet === null || e.tageSeitAktivitaet >= s.stilleTage)
   ) {
     signale.push({
       schluessel: "stille",
@@ -147,7 +160,7 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
 
   if (
     e.termineVereinbart14 >= 3 &&
-    e.termineGehalten14 / e.termineVereinbart14 < SCHWELLEN.gehaltenQuoteMin
+    e.termineGehalten14 / e.termineVereinbart14 < s.gehaltenQuoteMin
   ) {
     signale.push({
       schluessel: "termine_platzen",
@@ -158,7 +171,7 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
   }
 
   if (
-    e.termineGehaltenMonat >= SCHWELLEN.gehalteneTermineOhneAbschluss &&
+    e.termineGehaltenMonat >= s.gehalteneTermineOhneAbschluss &&
     e.abschluesseMonat === 0
   ) {
     signale.push({
@@ -173,8 +186,8 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
   // vorbei ist. An Tag drei ist "noch kein Abschluss" der Normalfall.
   if (
     tageDabei !== null &&
-    tageDabei >= SCHWELLEN.schonungstage * 2 &&
-    tageDabei <= SCHWELLEN.onboardingWochen * 7 &&
+    tageDabei >= s.schonungstage * 2 &&
+    tageDabei <= s.onboardingWochen * 7 &&
     e.abschluesseGesamt === 0
   ) {
     signale.push({
@@ -186,7 +199,7 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
   }
 
   if (e.pipelineSichtbar && !frisch) {
-    if (e.kontakteInAkquise < SCHWELLEN.pipelineMindestbestand) {
+    if (e.kontakteInAkquise < s.pipelineMindestbestand) {
       signale.push({
         schluessel: "pipeline_leer",
         titel:
@@ -198,7 +211,7 @@ export function signaleFuer(e: SignalEingabe): Signal[] {
       });
     }
 
-    if (e.ueberfaelligeSchritte > SCHWELLEN.ueberfaelligMax) {
+    if (e.ueberfaelligeSchritte > s.ueberfaelligMax) {
       signale.push({
         schluessel: "ueberfaellig",
         titel: `${e.ueberfaelligeSchritte} überfällige Schritte`,
