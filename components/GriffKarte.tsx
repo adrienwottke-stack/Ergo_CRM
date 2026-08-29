@@ -138,7 +138,7 @@ export default function GriffKarte({
       {weitere > 0 && (
         <Link
           href="/mannschaft"
-          className="block text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
+          className="flex min-h-11 items-center text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
         >
           +{weitere} weitere {weitere === 1 ? "braucht" : "brauchen"} dich — zur Mannschaft
         </Link>

@@ -140,7 +140,7 @@ export default function DirektenListe({
       <div className="mt-4 border-t border-line pt-3">
         <Link
           href="/mannschaft"
-          className="text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
         >
           Alle Ebenen und Zahlen — zur Mannschaft
         </Link>
