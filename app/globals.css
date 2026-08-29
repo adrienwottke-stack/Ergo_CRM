@@ -602,8 +602,9 @@ input[type="number"]::-webkit-outer-spin-button {
     }
   }
 
-  /* Nur fuer den roten Zustand "braucht dich". Ein einziger Punkt in der
-     ganzen App darf atmen, sonst wird die Seite unruhig. */
+  /* Nur fuer den roten Zustand "braucht dich". Atmen duerfen in der App nur
+     zwei Stellen - dieser Punkt und der Trichter-Engpass (engpass-puls,
+     unten) - sonst wird die Seite unruhig. */
   @keyframes halo {
     0%,
     100% {
@@ -669,6 +670,24 @@ input[type="number"]::-webkit-outer-spin-button {
 
   .animate-spruch {
     animation: spruch-auftritt 0.4s ease-out both;
+  }
+
+  /* Der Engpass im Trichter - die einzige Stufe, die von allen Uebergaengen
+     am schwaechsten ist. Anders als halo (Box-Shadow-Ping) atmet hier die
+     Deckkraft selbst: das Segment ist schon rot, der Puls zieht nur die
+     Aufmerksamkeit dorthin, wo es tatsaechlich hakt. */
+  @keyframes engpass-puls {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  .animate-engpass {
+    animation: engpass-puls 2.4s ease-in-out infinite;
   }
 }
 
