@@ -266,12 +266,12 @@ export default async function MannschaftPage({
     return {
       id: person.id,
       name: person.name,
-      // Seit ADR 0001 ist die ganze Instanz im Bild, nicht nur der eigene
-      // Ast - die echte Fuehrungskraft ueber dem Betrachter (und ueber jedem
-      // anderen) haengt also fast immer mit drin, `baulayout` haengt sie an
-      // der richtigen Stelle ein. Nur wer ganz ohne sichtbare Fuehrungskraft
-      // dasteht (echte Wurzel, oder eine deaktivierte Fuehrungskraft darueber)
-      // wird zu einem eigenen Baum daneben.
+      // Kein Sonderfall fuer den Betrachter selbst: haengt seine echte
+      // Fuehrungskraft nicht mit im Bild (der Normalfall - nur der eigene
+      // Ast ist sichtbar), macht `baulayout` ihn ohnehin zur Wurzel. Steht sie
+      // aber mit im Bild (Admin-Ansicht "gesamte Struktur"), muss der
+      // Betrachter dort auch wirklich unter ihr haengen - sonst zeigt das Bild
+      // eine andere Hierarchie als der Rest der Seite.
       elternId: elternIdVon(person.path),
       ampel: person.ampel,
       istDu: person.istDu,
@@ -281,18 +281,40 @@ export default async function MannschaftPage({
       fuehrt: person.fuehrt,
       kopf: kopfzeile(person),
       ast: astZeile,
+      istUeber: false,
     };
   });
 
-  // Unter wen darf gehaengt werden: der eigene Ast, man selbst zuerst. NICHT
-  // `lage.baum` (seit ADR 0001 die ganze Instanz) - sonst koennte man sich
-  // Leute unter eine fremde Fuehrungskraft haengen, und der Server-Riegel in
-  // actions.ts (personAufnehmen, gegen strukturKonten) wiese das ohnehin ab.
+  // Die Kette ueber dem Betrachter obendrauf - Wurzel zuerst, direkter Chef
+  // direkt ueber "Du". In der Admin-Ansicht "gesamte Struktur" steht sie
+  // unter Umstaenden schon in `knoten` (dort ist jeder mit im Bild, echt
+  // verknuepft ueber den Pfad) - dann bleibt sie aussen vor, sonst haengt
+  // derselbe Mensch zweimal im Bild.
+  const bekannteIds = new Set(knoten.map((k) => k.id));
+  const ueberDir: OrgaKnoten[] = lage.oben.some((person) => bekannteIds.has(person.id))
+    ? []
+    : lage.oben.map((person, i, liste) => ({
+        id: person.id,
+        name: person.name,
+        elternId: i === 0 ? null : liste[i - 1]!.id,
+        ampel: "gruen",
+        istDu: false,
+        platzhalter: false,
+        eingeladen: false,
+        ausgetreten: false,
+        fuehrt: 0,
+        kopf: "",
+        ast: null,
+        istUeber: true,
+      }));
+  knoten.unshift(...ueberDir);
+
+  // Unter wen darf gehaengt werden: der eigene Ast, man selbst zuerst.
   // Platzhalter sind erlaubt - eine geplante Ebene bekommt ihre Leute, bevor
   // sie selbst ein Konto hat.
   const fuehrungen = [
     { id: lage.ich.id, name: lage.ich.name || "Du", istDu: true },
-    ...lage.leute
+    ...lage.baum
       .filter((person) => !person.ausgetreten)
       .map((person) => ({ id: person.id, name: person.name, istDu: false })),
   ];
@@ -321,16 +343,21 @@ export default async function MannschaftPage({
           die Abschnitte darunter zu scrollen. Reine Anzeige derselben Daten,
           die "Heute dran" & Co. weiter unten ohnehin schon laden. */}
       <MannschaftsMatrix
-        personen={lage.baum}
+        personen={lage.leute}
         einheiten={einheiten}
         zeigeEinheiten={zeigeEinheiten}
       />
 
+      {lage.fuehrtNiemanden && lage.gesamtstruktur && (
+        <p className="rounded-lg bg-sunken px-3 py-2 text-sm text-ink-muted">
+          Du führst selbst niemanden – als Admin siehst du hier trotzdem die
+          gesamte Struktur.
+        </p>
+      )}
+
       {lage.fuehrtNiemanden && (
         <div className={`${card} p-6`}>
-          <p className="text-sm font-medium text-ink">
-            Du führst niemanden — die Struktur siehst du trotzdem.
-          </p>
+          <p className="text-sm font-medium text-ink">Noch niemand in deiner Struktur</p>
           <p className="mt-1 text-sm text-ink-muted">
             Unter{" "}
             <Link href="/einladen" className="font-medium text-navy-700 hover:underline">
@@ -564,10 +591,11 @@ export default async function MannschaftPage({
           Baumreihenfolge, Direkte prominent, Tiefe eingerueckt und mit dem
           Namen der Fuehrungskraft davor. Wer hier steht, ist bereits oben
           abgehandelt - das hier ist zum Nachsehen, nicht zum Entscheiden. */}
-      <section className="space-y-3">
+      {!lage.fuehrtNiemanden && (
+        <section className="space-y-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h2 className={kicker}>
-              Gesamte Struktur ({lage.baum.length})
+              {lage.gesamtstruktur ? "Gesamte Struktur" : "Deine Struktur"} ({lage.baum.length})
             </h2>
             <div className="ml-auto flex flex-wrap items-center gap-1.5">
               {/* Zwei Sichten auf dieselbe Struktur. Das Bild beantwortet
@@ -602,10 +630,7 @@ export default async function MannschaftPage({
                   className={`${card} p-4 scroll-mt-24 sm:p-5 ${
                     person.tiefe > 1 ? "border-l-2 border-l-line" : ""
                   }`}
-                  // Seit `tiefe` absolut zaehlt (ADR 0001), koennen echte
-                  // Wurzeln mit tiefe 0 in dieser Liste stehen - ohne den
-                  // Max-Riegel gaebe "tiefe - 1" dort einen negativen Einzug.
-                  style={{ marginLeft: `${Math.max(0, Math.min(person.tiefe - 1, 3)) * 12}px` }}
+                  style={{ marginLeft: `${Math.min(person.tiefe - 1, 3) * 12}px` }}
                 >
                   <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                     <span className="flex items-center gap-2">
@@ -729,6 +754,7 @@ export default async function MannschaftPage({
           </ul>
           )}
         </section>
+      )}
 
       {/* --- Einheiten in der Struktur ---------------------------------------
           Die Zahl, in der der Betrieb rechnet - hier je Kopf aufgeschluesselt.
@@ -738,7 +764,7 @@ export default async function MannschaftPage({
       {zeigeEinheiten && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h2 className={kicker}>Einheiten in der Struktur</h2>
+            <h2 className={kicker}>Einheiten in deiner Struktur</h2>
             <span className="text-xs text-ink-muted">
               {produktionsmonat(berlinToday()).label} · selbst gemeldet
             </span>
@@ -819,19 +845,13 @@ export default async function MannschaftPage({
                           <span className="text-ink-soft">—</span>
                         ) : (
                           <div className="flex items-center justify-end gap-2">
-                            {/* Die Breite steht am Huellen-div, nicht als
-                                className am Balken: Fortschritt bringt selbst
-                                "w-full" mit, und cn() ist ein reines
-                                Zusammenfuegen ohne tailwind-merge (ui.ts) -
-                                beide Klassen blieben stehen und w-full gewaenne. */}
-                            <div className="w-16 shrink-0">
-                              <Fortschritt
-                                anteil={anteil}
-                                ton={anteil * 100 > fokusProzent ? "warnung" : "info"}
-                                hoehe="normal"
-                                beschriftung={`${person.name}: ${Math.round(anteil * 100)} Prozent der Struktur-Summe`}
-                              />
-                            </div>
+                            <Fortschritt
+                              anteil={anteil}
+                              ton={anteil * 100 > fokusProzent ? "warnung" : "info"}
+                              hoehe="normal"
+                              className="w-16"
+                              beschriftung={`${person.name}: ${Math.round(anteil * 100)} Prozent der Struktur-Summe`}
+                            />
                             <span className="w-10 shrink-0 tabular-nums text-ink-muted">
                               {Math.round(anteil * 100)} %
                             </span>

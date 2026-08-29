@@ -208,8 +208,7 @@ export default async function PersonPage({
   const lage = await astLage(user, id);
   if (!lage) notFound();
 
-  const { person, imEigenenAst, ast, direkte, summe, koepfe, wartende, offen, verdeckt } =
-    lage;
+  const { person, ast, direkte, summe, koepfe, wartende, offen, verdeckt } = lage;
   const fuehrt = ast.length > 0;
 
   // Der Verlauf umfasst die Person UND ihren Ast - aber nur die, deren Namen
@@ -266,11 +265,6 @@ export default async function PersonPage({
           {" · "}
           {person.einblick.hinweis}
         </p>
-        {/* Sehen darf jeder (ADR 0001) - die Knoepfe unten bleiben trotzdem
-            dem eigenen Ast vorbehalten. Diese Zeile sagt, warum sie fehlen. */}
-        {!imEigenenAst && (
-          <p className="mt-1 text-xs text-ink-soft">Nicht dein Ast — du siehst hier nur zu.</p>
-        )}
       </div>
 
       {/* --- Zuletzt und als Naechstes ---------------------------------------
@@ -284,19 +278,14 @@ export default async function PersonPage({
             Hier bleibt es leer, bis er sein Konto hat — Nullen wären eine
             Behauptung über jemanden, der nie gefragt wurde.
           </p>
-          {/* Nachreichen ist eine Handlung am eigenen Ast, keine Auskunft -
-              bei einem fremden Platzhalter bleibt es bei der Auskunft oben.
-              `einladungsCode` ist fuer ihn ohnehin schon null (lib/fuehrung.ts). */}
-          {imEigenenAst && (
-            <div className="mt-3">
-              <EinladungNachreichen
-                fuerId={person.id}
-                name={person.vorname}
-                vorhandenerCode={person.einladungsCode}
-                herkunft={herkunft}
-              />
-            </div>
-          )}
+          <div className="mt-3">
+            <EinladungNachreichen
+              fuerId={person.id}
+              name={person.vorname}
+              vorhandenerCode={person.einladungsCode}
+              herkunft={herkunft}
+            />
+          </div>
         </section>
       ) : (
         <section className={`${card} space-y-2 p-4 sm:p-5`}>
@@ -340,12 +329,8 @@ export default async function PersonPage({
           Bei einem Platzhalter faellt das ganze Stueck weg: "Laeuft." waere
           eine Bewertung von jemandem, der nie gefragt wurde, und ein
           Anruf-Knopf zeigte auf eine Nummer, die eine Fuehrungskraft
-          eingetragen hat statt er selbst.
-
-          Bei einer fremden Person (nicht `imEigenenAst`, ADR 0001) faellt es
-          ebenso weg: "Dein Schritt" waere hier eine Handlungsaufforderung an
-          jemanden, der diese Person gar nicht fuehrt. */}
-      {!person.platzhalter && imEigenenAst && (
+          eingetragen hat statt er selbst. */}
+      {!person.platzhalter && (
       <section className={`${card} p-4 sm:p-5`}>
         <h2 className={kicker}>Dein Schritt</h2>
         <p className="mt-1.5 text-sm text-ink">{fuehrungsSchritt(person)}</p>

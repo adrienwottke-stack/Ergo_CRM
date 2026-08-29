@@ -73,30 +73,6 @@ export async function sichtbarkeit(
 }
 
 /**
- * Sichtbarkeit auf die gesamte Instanz - jedes aktive Konto, unabhaengig von
- * der eigenen Position im Baum.
- *
- * NUR fuer die Personen-/Struktursicht auf /mannschaft (siehe ADR 0001: sehen
- * darf jeder die ganze Struktur, fuehren bleibt trotzdem der eigene Ast).
- * Kontakte laufen davon unberuehrt weiter ausschliesslich ueber
- * `sichtbarkeit()` mit dem passenden Umfang - wer diese Funktion kopiert, um
- * irgendwo Kontakte instanzweit zu zeigen, hat die Entscheidung nicht
- * verstanden.
- */
-export async function instanzSicht(): Promise<Sichtbarkeit> {
-  const konten = await prisma.user.findMany({
-    where: { deactivatedAt: null },
-    select: { id: true },
-  });
-  const ids = konten.map((konto) => konto.id);
-  return {
-    beraterIds: ids,
-    kontakte: { ownerId: { in: ids } },
-    ueberKontakt: { contact: { is: { ownerId: { in: ids } } } },
-  };
-}
-
-/**
  * Kurzform fuer den haeufigsten Fall: "nur meine eigenen Daten". Spart den
  * `await` auf eine Datenbankabfrage, die es fuer EIGENE gar nicht braucht.
  */

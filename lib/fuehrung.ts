@@ -10,7 +10,7 @@
 // Siehe docs/struktur-plan.md, Abschnitt 4.
 
 import { prisma } from "@/lib/prisma";
-import { instanzSicht } from "@/lib/scope";
+import { sichtbarkeit } from "@/lib/scope";
 import { ebene, elternIdVon } from "@/lib/struktur";
 import { berlinToday, dayToUtcDate, startOfMonth, startOfWeek } from "@/lib/dates";
 import { quotaTypePoints } from "@/lib/labels";
@@ -93,11 +93,6 @@ export type Mannschaftsperson = {
   name: string;
   vorname: string;
   path: string;
-  /**
-   * Ebene im GESAMTEN Baum, nicht relativ zum Betrachter - seit `baum` die
-   * ganze Instanz zeigt (ADR 0001), waere "relativ zu mir" fuer die anderen
-   * Wurzeln ohnehin falsch. 0 = Wurzel.
-   */
   tiefe: number;
   istDu: boolean;
   istDirekt: boolean;
@@ -153,27 +148,33 @@ export type Mannschaftslage = {
   /** Die eigene Zeile. Gehoert nicht zwischen die Leute - sie ist das eigene
       Geschaeft, nicht Fuehrungsarbeit. */
   ich: Mannschaftsperson;
-  /**
-   * Der eigene Ast, nach Dringlichkeit sortiert - die Arbeitsliste. Wer hier
-   * steht, dafuer traegt der Betrachter Verantwortung; `/heute` zaehlt genau
-   * diese Liste fuer seine Struktur-Zeile. NICHT die Instanz, auch wenn
-   * `baum` seit ADR 0001 mehr zeigt - eine Arbeitsliste ist kein Aussichtspunkt.
-   */
+  /** Alle unter dem Betrachter, nach Dringlichkeit sortiert. */
   leute: Mannschaftsperson[];
-  /**
-   * Jedes aktive Konto der Instanz, in Baumreihenfolge - fuer die
-   * Struktursicht. Seit ADR 0001 sehen darf das jeder, unabhaengig vom
-   * eigenen Ast; nur `leute` oben bleibt die engere Arbeitsliste. Groesser
-   * als `leute`, sobald der Betrachter nicht selbst eine Wurzel mit der
-   * ganzen Instanz darunter ist.
-   */
+  /** Dieselben Leute in Baumreihenfolge - fuer die Strukturansicht. */
   baum: Mannschaftsperson[];
   /** Wer heute Aufmerksamkeit braucht (rot vor gelb) - ohne die ruhenden. */
   dringend: Mannschaftsperson[];
   /** Wo sich die Fuehrungskraft schon gekuemmert hat und die Frist laeuft. */
   ruhend: Mannschaftsperson[];
-  /** Der eigene Ast ist leer - nicht die Instanz, die zeigt `baum` immer. */
   fuehrtNiemanden: boolean;
+  /**
+   * Admin ohne eigene Struktur: `baum` zeigt hier ausnahmsweise die GANZE
+   * Instanz statt nichts. Ein Admin soll die Struktur immer sehen koennen,
+   * auch wenn unter ihm selbst niemand haengt - siehe lib/scope.ts, Umfang
+   * "ALLE".
+   */
+  gesamtstruktur: boolean;
+  /**
+   * Die eigene Fuehrungskette, Wurzel zuerst, der direkte Chef zuletzt.
+   *
+   * `baum` zeigt nur, wer unter dem Betrachter haengt - fuer eine
+   * Fuehrungskraft die richtige Grenze, denn fremde Aeste gehen sie nichts an.
+   * Aber "unter wem haenge ICH" ist dieselbe Frage von der anderen Seite, und
+   * die beantwortet kein Astro-Feld hier: nur der eigene Pfad kennt sie, ohne
+   * dass dafuer eine fremde Struktur sichtbar wird. Nur Namen, keine Zahlen -
+   * Leistung der eigenen Fuehrungskraft ist nicht die Sache des Betrachters.
+   */
+  oben: { id: string; name: string }[];
 };
 
 const leereWerte = (): Werte => ({
@@ -218,12 +219,15 @@ export async function mannschaftsLage(betrachter: {
   id: string;
   role: UserRole;
 }): Promise<Mannschaftslage> {
-  // Sehen darf jeder die ganze Struktur (ADR 0001) - die fruehere Ausnahme,
-  // die nur einem Admin ohne eigene Leute die GANZE Instanz zeigte, ist damit
-  // ueberholt: das gilt jetzt fuer alle. `baum` unten fuehrt deshalb immer die
-  // ganze Instanz; wer FUEHRT, entscheidet weiterhin allein `leute` (der
-  // eigene Ast, siehe die Ableitungen weiter unten).
-  const sicht = await instanzSicht();
+  // Der Admin sieht IMMER die ganze Instanz, unabhaengig von der eigenen
+  // Struktur - Systemverwaltung ist keine Fuehrungsposition mit Sonderfall,
+  // sondern ein eigener, bedingungsloser Umfang (lib/scope.ts, Umfang "ALLE").
+  // Jede andere Person - auch eine Fuehrungskraft mit grosser eigener
+  // Struktur - sieht nur sich selbst und alles darunter: "ALLE" faellt fuer
+  // Nicht-Admins in `beraterIds()` von selbst auf "STRUKTUR" zurueck, ein
+  // zweiter Aufruf mit anderem Umfang ist dafuer nicht noetig.
+  const gesamtstruktur = betrachter.role === "ADMIN";
+  const sicht = await sichtbarkeit(betrachter, "ALLE");
 
   const heute = berlinToday();
   const heuteStart = dayToUtcDate(heute);
@@ -513,6 +517,20 @@ export async function mannschaftsLage(betrachter: {
 
   const nameVon = new Map(berater.map((person) => [person.id, person.name]));
   const eigenerPfad = berater.find((person) => person.id === betrachter.id)?.path ?? "/";
+  const eigeneTiefe = ebene(eigenerPfad);
+
+  // Die Kette ueber dem Betrachter: der Pfad traegt sie schon, ohne
+  // rekursive Abfrage. Wurzel zuerst, direkter Chef zuletzt.
+  const obenIds = eigenerPfad.split("/").filter(Boolean).slice(0, -1);
+  const obenKonten =
+    obenIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: obenIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+  const obenNameVon = new Map(obenKonten.map((konto) => [konto.id, konto.name]));
+  const oben = obenIds.map((id) => ({ id, name: obenNameVon.get(id) ?? "?" }));
 
   const alle: Mannschaftsperson[] = berater.map((person) => {
     const w = werte.get(person.id) ?? leereWerte();
@@ -567,7 +585,7 @@ export async function mannschaftsLage(betrachter: {
       name: person.name,
       vorname: person.name.split(" ")[0] ?? person.name,
       path: person.path,
-      tiefe: ebene(person.path),
+      tiefe: Math.max(0, ebene(person.path) - eigeneTiefe),
       istDu: person.id === betrachter.id,
       istDirekt: person.leaderId === betrachter.id,
       ueber:
@@ -580,20 +598,7 @@ export async function mannschaftsLage(betrachter: {
       ausgetreten: person.deactivatedAt !== null,
       platzhalter,
       eingeladen: platzhalter && einladungJe.has(person.id),
-      // Der Code ist ein Zugangsdatum und bleibt im eigenen Ast. Seit die
-      // Struktursicht instanzweit ist (ADR 0001), taucht ein fremder
-      // Platzhalter mit im Baum auf - sein Code darf deshalb nur dann ins
-      // RSC-Payload, wenn der Betrachter Admin ist oder selbst in seinem Ast
-      // haengt. Der Fallback-Pfad "/" (kein eigenerPfad gefunden) zaehlt
-      // bewusst NICHT als eigener Ast - sonst waere er ein Praefix-Treffer auf
-      // jeden Pfad, und ausgerechnet im Fehlerfall saehe der Betrachter jeden
-      // fremden Einladungscode.
-      einladungsCode:
-        platzhalter &&
-        (betrachter.role === "ADMIN" ||
-          (eigenerPfad !== "/" && person.path.startsWith(eigenerPfad)))
-          ? (einladungJe.get(person.id) ?? null)
-          : null,
+      einladungsCode: platzhalter ? (einladungJe.get(person.id) ?? null) : null,
       angekommen,
       installiert: person.installedAt !== null,
       frischGestartet:
@@ -673,20 +678,8 @@ export async function mannschaftsLage(betrachter: {
   const baum = alle
     .filter((person) => !person.istDu)
     .sort((a, b) => nameSchluessel(a.path).localeCompare(nameSchluessel(b.path), "de"));
-
-  // Nur der eigene Ast ist Arbeitsliste (ADR 0001): `baum` zeigt jetzt die
-  // ganze Instanz, aber "wer braucht MICH heute" bleibt eine Frage an den
-  // eigenen Pfad - sonst zaehlt /heute (die Struktur-Zeile mit lage.leute) am
-  // Ende die ganze Firma statt der eigenen Leute. Der Fallback-Pfad "/" zaehlt
-  // bewusst NICHT als eigener Ast, aus demselben Grund wie beim Einladungscode
-  // oben: sonst waere er ein Praefix-Treffer auf jeden Pfad.
-  const imAst = (person: Mannschaftsperson) =>
-    eigenerPfad !== "/" && person.path.startsWith(eigenerPfad);
-
-  // Erst auf den eigenen Ast eingrenzen, DANACH nach Dringlichkeit sortieren -
-  // in dieser Reihenfolge, sonst zaehlt die Sortierung schon auf der ganzen
-  // Instanz. Ausgetretene stehen immer unten: sie zaehlen nirgends mehr mit.
-  const leute = baum.filter(imAst).sort(
+  // Ausgetretene stehen immer unten: sie zaehlen nirgends mehr mit.
+  const leute = [...baum].sort(
     (a, b) =>
       Number(a.ausgetreten) - Number(b.ausgetreten) ||
       a.rang - b.rang ||
@@ -697,6 +690,16 @@ export async function mannschaftsLage(betrachter: {
     (person) => !person.ausgetreten && person.ampel !== "gruen"
   );
 
+  // "Fuehrt niemanden" fragt nach der EIGENEN Struktur, nicht nach der Groesse
+  // von `baum` - fuer den Admin ist `baum` seit der Umstellung auf Umfang
+  // "ALLE" immer die ganze Instanz, auch wenn er persoenlich keine einzige
+  // Person unter sich hat. `ich.path` traegt die eigene Id am Ende; alles
+  // darunter erkennt man am Praefix, unabhaengig davon, wessen Struktur
+  // `baum` sonst noch enthaelt. Die Wache auf "/" fängt den Betrachter-nicht-
+  // gefunden-Fallback ab - sonst waere er ein Praefix-Treffer auf jeden Pfad.
+  const fuehrtEigeneLeute =
+    ich.path !== "/" && baum.some((person) => person.path.startsWith(ich.path));
+
   return {
     ich,
     leute,
@@ -706,8 +709,9 @@ export async function mannschaftsLage(betrachter: {
     // wenn man arbeitet - und nicht erst, wenn der andere sich bewegt.
     dringend: auffaellig.filter((person) => !person.betreuung?.ruht),
     ruhend: auffaellig.filter((person) => person.betreuung?.ruht),
-    // Eigener Ast, nicht Instanz - `baum` ist seit ADR 0001 fast nie leer.
-    fuehrtNiemanden: leute.length === 0,
+    fuehrtNiemanden: !fuehrtEigeneLeute,
+    gesamtstruktur,
+    oben,
   };
 }
 
@@ -944,22 +948,11 @@ export async function astVergleich(userId: string): Promise<AstVergleich | null>
 // laufen frueher oder spaeter auseinander, und dann glaubt die Fuehrungskraft
 // keiner von beiden mehr - genau der Grund, aus dem es diese Datei gibt.
 //
-// Seit ADR 0001 ist "findbar" keine Zugriffsgrenze mehr: jede aktive Person
-// der Instanz taucht hier auf, auch eine fremde. Was bleibt, ist
-// `imEigenenAst` - die Vorgabe fuer die Seite, welche Knoepfe sie ueberhaupt
-// zeigt. Die eigentliche Grenze fuer Schreibzugriffe steht unveraendert in
-// mannschaft/actions.ts.
+// Die Zugriffsgrenze faellt dabei nebenbei mit ab: wer nicht im eigenen Ast
+// haengt, steht nicht in der Lage und ist damit auch hier nicht zu finden.
 
 export type AstLage = {
   person: Mannschaftsperson;
-  /**
-   * Steht die angesehene Person im eigenen Ast des Betrachters - oder schaut
-   * er nur zu? Admin zaehlt immer als "eigener Ast": er sieht auf /mannschaft
-   * ohnehin die ganze Instanz. Deckt sich mit `inMeinerStruktur` in
-   * mannschaft/actions.ts - dort die letzte Verteidigung fuer
-   * Schreibzugriffe, hier die Vorgabe fuer die Anzeige.
-   */
-  imEigenenAst: boolean;
   /** Alles unter der Person, ohne sie selbst, in Baumreihenfolge. */
   ast: Mannschaftsperson[];
   /** Nur die direkt Unterstellten der Person. */
@@ -1087,20 +1080,10 @@ export async function astLage(
   const lage = await mannschaftsLage(betrachter);
   const alle = [lage.ich, ...lage.baum];
   const person = alle.find((eintrag) => eintrag.id === personId);
-  // "Gibt es nicht" ist seit ADR 0001 die einzige Bedeutung: `alle` zeigt die
-  // ganze Instanz, nicht mehr nur den eigenen Ast. Wer hier fehlt, ist eine
-  // unbekannte Id oder ein deaktiviertes Konto - beides faellt schon aus
-  // `instanzSicht()` heraus, bevor diese Stelle ueberhaupt gefragt wird.
+  // Nicht im eigenen Ast = existiert fuer diesen Betrachter nicht. Kein
+  // Unterschied zwischen "gibt es nicht" und "darfst du nicht": beides ist
+  // hier dieselbe Antwort, und das ist Absicht.
   if (!person) return null;
-
-  // Sehen darf jeder (ADR 0001) - handeln nur im eigenen Ast. Admin zaehlt
-  // immer als eigener Ast, deckungsgleich mit `inMeinerStruktur` in
-  // mannschaft/actions.ts. Der Fallback-Pfad "/" (lage.ich.path nicht
-  // gefunden) zaehlt bewusst NICHT als eigener Ast - sonst waere er ein
-  // Praefix-Treffer auf jeden Pfad.
-  const imEigenenAst =
-    betrachter.role === "ADMIN" ||
-    (lage.ich.path !== "/" && person.path.startsWith(lage.ich.path));
 
   const ast = lage.baum.filter(
     (eintrag) => eintrag.id !== person.id && eintrag.path.startsWith(person.path)
@@ -1111,7 +1094,6 @@ export async function astLage(
 
   return {
     person,
-    imEigenenAst,
     ast,
     // Der Pfad traegt die eigene Id am Ende - "direkt unter X" ist damit eine
     // exakte Gleichheit statt einer Ebenenrechnung. `ueberId` taugt hier
