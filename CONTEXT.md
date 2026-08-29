@@ -21,7 +21,7 @@ Dieselbe Übergangsquote, aber gerechnet aus den Summen aller aktiven Personen d
 ### Struktur
 
 **Struktur / Gesamtstruktur**:
-Der Baum aller Personen der Instanz — wer wen führt. Sehen darf die gesamte Struktur jede Person; führen bleibt auf den eigenen Ast beschränkt.
+Der Baum aller Personen der Instanz — wer wen führt. Die gesamte Struktur sehen darf nur der Admin, unabhängig von dessen eigener Struktur. Jede Führungskraft — auch eine, die organisatorisch ganz oben steht — sieht ausschließlich die eigene Struktur: sich selbst und alles, was darunter hängt.
 
 **Ast**:
 Eine Person und alles, was unter ihr hängt.

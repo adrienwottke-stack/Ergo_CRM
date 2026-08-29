@@ -1,5 +1,7 @@
 # Jeder sieht die Gesamtstruktur, geführt wird weiter nur der eigene Ast
 
+Status: superseded by ADR-0004 (29.08.2026) — nach einem Tag im echten Betrieb zurückgenommen: Sehen war zu weit gefasst, Adrien wollte nur sich selbst instanzweit, jede Führungskraft ausschließlich den eigenen Ast.
+
 Bisher zeigte die Struktur-Ansicht jeder Person nur den eigenen Ast; ab 28.08.2026 sieht jede Person die gesamte Instanz-Struktur samt Kennzahlen, während Führen serverseitig weiter auf den eigenen Ast beschränkt bleibt.
 
 ## Kontext
