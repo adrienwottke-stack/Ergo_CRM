@@ -60,18 +60,54 @@ export default function MannschaftsMatrix({
         <h2 className={kicker}>Team-Cockpit</h2>
         <span className="text-xs text-ink-muted">nach Dringlichkeit sortiert</span>
       </div>
+      {/* Nachgemessen bei 375 px: die Tabelle war 640 px breit, sichtbar waren
+          343 - die Fuehrungskraft sah gut die Haelfte und musste knapp zwei
+          Bildschirmbreiten wischen. Dabei lief die 126 px breite Namensspalte
+          als Erstes aus dem Bild, und uebrig blieben Zahlen ohne Namen.
+
+          Zwei Griffe dagegen. Erstens bleibt die Namensspalte stehen (sticky
+          left-0) - die Zahl behaelt beim Wischen ihren Menschen. Zweitens
+          tragen die Kopftexte am Handy Kurzformen und erst ab sm die ganzen
+          Woerter; die Spaltenbreite haengt an ihnen, nicht an den Zahlen.
+
+          Die feststehende Spalte traegt glas-stark und eine rechte Kante, nicht
+          einfach bg-surface: nachgemessen sind die Haus-Flaechen absichtlich
+          durchsichtig (bg-surface = rgba(23,33,51,0.66), bg-sunken = 6 %
+          Weiss). Eine haltende Zelle mit solchem Grund liesse die
+          wegscrollenden Zahlen durch sich hindurchscheinen. glas-stark legt
+          Unschaerfe darunter - derselbe Griff, mit dem die Namen-Tabelle ihren
+          Kopf stehen laesst (components/NameList.tsx). */}
       <div className={`${card} overflow-x-auto`}>
-        <table className="w-full min-w-160 text-left text-sm">
+        <table className="w-full min-w-[30rem] text-left text-sm">
           <thead className="border-b border-line/80 bg-sunken/60">
             <tr>
-              <th className={th}>Name</th>
-              <th className={`${th} text-right`}>Anrufe (Woche)</th>
-              <th className={`${th} text-right`}>Vereinbart (14 Tage)</th>
-              <th className={`${th} text-right`}>Abschlüsse (Monat)</th>
+              <th
+                className={`${th} sticky left-0 z-20 glas-stark border-r border-line`}
+              >
+                Name
+              </th>
+              <th className={`${th} text-right`}>
+                <span className="sm:hidden">Anrufe</span>
+                <span className="hidden sm:inline">Anrufe (Woche)</span>
+              </th>
+              <th className={`${th} text-right`}>
+                <span className="sm:hidden">Verein. 14T</span>
+                <span className="hidden sm:inline">Vereinbart (14 Tage)</span>
+              </th>
+              <th className={`${th} text-right`}>
+                <span className="sm:hidden">Abschl.</span>
+                <span className="hidden sm:inline">Abschlüsse (Monat)</span>
+              </th>
               {zeigeEinheiten && (
-                <th className={`${th} text-right`}>Einheiten (Monat)</th>
+                <th className={`${th} text-right`}>
+                  <span className="sm:hidden">EH</span>
+                  <span className="hidden sm:inline">Einheiten (Monat)</span>
+                </th>
               )}
-              <th className={`${th} text-right`}>Punkte (Woche)</th>
+              <th className={`${th} text-right`}>
+                <span className="sm:hidden">Punkte</span>
+                <span className="hidden sm:inline">Punkte (Woche)</span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -79,7 +115,9 @@ export default function MannschaftsMatrix({
                 liest zuerst "wo steht die Mannschaft insgesamt" und danach
                 erst, wer im Einzelnen dahintersteckt. */}
             <tr className="bg-sunken/60">
-              <td className={`${td} font-semibold text-ink`}>
+              <td
+                className={`${td} sticky left-0 z-10 glas-stark border-r border-line font-semibold text-ink`}
+              >
                 Zusammen ({zeilen.length})
               </td>
               <td className={`${td} text-right font-semibold tabular-nums text-ink`}>
@@ -104,12 +142,18 @@ export default function MannschaftsMatrix({
               const zahlen = einheiten.get(person.id);
               return (
                 <tr key={person.id}>
-                  <td className={`${td} font-medium text-ink`}>
+                  <td
+                    className={`${td} sticky left-0 z-10 glas-stark border-r border-line font-medium text-ink`}
+                  >
+                    {/* Der Name traegt seine 44 px selbst (flex + py-2.5 -my-2.5):
+                        als blosses Inline-Element war die Trefferflaeche rund
+                        20 px hoch - das Polster gehoert der Tabellenzelle, nicht
+                        dem Link darin. */}
                     <span className="flex items-center gap-2">
                       <Ampel ampel={person.ampel} variante="punkt" />
                       <Link
                         href={`/mannschaft/${person.id}`}
-                        className="rounded transition hover:text-navy-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600"
+                        className="-my-2.5 flex min-h-11 items-center rounded py-2.5 transition hover:text-navy-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600"
                       >
                         {person.name}
                       </Link>
