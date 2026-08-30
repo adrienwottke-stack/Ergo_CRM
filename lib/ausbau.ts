@@ -66,25 +66,36 @@ export const SCHWELLEN_PLATZHALTER = { anrufe: 20, termine: 3 } as const;
  * cache(): eine Abfrage je Anfrage. Die Schale, der Waechter und die Seite
  * fragen nacheinander dasselbe.
  */
-export const ausbaustand = cache(
-  async (user: {
-    id: string;
-    role: string;
-    ausbau?: number | null;
-  }): Promise<Ausbaustand> => {
+// Der gecachte Kern. Schluessel sind PRIMITIVE, nicht das User-Objekt:
+// React cache() vergleicht die Argumente mit ===, und Layout und Seite laden
+// den Benutzer je einmal frisch (requireOnboardedUser bzw. requireUser rufen
+// beide currentUser auf). Mit dem Objekt als Schluessel lief die Zaehlung
+// deshalb zweimal je Aufruf von /heute.
+const standFuer = cache(
+  async (
+    userId: string,
+    role: string,
+    ausbau: number,
+  ): Promise<Ausbaustand> => {
     const direkte = await prisma.user
-      .count({ where: { leaderId: user.id, deactivatedAt: null } })
+      .count({ where: { leaderId: userId, deactivatedAt: null } })
       .catch(() => 0);
 
-    return {
-      // ?? AUSBAU_ANFANG faengt die Zeit ab, in der diese Datei schon im Repo,
-      // die Migration aber noch nicht auf der Datenbank ist.
-      stufe: user.ausbau ?? AUSBAU_ANFANG,
-      fuehrt: direkte > 0,
-      istAdmin: user.role === "ADMIN",
-    };
+    return { stufe: ausbau, fuehrt: direkte > 0, istAdmin: role === "ADMIN" };
   },
 );
+
+export function ausbaustand(user: {
+  id: string;
+  role: string;
+  ausbau?: number | null;
+}): Promise<Ausbaustand> {
+  // ?? AUSBAU_ANFANG ist reine Typ-Absicherung, KEIN Schutz gegen eine noch
+  // nicht gefahrene Migration: fehlt die Spalte, scheitert schon
+  // currentUser() (prisma.user.findUnique liest alle Skalarfelder) und damit
+  // jede angemeldete Seite. Migration also vor dem Deploy fahren.
+  return standFuer(user.id, user.role, user.ausbau ?? AUSBAU_ANFANG);
+}
 
 // --- Wer freischalten darf ---------------------------------------------------
 
@@ -156,7 +167,7 @@ export type Vorschlag = {
 };
 
 /**
- * Wer von diesen Konten waere jetzt freizuschalten?
+ * Wen diese Fuehrungskraft heute freischalten koennte.
  *
  * GERECHNET, NICHT GESPEICHERT. Es gibt heute keinen Erzeuger fuer
  * LeadershipTask - die einzige create-Stelle ist die Fuehrungskraft selbst
@@ -168,15 +179,14 @@ export type Vorschlag = {
  * faengt montags bei null an, der Ausbau darf das nicht - sonst haenge der
  * Vorschlag vom Wochentag ab.
  */
-export async function vorschlaegeFuer(
-  kandidatenIds: string[],
-): Promise<Vorschlag[]> {
-  if (kandidatenIds.length === 0) return [];
-
+export async function vorschlaegeFuer(leaderId: string): Promise<Vorschlag[]> {
+  // EINE Abfrage statt zwei: die Direkten und ihr Ausbaustand kommen zusammen.
+  // Vorher stand daneben noch ein eigenes findMany auf /heute - das war die
+  // vierte Runde derselben Frage auf derselben Seite.
   const [konten, grenzen] = await Promise.all([
     prisma.user.findMany({
       where: {
-        id: { in: kandidatenIds },
+        leaderId,
         ausbau: { lt: AUSBAU_VOLL },
         deactivatedAt: null,
         passwordHash: { not: null },

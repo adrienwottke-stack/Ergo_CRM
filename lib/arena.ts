@@ -51,7 +51,20 @@ export function stundenBis(ziel: Date, jetzt = new Date()): number {
 
 // --- Rangliste --------------------------------------------------------------
 
-export async function ladeRangliste(start: Date): Promise<ArenaZeile[]> {
+/**
+ * Die Rangliste eines Zeitraums.
+ *
+ * `mitSerie` schaltet die Serien-Berechnung ab. Sie kostet eine eigene
+ * Abfrage ueber ALLE Eintraege der letzten 60 Tage und hat auf die Punkte und
+ * damit auf die Reihenfolge keinen Einfluss - wer nur den Platz braucht (die
+ * Rangliste-Zeile auf /heute, docs/ausbau-plan.md Abschnitt 4), zahlt sie
+ * sonst bei jedem Seitenaufruf mit. Die Punkte bleiben in beiden Faellen
+ * identisch, damit Zeile und /leaderboard nie zwei Plaetze zeigen.
+ */
+export async function ladeRangliste(
+  start: Date,
+  { mitSerie = true }: { mitSerie?: boolean } = {},
+): Promise<ArenaZeile[]> {
   const heute = berlinToday();
   const [logs, personen, serienLogs, anwesenheit] = await Promise.all([
     prisma.dailyLog.findMany({
@@ -59,10 +72,12 @@ export async function ladeRangliste(start: Date): Promise<ArenaZeile[]> {
       select: { personId: true, type: true, count: true, activityId: true },
     }),
     prisma.person.findMany({ select: { id: true, name: true } }),
-    prisma.dailyLog.findMany({
-      where: { date: { gte: dayToUtcDate(shiftDay(heute, -60)) } },
-      select: { personId: true, date: true },
-    }),
+    mitSerie
+      ? prisma.dailyLog.findMany({
+          where: { date: { gte: dayToUtcDate(shiftDay(heute, -60)) } },
+          select: { personId: true, date: true },
+        })
+      : Promise.resolve([] as { personId: string; date: Date }[]),
     // Die Anwesenheitstage im selben Fenster. Eigene Tabelle, nicht DailyLog -
     // siehe lib/anwesenheit.ts.
     anwesenheitJePerson(start),

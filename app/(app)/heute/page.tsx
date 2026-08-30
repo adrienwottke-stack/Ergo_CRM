@@ -10,13 +10,13 @@ import {
   dayToUtcDate,
   dueState,
   hasTimeOfDay,
+  startOfWeek,
   utcToBerlinLocalInput,
   type DueState,
 } from "@/lib/dates";
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
 import { AUSBAU_VOLL, ausbaustand, vorschlaegeFuer } from "@/lib/ausbau";
 import { ladeRangliste } from "@/lib/arena";
-import { startOfWeek } from "@/lib/dates";
 import { liegtLabel, liegtSeit } from "@/lib/liegenbleiber";
 import { herkunftAusQuelle } from "@/lib/empfehlungen";
 import {
@@ -138,23 +138,27 @@ export default async function HeutePage() {
   // Starterpass und eine Zeile von der Rangliste. Alles andere kommt spaeter -
   // eine Seite mit achtzehn Bloecken ist der zweite Grund, aus dem der Start
   // ueberfordert (der erste ist die Leiste).
+  //
+  // Der Ausbaustand steht vorweg, weil beide Zeilen darunter davon abhaengen.
+  // Er kostet nichts: das Layout hat ihn fuer denselben Benutzer schon geholt,
+  // und standFuer() ist auf die Id gecacht.
   const ausbau = await ausbaustand(user);
   const vollerUmfang = ausbau.stufe >= AUSBAU_VOLL || ausbau.istAdmin;
 
-  // Der eine Blick auf die Rangliste, den Ausbau 1 behaelt. Nur hier geladen:
-  // ab Ausbau 2 steht der ganze Wettbewerbsbereich in der Leiste und die Zeile
-  // waere die dritte Anzeige derselben Zahl.
-  const ranglistenBlick = vollerUmfang ? null : await ranglistenZeile(user.id);
-
-  // Wen die Fuehrungskraft heute freischalten koennte. Gerechnet, nicht
-  // gespeichert - siehe components/AusbauVorschlag.tsx. Nur ueber die eigenen
-  // Direkten: wer tiefer im Ast haengt, wird von SEINER Fuehrungskraft
-  // freigeschaltet, nicht ueber deren Kopf hinweg.
-  const meineDirekten = await prisma.user.findMany({
-    where: { leaderId: user.id, deactivatedAt: null, passwordHash: { not: null } },
-    select: { id: true },
-  });
-  const ausbauVorschlaege = await vorschlaegeFuer(meineDirekten.map((k) => k.id));
+  // Beides parallel, nicht nacheinander: /heute ist die Seite, die jeder
+  // morgens zuerst oeffnet, und jede zusaetzliche Runde ueber den Pooler
+  // liegt voll auf ihrer Ladezeit.
+  const [ranglistenBlick, ausbauVorschlaege] = await Promise.all([
+    // Der eine Blick auf die Rangliste, den Ausbau 1 behaelt. Ab Ausbau 2
+    // steht der ganze Wettbewerbsbereich in der Leiste und die Zeile waere
+    // die dritte Anzeige derselben Zahl.
+    vollerUmfang ? null : ranglistenZeile(user.id),
+    // Wen die Fuehrungskraft heute freischalten koennte. Gerechnet, nicht
+    // gespeichert - siehe components/AusbauVorschlag.tsx. Nur die eigenen
+    // Direkten: wer tiefer im Ast haengt, wird von SEINER Fuehrungskraft
+    // freigeschaltet, nicht ueber deren Kopf hinweg.
+    vorschlaegeFuer(user.id),
+  ]);
 
   // Die Aufgeh-Karte: einmal, nachdem jemand freigeschaltet wurde. Konten, die
   // die Migration hochgesetzt hat, tragen kein ausbauGesetztAm - fuer sie ging
@@ -727,8 +731,7 @@ export default async function HeutePage() {
       {/* AP-02: das Dashboard, das Emil wollte - Zahlen und Eintragen ganz
           oben, nicht unter Wettbewerb. Bei einer Fuehrungskraft direkt nach
           dem Lagebild, sonst direkt nach dem Postfach: der Aufmacher der
-          Seite bleibt Mensch, gleich danach die eigene Zahl. Immer da, keine
-          Bedingung - ein Dashboard-Baustein ist keine Meldung. */}
+          Seite bleibt Mensch, gleich danach die eigene Zahl. */}
       {/* Erst ab Ausbau 2. Der frueher hier stehende Satz "immer da, keine
           Bedingung - ein Dashboard-Baustein ist keine Meldung" galt fuer eine
           App, die jedem alles zeigte. Einheiten haengen an der Karrierestufe,
@@ -1136,7 +1139,12 @@ async function ranglistenZeile(userId: string) {
   });
   if (!person) return null;
 
-  const zeilen = await ladeRangliste(startOfWeek(berlinToday()));
+  // ohne Serie: die kostet eine Abfrage ueber alle Eintraege der letzten 60
+  // Tage und aendert an Punkten und Platz nichts. Fuer eine Zeile auf der
+  // meistgeoeffneten Seite ist das der falsche Preis.
+  const zeilen = await ladeRangliste(startOfWeek(berlinToday()), {
+    mitSerie: false,
+  });
   const index = zeilen.findIndex((zeile) => zeile.personId === person.id);
 
   return {
