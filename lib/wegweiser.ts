@@ -14,6 +14,8 @@
 // nicht "Einheiten". Wer nur den Ort sucht, findet ihn ueber die Synonyme
 // trotzdem.
 
+import { darfSehen, type Ausbaustand } from "@/lib/ausbauSicht";
+
 export type WegweiserEintrag = {
   /** Stabiler Schluessel - taucht im Treffer-los-Log nie auf, nur intern. */
   id: string;
@@ -30,7 +32,6 @@ export type WegweiserEintrag = {
    * (lib/suchlog.ts) und gehoert dann hierher.
    */
   synonyme: string[];
-  nurAdmin?: boolean;
 };
 
 export const WEGWEISER: WegweiserEintrag[] = [
@@ -362,13 +363,16 @@ export const WEGWEISER: WegweiserEintrag[] = [
   },
 
   // --- Nur der Admin -------------------------------------------------------
+  // Kein eigenes Kennzeichen mehr an den Eintraegen: dass /team und /werkstatt
+  // dem Admin gehoeren, steht in lib/ausbauSicht.ts und wird von darfSehen()
+  // beantwortet. Zwei Mechanismen fuer dieselbe Frage laufen frueher oder
+  // spaeter auseinander.
   {
     id: "team-verwalten",
     titel: "Team verwalten",
     href: "/team",
     bereich: "Team",
     synonyme: ["konten", "nutzer", "passwort", "zugang", "sperren", "verwaltung"],
-    nurAdmin: true,
   },
   {
     id: "werkstatt",
@@ -383,7 +387,6 @@ export const WEGWEISER: WegweiserEintrag[] = [
       "rueckmeldungen",
       "was benutzt keiner",
     ],
-    nurAdmin: true,
   },
 ];
 
@@ -429,18 +432,13 @@ export function normalisiere(roh: string): string {
  *   2 = ein Wort im Titel faengt so an  ("eintragen" -> Einheiten eintragen)
  *   1 = ein Synonym oder der Bereich passt
  */
-export function sucheImWegweiser(
-  roh: string,
-  istAdmin: boolean
-): WegweiserEintrag[] {
+function bewerteImWegweiser(roh: string): WegweiserEintrag[] {
   const frage = normalisiere(roh);
   if (!frage) return [];
 
   const bewertet: { eintrag: WegweiserEintrag; punkte: number }[] = [];
 
   for (const eintrag of WEGWEISER) {
-    if (eintrag.nurAdmin && !istAdmin) continue;
-
     const titel = normalisiere(eintrag.titel);
     let punkte = 0;
 
@@ -472,4 +470,23 @@ export function sucheImWegweiser(
   return bewertet
     .sort((a, b) => b.punkte - a.punkte)
     .map((zeile) => zeile.eintrag);
+}
+
+/**
+ * Was jemand auf seinem Ausbaustand tatsaechlich sehen darf - und ob die Frage
+ * daneben etwas getroffen haette, das fuer ihn noch zu ist.
+ *
+ * Die beiden gehoeren zusammen, weil der Unterschied teuer ist: ein Treffer,
+ * der nur gesperrt ist, ist KEIN Fehlschlag. Wuerde er als solcher gemeldet,
+ * stuende "einheiten" in der Werkstatt unter "Gesucht, nichts gefunden" -
+ * und der Admin ergaenzte ein Synonym gegen ein Problem, das keines ist
+ * (docs/findbarkeit-plan.md, Abschnitt 6; docs/ausbau-plan.md, Abschnitt 3).
+ */
+export function sucheImWegweiser(
+  roh: string,
+  stand: Ausbaustand
+): { treffer: WegweiserEintrag[]; nurGesperrt: boolean } {
+  const alle = bewerteImWegweiser(roh);
+  const treffer = alle.filter((eintrag) => darfSehen(eintrag.href, stand));
+  return { treffer, nurGesperrt: treffer.length === 0 && alle.length > 0 };
 }

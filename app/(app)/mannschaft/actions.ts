@@ -16,6 +16,7 @@ import { pfadUnter, strukturKonten } from "@/lib/struktur";
 import { ablaufDatum, neuerCode } from "@/lib/einladung";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { artFuerSignal, istFrist, tageFuerFrist } from "@/lib/fuehrungsaufgaben";
+import { AUSBAU_VOLL } from "@/lib/ausbauSicht";
 import type { UserRole } from "@/lib/generated/prisma/enums";
 
 const TAG_MS = 24 * 60 * 60 * 1000;
@@ -282,4 +283,40 @@ export async function einladungFuerPlatzhalter(formData: FormData) {
 
   neuRechnen();
   return { code };
+}
+
+/**
+ * Freischalten: den Ausbau einer Person von 1 auf 2 heben
+ * (docs/ausbau-plan.md, docs/adr/0005-ausbau-durch-die-fuehrungskraft.md).
+ *
+ * Der eine Griff der ganzen Mechanik. Er steht hier und nicht in einer eigenen
+ * Datei, weil er dasselbe ist wie alles andere in dieser Datei: eine
+ * Fuehrungskraft entscheidet etwas ueber jemanden aus ihrer Struktur, und die
+ * Autorisierung dafuer steht schon oben in inMeinerStruktur().
+ *
+ * NUR AUFWAERTS. Das `ausbau: { lt: AUSBAU_VOLL }` im Filter ist kein
+ * Wettlauf-Schutz, sondern die Regel selbst: dieser Weg kann nichts zumachen.
+ * Ein zweiter Tipp auf denselben Knopf ist damit folgenlos statt schaedlich.
+ *
+ * Kein Undo-Eintrag. Das Rueckgaengig-Fenster (lib/undo.ts) ist fuer Griffe
+ * gedacht, die man versehentlich tut - hier waere das Zuruecknehmen selbst der
+ * Schaden: der Betroffene haette die neuen Reiter schon gesehen.
+ */
+export async function ausbauFreischalten(formData: FormData) {
+  const user = await requireUser();
+  const memberId = feld(formData, "memberId");
+  if (!memberId) return;
+  if (!(await inMeinerStruktur(user.id, memberId, user.role))) return;
+
+  await prisma.user.updateMany({
+    where: { id: memberId, ausbau: { lt: AUSBAU_VOLL } },
+    data: {
+      ausbau: AUSBAU_VOLL,
+      ausbauGesetztVon: user.id,
+      ausbauGesetztAm: new Date(),
+    },
+  });
+
+  neuRechnen();
+  revalidatePath("/werkstatt");
 }

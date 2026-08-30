@@ -12,6 +12,7 @@ import { LogoutIcon } from "@/components/icons";
 import ThemaSchalter from "@/components/ThemaSchalter";
 import RueckmeldungGeben from "@/components/RueckmeldungGeben";
 import { schalter } from "@/lib/features";
+import { ausbaustand, darfSehen, type Ausbaustand } from "@/lib/ausbau";
 import { shell, gutter } from "@/components/ui";
 import type { User } from "@/lib/generated/prisma/client";
 
@@ -28,21 +29,29 @@ import type { User } from "@/lib/generated/prisma/client";
 // Wettbewerbs zusammengehoert (Arena, Rangliste, eigene Aktivitaeten), verlinkt
 // sich auf den Seiten selbst - eine Ebene tiefer, wo es hingehoert.
 
-export function navigationFuer(user: User): NavLink[] {
-  return [
+export function navigationFuer(stand: Ausbaustand): NavLink[] {
+  // EINE Liste, in Reihenfolge. Was ein Konto davon sieht, entscheidet
+  // darfSehen() in lib/ausbauSicht.ts - hier steht kein zweites Regelwerk,
+  // sonst zeigte die Leiste irgendwann etwas anderes als der Wegweiser.
+  //
+  // Am Anfang bleiben vier Punkte stehen: Namen, Heute, Kalender, Einladen.
+  // Das ist der Beruf am ersten Tag - aufnehmen, anrufen, Termine legen - und
+  // "Einladen" gehoert ausdruecklich dazu: Werben ist der Kern des Berufs,
+  // nicht die Kuer (docs/ausbau-plan.md, Abschnitt 2).
+  //
+  // "Mannschaft" haengt an der Fuehrungs-Achse und NICHT am Ausbau. Wer einen
+  // Geschaeftspartner unter sich hat, muss ihn fuehren koennen - sofort, ohne
+  // dass jemand etwas freischaltet. Der alte Einwand ("dann findet gerade der
+  // die Seite nicht, der seine Struktur eintragen will") traegt nicht mehr:
+  // "Einladen" steht ab dem ersten Tag da, und ueber eine Einladung entsteht
+  // der erste Geschaeftspartner.
+  const alle: NavLink[] = [
     { href: "/namen", label: "Namen" },
     { href: "/heute", label: "Heute" },
     { href: "/kalender", label: "Kalender" },
-    { href: "/trichter", label: "Trichter" },
-    // "Mannschaft" steht bei jedem, auch bei dem, der noch niemanden fuehrt.
-    // Vorher hing der Punkt daran, ob schon jemand unter einem haengt - damit
-    // blieb der Weg genau dem verborgen, der ihn zuerst braucht: Wer seine
-    // Struktur eintragen will, fand die Seite dafuer erst, wenn die Struktur
-    // schon stand. Die Seite faengt den leeren Fall selbst ab und zeigt dann
-    // das Aufnehmen statt einer leeren Liste.
-    { href: "/mannschaft", label: "Mannschaft" },
-    // "Einladen" kann jeder: Werben ist der Kern des Berufs, nicht die Kuer.
     { href: "/einladen", label: "Einladen" },
+    { href: "/trichter", label: "Trichter" },
+    { href: "/mannschaft", label: "Mannschaft" },
     // Ein Punkt fuer den ganzen Wettbewerb. Rangliste und eigene Aktivitaeten
     // haengen darunter und markieren denselben Punkt mit.
     {
@@ -50,10 +59,10 @@ export function navigationFuer(user: User): NavLink[] {
       label: "Wettbewerb",
       match: ["/leaderboard", "/log", "/spiel"],
     },
-    ...(user.role === "ADMIN"
-      ? [{ href: "/team", label: "Team", match: ["/werkstatt"] }]
-      : []),
+    { href: "/team", label: "Team", match: ["/werkstatt"] },
   ];
+
+  return alle.filter((link) => darfSehen(link.href, stand));
 }
 
 // Wohin eine Rueckmeldung geht: der Vorname des aeltesten aktiven Admin-Kontos.
@@ -79,7 +88,8 @@ export default async function AppShell({
   user: User;
   children: React.ReactNode;
 }) {
-  const links = navigationFuer(user);
+  const stand = await ausbaustand(user);
+  const links = navigationFuer(stand);
   // Ein Schalter, eine Abfrage, auf jeder Seite. Sie steht hier und nicht im
   // Schnellzugriff selbst: der ist eine Client-Komponente und kann die
   // Feature-Tabelle nicht lesen.
@@ -114,7 +124,7 @@ export default async function AppShell({
                 Hinter demselben Plus haengen inzwischen auch die Einheiten und
                 der Wegweiser (docs/findbarkeit-plan.md) - aus demselben Grund
                 und an derselben Stelle statt als zweites Symbol daneben. */}
-            <Schnellzugriff istAdmin={user.role === "ADMIN"} wegweiserAn={wegweiserAn} />
+            <Schnellzugriff ausbau={stand} wegweiserAn={wegweiserAn} />
             {/* Nur am Rechner und nur im Browser-Tab: das Symbol erklaert, wie
                 das Cockpit hier in ein eigenes Fenster kommt. Am Handy erscheint
                 es nie - dort ist die Installation Pflicht und laengst

@@ -27,7 +27,9 @@ Der Baum aller Personen der Instanz — wer wen führt. Die gesamte Struktur seh
 Eine Person und alles, was unter ihr hängt.
 
 **Führungskraft (FK)**:
-Keine Rolle, sondern eine Position: Wer Direkte unter sich hat, führt.
+Keine Rolle, sondern eine Position: Wer Direkte unter sich hat, führt. Damit ist
+Führung zugleich die zweite Achse neben dem **Ausbau** — sie wird nie gesetzt,
+sondern gezählt.
 
 **Platzhalter**:
 Ein angelegtes Konto ohne eigenen Zugang. Steht im Baum, zählt in keiner Summe und trägt keine Ampel.
@@ -51,6 +53,27 @@ Die kumulierte Einheiten-Kurve über die Zeit — die eigene auf der Einheiten-S
 
 **Vorführen**:
 Der Schalter fürs Zeigen vor Fremden: alle Namen der eigenen Leute werden zu Initialen, Zahlen und Kurven bleiben echt. Gilt je Browser-Tab und wird nie gespeichert.
+
+### Ausbau
+
+**Ausbau**:
+Wie viel vom Werkzeug für eine Person offen ist. Zwei Stände: der Anfang —
+Namen, Heute, Kalender, Einladen — und der volle Umfang. Die Führungskraft
+hebt ihn, nie der Betroffene, und nur nach oben. Kein Wort der Oberfläche:
+sichtbar wird er allein in dem Moment, in dem etwas aufgeht.
+
+Nicht zu verwechseln mit **Aufbau**: dort wächst die Struktur, hier das
+Werkzeug.
+
+**Freischalten**:
+Der eine Griff, mit dem eine Führungskraft den Ausbau einer ihrer Leute hebt.
+Die App schlägt ihn vor, sobald die Zahlen stimmen — sie tut ihn nie selbst.
+Zurücknehmen lässt er sich nicht.
+
+**Die zwei Achsen**:
+Ausbau und Führung stehen nebeneinander, nicht übereinander. Der Ausbau wird
+gesetzt, die Führung ergibt sich — wer Direkte hat, führt. Sie kreuzen sich
+frei: eine Führungskraft am Anfang sieht ihre Mannschaft, aber keinen Trichter.
 
 ### Aufbau
 

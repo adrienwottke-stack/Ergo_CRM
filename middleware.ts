@@ -15,7 +15,16 @@ export async function middleware(request: NextRequest) {
   );
   if (!session) return NextResponse.redirect(new URL("/login", request.url));
 
-  const antwort = NextResponse.next();
+  // Der Pfad als Kopfzeile, damit die Layouts ihn lesen koennen: eine
+  // Server-Komponente kennt ihre eigene Adresse nicht, und der Ausbau-Waechter
+  // braucht sie (docs/ausbau-plan.md). Entschieden wird NICHT hier - die
+  // Middleware laeuft auf der Edge-Runtime und hat keine Datenbank, aus
+  // demselben Grund, aus dem schon die Willkommens-Weiche im Layout sitzt
+  // (lib/auth.ts, requireOnboardedUser). Sie reicht nur weiter.
+  const kopfzeilen = new Headers(request.headers);
+  kopfzeilen.set("x-pfad", request.nextUrl.pathname);
+
+  const antwort = NextResponse.next({ request: { headers: kopfzeilen } });
 
   if (request.nextUrl.pathname === "/kalender") {
     const gewaehlt = request.nextUrl.searchParams.get("ansicht");

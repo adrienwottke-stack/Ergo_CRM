@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, shiftDay } from "@/lib/dates";
 import {
+  btnPrimary,
   btnSecondary,
   card,
   cardInteractive,
@@ -29,10 +30,12 @@ import { einstellungenStehen } from "@/lib/einstellungen";
 import { AMPEL_FELDER, ampelAnzeigewert, ampelKriterien } from "@/lib/ampelKriterien";
 import {
   ampelKriterienSpeichern,
+  ausbauNachziehen,
   fokusProzentsatzSpeichern,
   schalten,
   schwellenSpeichern,
 } from "./actions";
+import { AUSBAU_VOLL } from "@/lib/ausbauSicht";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +76,7 @@ export default async function WerkstattPage() {
     features,
     nutzung,
     koepfe,
+    wartende,
     offeneMeldungen,
     ohneTreffer,
     schwellen,
@@ -87,6 +91,23 @@ export default async function WerkstattPage() {
       select: { featureKey: true, personId: true },
     }),
     prisma.person.count(),
+    // Wer auf Ausbau 1 steht und sich anmelden kann - also tatsaechlich vor
+    // einer aufgeraeumten Leiste sitzt und wartet. Platzhalter zaehlen nicht:
+    // sie sehen nie eine Oberflaeche (docs/ausbau-plan.md, Abschnitt 3).
+    prisma.user.findMany({
+      where: {
+        ausbau: { lt: AUSBAU_VOLL },
+        deactivatedAt: null,
+        passwordHash: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        leader: { select: { name: true, passwordHash: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
     prisma.rueckmeldung.count({ where: { stand: { in: [...OFFENE_STAENDE] } } }),
     // Wonach im Wegweiser gesucht wurde, ohne dass es etwas gab. Ueber Tage
     // hinweg zusammengezogen: interessant ist das Wort, nicht der Tag.
@@ -279,6 +300,66 @@ export default async function WerkstattPage() {
         Arena ist weg, sie kostete den Partner Aufmerksamkeit und brachte ihm
         keinen Termin.
       </p>
+
+      {/* Warten auf Freischaltung (docs/ausbau-plan.md, Abschnitt 3).
+
+          Freischalten ist Sache der Fuehrungskraft. Dieser Block ist der
+          Notausgang: er zeigt, wer haengt - und ganz nebenbei, welche
+          Fuehrungskraft nicht hinschaut. Steht bewusst hier oben, nicht
+          unter den Schaltern: es ist die einzige Stelle der Werkstatt, an
+          der ein Mensch wartet und nicht eine Einstellung. */}
+      <div className={`${card} p-5 sm:p-6`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className={sectionTitle}>Warten auf Freischaltung</h2>
+          <span className="text-xs text-ink-muted">{wartende.length} offen</span>
+        </div>
+
+        {wartende.length === 0 ? (
+          <p className="mt-2 text-sm text-ink-muted">
+            Niemand wartet. Jedes Konto mit Zugang steht auf vollem Umfang.
+          </p>
+        ) : (
+          <>
+            <p className="mt-2 max-w-2xl text-sm text-ink-muted">
+              Diese Konten sehen vier Reiter: Namen, Heute, Kalender,
+              Einladen. Trichter und Wettbewerb macht ihre Führungskraft auf
+              — oder du hier, wenn sie es nicht tut. Zurück geht es nicht.
+            </p>
+
+            <ul className="mt-4 divide-y divide-line">
+              {wartende.map((konto) => (
+                <li
+                  key={konto.id}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3"
+                >
+                  <span className="text-sm text-ink">
+                    <span className="font-medium">{konto.name}</span>
+                    <span className="ml-2 text-ink-muted">
+                      {konto.leader === null
+                        ? "niemand darüber"
+                        : konto.leader.passwordHash === null
+                          ? `über ${konto.leader.name} — Platzhalter, kann nicht freischalten`
+                          : `wartet auf ${konto.leader.name}`}
+                    </span>
+                  </span>
+                  <form action={ausbauNachziehen}>
+                    <input type="hidden" name="userId" value={konto.id} />
+                    <button type="submit" className={btnSecondary}>
+                      Aufmachen
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+
+            <form action={ausbauNachziehen} className="mt-4">
+              <button type="submit" className={btnPrimary}>
+                Alle {wartende.length} aufmachen
+              </button>
+            </form>
+          </>
+        )}
+      </div>
 
       {/* --- Karrierestufen-Schwellen ----------------------------------------
           Emils Satz: "Stufen-Schwellen einbauen - dafuer schickt mir Emil was,

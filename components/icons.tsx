@@ -156,6 +156,18 @@ export function LockIcon({ className }: { className?: string }) {
   );
 }
 
+// Der aufgesprungene Buegel: derselbe Koerper wie LockIcon, der Buegel steht
+// offen nach rechts. Fuer den Freischalt-Knopf (docs/ausbau-plan.md) - ein
+// geschlossenes Schloss auf einem Knopf, der oeffnet, sagt das Gegenteil.
+export function UnlockIcon({ className }: { className?: string }) {
+  return (
+    <svg {...iconProps(className)}>
+      <rect x="5" y="10.5" width="14" height="9.5" rx="2" />
+      <path d="M8 10.5V8a4 4 0 0 1 7.5-2M12 14.5v2" />
+    </svg>
+  );
+}
+
 export function TrashIcon({ className }: { className?: string }) {
   return (
     <svg {...iconProps(className)}>

@@ -14,6 +14,9 @@ import {
   type DueState,
 } from "@/lib/dates";
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
+import { AUSBAU_VOLL, ausbaustand, vorschlaegeFuer } from "@/lib/ausbau";
+import { ladeRangliste } from "@/lib/arena";
+import { startOfWeek } from "@/lib/dates";
 import { liegtLabel, liegtSeit } from "@/lib/liegenbleiber";
 import { herkunftAusQuelle } from "@/lib/empfehlungen";
 import {
@@ -49,6 +52,9 @@ import Meldungen from "@/components/Meldungen";
 import Postfach from "@/components/Postfach";
 import NummerHinterlegen from "@/components/NummerHinterlegen";
 import EinheitenKarte from "@/components/EinheitenKarte";
+import RanglisteZeile from "@/components/RanglisteZeile";
+import AusbauVorschlag from "@/components/AusbauVorschlag";
+import AusbauAufgegangen from "@/components/AusbauAufgegangen";
 import TerminFrageKarte, { type TerminFrage } from "@/components/TerminFrageKarte";
 import { card, chip, flaeche, kicker as kickerStil } from "@/components/ui";
 import SeitenKopf from "@/components/SeitenKopf";
@@ -126,6 +132,34 @@ export default async function HeutePage() {
   // In after(): der Rueckruf laeuft NACH der ausgelieferten Antwort. Kostet
   // den Nutzer keine Millisekunde und kann die Seite nicht mehr kippen.
   after(() => merkeAnwesenheit(user.id));
+
+  // Wie viel diese Seite zeigt (docs/ausbau-plan.md, Abschnitt 4). Auf Ausbau 1
+  // bleiben vier Bloecke stehen: Tagespensum, die Aufgabenlisten, der
+  // Starterpass und eine Zeile von der Rangliste. Alles andere kommt spaeter -
+  // eine Seite mit achtzehn Bloecken ist der zweite Grund, aus dem der Start
+  // ueberfordert (der erste ist die Leiste).
+  const ausbau = await ausbaustand(user);
+  const vollerUmfang = ausbau.stufe >= AUSBAU_VOLL || ausbau.istAdmin;
+
+  // Der eine Blick auf die Rangliste, den Ausbau 1 behaelt. Nur hier geladen:
+  // ab Ausbau 2 steht der ganze Wettbewerbsbereich in der Leiste und die Zeile
+  // waere die dritte Anzeige derselben Zahl.
+  const ranglistenBlick = vollerUmfang ? null : await ranglistenZeile(user.id);
+
+  // Wen die Fuehrungskraft heute freischalten koennte. Gerechnet, nicht
+  // gespeichert - siehe components/AusbauVorschlag.tsx. Nur ueber die eigenen
+  // Direkten: wer tiefer im Ast haengt, wird von SEINER Fuehrungskraft
+  // freigeschaltet, nicht ueber deren Kopf hinweg.
+  const meineDirekten = await prisma.user.findMany({
+    where: { leaderId: user.id, deactivatedAt: null, passwordHash: { not: null } },
+    select: { id: true },
+  });
+  const ausbauVorschlaege = await vorschlaegeFuer(meineDirekten.map((k) => k.id));
+
+  // Die Aufgeh-Karte: einmal, nachdem jemand freigeschaltet wurde. Konten, die
+  // die Migration hochgesetzt hat, tragen kein ausbauGesetztAm - fuer sie ging
+  // nichts auf, und die Karte erscheint zu Recht nie.
+  const gerade = user.ausbauGesetztAm !== null && user.ausbauGezeigtAm === null;
 
   const sicht = eigene(user.id);
   const today = berlinToday();
@@ -298,7 +332,13 @@ export default async function HeutePage() {
       strukturVerlauf(user.id),
       schalter("einheiten"),
     ]);
-    einheitenAn = schalterWerte.einheiten;
+    // Die Einheiten-Zeilen im Lagebild (Team-Puls, Schwellen-Zeile) haengen an
+    // BEIDEM: am Feature-Schalter und am Ausbau. Eine Fuehrungskraft auf
+    // Ausbau 1 sieht ihre Ampeln und ihre Direkten, aber keine
+    // Einheiten-Zahlen - sie kann sie auf /einheiten ja auch nicht nachsehen.
+    // Hier gesetzt und nicht erst beim Rendern: so bleiben auch die teuren
+    // Abfragen darunter aus.
+    einheitenAn = schalterWerte.einheiten && vollerUmfang;
     const direkteIds = direkteKonten.map((konto) => konto.id);
 
     // Haengt am Ergebnis der beiden Abfragen oben (Astliste, direkte Ids) -
@@ -564,6 +604,11 @@ export default async function HeutePage() {
     <div className="space-y-6">
       <SeitenKopf kicker={lage ? "Führung" : "Beraterbereich"} titel="Heute" />
 
+      {/* Ganz oben und nur einmal: der einzige Ort, an dem die App ueber
+          den Ausbau spricht. Vor dem Postfach, weil eine Nachricht morgen
+          auch noch da ist - dieser Moment nicht. */}
+      {gerade && <AusbauAufgegangen />}
+
       {/* Was jemand geschrieben hat, steht vor der Arbeit - es dauert zehn
           Sekunden und ist der Grund, warum sich das Werkzeug nach Mannschaft
           anfuehlt und nicht nach Verwaltung. */}
@@ -604,6 +649,13 @@ export default async function HeutePage() {
           {griffPersonen.length > 0 && (
             <GriffKarte personen={griffPersonen} gesamt={griffGesamt} />
           )}
+
+          {/* Wer so weit ist, dass sich der naechste Schritt lohnt. Steht
+              zwischen den Faellen, die heute einen Griff brauchen - eine
+              Fuehrungskraft hat EINE Liste (docs/struktur-plan.md, 5), und
+              "jemanden weiterbringen" gehoert genauso hinein wie
+              "jemanden auffangen". */}
+          <AusbauVorschlag vorschlaege={ausbauVorschlaege} />
 
           {gelbAlle.length > 0 && (
             <Link
@@ -677,6 +729,12 @@ export default async function HeutePage() {
           dem Lagebild, sonst direkt nach dem Postfach: der Aufmacher der
           Seite bleibt Mensch, gleich danach die eigene Zahl. Immer da, keine
           Bedingung - ein Dashboard-Baustein ist keine Meldung. */}
+      {/* Erst ab Ausbau 2. Der frueher hier stehende Satz "immer da, keine
+          Bedingung - ein Dashboard-Baustein ist keine Meldung" galt fuer eine
+          App, die jedem alles zeigte. Einheiten haengen an der Karrierestufe,
+          und die ist bei jedem Neuen NULL: die Karte zeigt ihm zwei Nullen und
+          einen Balken ohne Ziel. Das ist keine Auskunft, das ist Fuellung. */}
+      {vollerUmfang && (
       <EinheitenKarte
         monat={formatEinheiten(einheitenMonat)}
         monatLabel={produktionsmonat(today).label}
@@ -685,6 +743,7 @@ export default async function HeutePage() {
         naechsteStufe={naechsteKarrierestufe}
         karrierestufeFehlt={user.karrierestufe === null}
       />
+      )}
 
       {/* AP-10: die proaktive Frage nach einem vergangenen Termin - noch vor
           dem Tagespensum. Sonst haette sie sich in der Liste weiter unten
@@ -758,7 +817,7 @@ export default async function HeutePage() {
             ueber dem Nachfuell-Alarm, weil ein liegender Name der teurere
             Fehler ist - Nachschub holen kann man morgen, einen kalt
             gewordenen Namen nicht zurueckholen. */}
-        {aeltester && (
+        {vollerUmfang && aeltester && (
           <div
             className={`${flaeche("gefahr")} mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
           >
@@ -783,7 +842,7 @@ export default async function HeutePage() {
         )}
 
         {/* Nachfuell-Alarm: ohne Namen kein Anruf, egal wie voll der Tag ist. */}
-        {nachfuellen && (
+        {vollerUmfang && nachfuellen && (
           <div
             className={`${flaeche("warnung")} mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
           >
@@ -818,7 +877,20 @@ export default async function HeutePage() {
 
       {/* Fragt nur, wenn noch nicht zugestimmt wurde - und erklaert wofuer,
           bevor der Browser fragt. */}
-      <Meldungen vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""} />
+      {vollerUmfang && (
+        <Meldungen vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""} />
+      )}
+
+      {/* Auf Ausbau 1 der einzige Blick nach draussen: wo stehe ich. Steht
+          NACH dem Tagespensum, weil der Vergleich erst etwas wert ist, wenn
+          man weiss, was man selbst heute getan hat. */}
+      {ranglistenBlick && (
+        <RanglisteZeile
+          platz={ranglistenBlick.platz}
+          koepfe={ranglistenBlick.koepfe}
+          ueberMir={ranglistenBlick.ueberMir}
+        />
+      )}
 
       {/* Startwoche, Brief, Versprechen, Wiedereinstieg - meldet sich nur,
           wenn einer dieser Momente wirklich ansteht. */}
@@ -977,7 +1049,11 @@ export default async function HeutePage() {
           ))
       )}
 
-      {orphans.length > 0 && (
+      {/* "Ohne naechsten Schritt" ist eine Aufraeumliste. Sie setzt voraus,
+          dass schon genug Kontakte da sind, um welche zu verlieren - am ersten
+          Tag steht dort die halbe frisch eingetragene Namensliste und sieht aus
+          wie ein Vorwurf. */}
+      {vollerUmfang && orphans.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-base font-semibold text-ink">
@@ -1044,4 +1120,36 @@ export default async function HeutePage() {
       )}
     </div>
   );
+}
+
+// Platz, Kopfzahl und die zwei Namen darueber - fuer die eine Zeile auf
+// Ausbau 1 (docs/ausbau-plan.md, Abschnitt 4).
+//
+// Dieselbe Quelle wie /leaderboard (ladeRangliste ueber die laufende Woche),
+// damit die Zeile und die Seite spaeter nie zwei verschiedene Plaetze zeigen.
+// Wer diese Woche nichts getan hat, steht gar nicht in der Liste: dann ist der
+// Platz null und die Zeile sagt das, statt einen letzten Platz zu erfinden.
+async function ranglistenZeile(userId: string) {
+  const person = await prisma.person.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!person) return null;
+
+  const zeilen = await ladeRangliste(startOfWeek(berlinToday()));
+  const index = zeilen.findIndex((zeile) => zeile.personId === person.id);
+
+  return {
+    platz: index < 0 ? null : index + 1,
+    koepfe: zeilen.length,
+    // Von unten nach oben: der direkt vor mir zuerst. Das ist der, den man
+    // ueberholen kann - nicht der Erste.
+    ueberMir:
+      index <= 0
+        ? []
+        : zeilen
+            .slice(Math.max(0, index - 2), index)
+            .reverse()
+            .map((zeile) => zeile.name),
+  };
 }

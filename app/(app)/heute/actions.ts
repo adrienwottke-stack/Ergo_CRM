@@ -26,3 +26,19 @@ export async function abrechnungGesehen() {
   });
   revalidatePath("/heute");
 }
+
+/**
+ * "Verstanden" auf der Aufgeh-Karte (docs/ausbau-plan.md, Abschnitt 3).
+ *
+ * Setzt den Zeitstempel, danach ist die Karte fuer immer weg. Muster wie
+ * whyShownAt/pledgeShownAt: gezeigt heisst gezeigt, es gibt keinen Weg zurueck
+ * und keinen Zaehler.
+ */
+export async function ausbauGesehen() {
+  const user = await requireUser();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { ausbauGezeigtAm: new Date() },
+  });
+  revalidatePath("/heute");
+}

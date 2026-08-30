@@ -1,4 +1,4 @@
-// Probe der reinen Rechenkerne: Stufen und Meilensteine.
+// Probe der reinen Rechenkerne: Stufen, Meilensteine und der Ausbau.
 //
 // Das Projekt hat keinen Test-Laeufer. "Pruefbar" heisst hier: die Funktionen
 // sind so gebaut, dass ein Skript sie mit Beispieldaten durchspielen kann -
@@ -15,6 +15,7 @@
 
 import { stufeVon } from "../lib/stufen.ts";
 import { offeneMeilensteine, meilensteinZuSchluessel } from "../lib/meilensteine.ts";
+import { bereichVon, darfSehen, sperreFuer, titelVon } from "../lib/ausbauSicht.ts";
 
 let fehler = 0;
 
@@ -63,5 +64,53 @@ pruefe("gefaelschte Schwelle wird abgewiesen", meilensteinZuSchluessel("nummern5
 pruefe("erfundener Schluessel wird abgewiesen", meilensteinZuSchluessel("quatsch99", heute), null);
 pruefe("echter Schluessel geht durch", meilensteinZuSchluessel("nummern25", heute)?.wert, 25);
 
+
+// --- Ausbau (docs/ausbau-plan.md) -------------------------------------------
+//
+// Die zwei Achsen: stufe (1 -> 2, von der Fuehrungskraft gesetzt) und fuehrt
+// (haengt jemand unter mir). Sie kreuzen sich frei - genau das ist hier die
+// interessante Stelle.
+
+console.log("");
+console.log("Ausbau");
+
+const anfang = { stufe: 1, fuehrt: false, istAdmin: false };
+const fkAmAnfang = { stufe: 1, fuehrt: true, istAdmin: false };
+const voll = { stufe: 2, fuehrt: false, istAdmin: false };
+const admin = { stufe: 1, fuehrt: false, istAdmin: true };
+
+pruefe("unbekannte Adresse gilt als Anfang", bereichVon("/namen/sammeln"), "anfang");
+pruefe("Unterseite erbt den Bereich", bereichVon("/mannschaft/abc123"), "fuehrung");
+// Der Praefix darf nicht auf einen laengeren Namen passen.
+pruefe("/teamabend ist nicht /team", bereichVon("/teamabend"), "fuehrung");
+pruefe("/team bleibt Admin", bereichVon("/team"), "admin");
+
+pruefe("Anfang sieht die Namensliste", darfSehen("/namen", anfang), true);
+pruefe("Anfang sieht den Kalender", darfSehen("/kalender", anfang), true);
+pruefe("Anfang sieht Einladen", darfSehen("/einladen", anfang), true);
+pruefe("Anfang sieht den Trichter nicht", darfSehen("/trichter", anfang), false);
+pruefe("Anfang sieht die Mannschaft nicht", darfSehen("/mannschaft", anfang), false);
+
+// Der Kern des Modells: die Achsen sind unabhaengig.
+pruefe("FK auf Stufe 1 sieht die Mannschaft", darfSehen("/mannschaft", fkAmAnfang), true);
+pruefe("FK auf Stufe 1 sieht den Trichter NICHT", darfSehen("/trichter", fkAmAnfang), false);
+pruefe("Stufe 2 ohne Leute sieht den Trichter", darfSehen("/trichter", voll), true);
+pruefe("Stufe 2 ohne Leute sieht die Mannschaft NICHT", darfSehen("/mannschaft", voll), false);
+
+// Der Admin ist der Notausgang der Mechanik und darf nirgends anstossen.
+pruefe("Admin sieht die Werkstatt", darfSehen("/werkstatt", admin), true);
+pruefe("Admin sieht alles trotz Stufe 1", darfSehen("/trichter", admin), true);
+pruefe("Nicht-Admin sieht die Werkstatt nicht", darfSehen("/werkstatt", voll), false);
+
+// sperreFuer ist bewusst NICHT !darfSehen: Admin-Bereiche laufen weiter ueber
+// requireAdmin() in der Seite, nicht ueber den Ausbau-Waechter im Layout.
+pruefe("Waechter sperrt den Trichter", sperreFuer("/trichter", anfang), "voll");
+pruefe("Waechter sperrt die Mannschaft", sperreFuer("/mannschaft", anfang), "fuehrung");
+pruefe("Waechter laesst /team durch", sperreFuer("/team", anfang), null);
+pruefe("Waechter laesst den Anfang durch", sperreFuer("/namen", anfang), null);
+pruefe("Waechter laesst den Admin durch", sperreFuer("/trichter", admin), null);
+
+pruefe("Titel fuer die Sperrseite", titelVon("/trichter"), "Der Trichter");
+pruefe("Titel faellt zurueck", titelVon("/irgendwas"), "Die Seite");
 console.log(fehler === 0 ? "\nAlles sauber." : `\n${fehler} Fehler.`);
 process.exit(fehler === 0 ? 0 : 1);

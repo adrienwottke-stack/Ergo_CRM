@@ -12,6 +12,7 @@ import {
 } from "@/lib/einheiten";
 import { einstellungSetzen, ganzzahl } from "@/lib/einstellungen";
 import { AMPEL_FELDER } from "@/lib/ampelKriterien";
+import { AUSBAU_VOLL } from "@/lib/ausbauSicht";
 import type { FeatureState } from "@/lib/generated/prisma/enums";
 
 const zustaende: FeatureState[] = ["TEST", "LAEUFT", "AUS", "ABGERISSEN"];
@@ -149,4 +150,42 @@ export async function fokusProzentsatzSpeichern(formData: FormData) {
 
   revalidatePath("/werkstatt");
   revalidatePath("/mannschaft");
+}
+
+/**
+ * Der Notausgang der Ausbau-Mechanik (docs/ausbau-plan.md, Abschnitt 3).
+ *
+ * Freischalten ist Sache der Fuehrungskraft. Der Admin sammelt nach, wo sie
+ * nicht reagiert - sonst haengt jemand an der Passivitaet eines anderen fest.
+ * Ohne diesen Knopf waere die Migration, die alle auf Ausbau 1 setzt, eine
+ * Einbahnstrasse in eine Warteschlange.
+ *
+ * Ein Konto oder alle: ohne "userId" gehen alle wartenden auf. Beides derselbe
+ * Weg, damit es nicht zwei Fassungen derselben Regel gibt.
+ *
+ * NUR AUFWAERTS - das `lt: AUSBAU_VOLL` im Filter ist die Regel, kein
+ * Wettlauf-Schutz. Platzhalter bleiben aussen vor: sie koennen sich nie
+ * anmelden, und wird spaeter ein echtes Konto daraus, soll die Freischaltung
+ * DANN entschieden werden.
+ */
+export async function ausbauNachziehen(formData: FormData) {
+  const admin = await requireAdmin();
+  const einzeln = formData.get("userId");
+
+  await prisma.user.updateMany({
+    where: {
+      ausbau: { lt: AUSBAU_VOLL },
+      deactivatedAt: null,
+      passwordHash: { not: null },
+      ...(typeof einzeln === "string" && einzeln ? { id: einzeln } : {}),
+    },
+    data: {
+      ausbau: AUSBAU_VOLL,
+      ausbauGesetztVon: admin.id,
+      ausbauGesetztAm: new Date(),
+    },
+  });
+
+  revalidatePath("/werkstatt");
+  revalidatePath("/heute");
 }

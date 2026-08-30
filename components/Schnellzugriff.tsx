@@ -45,6 +45,7 @@ import { einheitSchnellBuchen } from "@/app/(team)/einheiten/actions";
 import { suchlauf } from "@/app/wegweiserAction";
 import type { SchnellStand } from "@/lib/stats";
 import { sucheImWegweiser, type WegweiserEintrag } from "@/lib/wegweiser";
+import { AUSBAU_VOLL, type Ausbaustand } from "@/lib/ausbauSicht";
 import Modal from "@/components/Modal";
 import EinheitenHilfe from "@/components/EinheitenHilfe";
 import {
@@ -73,11 +74,12 @@ function ArtSymbol({ type, className }: { type: QuotaType; className?: string })
 }
 
 export default function Schnellzugriff({
-  istAdmin,
+  ausbau,
   wegweiserAn,
 }: {
   /** Entscheidet, ob Team und Werkstatt im Wegweiser auftauchen. */
-  istAdmin: boolean;
+  /** Entscheidet, was der Wegweiser zeigt und ob das Einheiten-Feld dasteht. */
+  ausbau: Ausbaustand;
   /** Schalter aus lib/features.ts. Aus heisst: kein Filterfeld, drei Zaehler. */
   wegweiserAn: boolean;
 }) {
@@ -110,17 +112,26 @@ export default function Schnellzugriff({
   // "ei", "ein") als eigene Zeile im Treffer-los-Log.
   const letzteSuche = useRef<{ begriff: string; treffer: boolean } | null>(null);
 
-  const treffer = useMemo(
-    () => (suche.trim() ? sucheImWegweiser(suche, istAdmin) : []),
-    [suche, istAdmin]
+  const { treffer, nurGesperrt } = useMemo(
+    () =>
+      suche.trim()
+        ? sucheImWegweiser(suche, ausbau)
+        : { treffer: [], nurGesperrt: false },
+    [suche, ausbau]
   );
   const imWegweiser = wegweiserAn && suche.trim().length > 0;
 
   useEffect(() => {
     if (!suche.trim()) return;
-    letzteSuche.current = { begriff: suche, treffer: treffer.length > 0 };
+    // Ein Ziel, das nur noch zu ist, zaehlt als Treffer: sonst stuende
+    // "einheiten" in der Werkstatt unter "Gesucht, nichts gefunden" und der
+    // Admin baute ein Synonym gegen ein Problem, das keines ist.
+    letzteSuche.current = {
+      begriff: suche,
+      treffer: treffer.length > 0 || nurGesperrt,
+    };
     setMarkiert(0);
-  }, [suche, treffer.length]);
+  }, [suche, treffer.length, nurGesperrt]);
 
   const oeffnen = useCallback((mitFokus: boolean) => {
     setOffen(true);
@@ -328,7 +339,11 @@ export default function Schnellzugriff({
             autoCapitalize="off"
             spellCheck={false}
             aria-label="Suchen"
-            placeholder="Einheiten, Namen, Termin …"
+            placeholder={
+              ausbau.stufe >= AUSBAU_VOLL
+                ? "Einheiten, Namen, Termin …"
+                : "Namen, Termin, Kontakt …"
+            }
             className={cn(inputBlank, "mb-4")}
           />
         )}
@@ -364,12 +379,22 @@ export default function Schnellzugriff({
               ))}
             </div>
           ) : (
-            // Keine Sackgasse: was hier fehlt, landet als Zeile in der
-            // Werkstatt und ist damit die naechste Aufgabe, kein Achselzucken.
-            <p className="rounded-xl border border-line bg-sunken px-4 py-6 text-center text-13 text-ink-muted">
-              Dazu finde ich nichts. Das ist notiert — schreib es zur Sicherheit
-              übers Megafon dazu.
-            </p>
+            nurGesperrt ? (
+              // Getroffen, aber noch zu. Das ist kein Fehlschlag und darf
+              // auch nicht wie einer aussehen - sonst sucht jemand weiter
+              // nach einem Wort, das er laengst richtig getippt hat.
+              <p className="rounded-xl border border-line bg-sunken px-4 py-6 text-center text-13 text-ink-muted">
+                Das gibt es — es ist nur noch zu. Deine Führungskraft macht es
+                auf, wenn du so weit bist.
+              </p>
+            ) : (
+              // Keine Sackgasse: was hier fehlt, landet als Zeile in der
+              // Werkstatt und ist damit die naechste Aufgabe, kein Achselzucken.
+              <p className="rounded-xl border border-line bg-sunken px-4 py-6 text-center text-13 text-ink-muted">
+                Dazu finde ich nichts. Das ist notiert — schreib es zur Sicherheit
+                übers Megafon dazu.
+              </p>
+            )
           )
         ) : (
           <>
@@ -443,7 +468,13 @@ export default function Schnellzugriff({
             {/* --- Die Zahl, in der der Betrieb rechnet ---------------------
                 Unter der Trennlinie und mit eigenem Feld statt +1: eine
                 Einheit ist keine Strichliste. Rueckwirkend buchen geht auf
-                /einheiten - hier zaehlt der heutige Tag. */}
+                /einheiten - hier zaehlt der heutige Tag.
+
+                Erst ab Ausbau 2, wie /einheiten selbst: Einheiten haengen an
+                der Karrierestufe, und die ist bei jedem Neuen NULL. Das Feld
+                stuende sonst am ersten Tag da und traege eine Zahl ab, die
+                nirgends ankommt (docs/ausbau-plan.md, Abschnitt 4). */}
+            {ausbau.stufe >= AUSBAU_VOLL && (
             <div className="mt-4 border-t border-line pt-4">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="flex items-center gap-1.5 text-13 font-medium text-ink-muted">
@@ -502,6 +533,7 @@ export default function Schnellzugriff({
                 </p>
               ) : null}
             </div>
+            )}
 
             {/* Der Grund zum Tippen, in einer Zeile. Kein zweiter Bildschirm. */}
             <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-3 text-13 text-ink-muted">

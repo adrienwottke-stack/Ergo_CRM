@@ -307,6 +307,37 @@ model User {
   // nach: eine Zahl, danach laufen die Buchungen.
   einheitenStart Int @default(0)
 
+  // --- Ausbau (docs/ausbau-plan.md) ------------------------------------------
+  // Wie viel vom Werkzeug fuer diese Person offen ist. 1 = der Anfang (Namen,
+  // Heute, Kalender, Einladen), 2 = voller Umfang. Die FUEHRUNGSKRAFT setzt die
+  // Zahl, nie der Betroffene, und nur nach oben.
+  //
+  // Nicht verwechseln mit "Aufbau" (CONTEXT.md): dort waechst die STRUKTUR,
+  // hier waechst das WERKZEUG. Ein Buchstabe Unterschied, zwei Sachen.
+  //
+  // Warum ueberhaupt gespeichert, wo lib/stufen.ts mit "eine Stufe wird NICHT
+  // gespeichert" anfaengt: dort rechnet eine Formel, hier entscheidet ein
+  // Mensch. Und anders als das tote User.careerLevel von damals
+  // (20260823120000_kernmodell_rueckbau, "wird nie gelesen und nie
+  // geschrieben") wird dieses Feld auf jeder Seite gelesen.
+  //
+  // Die zweite Achse - Fuehrung - steht bewusst NICHT hier. Ob jemand fuehrt,
+  // haengt allein daran, ob ein einloggbares Konto unter ihm haengt, und das
+  // sagt leaderId bereits. Ein mitgefuehrtes Feld muesste bei jedem Umhaengen
+  // fortgeschrieben werden und stuende ab dem ersten verpassten Fall dauerhaft
+  // falsch da - dieselbe Begruendung wie bei der Team-Summe
+  // (docs/einheiten-plan.md, Abschnitt 10).
+  ausbau           Int       @default(1)
+  // Wer freigeschaltet hat und wann. Reine Nachvollziehbarkeit: an diesen zwei
+  // Feldern haengt keine Logik, sie beantworten nur "wer war das?".
+  ausbauGesetztVon String?
+  ausbauGesetztAm  DateTime?
+  // Ob die Aufgeh-Karte schon dastand. Muster wie whyShownAt/pledgeShownAt:
+  // NULL heisst "noch nicht gezeigt". Konten, die die Migration hochgesetzt
+  // hat, tragen kein ausbauGesetztAm - fuer sie ging nichts auf, und die Karte
+  // erscheint zu Recht nie.
+  ausbauGezeigtAm  DateTime?
+
   // --- Willkommen (docs/willkommen-plan.md) ----------------------------------
   // NULL = hat den Start noch nie gesehen. Einmalig gesetzt, danach nie wieder
   // automatisch. Bewusst kein Schritt-Zaehler: wer mittendrin abbricht, faengt
