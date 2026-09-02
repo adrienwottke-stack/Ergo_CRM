@@ -2,6 +2,8 @@
 
 Stand: 01.09.2026 — Notizen vom 31.08. (Zoom-Vorführung), Klärungen von Adrien per Sprachnotiz am 01.09., alle Deutungsfragen in drei Fragerunden entschieden. **Dieses Dokument ist jetzt der Umsetzungsplan**: 14 Arbeitspakete (AP-15 bis AP-28, fortlaufend nach Runde 1), fünf Wellen, ein Commit je Paket.
 
+**Nachtrag 01.09.2026 abends: ALLE 14 Pakete sind umgesetzt und committet** — Commit-Tabelle, Prüfstand und Restpunkte in Abschnitt 13. Der Branch ist **nicht gepusht**: ein Push löst den Vercel-Build aus, und der fährt die Direktkontakt-Migration gegen die geteilte Produktions-Datenbank.
+
 Runde 1 steht in [emil-feedback-plan.md](emil-feedback-plan.md) — deren 14 Pakete sind umgesetzt; was hier steht, ist Emils Reaktion auf genau diesen Stand. Basis: Branch `redesign/liquid-glass`, Commit `a875807`.
 
 > Die Hausregel aus Runde 1 gilt weiter: **Emil beschreibt selten fehlende Features — meist beschreibt er Features, die er nicht gefunden hat. Erst prüfen, dann bauen.** Zwei der siebzehn Notizen waren genau das (N3, N17).
@@ -407,3 +409,54 @@ Sicht-Check nach Welle 2 und am Ende über die Vorschau (`.claude/launch.json` �
 2. **Der abgelesene Stand steht außerhalb des Blickfelds.** Fadenkreuz mitten in der Kurve, Wert am Kartenkopf außerhalb des Ausschnitts. → AP-15.
 3. **Die Matrix trägt viele „—"-Zeilen.** Sechs von elf Köpfen sind Platzhalter ohne Passwort — wie vorgesehen, aber der erste Eindruck ist halbleer. Kein Paket; erledigt sich mit echten Konten.
 4. **Vorführen zeigte „Jonas." und „Timo."** — identische Vornamen wachsen bis zum vollen Wort. → AP-22 macht das gegenstandslos.
+
+---
+
+## 13. Umsetzung — Stand 01.09.2026 abends
+
+Gebaut in einer Session über Sonnet-/Opus-Subagenten mit Datei-Eigentum, in fünf Wellen; jedes Paket einzeln geprüft (`tsc`, `eslint`) und committet. Zum Schluss ein echter `npx next build` (ohne Migrationsschritt): grün.
+
+| Commit | Paket | Inhalt |
+|---|---|---|
+| `9788c51` | Doku | Dieser Plan, CONTEXT.md (Tracker, Zählname, Direktkontakt, Wettbewerb-Begriffe), ADR 0006 |
+| `aca22ab` | AP-21 | Direktkontakttrichter: Schema + Migration `20260901120000_direktkontakt`, /direktkontakt, Zähler, eigener Trichter |
+| `19ca8b5` | AP-16 | `lib/aktivitaeten.ts` — Tageswerte Anrufe/Termine, Quelle identisch mit der Matrix |
+| `0e4e80a` | AP-20 | Frage nach dem Anruf in der Heute-Liste, Wochentags-Chips, Uhrzeit für „Später", Wiedervorlagen in Feed + Kalender |
+| `67e7744` | AP-15 | VerlaufsChart: zwei Serien, Legende, Ablese-Badge, Formatter |
+| `34efe78` | AP-17 | /mannschaft: Kurven-Block oben (Eigen/Team disjunkt), Matrix darunter, Link zum Direktkontakt |
+| `e71a8fe` | AP-24 | Teamabend-Rückblick: Karten je Person, Team-Engpass ohne Namen, Kuratierung je Tab |
+| `1ee6188` | AP-22 | Vorführen: Zählnamen „GP n" |
+| `2c2d329` | AP-26 | FK-Nav-Reihenfolge, Megafon-Label „Feedback" + Hinweispunkt |
+| `f2a4664` | AP-25 | Stufen-Titel konfigurierbar (Werkstatt), Default Mix |
+| `a9b7a03` | AP-20b | Uhrzeit auch im Durchlauf, Anruf-Frage in der Kontaktakte, ICS-Knopf-Guard, Wiedervorlage-Stil |
+| `aca984f` | AP-18 | /heute-FK-Kopf: Einheiten + Anrufe nebeneinander, Sparkline ohne Fläche bei Stillstand |
+| `41c0f2b` | AP-28 | Saison-Trophäen + Vitrine auf /spiel, on-the-fly aus DailyLog |
+| `e6e74a8` | AP-23 | Rename → Tracker: 40 Stellen in 23 Dateien, Schlüssel byte-identisch |
+| `92a36a9` | AP-27 | Team-Challenge, eigene Serie im Arena-Kopf, Saison-Zwischenstand, Teamabend nur eigene Struktur (D20-Rest) |
+| `c1a4d15` | Nachzügler | Vitrine-Schalter + Zählstelle, Feature-Zeilen für direktkontakt/challenge/trophaeen in der Migration |
+| `e05f27a` | AP-19 | Personenseite: Kurven (Eigen/Ast, Anrufe/Termine), Block „Fürs 1:1", vorführfest |
+
+Dazu `c4add9c` (`.codegraph/` ignoriert). Die Commits `37746aa`/`2547a15` stammen von einer parallelen Session (Konto austragen/löschen) und liegen dazwischen.
+
+### Prüfstand
+
+- `npx tsc --noEmit` grün, `npx eslint .` ohne Fehler (eine Warnung in einem gitignorierten Audit-Skript), `npx prisma validate` grün.
+- `npx next build` grün — bewusst **nicht** `npm run build`: das Skript ist `prisma migrate deploy && next build` und würde die Migration gegen die geteilte Prod-DB fahren.
+- `prisma migrate status`: genau eine offene Migration, `20260901120000_direktkontakt` (additiv, idempotent, ohne eigenes BEGIN/COMMIT). Bis zum Deploy fängt der Code die fehlende Tabelle ab.
+- Sicht-Check hinter dem Login: nur mit Adriens Anmeldung in der Vorschau möglich (Passwörter gibt es hier nie) — offen, siehe unten.
+
+### Bewusste Abweichungen und Restpunkte
+
+- **Abweichung in AP-17:** Der Kartenkopf der Einheiten-Kurve zeigt die führende Serie (Eigen), die Kachel darüber Eigen + Team — in der Fußnote erklärt. Stört es Emil, zeigt die Kachel künftig nur Eigen.
+- **Vorführen auf der Personenseite:** „Dein Schritt" (aus `fuehrungsSchritt()`), „Termine, die anstehen" und „Liegt länger" nennen im Fließtext weiter Klarnamen — bewusst nicht angefasst (Scope), meldenswert.
+- **Trichter-Grafik dupliziert:** `components/TrichterGrafik.tsx` ist auf vier Stufen festgenagelt; der Direktkontakt hat eine eigene Kopie mit fünf. Ein Einzeiler (`HOEHE` aus `stufen.length`) würde die Kopie überflüssig machen.
+- **`lib/rueckblick.ts`** ermittelt die Struktur auf /teamabend ein zweites Mal selbst (AP-27 filtert Rangliste/Puls separat). Ein optionaler `personIds`-Parameter würde eine Abfrage sparen.
+- **Alte Zeilennummern** in den AP-Beschreibungen (Abschnitt 7) stimmen nach dem Umbau nicht mehr — sie beschreiben den Ist-Zustand vor der Umsetzung.
+- **Liga** nicht gebaut (E4), **Wochenziel** Platzhalter 100 (E3), **Titel-Satz** Mix läuft (E1), **TimeTree-Latenz** zu erklären (E2), **Trophäen-Arten** die drei (E5).
+- **Installierte PWAs** zeigen bis zur Neuinstallation „Cockpit" (ADR 0006).
+
+### Wie es weitergeht
+
+1. Adrien loggt sich in der Vorschau ein → Sicht-Check /mannschaft, /heute, /mannschaft/[id], /direktkontakt, /arena, /spiel, /teamabend, /kalender, Desktop und Handy-Breite.
+2. Push nach `origin` — Vercel baut den Preview und fährt dabei die Migration auf der Prod-DB; vorher ein Probelauf der SQL in einer Transaktion mit Rollback (Repo-Regel).
+3. Emil die fünf offenen Punkte E1–E5 stellen.
