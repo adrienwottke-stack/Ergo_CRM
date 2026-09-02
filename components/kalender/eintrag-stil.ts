@@ -63,9 +63,23 @@ const fremdStil: EintragStil = {
   punkt: "bg-emerald-400",
 };
 
+// Wiedervorlage: der zugesagte Rueckruf mit Uhrzeit (Herkunft WIEDERVORLAGE,
+// siehe lib/kalender/laden.ts). Bewusst derselbe ruhige Slate-Ton wie
+// SONSTIGES - eine Rueckmeldung ist kein Kundentermin und soll neben KONTAKT
+// nicht vorlaut wirken. Trotzdem ein eigener, ausdruecklicher Eintrag statt
+// des SONSTIGES-Fallbacks (der ueber `art` laeuft, das WIEDERVORLAGE gar
+// nicht setzt): so zieht eine spaetere Farbaenderung an SONSTIGES diesen Ton
+// nicht ungewollt mit.
+const wiedervorlageStil: EintragStil = {
+  block: "border-l-2 border-l-slate-500 bg-slate-50 text-slate-800",
+  streifen: "bg-slate-100 text-slate-700",
+  punkt: "bg-slate-500",
+};
+
 export function stilFuer(eintrag: KalenderEintrag): EintragStil {
   if (eintrag.herkunft === "KONTAKT") return kontaktStil;
   if (eintrag.herkunft === "FREMD") return fremdStil;
+  if (eintrag.herkunft === "WIEDERVORLAGE") return wiedervorlageStil;
   return artTon[eintrag.art ?? "SONSTIGES"];
 }
 

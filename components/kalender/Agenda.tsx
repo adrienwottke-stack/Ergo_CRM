@@ -131,7 +131,11 @@ export function Agenda({
                         <PhoneIcon className="h-4 w-4" />
                       </a>
                     )}
-                    {eintrag.kontaktId && (
+                    {/* Nur Kundentermine tragen appointmentAt - eine
+                        Wiedervorlage haette hier nichts zum Herunterladen
+                        (/kalender/{id}.ics filtert auf appointmentAt) und
+                        liefert sonst 404. */}
+                    {eintrag.herkunft === "KONTAKT" && eintrag.kontaktId && (
                       <a
                         href={`/kalender/${eintrag.kontaktId}.ics`}
                         aria-label={`Termin mit ${eintrag.titel} in den Kalender übernehmen`}

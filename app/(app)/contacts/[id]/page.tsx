@@ -17,6 +17,7 @@ import type { ActivityType } from "@/lib/generated/prisma/enums";
 import StageBadge from "@/components/StageBadge";
 import NextStepBadge, { formatDue } from "@/components/NextStepBadge";
 import ContactActions from "@/components/ContactActions";
+import AnrufKnopf from "@/components/AnrufKnopf";
 import DeleteContactButton from "@/components/DeleteContactButton";
 import KandidaturKarte from "@/components/KandidaturKarte";
 import QrCode from "@/components/schleuse/QrCode";
@@ -172,8 +173,16 @@ export default async function ContactDetailPage({
         </div>
       </div>
 
-      {/* Was als Nächstes zu tun ist, steht ganz oben. */}
-      <section className={`${card} p-5 sm:p-6`}>
+      {/* Was als Nächstes zu tun ist, steht ganz oben. Id + tabIndex sind das
+          Anker/Fokus-Ziel von AnrufKnopf weiter unten: nach der Rückkehr aus
+          der Telefon-App holt der Ring hierher, wo die Ergebnis-Knöpfe schon
+          stehen (ContactActions) - ohne eigene Ergebnisleiste wie
+          QuickRowActions. */}
+      <section
+        id="naechster-schritt"
+        tabIndex={-1}
+        className={`${card} scroll-mt-24 p-5 sm:p-6 focus:outline-none focus:ring-2 focus:ring-navy-500 focus:ring-offset-2`}
+      >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className={kicker}>Nächster Schritt</p>
@@ -232,18 +241,15 @@ export default async function ContactDetailPage({
       <div className={`${card} grid gap-x-8 gap-y-5 p-6 sm:grid-cols-2 sm:p-8`}>
         <div>
           <p className={kicker}>Telefon</p>
-          <p className="mt-1 text-sm text-ink">
-            {contact.phone ? (
-              <a
-                href={`tel:${contact.phone}`}
-                className="font-medium text-navy-600 hover:underline"
-              >
-                {contact.phone}
-              </a>
-            ) : (
-              "–"
-            )}
-          </p>
+          {contact.phone ? (
+            <AnrufKnopf
+              telefon={contact.phone}
+              vorname={contact.name.split(" ")[0] || contact.name}
+              zielId="naechster-schritt"
+            />
+          ) : (
+            <p className="mt-1 text-sm text-ink">–</p>
+          )}
         </div>
         <div>
           <p className={kicker}>Beruf</p>

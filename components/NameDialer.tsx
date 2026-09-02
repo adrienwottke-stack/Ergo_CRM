@@ -6,11 +6,7 @@ import { recordCallResult } from "@/app/(app)/contacts/results";
 import { ratingHints, ratingLabels, ratingPalette } from "@/lib/namelist";
 import GuideBody from "@/components/GuideBody";
 import Einwandhilfe from "@/components/Einwandhilfe";
-import {
-  AppointmentDialog,
-  ChoiceDialog,
-  LATER_CHIPS,
-} from "@/components/ResultDialogs";
+import { AppointmentDialog, SpaeterDialog } from "@/components/ResultDialogs";
 import { undoMoeglich } from "@/components/UndoBar";
 import {
   ArrowRightIcon,
@@ -389,16 +385,13 @@ export default function NameDialer({
         onSave={(when) => submit("appointment", { appointmentAt: when })}
       />
 
-      <ChoiceDialog
+      <SpaeterDialog
         open={dialog === "later"}
-        title="Wann nochmal?"
-        subtitle={current.name}
+        name={current.name}
         pending={pending}
-        choices={LATER_CHIPS.map((chip) => ({
-          label: chip.label,
-          onPick: () => submit("later", { days: chip.days }),
-        }))}
         onClose={() => setDialog(null)}
+        onTage={(tage) => submit("later", { days: tage })}
+        onZeitpunkt={(wann) => submit("later", { followUpAt: wann })}
       />
     </div>
   );
