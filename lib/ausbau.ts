@@ -33,12 +33,13 @@ export {
   darfSehen,
   sperreFuer,
   sperrgrund,
+  zeigeMehrEintrag,
   type Ausbaustand,
   type Bereich,
 } from "@/lib/ausbauSicht";
 
 /** Ab hier schlaegt die App der Fuehrungskraft vor freizuschalten. */
-export const SCHWELLEN_PLATZHALTER = { anrufe: 20, termine: 3 } as const;
+export const SCHWELLEN_PLATZHALTER = { vereinbart: 5, gehalten: 1 } as const;
 
 // --- Der Stand einer Person --------------------------------------------------
 
@@ -144,54 +145,78 @@ export async function naechsteFkOberhalb(
 
 // --- Der Vorschlag -----------------------------------------------------------
 
-export type Schwellen = { anrufe: number; termine: number };
+export type Schwellen = { vereinbart: number; gehalten: number };
 
 /** Die zwei Schwellen aus der Werkstatt, sonst die Platzhalter. */
 export async function schwellen(): Promise<Schwellen> {
   const werte = await einstellungen();
   if (werte === null) return { ...SCHWELLEN_PLATZHALTER };
   return {
-    anrufe: ganzzahl(werte.get("ausbau.anrufe")) ?? SCHWELLEN_PLATZHALTER.anrufe,
-    termine:
-      ganzzahl(werte.get("ausbau.termine")) ?? SCHWELLEN_PLATZHALTER.termine,
+    vereinbart:
+      ganzzahl(werte.get("ausbau.termine_vereinbart")) ??
+      SCHWELLEN_PLATZHALTER.vereinbart,
+    gehalten:
+      ganzzahl(werte.get("ausbau.termine_gehalten")) ??
+      SCHWELLEN_PLATZHALTER.gehalten,
   };
 }
 
 export type Vorschlag = {
   userId: string;
   name: string;
-  anrufe: number;
+  vereinbart: number;
   gehalten: number;
   /** Der Grund, so wie er der Fuehrungskraft danebensteht. */
   grund: string;
+  /** Gesetzt, wenn die Zeile aus einer Bitte kommt statt aus der Schwelle
+   * (docs/adr/0007-die-bitte-um-ausbau.md) - grund ist dann nur "hat
+   * gebeten", das Datum haengt die Anzeige selbst an. */
+  bitteAm: Date | null;
 };
 
 /**
- * Wen diese Fuehrungskraft heute freischalten koennte.
+ * Wen diese Fuehrungskraft heute freischalten koennte - plus wer selbst
+ * gebeten hat.
  *
  * GERECHNET, NICHT GESPEICHERT. Es gibt heute keinen Erzeuger fuer
  * LeadershipTask - die einzige create-Stelle ist die Fuehrungskraft selbst
  * (app/(app)/mannschaft/actions.ts). Ein gespeicherter Vorschlag muesste beim
  * Freischalten, beim Umhaengen und beim Deaktivieren aufgeraeumt werden;
- * gerechnet verschwindet er von selbst, sobald ausbau === 2 steht.
+ * gerechnet verschwindet er von selbst, sobald ausbau === 2 steht - das gilt
+ * jetzt auch fuer die Bitte, siehe User.bitteAm in prisma/schema.prisma.
  *
  * Gezaehlt wird ueber die GESAMTE Zeit, nicht ueber die Woche: die Rangliste
  * faengt montags bei null an, der Ausbau darf das nicht - sonst haenge der
  * Vorschlag vom Wochentag ab.
+ *
+ * ERGEBNISSE STATT ANRUFE (ADR-0007, Fassung 2 nach Nachpruefung 01.09.):
+ * Anrufe messen nur, wer sie eintraegt - der beste Verkaeufer der Instanz
+ * stand deshalb nie ueber der alten Schwelle. Jetzt zaehlt APPOINTMENT_SET +
+ * APPOINTMENT_HELD, und ODER statt UND: 5 vereinbarte Termine reichen so gut
+ * wie 1 gehaltener.
+ *
+ * OHNE leaderId (Werkstatt, admin-weit): dieselbe Rechnung ueber ALLE Konten
+ * ohne vollen Umfang, nicht nur die eigenen Direkten. Der Admin ist der
+ * Notausgang der Mechanik und darf jeden sehen, der wartet.
  */
-export async function vorschlaegeFuer(leaderId: string): Promise<Vorschlag[]> {
+export async function vorschlaegeFuer(leaderId?: string): Promise<Vorschlag[]> {
   // EINE Abfrage statt zwei: die Direkten und ihr Ausbaustand kommen zusammen.
   // Vorher stand daneben noch ein eigenes findMany auf /heute - das war die
   // vierte Runde derselben Frage auf derselben Seite.
   const [konten, grenzen] = await Promise.all([
     prisma.user.findMany({
       where: {
-        leaderId,
+        ...(leaderId ? { leaderId } : {}),
         ausbau: { lt: AUSBAU_VOLL },
         deactivatedAt: null,
         passwordHash: { not: null },
       },
-      select: { id: true, name: true, person: { select: { id: true } } },
+      select: {
+        id: true,
+        name: true,
+        bitteAm: true,
+        person: { select: { id: true } },
+      },
     }),
     schwellen(),
   ]);
@@ -200,22 +225,24 @@ export async function vorschlaegeFuer(leaderId: string): Promise<Vorschlag[]> {
   const personIds = konten
     .map((k) => k.person?.id)
     .filter((id): id is string => Boolean(id));
-  if (personIds.length === 0) return [];
 
-  const summen = await prisma.dailyLog.groupBy({
-    by: ["personId", "type"],
-    where: {
-      personId: { in: personIds },
-      type: { in: ["CALL", "APPOINTMENT_HELD"] },
-    },
-    _sum: { count: true },
-  });
+  const summen =
+    personIds.length === 0
+      ? []
+      : await prisma.dailyLog.groupBy({
+          by: ["personId", "type"],
+          where: {
+            personId: { in: personIds },
+            type: { in: ["APPOINTMENT_SET", "APPOINTMENT_HELD"] },
+          },
+          _sum: { count: true },
+        });
 
-  const jePerson = new Map<string, { anrufe: number; gehalten: number }>();
+  const jePerson = new Map<string, { vereinbart: number; gehalten: number }>();
   for (const zeile of summen) {
-    const stand = jePerson.get(zeile.personId) ?? { anrufe: 0, gehalten: 0 };
+    const stand = jePerson.get(zeile.personId) ?? { vereinbart: 0, gehalten: 0 };
     const wert = zeile._sum.count ?? 0;
-    if (zeile.type === "CALL") stand.anrufe += wert;
+    if (zeile.type === "APPOINTMENT_SET") stand.vereinbart += wert;
     else stand.gehalten += wert;
     jePerson.set(zeile.personId, stand);
   }
@@ -223,18 +250,34 @@ export async function vorschlaegeFuer(leaderId: string): Promise<Vorschlag[]> {
   const offen: Vorschlag[] = [];
   for (const konto of konten) {
     const personId = konto.person?.id;
-    if (!personId) continue;
-    const stand = jePerson.get(personId) ?? { anrufe: 0, gehalten: 0 };
-    if (stand.anrufe < grenzen.anrufe || stand.gehalten < grenzen.termine) {
-      continue;
+    const stand = personId
+      ? (jePerson.get(personId) ?? { vereinbart: 0, gehalten: 0 })
+      : { vereinbart: 0, gehalten: 0 };
+    const trifftSchwelle =
+      stand.vereinbart >= grenzen.vereinbart || stand.gehalten >= grenzen.gehalten;
+
+    if (trifftSchwelle) {
+      offen.push({
+        userId: konto.id,
+        name: konto.name,
+        vereinbart: stand.vereinbart,
+        gehalten: stand.gehalten,
+        grund:
+          stand.vereinbart + " Termine vereinbart, " + stand.gehalten + " gehalten",
+        bitteAm: null,
+      });
+    } else if (konto.bitteAm !== null) {
+      // Auch ohne Schwelle: wer gebeten hat, steht in derselben Liste
+      // (docs/adr/0007-die-bitte-um-ausbau.md).
+      offen.push({
+        userId: konto.id,
+        name: konto.name,
+        vereinbart: stand.vereinbart,
+        gehalten: stand.gehalten,
+        grund: "hat gebeten",
+        bitteAm: konto.bitteAm,
+      });
     }
-    offen.push({
-      userId: konto.id,
-      name: konto.name,
-      anrufe: stand.anrufe,
-      gehalten: stand.gehalten,
-      grund: stand.anrufe + " Anrufe, " + stand.gehalten + " gehaltene Termine",
-    });
   }
   return offen;
 }

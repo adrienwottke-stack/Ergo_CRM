@@ -75,15 +75,19 @@ zeigen, und das fällt beim Hinsehen auf.
 Platzhalter werden übersprungen — sie können sich nie anmelden. Wer niemanden
 über sich hat, braucht keine Freischaltung.
 
-**Die Schwellen** stehen als `Einstellung`-Zeilen `ausbau.anrufe` (20) und
-`ausbau.termine` (3), Muster wie `schwelle.1` — in der Werkstatt änderbar, ohne
-Deploy. Gezählt wird über die **gesamte Zeit**, nicht über die Woche: die
-Rangliste fängt montags bei null an, der Ausbau darf das nicht.
+**Die Schwellen** stehen als `Einstellung`-Zeilen `ausbau.termine_vereinbart`
+(5) und `ausbau.termine_gehalten` (1) — Ergebnisse statt Anrufe, seit
+[ADR-0007](adr/0007-die-bitte-um-ausbau.md). Getroffen ist die Schwelle, sobald
+eine der beiden Zahlen erreicht ist (**ODER**, nicht UND), gezählt über die
+**gesamte Zeit**: die Rangliste fängt montags bei null an, der Ausbau darf das
+nicht. Wer darunter liegt, darf zusätzlich selbst um mehr **bitten** — sichtbar
+im Lagebild der Führungskraft und in der Werkstatt.
 
-> **Kalibrierung offen.** `node scripts/ausbau-probe.mjs` zeigt am 30.08.2026
-> gegen die echte Datenbank **null Treffer** bei 20/3 (höchster Kopf: 23 Anrufe,
-> 1 gehaltener Termin). Am ersten Tag schlägt die App also niemandem etwas vor.
-> Gegenprobe: `node scripts/ausbau-probe.mjs 3 1` → 2 Treffer.
+> **Kalibrierung nachgezogen (ADR-0007).** `node scripts/ausbau-probe.mjs`
+> zeigt am 02.09.2026 gegen die echte Datenbank **3 Treffer** bei 5
+> vereinbarten ODER 1 gehaltenem Termin (Jonathan, nick, plus der Admin) — bei
+> der alten Anrufe-Schwelle (20/3) waren es am 30.08. **null**. Zwei Konten
+> ohne Vorschlag (Timo, Jonas) können jetzt selbst um mehr **bitten**.
 
 **Der Vorschlag** erscheint auf `/heute` zwischen den Führungsaufgaben, im
 Aussehen von `FuehrungsAufgabe`, mit dem Grund daneben und einem Knopf. Er wird

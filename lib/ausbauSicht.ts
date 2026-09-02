@@ -107,6 +107,21 @@ export function darfSehen(pfad: string, stand: Ausbaustand): boolean {
 }
 
 /**
+ * Der leise "Mehr"-Eintrag ganz am Ende der Navigation
+ * (docs/adr/0007-die-bitte-um-ausbau.md) - derselbe Wert entscheidet in
+ * components/AppShell.tsx, ob der Punkt erscheint, und in
+ * app/(app)/mehr/page.tsx, ob die Adresse selbst oeffnet oder nach /heute
+ * zurueckschickt.
+ *
+ * Admin sieht ohnehin alles (siehe darfSehen), fuer ihn gibt es nichts zu
+ * bitten. Wer schon auf vollem Umfang steht, ebenso nicht - AUSBAU_VOLL ist
+ * das Ende der Leiter.
+ */
+export function zeigeMehrEintrag(stand: Ausbaustand): boolean {
+  return !stand.istAdmin && stand.stufe < AUSBAU_VOLL;
+}
+
+/**
  * Der Satz, der auf der Sperrseite steht.
  *
  * Je Bereich einer, und er sagt WER oeffnet - nicht "keine Berechtigung". Der

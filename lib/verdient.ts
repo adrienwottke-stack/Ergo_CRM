@@ -3,6 +3,12 @@
 // Eine Stufe allein ist eine Zahl. Sie wird erst zu einem Grund, weiterzumachen,
 // wenn hinter ihr etwas steht, das vorher zu war.
 //
+// "Verdient" und nicht "Freischalten": das Wort gehört seit
+// docs/adr/0007-die-bitte-um-ausbau.md dem Ausbau - dem einen Griff, mit dem
+// eine Fuehrungskraft mehr vom Werkzeug oeffnet. Was hier aufgeht, kommt aus
+// der eigenen Arbeit an der Karrierestufe, nicht aus einer fremden Freigabe
+// (CONTEXT.md, Abschnitt Ausbau).
+//
 // Wichtig: hier stehen ausschließlich Dinge, die NEBEN der Arbeitswertung
 // liegen. Das Storno-Spiel ist eine getrennte Liga (docs/wettbewerb-plan.md,
 // 13.4) - Punkte fließen von der Arbeit ins Spiel, nie zurück. Das muss nicht
@@ -18,7 +24,7 @@
 // Deploy jemand anders bestimmt. Der einzige Weg, auf dem das nicht wieder
 // passieren kann, ist derselbe Deploy.
 
-export type Freischaltbar = {
+export type Verdientes = {
   schluessel: string;
   name: string;
   /** Ein Satz. Was ist das, und warum sollte es jemanden interessieren. */
@@ -30,7 +36,7 @@ export type Freischaltbar = {
   extern: boolean;
 };
 
-export const FREISCHALTBAR: readonly Freischaltbar[] = [
+export const VERDIENT: readonly Verdientes[] = [
   {
     schluessel: "storno",
     name: "Storno",
@@ -42,6 +48,6 @@ export const FREISCHALTBAR: readonly Freischaltbar[] = [
   },
 ];
 
-export function istFrei(eintrag: Freischaltbar, stufenNummer: number): boolean {
+export function istVerdient(eintrag: Verdientes, stufenNummer: number): boolean {
   return stufenNummer >= eintrag.abStufe;
 }

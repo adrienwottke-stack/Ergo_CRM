@@ -21,6 +21,14 @@ import type { Vorschlag } from "@/lib/ausbau";
 import { card } from "@/components/ui";
 import { UnlockIcon } from "@/components/icons";
 
+// Eigene Intl-Instanz, wie es in diesem Projekt ueberall gehalten wird
+// (siehe lib/export.ts) - fuer die Bitte-Zeile, die kein anderer Block hier
+// braucht.
+const datumFormat = new Intl.DateTimeFormat("de-DE", {
+  dateStyle: "medium",
+  timeZone: "Europe/Berlin",
+});
+
 export default function AusbauVorschlag({
   vorschlaege,
 }: {
@@ -46,7 +54,16 @@ export default function AusbauVorschlag({
               und sie soll widersprechen koennen, wenn die Zahlen zwar stimmen,
               der Mensch aber noch nicht so weit ist. */}
           <p className="mt-1.5 text-sm font-medium text-ink">
-            {vorschlag.name.split(" ")[0]} hat {vorschlag.grund}.
+            {vorschlag.bitteAm !== null ? (
+              <>
+                {vorschlag.name.split(" ")[0]} hat gebeten am{" "}
+                {datumFormat.format(vorschlag.bitteAm)}.
+              </>
+            ) : (
+              <>
+                {vorschlag.name.split(" ")[0]} hat {vorschlag.grund}.
+              </>
+            )}
           </p>
           <p className="mt-0.5 text-sm text-ink-muted">
             Trichter und Wettbewerb aufmachen? Zurück geht es nicht.

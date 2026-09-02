@@ -38,6 +38,7 @@ import {
   schwellenSpeichern,
 } from "./actions";
 import { AUSBAU_VOLL } from "@/lib/ausbauSicht";
+import { vorschlaegeFuer } from "@/lib/ausbau";
 import { TITEL_SAETZE, ladeStufenTitel } from "@/lib/stufen";
 import StufenTitelFormular from "@/components/StufenTitelFormular";
 
@@ -69,6 +70,13 @@ const standTon: Record<string, Ton> = {
 // Darunter fliegt ein Baustein nach drei Wochen raus.
 const ABRISS_KOEPFE = 3;
 
+// Fuer die Bitte-Zeile unten - eigene Intl-Instanz, wie in diesem Projekt
+// ueberall gehalten (siehe lib/export.ts).
+const datumFormat = new Intl.DateTimeFormat("de-DE", {
+  dateStyle: "medium",
+  timeZone: "Europe/Berlin",
+});
+
 export default async function WerkstattPage() {
   await requireAdmin();
 
@@ -81,6 +89,7 @@ export default async function WerkstattPage() {
     nutzung,
     koepfe,
     wartende,
+    vorschlaegeAlle,
     offeneMeldungen,
     ohneTreffer,
     schwellen,
@@ -114,6 +123,10 @@ export default async function WerkstattPage() {
       },
       orderBy: { createdAt: "asc" },
     }),
+    // Admin-weit: dieselbe Rechnung wie auf /heute, aber ohne leaderId -
+    // Bitten und Schwellen-Treffer ueber ALLE Konten ohne vollen Umfang
+    // (docs/adr/0007-die-bitte-um-ausbau.md).
+    vorschlaegeFuer(),
     prisma.rueckmeldung.count({ where: { stand: { in: [...OFFENE_STAENDE] } } }),
     // Wonach im Wegweiser gesucht wurde, ohne dass es etwas gab. Ueber Tage
     // hinweg zusammengezogen: interessant ist das Wort, nicht der Tag.
@@ -162,6 +175,15 @@ export default async function WerkstattPage() {
     }
     set.add(zeile.personId);
   }
+
+  // userId -> "hat gebeten am ..." oder der Schwellen-Grund, fuer die Zeile
+  // unter "wartet auf ...".
+  const grundJeKonto = new Map(
+    vorschlaegeAlle.map((v) => [
+      v.userId,
+      v.bitteAm !== null ? `hat gebeten am ${datumFormat.format(v.bitteAm)}` : v.grund,
+    ]),
+  );
 
   const stufen = Array.from(
     { length: KARRIERESTUFE_MAX - KARRIERESTUFE_MIN + 1 },
@@ -346,6 +368,11 @@ export default async function WerkstattPage() {
                 >
                   <span className="text-sm text-ink">
                     <span className="font-medium">{konto.name}</span>
+                    {grundJeKonto.get(konto.id) && (
+                      <span className="block text-xs text-emerald-700">
+                        {grundJeKonto.get(konto.id)}
+                      </span>
+                    )}
                     <span className="ml-2 text-ink-muted">
                       {konto.leader === null
                         ? "niemand darüber"

@@ -337,6 +337,13 @@ model User {
   // hat, tragen kein ausbauGesetztAm - fuer sie ging nichts auf, und die Karte
   // erscheint zu Recht nie.
   ausbauGezeigtAm  DateTime?
+  // Die Bitte: der Betroffene darf um mehr Ausbau bitten
+  // (docs/adr/0007-die-bitte-um-ausbau.md). Eine je Person - ein zweiter Tipp
+  // auf "Ich bitte darum" aendert nichts (siehe app/(app)/ausbauActions.ts).
+  // Endet mit dem Freischalten, weil ausbau dann 2 ist und vorschlaegeFuer()
+  // (lib/ausbau.ts) nur Konten unter AUSBAU_VOLL liest - kein Aufraeumen
+  // noetig, dieselbe Begruendung wie bei ausbauGesetztAm oben.
+  bitteAm          DateTime?
 
   // --- Willkommen (docs/willkommen-plan.md) ----------------------------------
   // NULL = hat den Start noch nie gesehen. Einmalig gesetzt, danach nie wieder

@@ -924,7 +924,7 @@ sich in einer Minute zeigen lässt:
 |---|---|---|
 | **Anwesenheits-Punkt** | `lib/anwesenheit.ts`, Tabelle `Anwesenheit` | Ein Punkt je Tag, an dem die App offen war. Geschrieben in `after()` beim Rendern von `/heute` und `/arena` |
 | **Stufen** | `lib/stufen.ts`, `/spiel` | Sechs Ränge aus den Punkten der gesamten Zeit. Nichts gespeichert, alles gerechnet |
-| **Freischaltung** | `lib/freischaltung.ts`, `/spiel` | Storno geht ab Stufe 2 auf. Vierter Reiter im Wettbewerb |
+| **Verdient** | `lib/verdient.ts`, `/spiel` | Storno geht ab Stufe 2 auf. Vierter Reiter im Wettbewerb |
 | **Wochentitel** | `lib/titel.ts`, Arena | Drei Titel als Live-Stand. Ein freier Titel zeigt, was fehlt |
 | **Feed** | `lib/feed.ts`, `lib/meilensteine.ts`, `app/(team)/feedAction.ts` | „Ans Netzwerk melden" auf `/log`, Wand in der Arena, Reaktionen aus den vier `SCHNELLTEXTE` |
 

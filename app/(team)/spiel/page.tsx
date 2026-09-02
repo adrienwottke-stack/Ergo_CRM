@@ -1,7 +1,7 @@
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { ladeGesamtpunkte } from "@/lib/arena";
 import { ladeStufenTitel, stufeVon, STUFEN } from "@/lib/stufen";
-import { FREISCHALTBAR, istFrei } from "@/lib/freischaltung";
+import { VERDIENT, istVerdient } from "@/lib/verdient";
 import {
   QUOTENKOENIG_MINDEST_ANRUFE,
   TROPHAEEN_ARTEN,
@@ -192,11 +192,11 @@ export default async function SpielPage() {
       {/* --- Die Kacheln ----------------------------------------------------- */}
       {an.spiel && (
         <section className="space-y-3">
-          <h2 className={sectionTitle}>Freigeschaltet</h2>
+          <h2 className={sectionTitle}>Verdient</h2>
 
           <ul className="grid gap-3 sm:grid-cols-2">
-            {FREISCHALTBAR.map((eintrag) => {
-              const offen = istFrei(eintrag, stand.stufe.nummer);
+            {VERDIENT.map((eintrag) => {
+              const offen = istVerdient(eintrag, stand.stufe.nummer);
               const noetig = stufenAnzeige.find((s) => s.nummer === eintrag.abStufe);
               const fehlt = noetig ? Math.max(0, noetig.ab - stand.gesamt) : 0;
 
@@ -245,7 +245,7 @@ export default async function SpielPage() {
                     </a>
                   ) : (
                     <p className="mt-4 text-sm font-medium text-ink-soft">
-                      Ab Stufe {eintrag.abStufe}
+                      Verdient ab Stufe {eintrag.abStufe}
                       {noetig ? ` (${noetig.name})` : ""} — noch{" "}
                       <span className="tabular-nums">{fehlt}</span>{" "}
                       {fehlt === 1 ? "Punkt" : "Punkte"}.

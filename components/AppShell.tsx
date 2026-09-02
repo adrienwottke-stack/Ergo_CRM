@@ -12,7 +12,7 @@ import { LogoutIcon } from "@/components/icons";
 import ThemaSchalter from "@/components/ThemaSchalter";
 import RueckmeldungGeben from "@/components/RueckmeldungGeben";
 import { schalter } from "@/lib/features";
-import { ausbaustand, darfSehen, type Ausbaustand } from "@/lib/ausbau";
+import { ausbaustand, darfSehen, zeigeMehrEintrag, type Ausbaustand } from "@/lib/ausbau";
 import { shell, gutter } from "@/components/ui";
 import type { User } from "@/lib/generated/prisma/client";
 
@@ -73,7 +73,15 @@ export function navigationFuer(stand: Ausbaustand): NavLink[] {
     ? [heute, mannschaft, kalender, namen, einladen, trichter, wettbewerb, team]
     : [namen, heute, kalender, einladen, trichter, mannschaft, wettbewerb, team];
 
-  return alle.filter((link) => darfSehen(link.href, stand));
+  const sichtbar = alle.filter((link) => darfSehen(link.href, stand));
+
+  // "Mehr" haengt an keinem Bereich - lib/ausbauSicht.ts kennt die Adresse
+  // nicht, sie zaehlt also als "anfang" und waere fuer JEDEN sichtbar, liefe
+  // sie durch denselben Filter. zeigeMehrEintrag() entscheidet deshalb
+  // eigens, ganz am Ende (docs/adr/0007-die-bitte-um-ausbau.md).
+  return zeigeMehrEintrag(stand)
+    ? [...sichtbar, { href: "/mehr", label: "Mehr" }]
+    : sichtbar;
 }
 
 // Wohin eine Rueckmeldung geht: der Vorname des aeltesten aktiven Admin-Kontos.

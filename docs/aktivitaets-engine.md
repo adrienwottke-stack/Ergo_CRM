@@ -134,7 +134,7 @@ Nachtragsfenster von zwei Tagen (`lib/labels.ts:55`, durchgesetzt in
 | **Kommentator** | `lib/kommentator.ts` | Funktionsfähig | `/arena` |
 | **Starterpass** | `lib/starterpass.ts` | Funktionsfähig | `/heute`, `/mannschaft` |
 | **Stufen** | `lib/stufen.ts` | Funktionsfähig, **25.08. gebaut** | `/arena`, `/spiel` |
-| **Freischaltung** | `lib/freischaltung.ts` | Funktionsfähig, **25.08. gebaut** | `/spiel` |
+| **Verdient** | `lib/verdient.ts` | Funktionsfähig, **25.08. gebaut, 02.09. umbenannt** | `/spiel` |
 | **Wochentitel** | `lib/titel.ts` | Funktionsfähig, **25.08. gebaut** | `/arena` |
 | **Feed + Reaktionen** | `lib/feed.ts`, `lib/meilensteine.ts` | Funktionsfähig, **25.08. gebaut** | `/arena`, `/log` |
 | **Anwesenheits-Punkt** | `lib/anwesenheit.ts:30` | Funktionsfähig, **25.08. gebaut** | fließt in die Rangliste |

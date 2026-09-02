@@ -67,7 +67,7 @@ Die fünf Stufen Angesprochen → Instagram → Nummer → Termin vereinbart →
 **Ausbau**:
 Wie viel vom Werkzeug für eine Person offen ist. Zwei Stände: der Anfang —
 Namen, Heute, Kalender, Einladen — und der volle Umfang. Die Führungskraft
-hebt ihn, nie der Betroffene, und nur nach oben. Kein Wort der Oberfläche:
+hebt ihn, nie der Betroffene — der darf darum **bitten** —, und nur nach oben. Kein Wort der Oberfläche:
 sichtbar wird er allein in dem Moment, in dem etwas aufgeht.
 
 Nicht zu verwechseln mit **Aufbau**: dort wächst die Struktur, hier das
@@ -75,8 +75,16 @@ Werkzeug.
 
 **Freischalten**:
 Der eine Griff, mit dem eine Führungskraft den Ausbau einer ihrer Leute hebt.
-Die App schlägt ihn vor, sobald die Zahlen stimmen — sie tut ihn nie selbst.
+Die App schlägt ihn vor, sobald die Ergebnisse stimmen — vereinbarte oder gehaltene Termine, nie Anrufe, denn Anrufe messen nur, wer sie einträgt — oder sobald jemand gebeten hat; sie tut ihn nie selbst.
 Zurücknehmen lässt er sich nicht.
+
+**Bitte**:
+Der Wunsch einer Person, mehr vom Werkzeug zu sehen. Sie stellt ihn selbst; freigeben kann ihn nur ihre Führungskraft oder der Admin. Eine je Person, und sie endet mit dem Freischalten.
+_Avoid_: Antrag, Anfrage — die Anfrage kommt von außen und will erst einen Zugang.
+
+**Verdient**:
+Was ab einer Karrierestufe von selbst aufgeht — heute das Spiel. Es kommt aus der eigenen Arbeit, nicht aus einer Freigabe.
+_Avoid_: Freischalten, Belohnung, Prämie
 
 **Die zwei Achsen**:
 Ausbau und Führung stehen nebeneinander, nicht übereinander. Der Ausbau wird
