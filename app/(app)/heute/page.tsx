@@ -39,6 +39,7 @@ import {
   strukturVerlauf,
   type Verlaufstag,
 } from "@/lib/einheiten";
+import { strukturAktivitaeten, type Aktivitaetstag } from "@/lib/aktivitaeten";
 import { strukturKonten } from "@/lib/struktur";
 import { schalter } from "@/lib/features";
 import { initialenKuerzel } from "@/lib/vorfuehren";
@@ -61,7 +62,11 @@ import SeitenKopf from "@/components/SeitenKopf";
 import VorfuehrProvider from "@/components/VorfuehrProvider";
 import VorfuehrSchalter from "@/components/VorfuehrSchalter";
 import GpName from "@/components/GpName";
-import LageKopf, { type SchwellenZeile, type TeamPuls } from "@/components/LageKopf";
+import LageKopf, {
+  type AktivitaetPuls,
+  type SchwellenZeile,
+  type TeamPuls,
+} from "@/components/LageKopf";
 import GriffKarte, { VorfuehrHinweis, type GriffPerson } from "@/components/GriffKarte";
 import DirektenListe, { type DirektenZeile, type DirektenStufe } from "@/components/DirektenListe";
 import LeerZustand from "@/components/LeerZustand";
@@ -103,6 +108,26 @@ function monatsKurve(sockel: number, tage: Verlaufstag[], monatStart: Date, bis:
     const zeit = dayToUtcDate(eintrag.tag).getTime();
     if (zeit >= monatStart.getTime() && zeit <= bis.getTime()) {
       stand += eintrag.hundertstel;
+      werte.push(stand);
+    }
+  }
+  return werte;
+}
+
+// Kumulierte Anrufe-Kurve fuer MiniVerlauf im Lagebild (AP-18: zweite
+// Kompakt-Kurve neben Einheiten, N5/N2 der Feedback-Runde). Dieselbe
+// Fenster- und Tageslogik wie monatsKurve() oben (Kalendertag -> UTC-Datum,
+// Filter auf [monatStart, bis], laufende Summe) - aber OHNE dessen
+// Sockel-Aufsummierung vor monatStart: fuer Anrufe gibt es keinen
+// mitgebrachten Bestand wie bei Einheiten, darum startet die Kurve immer bei
+// 0 und ihr Endwert ist bewusst die MONATSSUMME, kein Gesamtstand seit je.
+function aktivitaetsKurve(tage: Aktivitaetstag[], monatStart: Date, bis: Date): number[] {
+  const werte = [0];
+  let stand = 0;
+  for (const eintrag of tage) {
+    const zeit = dayToUtcDate(eintrag.tag).getTime();
+    if (zeit >= monatStart.getTime() && zeit <= bis.getTime()) {
+      stand += eintrag.anrufe;
       werte.push(stand);
     }
   }
@@ -299,6 +324,9 @@ export default async function HeutePage() {
   // null zusaetzliche Abfragen, kein zusaetzliches Markup.
   let einheitenAn = false;
   let puls: TeamPuls | null = null;
+  // Undefined statt null (D-Muster wie in LageKopf-Prop): AP-18, Anrufe der
+  // Struktur - unabhaengig vom Einheiten-Schalter, siehe Bau weiter unten.
+  let aktivitaet: AktivitaetPuls | undefined;
   let schwellenZeile: SchwellenZeile | null = null;
   let griffPersonen: GriffPerson[] = [];
   let griffGesamt = 0;
@@ -325,7 +353,7 @@ export default async function HeutePage() {
     // strukturKonten(), also OHNE Ausgetretene) - nur so zaehlen die
     // Ast-Deltas unten und der Gesamtstand oben zur selben Zahl zusammen
     // (die Invariante aus lib/einheiten.ts, Abschnitt "Das Lagebild").
-    const [direkteKonten, astKonten, verlauf, schalterWerte] = await Promise.all([
+    const [direkteKonten, astKonten, verlauf, schalterWerte, aktivitaeten] = await Promise.all([
       prisma.user.findMany({
         where: { leaderId: user.id, deactivatedAt: null },
         select: { id: true },
@@ -335,6 +363,10 @@ export default async function HeutePage() {
       ),
       strukturVerlauf(user.id),
       schalter("einheiten"),
+      // AP-18: dieselbe Struktur-Population wie astKonten oben, aber eigens
+      // von strukturAktivitaeten() ermittelt (lib/aktivitaeten.ts ist die
+      // einzige Datei jenes Auftrags - kein Teilen der Ast-Liste von hier aus).
+      strukturAktivitaeten(user.id),
     ]);
     // Die Einheiten-Zeilen im Lagebild (Team-Puls, Schwellen-Zeile) haengen an
     // BEIDEM: am Feature-Schalter und am Ausbau. Eine Fuehrungskraft auf
@@ -378,6 +410,24 @@ export default async function HeutePage() {
         traegtZahlen: gesamtstand !== 0 || verlauf.tage.length > 0,
       };
     }
+
+    // Anrufe der Struktur im laufenden Monat (AP-18, N5/N2): unabhaengig vom
+    // Einheiten-Schalter, weil eine Fuehrungskraft ohne Einheiten-Freischaltung
+    // trotzdem sehen soll, wie ihre Struktur telefoniert. monatLabel steht
+    // hier bereits fest (oben unbedingt gesetzt, nicht erst im
+    // einheitenAn-Zweig) - "im September" statt eines eigens gerechneten
+    // Zuwachses, um keine zweite Zeitspannen-Logik (Woche vs. Monat) neben
+    // der ohnehin schon zwei Fenster kennenden Matrix einzufuehren.
+    const aktivitaetWerte = aktivitaetsKurve(
+      aktivitaeten.tage,
+      produktionsmonat(today).start,
+      dayToUtcDate(today)
+    );
+    aktivitaet = {
+      summe: aktivitaetWerte[aktivitaetWerte.length - 1],
+      werte: aktivitaetWerte,
+      hinweis: `im ${monatLabel}`,
+    };
 
     // Server rechnet EINMAL die Vorfuehr-Kuerzel fuer jeden Namen, der im
     // Lagebild ueberhaupt vorkommen kann - GpName bekommt dann nur noch
@@ -648,6 +698,7 @@ export default async function HeutePage() {
             einheitenAn={einheitenAn}
             puls={puls}
             schwellenZeile={schwellenZeile}
+            aktivitaet={aktivitaet}
           />
 
           {griffPersonen.length > 0 && (

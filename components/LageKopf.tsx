@@ -10,6 +10,12 @@ import { ChevronRightIcon } from "@/components/icons";
 // Zeilen in einer Karte, nicht mehr. Harte Regel, absichtlich hier oben
 // notiert: jede weitere Kennzahl gehoert auf /mannschaft, nicht hier hinein -
 // sonst wird aus dem Erstblick wieder ein Dashboard mit zwanzig Zahlen.
+//
+// AP-18 (N5, D13): Zeile 2 bleibt EINE Zeile, zeigt aber bis zu zwei
+// Kompakt-Kurven nebeneinander statt einer - Einheiten (wie bisher) und
+// Anrufe der Struktur. Die optionale Prop `aktivitaet` traegt die zweite
+// Kachel; ohne sie sieht der Kopf exakt aus wie vor AP-18 (siehe die
+// Fallunterscheidung bei `zeilePuls` weiter unten).
 
 export type SchwellenZeile =
   | {
@@ -41,6 +47,24 @@ export type TeamPuls = {
   traegtZahlen: boolean;
 };
 
+/**
+ * Die zweite Kompakt-Kurve im Kopf (AP-18): Anrufe der Struktur im laufenden
+ * Monat. Anders als TeamPuls kein `traegtZahlen` - eine Struktur ohne Anrufe
+ * in diesem Monat zeigt ehrlich "0 Anrufe", das ist keine Vorstufe wie bei
+ * Einheiten (dort steht "eingetragen, aber noch nicht drin" fuer Konten ohne
+ * jede Zahl ueberhaupt).
+ */
+export type AktivitaetPuls = {
+  /** Monatssumme, nicht Gesamtstand seit je - siehe aktivitaetsKurve() in
+   *  heute/page.tsx: Anrufe haben keinen mitgebrachten Bestand wie Einheiten. */
+  summe: number;
+  /** Kumulierte Tageswerte im selben Fenster wie TeamPuls.verlaufWerte. */
+  werte: number[];
+  /** Fertiger Text unter der Zahl, z. B. "im September" - vom Aufrufer
+   *  gebaut, damit diese Komponente kein Datum selbst berechnen muss. */
+  hinweis: string;
+};
+
 /** "+41,25" / "-12,00" - das Vorzeichen fehlt bei Intl.NumberFormat fuer
  *  positive Zahlen, gehoert in der Delta-Zeile aber immer dazu. */
 function mitVorzeichen(hundertstel: number): string {
@@ -52,6 +76,7 @@ export default function LageKopf({
   einheitenAn,
   puls,
   schwellenZeile,
+  aktivitaet,
 }: {
   bilanz: { gruen: number; gelb: number; rot: number; grau: number };
   einheitenAn: boolean;
@@ -60,6 +85,11 @@ export default function LageKopf({
   puls: TeamPuls | null;
   /** null, wenn keiner der drei Faelle zutrifft - dann faellt Zeile 3 weg. */
   schwellenZeile: SchwellenZeile | null;
+  /** Anrufe der Struktur im laufenden Monat (AP-18) - OPTIONAL: ohne diese
+   *  Prop sieht der Kopf aus wie vor AP-18 (nur die Einheiten-Kachel, wenn
+   *  `puls` gesetzt ist). Mit ihr stehen Einheiten- und Anrufe-Kachel
+   *  nebeneinander in Zeile 2. */
+  aktivitaet?: AktivitaetPuls;
 }) {
   const alleGruen = bilanz.rot === 0 && bilanz.gelb === 0;
 
@@ -122,48 +152,105 @@ export default function LageKopf({
     </Link>
   );
 
-  const zeilePuls = einheitenAn && puls && (
+  // Einheiten-Kachel-Inhalt: inhaltlich unveraendert seit dem Lagebild-Bau.
+  // Als eigene Variable, weil sie jetzt in ZWEI verschiedenen Huellen landet -
+  // einmal alleine (ohne `aktivitaet`), einmal als linke Haelfte einer
+  // Zwei-Kachel-Zeile (mit `aktivitaet`, siehe `zeilePuls` weiter unten).
+  const einheitenInhalt = puls && (
+    puls.traegtZahlen ? (
+      <>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className="min-w-0 text-2xl font-bold tabular-nums tracking-[-0.02em] text-ink sm:text-3xl lg:text-4xl">
+            {formatEinheiten(puls.gesamtstand)}
+          </span>
+          <span className="text-sm font-medium text-ink-muted">Einheiten</span>
+        </div>
+        <p className="mt-0.5 text-xs text-ink-soft">
+          Deine Struktur zusammen — du und dein Team
+        </p>
+        <p
+          className={`mt-1.5 text-sm font-medium tabular-nums ${
+            puls.delta >= 0 ? "text-emerald-700" : "text-red-700"
+          }`}
+        >
+          {mitVorzeichen(puls.delta)} im {puls.monatLabel}
+          {/* Vormonat ohne Buchung ist keine Vergleichsbasis - die
+              Halbzeile faellt dann weg statt "Juli bis hierhin: 0,00" zu
+              behaupten. */}
+          {puls.vormonat !== 0 && (
+            <> · {puls.vormonatLabel} bis hierhin: {mitVorzeichen(puls.vormonat)}</>
+          )}
+        </p>
+        {puls.verlaufWerte.length >= 2 ? (
+          <MiniVerlauf werte={puls.verlaufWerte} className="mt-3 h-14 w-full text-akzent" />
+        ) : (
+          <p className="mt-3 text-sm text-ink-soft">Noch keine Buchungen im {puls.monatLabel}.</p>
+        )}
+      </>
+    ) : (
+      <p className="text-sm text-ink-soft">
+        Deine Leute sind eingetragen, aber noch nicht drin.
+      </p>
+    )
+  );
+
+  // Anrufe-Kachel-Inhalt (AP-18): knapper als die Einheiten-Kachel, weil sie
+  // in der Zwei-Kachel-Zeile nur die halbe Breite bekommt (~160px am Handy) -
+  // eine Zahl, ein Hinweistext, die Kurve, keine zusaetzliche Bildunterschrift.
+  const aktivitaetInhalt = aktivitaet && (
+    <>
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="min-w-0 text-2xl font-bold tabular-nums tracking-[-0.02em] text-ink sm:text-3xl lg:text-4xl">
+          {aktivitaet.summe}
+        </span>
+        <span className="text-sm font-medium text-ink-muted">Anrufe</span>
+      </div>
+      <p className="mt-1.5 text-sm font-medium text-ink-muted">{aktivitaet.hinweis}</p>
+      {aktivitaet.werte.length >= 2 ? (
+        <MiniVerlauf werte={aktivitaet.werte} className="mt-3 h-14 w-full text-akzent" />
+      ) : (
+        <p className="mt-3 text-sm text-ink-soft">Noch keine Anrufe {aktivitaet.hinweis}.</p>
+      )}
+    </>
+  );
+
+  // Ohne `aktivitaet`: die Einheiten-Kachel bleibt alleine die ganze Spalte -
+  // byteidentisch zur Fassung vor AP-18 (gleiche Klassen, gleiche Position).
+  const kachelEinheitenAllein = einheitenAn && puls && (
     <Link
       href="/mannschaft#verlauf"
       className="block min-h-11 rounded-xl px-1 py-1.5 transition hover:bg-sunken/60 sm:col-start-2 sm:row-start-1 sm:row-span-2"
     >
-      {puls.traegtZahlen ? (
-        <>
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="min-w-0 text-2xl font-bold tabular-nums tracking-[-0.02em] text-ink sm:text-3xl lg:text-4xl">
-              {formatEinheiten(puls.gesamtstand)}
-            </span>
-            <span className="text-sm font-medium text-ink-muted">Einheiten</span>
-          </div>
-          <p className="mt-0.5 text-xs text-ink-soft">
-            Deine Struktur zusammen — du und dein Team
-          </p>
-          <p
-            className={`mt-1.5 text-sm font-medium tabular-nums ${
-              puls.delta >= 0 ? "text-emerald-700" : "text-red-700"
-            }`}
-          >
-            {mitVorzeichen(puls.delta)} im {puls.monatLabel}
-            {/* Vormonat ohne Buchung ist keine Vergleichsbasis - die
-                Halbzeile faellt dann weg statt "Juli bis hierhin: 0,00" zu
-                behaupten. */}
-            {puls.vormonat !== 0 && (
-              <> · {puls.vormonatLabel} bis hierhin: {mitVorzeichen(puls.vormonat)}</>
-            )}
-          </p>
-          {puls.verlaufWerte.length >= 2 ? (
-            <MiniVerlauf werte={puls.verlaufWerte} className="mt-3 h-14 w-full text-akzent" />
-          ) : (
-            <p className="mt-3 text-sm text-ink-soft">Noch keine Buchungen im {puls.monatLabel}.</p>
-          )}
-        </>
-      ) : (
-        <p className="text-sm text-ink-soft">
-          Deine Leute sind eingetragen, aber noch nicht drin.
-        </p>
-      )}
+      {einheitenInhalt}
     </Link>
   );
+
+  // Mit `aktivitaet`: zwei schmalere Kacheln nebeneinander, `min-w-0` und
+  // `tabular-nums` gegen ueberlaufende Zahlen am Handy. Die Anrufe-Kachel
+  // bekommt col-span-2, sobald die Einheiten-Kachel fehlt (Schalter aus) -
+  // sonst bliebe die Haelfte der Zeile leer.
+  const zweiKacheln = aktivitaet && (
+    <div className="grid grid-cols-2 gap-3 sm:col-start-2 sm:row-start-1 sm:row-span-2">
+      {einheitenAn && puls && (
+        <Link
+          href="/mannschaft#verlauf"
+          className="block min-h-11 min-w-0 rounded-xl px-1 py-1.5 transition hover:bg-sunken/60"
+        >
+          {einheitenInhalt}
+        </Link>
+      )}
+      <Link
+        href="/mannschaft#verlauf"
+        className={`block min-h-11 min-w-0 rounded-xl px-1 py-1.5 transition hover:bg-sunken/60 ${
+          einheitenAn && puls ? "" : "col-span-2"
+        }`}
+      >
+        {aktivitaetInhalt}
+      </Link>
+    </div>
+  );
+
+  const zeilePuls = aktivitaet ? zweiKacheln : kachelEinheitenAllein;
 
   const zeileSchwellen = schwellenZeile && (
     <Link
@@ -174,7 +261,7 @@ export default function LageKopf({
         <span className={chip("erfolg")}>
           Kurz vor Stufe {schwellenZeile.stufe}:{" "}
           <GpName name={schwellenZeile.name} kurz={schwellenZeile.kurz} /> — noch{" "}
-          {formatEinheiten(schwellenZeile.rest)} ({schwellenZeile.prozent} %)
+          {formatEinheiten(schwellenZeile.rest)} ({schwellenZeile.prozent} %)
           {schwellenZeile.weitere > 0 && (
             <> · +{schwellenZeile.weitere} weitere kurz davor</>
           )}
@@ -200,7 +287,7 @@ export default function LageKopf({
       <h2 className={`${sectionTitle} sr-only`}>Lagebild</h2>
       <div
         className={
-          einheitenAn && puls
+          (einheitenAn && puls) || aktivitaet
             ? "grid gap-1 sm:grid-cols-2 sm:grid-rows-2 sm:gap-x-6"
             : "space-y-1"
         }

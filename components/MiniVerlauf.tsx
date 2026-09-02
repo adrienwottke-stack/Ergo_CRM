@@ -13,6 +13,13 @@
 // Aufrufer via text-akzent -, vector-effect non-scaling-stroke,
 // preserveAspectRatio="none" fuers verzerrte Ziehen auf die Kartenbreite,
 // keine Schrift im SVG, aria-hidden weil die Zahl daneben die Bedeutung traegt.
+//
+// STILLSTAND (AP-18, Anhang-Punkt 1): max === min heisst keine Bewegung im
+// Fenster - eine waagerechte Linie MIT Flaeche sah am Bildschirm wie ein
+// leerer blauer Balken aus ("+0,00 im August" wirkte wie ein Fehler statt wie
+// eine ehrliche Null). Bei Stillstand faellt die Flaeche komplett weg und die
+// Linie wird eine Idee duenner - eine Gerade bleibt sichtbar, sieht aber nicht
+// mehr wie eine gefuellte Kachel aus.
 
 const BREITE = 200;
 const HOEHE = 56;
@@ -33,6 +40,9 @@ export default function MiniVerlauf({
 
   const hoch = Math.max(...werte);
   const tief = Math.min(...werte);
+  // Keine Bewegung im Fenster - siehe Kopfkommentar "STILLSTAND": Flaeche
+  // entfaellt unten, die Linie wird etwas duenner.
+  const flach = hoch === tief;
   // Flache Serie (alle Werte gleich, ggf. alle 0): eine Spannweite von 0
   // wuerde die Y-Rechnung durch null teilen. Polster oben UND unten wie in
   // VerlaufsChart, damit eine flache Linie mittig steht statt am oberen Rand.
@@ -59,12 +69,14 @@ export default function MiniVerlauf({
       className={className ?? "h-14 w-full"}
       aria-hidden="true"
     >
-      <path d={flaechePfad} fill="currentColor" fillOpacity={0.14} stroke="none" />
+      {!flach && (
+        <path d={flaechePfad} fill="currentColor" fillOpacity={0.14} stroke="none" />
+      )}
       <path
         d={linie}
         fill="none"
         stroke="currentColor"
-        strokeWidth={2}
+        strokeWidth={flach ? 1.5 : 2}
         strokeLinecap="round"
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
