@@ -50,6 +50,11 @@ const BEREICHE: ReadonlyArray<
   // Fuehrung - die zweite Achse.
   ["/mannschaft", "fuehrung", "Die Mannschaft"],
   ["/teamabend", "fuehrung", "Der Teamabend"],
+  // Steht in KEINER Leiste (AP-21, Notiz N14: "verstecktes FK-Tool"). Die
+  // Zeile hier ist trotzdem noetig: sie ist der Riegel, der einem Neuling ohne
+  // Direkte die Sperrseite statt des Trichters zeigt - und sie haelt den
+  // Eintrag im Wegweiser vor ihm verborgen.
+  ["/direktkontakt", "fuehrung", "Der Direktkontakttrichter"],
 
   // Voller Umfang: auswerten, vergleichen, die Betriebswaehrung.
   ["/trichter", "voll", "Der Trichter"],

@@ -238,6 +238,32 @@ export const WEGWEISER: WegweiserEintrag[] = [
       "aufnehmen",
     ],
   },
+  // Der Direktkontakttrichter steht in keiner Leiste (AP-21). Damit ist DIESE
+  // Zeile der Hauptweg dorthin - wer "quote", "strasse" oder "instagram" tippt,
+  // muss ihn finden. Fuer alle ohne Direkte bleibt er unsichtbar: darfSehen()
+  // filtert ihn ueber den Bereich "fuehrung" (lib/ausbauSicht.ts) heraus.
+  {
+    id: "direktkontakt",
+    titel: "Direktkontakte zählen",
+    href: "/direktkontakt",
+    bereich: "Mannschaft",
+    synonyme: [
+      "direktkontakt",
+      "direktansprache",
+      "ansprechen",
+      "angesprochen",
+      "strasse",
+      "instagram",
+      "insta",
+      "dm",
+      "nummer bekommen",
+      "quote",
+      "quoten tracken",
+      "trichter fuer ansprache",
+      "kaltansprache",
+      "fremde ansprechen",
+    ],
+  },
   {
     id: "einladen",
     titel: "Jemanden einladen",

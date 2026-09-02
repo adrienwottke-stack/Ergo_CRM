@@ -411,6 +411,11 @@ model User {
   kandidaturen         Kandidatur[]
   geworbenAus          Kandidatur?    @relation("Geworben")
 
+  // Die Tageszaehler der Direktansprache (AP-21). Am Konto und nicht an der
+  // Person: die Zaehler gehen nie in die Punktewertung ein - dieselbe Grenze
+  // wie bei Einheitenbuchung.
+  direktkontakte DirektkontaktTag[]
+
   @@index([leaderId])
   @@index([path])
 }
@@ -1235,4 +1240,39 @@ model Anfrage {
   createdAt  DateTime  @default(now())
 
   @@index([createdAt])
+}
+
+// --- Direktkontakt (docs/emil-feedback-runde-2.md, AP-21; CONTEXT.md) --------
+// Die Direktansprache auf der Strasse oder ueber Instagram. Gezaehlt wird, was
+// passiert ist - NICHT, wem es passiert ist: auf der Strasse tippt niemand
+// Namen ein (Entscheidung D16). Wer aus einer Ansprache ein Kontakt wird, wird
+// weiterhin ganz normal als Contact angelegt.
+//
+// EIN TAGESZAEHLER JE STUFE, kein Ereignis-Protokoll. Damit ist die Zeile
+// idempotent (upsert auf ownerId+tag+stufe), der Fehltipper ist ein Dekrement
+// statt eine Loeschung, und ein Jahr Ansprache sind fuenf Zeilen je Arbeitstag
+// statt hunderte. Dieselbe Ueberlegung wie bei DailyLog, nur enger.
+
+enum DirektkontaktStufe {
+  ANGESPROCHEN // jemand fremdes angesprochen
+  INSTAGRAM // er hat das Profil genommen / folgt
+  NUMMER // Telefonnummer bekommen
+  TERMIN // Termin vereinbart
+  REKRUTIERT // als Geschaeftspartner gestartet
+}
+
+model DirektkontaktTag {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Berliner Kalendertag als UTC-Mitternacht - dieselbe Konvention wie
+  // DailyLog.date, gerechnet ueber lib/dates.ts. Hier als echtes DATE, weil an
+  // dieser Zahl nie eine Uhrzeit haengt.
+  tag    DateTime           @db.Date
+  stufe  DirektkontaktStufe
+  anzahl Int                @default(0)
+
+  @@unique([ownerId, tag, stufe])
+  @@index([ownerId, tag])
 }

@@ -52,7 +52,13 @@ export type ArenaKey =
   | "bericht"
   // Die oeffentliche Anfrage-Seite. Der Schalter sitzt an der Server-Action
   // UND an der Seite: AUS heisst, es kommt nichts mehr an.
-  | "anfrage";
+  | "anfrage"
+  // --- Emils Runde 2 (docs/emil-feedback-runde-2.md) --------------------------
+  // Der Direktkontakttrichter (AP-21): fuenf Schnellzaehler fuer die
+  // Direktansprache. Steht in keiner Leiste - gerade deshalb braucht er eine
+  // Zaehlstelle: bleibt die Zahl bei null, findet ihn niemand, und der Weg
+  // dorthin gehoert repariert statt das Werkzeug.
+  | "direktkontakt";
 
 // Eine Abfrage je Anfrage, danach beantwortet der Cache alle weiteren Fragen.
 export const featureStates = cache(async (): Promise<Map<string, FeatureState>> => {
