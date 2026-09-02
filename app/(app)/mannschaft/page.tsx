@@ -25,6 +25,7 @@ import PersonAufnehmen from "@/components/PersonAufnehmen";
 import { elternIdVon } from "@/lib/struktur";
 import { schalter } from "@/lib/features";
 import {
+  eigenerVerlauf,
   einheitenFuerStruktur,
   fokusProzentsatz,
   formatEinheiten,
@@ -32,9 +33,13 @@ import {
   stufenStandJe,
   strukturVerlauf,
   traegtZahlen,
+  type StrukturVerlauf,
   type StufenStand,
+  type Verlaufstag,
 } from "@/lib/einheiten";
-import VerlaufsChart from "@/components/VerlaufsChart";
+import { strukturAktivitaeten } from "@/lib/aktivitaeten";
+import MannschaftsKurven, { type Kurvensatz } from "@/components/MannschaftsKurven";
+import { type Verlaufsserie } from "@/components/VerlaufsChart";
 import { initialenKuerzel } from "@/lib/vorfuehren";
 import VorfuehrProvider from "@/components/VorfuehrProvider";
 import VorfuehrSchalter from "@/components/VorfuehrSchalter";
@@ -225,6 +230,47 @@ function kopfzeile(person: Mannschaftsperson): string {
   return `${w.anrufeWoche} Anrufe · ${w.gehaltenWoche} gehalten`;
 }
 
+/**
+ * Die Einheiten-Kurve als ZWEI DISJUNKTE Linien: was der Betrachter selbst
+ * geschrieben hat, und was der Rest seiner Struktur getragen hat (D11).
+ *
+ * DIE INVARIANTE, an der die ganze Seite haengt: Eigen + Team ist an JEDEM
+ * Punkt genau der bisherige Struktur-Stand - im Sockel und an jedem einzelnen
+ * Tag. Am Ende der Kurve ist das dieselbe Zahl wie die Zelle "Zusammen" der
+ * eigenen Zeile in der Einheiten-Tabelle weiter unten (Invariante an
+ * strukturVerlauf in lib/einheiten.ts: sockel + Summe aller Tage == astGesamt
+ * der eigenen Zeile). Zwei uebereinandergelegte Kurven, die zusammen etwas
+ * anderes ergaeben als die Tabelle darunter, waeren eine zweite
+ * Rechnungsbasis - genau das, was CONTEXT.md ausschliesst.
+ *
+ * Die Subtraktion darf ueber `struktur.tage` laufen und braucht keine
+ * Vereinigungsmenge: strukturKonten() haelt den Betrachter IMMER mit drin
+ * (lib/struktur.ts:44-59), jeder Tag mit eigener Buchung steht deshalb auch
+ * in der Struktur-Reihe. Die Tagesliste der Team-Linie bleibt bewusst
+ * ungefiltert - so faengt der Zeitraum "Alles" auf denselben Tag an wie die
+ * bisherige Struktur-Kurve.
+ *
+ * Reine Arithmetik auf zwei bereits geladenen Ergebnissen, keine Abfrage.
+ */
+function eigenUndTeam(
+  eigenSockel: number,
+  eigenTage: Verlaufstag[],
+  struktur: StrukturVerlauf
+): Verlaufsserie[] {
+  const eigenJeTag = new Map(eigenTage.map((tag) => [tag.tag, tag.hundertstel]));
+  return [
+    { name: "Eigen", sockel: eigenSockel, tage: eigenTage },
+    {
+      name: "Team",
+      sockel: struktur.sockel - eigenSockel,
+      tage: struktur.tage.map((tag) => ({
+        tag: tag.tag,
+        hundertstel: tag.hundertstel - (eigenJeTag.get(tag.tag) ?? 0),
+      })),
+    },
+  ];
+}
+
 export default async function MannschaftPage({
   searchParams,
 }: {
@@ -245,7 +291,7 @@ export default async function MannschaftPage({
   // nebeneinander statt hintereinander.
   const lage = await mannschaftsLage(user);
   const alle = [lage.ich, ...lage.baum];
-  const [aeste, einheitenAn, einheiten, fokusProzent] = await Promise.all([
+  const [aeste, einheitenAn, einheiten, fokusProzent, aktivitaeten] = await Promise.all([
     astVergleich(user.id),
     schalter("einheiten"),
     einheitenFuerStruktur(
@@ -256,24 +302,88 @@ export default async function MannschaftPage({
     // pflegbar in der Werkstatt, Platzhalter 50 %, solange nichts eingetragen
     // ist. Reine Konfig-Lesung, keine zweite Berechnung der Anteile selbst.
     fokusProzentsatz(),
+    // Anrufe und Termine als Tagesreihe fuer den Kurven-Block oben (AP-16/17).
+    // Steht HIER und nicht hinter dem Einheiten-Schalter: die beiden
+    // Aktivitaets-Kurven laufen immer, auch wo Einheiten abgeschaltet sind -
+    // eine Struktur ohne Einheiten hat trotzdem Schlagzahl. Eine Abfrage fuer
+    // die ganze Struktur, keine je Zeile.
+    strukturAktivitaeten(user.id),
   ]);
   const heuteStart = dayToUtcDate(berlinToday()).getTime();
   // Derselbe Schalter wie auf /einheiten: sonst laesst sich die Sichtbarkeit an
   // einer Stelle abschalten und an der anderen nicht.
   const zeigeEinheiten = einheitenAn.einheiten && traegtZahlen(einheiten);
 
-  // Verlauf-Kurve und Stufen-Spalte (Bauschritt 3 des Lagebild-Plans): beide
+  // Verlauf-Kurven und Stufen-Spalte (Bauschritt 3 des Lagebild-Plans): diese
   // Abfragen laufen nur, wenn der Einheiten-Schalter ueberhaupt an ist -
-  // sonst zahlt eine Struktur ohne das Feature fuer zwei Abfragen, die nie
+  // sonst zahlt eine Struktur ohne das Feature fuer Abfragen, die nie
   // gerendert werden. Der volle Sicht-Guard (zeigeEinheiten, inklusive
   // traegtZahlen) bleibt dem bestehenden Tabellen-Abschnitt vorbehalten und
   // steht erst nach diesem Await fest.
-  const [strukturverlauf, stufenstand] = einheitenAn.einheiten
+  //
+  // eigenerVerlauf() kommt fuer die zweite Linie der Einheiten-Kurve dazu
+  // (Eigen gegen Team, D11) - nebenher im selben Promise.all, nicht als
+  // dritte Runde hintereinander.
+  const [strukturverlauf, stufenstand, eigenverlauf] = einheitenAn.einheiten
     ? await Promise.all([
         strukturVerlauf(user.id),
         stufenStandJe(alle.map((person) => person.id)),
+        eigenerVerlauf(user.id),
       ])
-    : [null, null];
+    : [null, null, null];
+
+  // --- Die drei Kurven-Datensaetze fuer den Block ganz oben (D11/D12) -------
+  // Fertig gerechnet, damit der Browser nur noch umschaltet. Die Reihenfolge
+  // ist die Anzeigereihenfolge, und der erste Eintrag ist die Voreinstellung:
+  // ohne Einheiten-Sicht faellt der erste weg und die Anrufe stehen vorn
+  // (Regel aus AP-17 - Einheiten hinter demselben Schalter wie die Tabelle,
+  // Anrufe und Termine immer). Reine Arithmetik auf schon geladenen
+  // Ergebnissen, keine zusaetzliche Abfrage.
+  //
+  // Das Feld heisst historisch `hundertstel`, traegt hier aber die blanke
+  // Tageszahl: die Kurve rechnet ausschliesslich in Rohwerten, das Format
+  // kommt von aussen (Festlegung 7 in components/VerlaufsChart.tsx).
+  const heute = berlinToday();
+  const monatStartTag = produktionsmonat(heute).start.toISOString().slice(0, 10);
+  const kurven: Kurvensatz[] = [
+    ...(zeigeEinheiten && strukturverlauf && eigenverlauf
+      ? [
+          {
+            id: "einheiten" as const,
+            serien: eigenUndTeam(user.einheitenStart, eigenverlauf, strukturverlauf),
+          },
+        ]
+      : []),
+    // Kein Sockel: gezaehlte Anrufe und Termine gibt es erst, seit die App
+    // sie zaehlt. Und nur Tage MIT der jeweiligen Zahl - sonst finge der
+    // Zeitraum "Alles" an einem Tag an, an dem nur die andere Sorte gebucht
+    // wurde (strukturAktivitaeten liefert eine Zeile, sobald EINE der drei
+    // Zahlen steht).
+    {
+      id: "anrufe",
+      serien: [
+        {
+          name: "Anrufe",
+          sockel: 0,
+          tage: aktivitaeten.tage
+            .filter((tag) => tag.anrufe !== 0)
+            .map((tag) => ({ tag: tag.tag, hundertstel: tag.anrufe })),
+        },
+      ],
+    },
+    {
+      id: "termine",
+      serien: [
+        {
+          name: "Termine",
+          sockel: 0,
+          tage: aktivitaeten.tage
+            .filter((tag) => tag.vereinbart !== 0)
+            .map((tag) => ({ tag: tag.tag, hundertstel: tag.vereinbart })),
+        },
+      ],
+    },
+  ];
 
   // Woher die Einheiten kommen (AP-06): der Anteil jedes DIREKTEN Astes an
   // der eigenen Struktur-Summe. "Struktur-Summe" ist bewusst der Eintrag des
@@ -420,10 +530,29 @@ export default async function MannschaftPage({
         </p>
       </div>
 
+      {/* --- Die Kurven, ganz oben ------------------------------------------
+          Emils Ansage aus der zweiten Runde: Chart oben, Tabelle behalten
+          (D12). Deshalb steht hier EIN Bild mit drei Mini-Kacheln davor und
+          nicht drei gestapelte Kurven - die schoeben die Matrix aus dem
+          Blick, und die ist der Grund, warum diese Seite ueberhaupt
+          aufgemacht wird.
+
+          Der Anker `verlauf` ist hierher gewandert: der Kopf auf /heute
+          verlinkt auf /mannschaft#verlauf (components/LageKopf.tsx) und
+          landete bisher im vorletzten Abschnitt. Vorfuehren: in diesem Block
+          steht kein Name, es gibt nichts zu verdecken. */}
+      <section id="verlauf" className="scroll-mt-24 space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className={sectionTitle}>Verlauf deiner Struktur</h2>
+          <span className="text-xs text-ink-muted">tippen und halten zum Ablesen</span>
+        </div>
+        <MannschaftsKurven saetze={kurven} heute={heute} monatStart={monatStartTag} />
+      </section>
+
       {/* --- Das Team-Cockpit ------------------------------------------------
           Emils Wunsch fuer den Teamabend: Ampeln und Kernzahlen der ganzen
-          Mannschaft in einer dichten Zeile je Person, ganz oben, ohne durch
-          die Abschnitte darunter zu scrollen. Reine Anzeige derselben Daten,
+          Mannschaft in einer dichten Zeile je Person, direkt unter den Kurven
+          und vor allen uebrigen Abschnitten. Reine Anzeige derselben Daten,
           die "Heute dran" & Co. weiter unten ohnehin schon laden. */}
       <MannschaftsMatrix
         personen={lage.leute}
@@ -431,6 +560,20 @@ export default async function MannschaftPage({
         zeigeEinheiten={zeigeEinheiten}
         kurz={kurzMap}
       />
+
+      {/* --- Der Weg zum Direktkontakt-Zaehler ------------------------------
+          Der Trichter fuer die Strasse (AP-21) steht bewusst in KEINER
+          Leiste: er ist ein Werkzeug fuer Fuehrungskraefte, und die Leiste
+          gehoert allen. Wer ihn nicht im Wegweiser sucht (lib/wegweiser.ts,
+          Eintrag "direktkontakt"), findet ihn nur hier - deshalb dieser eine
+          Satz unter der Matrix, ruhig und ohne Kachel. Ein Rechte-Guard ist
+          unnoetig: /mannschaft selbst steht schon nur Fuehrungskraeften
+          offen. */}
+      <p className="text-sm">
+        <Link href="/direktkontakt" className="font-medium text-navy-700 hover:underline">
+          Direktkontakte zählen →
+        </Link>
+      </p>
 
       {lage.fuehrtNiemanden && lage.gesamtstruktur && (
         <p className="rounded-lg bg-sunken px-3 py-2 text-sm text-ink-muted">
@@ -877,35 +1020,14 @@ export default async function MannschaftPage({
         </VorfuehrVerdeckt>
       )}
 
-      {/* --- Verlauf deiner Struktur ------------------------------------------
-          Direkt ueber der Einheiten-Tabelle, mit demselben Guard. Der Endwert
-          der Kurve ist dieselbe Zahl wie die Zelle "Zusammen" der eigenen
-          Zeile in der Tabelle darunter - beide kommen aus derselben
-          Rechnungsbasis (strukturVerlauf() bzw. einheitenFuerStruktur(),
-          Invariante siehe Kommentar an strukturVerlauf in lib/einheiten.ts). */}
-      {zeigeEinheiten && strukturverlauf && (
-        <section id="verlauf" className="scroll-mt-24 space-y-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className={sectionTitle}>Verlauf deiner Struktur</h2>
-            <span className="text-xs text-ink-muted">
-              tippen und halten zum Ablesen
-            </span>
-          </div>
-          <VerlaufsChart
-            sockel={strukturverlauf.sockel}
-            tage={strukturverlauf.tage}
-            heute={berlinToday()}
-            monatStart={produktionsmonat(berlinToday()).start.toISOString().slice(0, 10)}
-            fussnote="Kumuliert über deine ganze Struktur, inklusive der Einheiten von vor der App — die stehen als eine Zahl ohne Datum, davor läuft die Kurve flach. Ein Storno zieht die Kurve nach unten."
-          />
-        </section>
-      )}
-
       {/* --- Einheiten in der Struktur ---------------------------------------
           Die Zahl, in der der Betrieb rechnet - hier je Kopf aufgeschluesselt.
           "Eigen" ist, was jemand selbst gemeldet hat, "Team" alles unter ihm.
           Bewusst getrennt von den Taetigkeits-Kennzahlen oben: das sind zwei
-          Waehrungen, und Einheiten zaehlen in keiner Rangliste mit. */}
+          Waehrungen, und Einheiten zaehlen in keiner Rangliste mit.
+          Die Zelle "Zusammen" der eigenen Zeile ist dieselbe Zahl, die die
+          Einheiten-Kachel ganz oben zeigt (Eigen + Team) - eine
+          Rechnungsbasis, zwei Anzeigen. */}
       {zeigeEinheiten && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
