@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { astLage, fuehrungsSchritt, type Mannschaftsperson } from "@/lib/fuehrung";
 import Ampel from "@/components/Ampel";
 import Kennzahl from "@/components/Kennzahl";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/einblick";
 import { nextStepLabels } from "@/lib/pipeline";
 import { EinladungNachreichen } from "@/components/PersonAufnehmen";
+import PersonEntfernen from "@/components/PersonEntfernen";
 import { SCHNELLTEXTE_FUEHRUNG } from "@/lib/nachrichten";
 import NachrichtSenden from "@/components/NachrichtSenden";
 import KuemmereMich from "@/components/KuemmereMich";
@@ -226,6 +228,13 @@ export default async function PersonPage({
   ]);
   const zuletzt = zuletztJe.get(person.id) ?? null;
   const naechstes = naechstesJe.get(person.id) ?? null;
+
+  // Nur fuer den Loesch-Dialog: was mitginge, steht dort als Zahl und nicht
+  // als Ueberraschung hinterher.
+  const eigeneKontakte =
+    person.id === user.id
+      ? 0
+      : await prisma.contact.count({ where: { ownerId: person.id } });
 
   const namen = new Map([person, ...ast].map((eintrag) => [eintrag.id, eintrag.vorname]));
   // Ein Herkunftsschild je Zeile lohnt sich erst, wenn mehr als einer liefert.
@@ -585,6 +594,35 @@ export default async function PersonPage({
               </ul>
             </details>
           )}
+        </section>
+      )}
+
+      {/* --- Aus der Mannschaft nehmen --------------------------------------
+          Ganz unten, hinter allem anderen: der Griff, den man einmal im
+          Quartal braucht, gehoert nicht neben den, den man taeglich braucht.
+          Vorher konnte das nur die Systemverwaltung - und bis die reagiert
+          hat, steht ein falscher Kasten im Organigramm und eine Null in jeder
+          Auswertung des Astes. */}
+      {person.id !== user.id && (
+        <section className={`${card} p-4 sm:p-5`}>
+          <h2 className={kicker}>Aus der Mannschaft nehmen</h2>
+          <p className="mt-1.5 text-sm text-ink-muted">
+            {person.platzhalter
+              ? `${person.vorname} steht nur als Kasten im Baum. Löschen nimmt ihn samt offener Einladung heraus.`
+              : `Austragen lässt ${person.vorname} im Baum stehen — die Historie bleibt, die Zahlen zählen nicht mehr mit. Löschen ist endgültig.`}
+          </p>
+          <div className="mt-3">
+            <PersonEntfernen
+              memberId={person.id}
+              name={person.name}
+              vorname={person.vorname}
+              platzhalter={person.platzhalter}
+              ausgetreten={person.ausgetreten}
+              kontakte={eigeneKontakte}
+              direkte={direkte.length}
+              ueberName={person.ueber ?? "dir"}
+            />
+          </div>
         </section>
       )}
 

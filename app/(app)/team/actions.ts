@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { umhaengen } from "@/lib/struktur";
+import { kontoAustragen, kontoLoeschen } from "@/lib/kontoLoeschen";
 import { ablaufDatum, neuerCode } from "@/lib/einladung";
 import { einladungZurueck } from "@/lib/einladung-ruecknahme";
 import { neuerResetCode, resetAblauf } from "@/lib/passwort";
@@ -125,10 +126,9 @@ export async function beraterUmhaengen(formData: FormData) {
 
 // --- Konto austragen ---------------------------------------------------------
 //
-// Der Normalfall, wenn jemand aufhoert. Das Konto bleibt im Baum stehen, damit
-// die Historie stimmt - wer sechs Monate lang Termine gemacht hat, soll nicht
-// rueckwirkend nie existiert haben. Es zaehlt nur in keiner laufenden
-// Auswertung mehr mit und kann sich nicht mehr anmelden.
+// Der Normalfall, wenn jemand aufhoert. Der Vorgang selbst steht in
+// lib/kontoLoeschen.ts - er gehoert nicht mehr allein der Systemverwaltung,
+// seit auch eine Fuehrungskraft ihre eigene Struktur aufraeumen darf.
 export async function benutzerAustragen(formData: FormData) {
   const admin = await requireAdmin();
   const userId = value(formData, "userId");
@@ -137,17 +137,8 @@ export async function benutzerAustragen(formData: FormData) {
   // Sich selbst austragen hiesse, sich selbst aus der Verwaltung aussperren.
   if (userId === admin.id) redirect("/team?error=sich_selbst");
 
-  const { count } = await prisma.user.updateMany({
-    where: { id: userId },
-    data: { deactivatedAt: wieder ? null : new Date() },
-  });
-  if (count === 0) redirect("/team?error=unbekannt");
-
-  // Sitzungen sind signierte Cookies ohne Gegenstueck in der Datenbank - sie
-  // laufen von selbst ab. Was sofort greift: Push-Meldungen hoeren auf.
-  if (!wieder) {
-    await prisma.pushAbo.deleteMany({ where: { userId } });
-  }
+  const fehler = await kontoAustragen(userId, wieder);
+  if (fehler) redirect("/team?error=unbekannt");
 
   revalidatePath("/team");
   revalidatePath("/mannschaft");
@@ -157,55 +148,16 @@ export async function benutzerAustragen(formData: FormData) {
 // --- Konto endgueltig loeschen -----------------------------------------------
 //
 // Fuer Testkonten und Fehlgriffe, nicht fuer Austritte - dafuer gibt es
-// "Austragen". Was hier mitgeht, steht im Bestaetigungsdialog; niemand soll
-// hinterher ueberrascht sein.
-//
-// Der heikle Teil ist der Baum: "User.path" ist ein materialisierter Pfad. Wer
-// eine Fuehrungskraft einfach loescht, laesst ihre Leute mit einem Pfad
-// zurueck, der auf ein Konto zeigt, das es nicht mehr gibt - und ab da findet
-// keine Sichtbarkeitsabfrage sie mehr. Deshalb ruecken die Direkten ZUERST
-// eine Ebene hoch, mitsamt ihren eigenen Aesten.
+// "Austragen". Was mitgeht, steht im Bestaetigungsdialog; niemand soll
+// hinterher ueberrascht sein. Der Vorgang selbst: lib/kontoLoeschen.ts.
 export async function benutzerLoeschen(formData: FormData) {
   const admin = await requireAdmin();
   const userId = value(formData, "userId");
   if (!userId) redirect("/team?error=invalid");
   if (userId === admin.id) redirect("/team?error=sich_selbst");
 
-  const konto = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, leaderId: true },
-  });
-  if (!konto) redirect("/team?error=unbekannt");
-
-  // Erst umhaengen, dann loeschen. Bricht etwas dazwischen ab, steht der Baum
-  // trotzdem richtig - nur das Konto ist noch da.
-  const direkte = await prisma.user.findMany({
-    where: { leaderId: userId },
-    select: { id: true },
-  });
-  for (const kind of direkte) {
-    await umhaengen(kind.id, konto.leaderId);
-  }
-
-  await prisma.$transaction([
-    // Die Zustimmungen zur Auftragsverarbeitung sind unveraenderlich - ein
-    // Trigger blockt UPDATE und DELETE auch gegen den Eigentuemer der Tabelle.
-    // Dieser eine Weg meldet sich ausdruecklich dabei an, sonst liesse sich
-    // kein Konto mehr loeschen, sobald es einmal zugestimmt hat.
-    //
-    // set_config(..., true) gilt nur fuer DIESE Transaktion. Darum steht es
-    // als erstes Element IM Feld und nicht davor: ausserhalb der Transaktion
-    // waere die Einstellung ueber den Pooler wertlos.
-    prisma.$queryRaw`SELECT set_config('app.avv_loeschen_erlaubt', 'ja', true)`,
-    // Die privaten Kontakte gehen mit. Sie haetten sonst keinen Eigentuemer
-    // mehr und waeren in keiner Ansicht je wieder sichtbar - Daten, die nur
-    // noch Platz belegen.
-    prisma.contact.deleteMany({ where: { ownerId: userId } }),
-    // Das Ranglistenprofil mitsamt seinen Zaehlern. Ohne das bliebe ein Name
-    // in der Rangliste stehen, hinter dem kein Konto mehr steckt.
-    prisma.person.deleteMany({ where: { userId } }),
-    prisma.user.delete({ where: { id: userId } }),
-  ]);
+  const fehler = await kontoLoeschen(userId);
+  if (fehler) redirect("/team?error=unbekannt");
 
   revalidatePath("/team");
   revalidatePath("/mannschaft");

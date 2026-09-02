@@ -9,10 +9,12 @@
 // wieder hin. Es gibt deshalb in der ganzen Anwendung keinen zweiten Weg, eine
 // LeadershipTask anzulegen.
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { pfadUnter, strukturKonten } from "@/lib/struktur";
+import { pfadUnter, strukturKonten } from "@/lib/struktur";
+import { kontoAustragen, kontoLoeschen } from "@/lib/kontoLoeschen";
 import { ablaufDatum, neuerCode } from "@/lib/einladung";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { artFuerSignal, istFrist, tageFuerFrist } from "@/lib/fuehrungsaufgaben";
@@ -338,3 +340,77 @@ export async function ausbauFreischalten(formData: FormData) {
   neuRechnen();
   revalidatePath("/werkstatt");
 }
+
+// --- Jemanden aus der eigenen Struktur entfernen -----------------------------
+//
+// Bis hierhin konnte das nur die Systemverwaltung (app/(app)/team). Eine
+// Fuehrungskraft, die sich beim Aufnehmen vertippt hat oder deren Partner nach
+// zwei Wochen wieder weg ist, musste jemanden anschreiben - und bis das
+// passiert, steht ein falscher Kasten im Organigramm und eine Null in jeder
+// Auswertung des Astes.
+//
+// Zwei Griffe, und der Unterschied ist der ganze Punkt:
+//
+//   Austragen  – jemand hoert auf. Das Konto bleibt im Baum, damit die
+//                Historie stimmt, zaehlt aber nirgends mehr mit. Umkehrbar.
+//   Loeschen   – ein Platzhalter, der nie einer war, oder ein Fehlgriff.
+//                Alles geht mit, und zwar endgueltig.
+//
+// Beide teilen sich denselben Riegel: der Betroffene muss im eigenen Ast
+// liegen (inMeinerStruktur), und er darf kein Admin sein - sonst koennte sich
+// ein Mitglied, unter dem versehentlich ein Admin haengt, die Verwaltung
+// wegloeschen.
+
+async function darfEntfernen(
+  user: { id: string; role: UserRole },
+  memberId: string
+): Promise<boolean> {
+  if (!memberId || memberId === user.id) return false;
+  if (!(await inMeinerStruktur(user.id, memberId, user.role))) return false;
+  if (user.role === "ADMIN") return true;
+  const ziel = await prisma.user.findUnique({
+    where: { id: memberId },
+    select: { role: true },
+  });
+  return ziel?.role === "MEMBER";
+}
+
+/** Aufgehoert: das Konto bleibt stehen, zaehlt aber nicht mehr mit. */
+export async function personAustragen(formData: FormData) {
+  const user = await requireUser();
+  const memberId = feld(formData, "memberId");
+  const wieder = feld(formData, "wieder") === "1";
+  if (!(await darfEntfernen(user, memberId))) {
+    return { fehler: "Diese Person liegt nicht in deiner Struktur." };
+  }
+
+  const fehler = await kontoAustragen(memberId, wieder);
+  if (fehler) return { fehler: "Person nicht gefunden." };
+
+  neuRechnen();
+  revalidatePath("/team");
+  revalidatePath(`/mannschaft/${memberId}`);
+  return { ok: true };
+}
+
+/**
+ * Endgueltig loeschen. Der Ast unter dem Geloeschten faellt NICHT mit: seine
+ * Direkten ruecken eine Ebene hoch (lib/kontoLoeschen.ts) und haengen danach
+ * an derselben Fuehrungskraft wie er. Alles andere waere eine Loeschung, die
+ * Leute mitreisst, die niemand gemeint hat.
+ */
+export async function personLoeschen(formData: FormData) {
+  const user = await requireUser();
+  const memberId = feld(formData, "memberId");
+  if (!(await darfEntfernen(user, memberId))) {
+    redirect("/mannschaft?fehler=nicht_erlaubt");
+  }
+
+  const fehler = await kontoLoeschen(memberId);
+  if (fehler) redirect("/mannschaft?fehler=unbekannt");
+
+  neuRechnen();
+  revalidatePath("/team");
+  revalidatePath("/leaderboard");
+  redirect("/mannschaft?geloescht=1");
+}
