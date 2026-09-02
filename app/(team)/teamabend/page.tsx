@@ -3,10 +3,12 @@ import { berlinToday, dayToUtcDate, startOfWeek } from "@/lib/dates";
 import { ladePuls, ladeRangliste } from "@/lib/arena";
 import { ladeFeed } from "@/lib/feed";
 import { ladeTitelStaende } from "@/lib/titel";
+import { rueckblickKarten } from "@/lib/rueckblick";
 import { aktiveKonten, indexkurveFuer, produktionsmonat } from "@/lib/einheiten";
 import { istAn, merkeNutzung } from "@/lib/features";
 import IndexKurve from "@/components/IndexKurve";
 import LeerZustand from "@/components/LeerZustand";
+import RueckblickKarten from "@/components/RueckblickKarten";
 import { MonitorIcon } from "@/components/icons";
 import { card, cn, kicker } from "@/components/ui";
 
@@ -78,7 +80,13 @@ export default async function TeamabendPage() {
     ladeFeed(person.id),
     aktiveKonten(),
   ]);
-  const punkte = await indexkurveFuer(ids, heute);
+  // Die Titel-Staende gehen an den Rueckblick weiter, statt dass er sie ein
+  // zweites Mal laedt - er braucht sie fuer seine erste Prioritaet
+  // (lib/rueckblick.ts). Dieselbe Datenladung, keine zweite Runde.
+  const [punkte, rueckblick] = await Promise.all([
+    indexkurveFuer(ids, heute),
+    rueckblickKarten(user.id, { heute, titel }),
+  ]);
 
   await merkeNutzung("teamabend", person.id);
 
@@ -94,6 +102,27 @@ export default async function TeamabendPage() {
           {vollDatumFormat.format(dayToUtcDate(heute))}
         </h1>
       </div>
+
+      {/* --- Rueckblick: die Karten, mit denen der Abend eroeffnet - was lief
+          und was bei Einzelnen besonders gut lief (N13, D20). Steht deshalb
+          als erster Block nach dem Kopf; alles darunter bleibt in seiner
+          Reihenfolge. Ohne eigene Struktur entfaellt der Block still: ein
+          Rueckblick auf sich selbst ist kein Teamabend. ------------------- */}
+      {rueckblick.hatStruktur && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className={blockTitel}>Rückblick</h2>
+            <span className={kicker}>Diese Woche</span>
+          </div>
+          {rueckblick.karten.length > 0 ? (
+            <RueckblickKarten karten={rueckblick.karten} />
+          ) : (
+            <p className="text-base text-ink-muted">
+              Diese Woche noch kein Highlight — ab Montag wieder.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* --- Titel: mehrere Wege, vorn zu sein - hier ohne "dein Titel",
           es geht um die Woche des Teams, nicht um die Person davor. -------- */}
