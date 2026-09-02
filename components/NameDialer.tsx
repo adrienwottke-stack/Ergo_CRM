@@ -55,11 +55,14 @@ export default function NameDialer({
   kind,
   guideTitle,
   guideBody,
+  onFertig,
 }: {
   queue: DialerEntry[];
   kind: ListKind;
   guideTitle: string;
   guideBody: string;
+  /** Gesetzt im Willkommens-Akt: die Ende-Karte fuehrt weiter statt zu Links. */
+  onFertig?: () => void;
 }) {
   // Eingefroren: nach jedem Ergebnis laedt der Server die Liste neu, der
   // erledigte Name faellt heraus – ohne diese Kopie wuerde der Durchlauf
@@ -167,15 +170,23 @@ export default function NameDialer({
           </dl>
         )}
 
-        <div className="flex flex-col justify-center gap-3 pt-2 sm:flex-row">
-          <Link href={`/namen?liste=${kind}`} className={btnPrimary}>
-            Zurück zur Liste
-          </Link>
-          <Link href="/leaderboard" className={btnSecondary}>
-            <TrophyIcon className="h-4 w-4" />
-            Rangliste ansehen
-          </Link>
-        </div>
+        {onFertig ? (
+          <div className="flex justify-center pt-2">
+            <button type="button" onClick={onFertig} className={btnPrimary}>
+              Weiter
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col justify-center gap-3 pt-2 sm:flex-row">
+            <Link href={`/namen?liste=${kind}`} className={btnPrimary}>
+              Zurück zur Liste
+            </Link>
+            <Link href="/leaderboard" className={btnSecondary}>
+              <TrophyIcon className="h-4 w-4" />
+              Rangliste ansehen
+            </Link>
+          </div>
+        )}
       </div>
     );
   }

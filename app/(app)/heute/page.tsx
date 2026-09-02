@@ -190,6 +190,17 @@ export default async function HeutePage() {
   // nichts auf, und die Karte erscheint zu Recht nie.
   const gerade = user.ausbauGesetztAm !== null && user.ausbauGezeigtAm === null;
 
+  // Wiedereintritt fuer Bestehende: der Willkommens-Ablauf hat einen Akt
+  // dazubekommen ("anruf", lib/willkommen.ts), nachdem diese Leute ihn schon
+  // durchlaufen hatten. onboardingSteps traegt ihn dann nicht - die Karte
+  // verschwindet von selbst, sobald der Akt beim Betreten gestempelt wird
+  // (app/(willkommen)/willkommen/actions.ts, aktErreicht).
+  const onboardingSteps =
+    user.onboardingSteps && typeof user.onboardingSteps === "object"
+      ? (user.onboardingSteps as Record<string, string>)
+      : {};
+  const anrufNachtrag = user.startedAt !== null && !onboardingSteps.anruf;
+
   const sicht = eigene(user.id);
   const today = berlinToday();
   const horizon = addDays(dayToUtcDate(today), 8);
@@ -670,6 +681,24 @@ export default async function HeutePage() {
           sechs die App installiert haben. Selbstblendung (nichts, wenn schon
           an oder technisch nicht moeglich) sitzt in Meldungen.tsx selbst. */}
       <Meldungen vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""} />
+
+      {/* Wiedereintritt: der Start hat nachtraeglich einen Anruf-Akt
+          bekommen. Nur fuer Bestehende, die ihn deshalb nie gesehen haben -
+          verschwindet von selbst, sobald sie ihn einmal betreten haben. */}
+      {anrufNachtrag && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-navy-200 bg-navy-50/60 px-4 py-3">
+          <p className="text-sm text-navy-900">
+            Der Start hat einen Schritt dazubekommen: ein Anruf. Zwei Minuten.
+          </p>
+          <Link
+            href="/willkommen?akt=anruf"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-akzent px-4 text-sm font-semibold text-white transition hover:bg-akzent-stark"
+          >
+            <PhoneIcon className="h-4 w-4" />
+            Jetzt
+          </Link>
+        </div>
+      )}
 
       {/* Was jemand geschrieben hat, steht vor der Arbeit - es dauert zehn
           Sekunden und ist der Grund, warum sich das Werkzeug nach Mannschaft

@@ -48,8 +48,17 @@ async function sozialbeweisFuer(userId: string, leaderId: string | null) {
   return null;
 }
 
-export default async function WillkommenPage() {
+export default async function WillkommenPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ akt?: string }>;
+}) {
   const user = await requireUser();
+  // Wiedereintritt fuer Bestehende (Karte auf /heute, "?akt=anruf"): nur der
+  // eine bekannte Wert zaehlt, alles andere faellt auf den normalen Ablauf
+  // zurueck - kein roher Query-String an die Komponente durchreichen.
+  const { akt } = await searchParams;
+  const startAkt = akt === "anruf" ? "anruf" : null;
 
   const [herkunft, gefuehrte, namenVorhanden] = await Promise.all([
     user.herkunftId
@@ -109,6 +118,7 @@ export default async function WillkommenPage() {
       einheitenStartVorbelegt={
         user.einheitenStart ? formatEinheiten(user.einheitenStart) : ""
       }
+      startAkt={startAkt}
     />
   );
 }

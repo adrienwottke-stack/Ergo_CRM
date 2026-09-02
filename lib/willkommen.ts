@@ -25,6 +25,7 @@ export const AKTE = [
   "einwand",
   "brief",
   "sprint",
+  "anruf",
   "einstufung",
   "karrierestufe",
   "rangliste",

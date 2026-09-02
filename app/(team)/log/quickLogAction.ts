@@ -12,6 +12,9 @@ import { kappeRest } from "@/lib/fairness";
 import { eigenerMonatsstand, formatEinheiten } from "@/lib/einheiten";
 import { streakDays, type SchnellStand } from "@/lib/stats";
 import { berlinDayOf, berlinToday, dayToUtcDate } from "@/lib/dates";
+import { eigene } from "@/lib/scope";
+import { quickLogCall } from "@/app/(app)/contacts/actions";
+import { setContactStage } from "@/app/(app)/pipeline/actions";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
 
 /** Der Tagesstand einer Art, nach der Buchung. Die Anzeige richtet sich danach. */
@@ -152,4 +155,77 @@ export async function standHeute(): Promise<SchnellStand> {
     serie: streakDays(new Set(tage.map((eintrag) => berlinDayOf(eintrag.date))), heute),
     einheitenMonat: formatEinheiten(einheitenMonat),
   };
+}
+
+// --- Die Bruecke: Strich -> Name ---------------------------------------------
+//
+// Nach einem Tipp auf Anruf oder Termin fragt Schnellzugriff.tsx "mit wem?" -
+// ein Tipp haengt das Ergebnis an einen Namen, "ohne Namen" bleibt moeglich.
+// Nummern gezogen bekommt keine Frage: der Name IST dort schon der Strich.
+
+export type BrueckeName = { id: string; name: string; phone: string };
+
+/** Bis zu acht eigene NEU/KONTAKTIERT-Namen mit Nummer, aelteste zuerst. */
+export async function brueckeAuswahl(): Promise<BrueckeName[]> {
+  const user = await requireUser();
+  const kontakte = await prisma.contact.findMany({
+    where: {
+      ...eigene(user.id).kontakte,
+      stage: { in: ["NEU", "KONTAKTIERT"] },
+      outcome: "OFFEN",
+      phone: { not: null },
+    },
+    select: { id: true, name: true, phone: true },
+    orderBy: { createdAt: "asc" },
+    take: 8,
+  });
+  return kontakte.map((k) => ({ id: k.id, name: k.name, phone: k.phone! }));
+}
+
+/** Wirft, wenn der Kontakt nicht existiert oder jemand anderem gehoert. */
+async function eigenerKontakt(userId: string, contactId: string): Promise<void> {
+  const kontakt = await prisma.contact.findFirst({
+    where: { id: contactId, ...eigene(userId).kontakte },
+    select: { id: true },
+  });
+  if (!kontakt) throw new Error("Kontakt nicht gefunden.");
+}
+
+/**
+ * Anruf an einen Namen haengen: dieselbe Zeile wie eben (der Strich "+"), nur
+ * jetzt mit Gesicht. quickLogCall legt seine EIGENE, mit der Aktivitaet
+ * verknuepfte Tages-Zeile an (activityId gesetzt) - die manuelle von eben
+ * (activityId leer) muss deshalb zuerst zurueck, sonst zaehlt derselbe Anruf
+ * doppelt.
+ */
+export async function brueckeAnruf(contactId: string): Promise<void> {
+  const user = await requireUser();
+  await eigenerKontakt(user.id, contactId);
+
+  await quickLogZurueck("CALL");
+  const data = new FormData();
+  data.set("contactId", contactId);
+  await quickLogCall(data);
+}
+
+/**
+ * Termin an einen Namen haengen: derselbe Grund wie bei brueckeAnruf -
+ * setContactStage vergibt den APPOINTMENT_SET-Punkt ueber eine eigene Zeile
+ * OHNE activityId, genau wie die manuelle von eben. Zurueck muss deshalb VOR
+ * dem Schreiben passieren, sonst traefe die Ruecknahme die falsche (die neu
+ * geschriebene) Zeile statt der alten.
+ */
+export async function brueckeTermin(
+  contactId: string,
+  appointmentAt: string
+): Promise<void> {
+  const user = await requireUser();
+  await eigenerKontakt(user.id, contactId);
+
+  await quickLogZurueck("APPOINTMENT_SET");
+  const data = new FormData();
+  data.set("contactId", contactId);
+  data.set("stage", "TERMIN_VEREINBART");
+  data.set("appointmentAt", appointmentAt);
+  await setContactStage(data);
 }

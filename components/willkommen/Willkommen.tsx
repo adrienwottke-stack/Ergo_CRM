@@ -23,6 +23,7 @@ import Hochrechnung from "@/components/willkommen/Hochrechnung";
 import EinwandTest from "@/components/willkommen/EinwandTest";
 import BriefAkt from "@/components/willkommen/BriefAkt";
 import NamenSprint from "@/components/willkommen/NamenSprint";
+import AnrufAkt from "@/components/willkommen/AnrufAkt";
 import Einstufung from "@/components/willkommen/Einstufung";
 import Karrierestufe from "@/components/willkommen/Karrierestufe";
 import RanglisteMoment from "@/components/willkommen/RanglisteMoment";
@@ -47,6 +48,7 @@ export default function Willkommen({
   schonFertig,
   karrierestufe,
   einheitenStartVorbelegt,
+  startAkt,
 }: {
   vorname: string;
   einlader: string;
@@ -60,6 +62,13 @@ export default function Willkommen({
   karrierestufe: number | null;
   /** Fertig formatiert ("120,50") oder leer - siehe app/(willkommen)/willkommen/page.tsx. */
   einheitenStartVorbelegt: string;
+  /**
+   * Wiedereintritt fuer Bestehende (?akt=... auf /willkommen, siehe page.tsx).
+   * Steht ausserhalb der Akt-Kette: rendert genau diesen einen Akt, stempelt
+   * ihn selbst und fuehrt am Ende zurueck nach /heute statt zu "weiter".
+   * Aktuell nur "anruf" - andere Werte fallen auf den normalen Ablauf zurueck.
+   */
+  startAkt?: string | null;
 }) {
   const router = useRouter();
   const akte: readonly string[] = leaderFlow ? LEADER_AKTE : AKTE;
@@ -70,8 +79,11 @@ export default function Willkommen({
 
   const akt = akte[stufe] as Akt | LeaderAkt;
 
-  // Messstempel je Akt. Verloren ist egal, blockiert waere schlimm.
+  // Messstempel je Akt. Verloren ist egal, blockiert waere schlimm. Beim
+  // Wiedereintritt (startAkt) stempelt der eigene Effekt weiter unten - hier
+  // wuerde sonst "boot" gestempelt, weil stufe/akt in diesem Zweig nie laufen.
   useEffect(() => {
+    if (startAkt) return;
     startTransition(async () => {
       try {
         await aktErreicht(akt);
@@ -79,15 +91,29 @@ export default function Willkommen({
         // bewusst leer
       }
     });
-  }, [akt]);
+  }, [akt, startAkt]);
+
+  // Wiedereintritt: eigener Stempel beim Betreten, ausserhalb der Kette -
+  // genau der Akt aus der URL gilt als erreicht, nicht "boot".
+  useEffect(() => {
+    if (!startAkt) return;
+    startTransition(async () => {
+      try {
+        await aktErreicht(startAkt);
+      } catch {
+        // bewusst leer
+      }
+    });
+  }, [startAkt]);
 
   // Das Hochfahren: zwei Sekunden Theater, dann geht es von selbst weiter.
+  // Nicht beim Wiedereintritt - der zeigt sofort den einen angefragten Akt.
   useEffect(() => {
-    if (akt !== "boot") return;
+    if (akt !== "boot" || startAkt) return;
     const sofort = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const timer = setTimeout(() => setStufe(1), sofort ? 150 : 2000);
     return () => clearTimeout(timer);
-  }, [akt]);
+  }, [akt, startAkt]);
 
   const weiter = () => setStufe((wert) => Math.min(wert + 1, akte.length - 1));
 
@@ -111,6 +137,20 @@ export default function Willkommen({
       }
     });
   };
+
+  // Wiedereintritt: genau ein Akt, ausserhalb der Kette und ohne ihre
+  // Fortschrittsleiste (die haette bei einem einzelnen Akt keine Bedeutung).
+  // onDone fuehrt zurueck nach /heute statt zu "weiter" - der Aufruf kam von
+  // dort und soll dort auch enden.
+  if (startAkt === "anruf") {
+    return (
+      <div className="mx-auto flex h-dvh max-w-md flex-col px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+        <div className="min-h-0 flex-1 pt-2">
+          <AnrufAkt onDone={() => router.push("/heute")} />
+        </div>
+      </div>
+    );
+  }
 
   if (akt === "boot") {
     return (
@@ -179,6 +219,7 @@ export default function Willkommen({
             }}
           />
         )}
+        {akt === "anruf" && <AnrufAkt onDone={weiter} />}
         {akt === "einstufung" && <Einstufung onDone={weiter} />}
         {/* AP-12: laeuft in AKTE UND LEADER_AKTE - eine Bedingung reicht,
             die Stufe fragt sich fuer Mitglieder wie Fuehrungskraefte gleich. */}

@@ -40,6 +40,10 @@ import {
   quickLog,
   quickLogZurueck,
   standHeute,
+  brueckeAuswahl,
+  brueckeAnruf,
+  brueckeTermin,
+  type BrueckeName,
 } from "@/app/(team)/log/quickLogAction";
 import { einheitSchnellBuchen } from "@/app/(team)/einheiten/actions";
 import { suchlauf } from "@/app/wegweiserAction";
@@ -48,6 +52,7 @@ import { sucheImWegweiser, type WegweiserEintrag } from "@/lib/wegweiser";
 import { AUSBAU_VOLL, type Ausbaustand } from "@/lib/ausbauSicht";
 import Modal from "@/components/Modal";
 import EinheitenHilfe from "@/components/EinheitenHilfe";
+import { AppointmentDialog } from "@/components/ResultDialogs";
 import {
   ArrowRightIcon,
   CalendarCheckIcon,
@@ -96,6 +101,20 @@ export default function Schnellzugriff({
   const [delta, setDelta] = useState<Partial<Record<QuotaType, number>>>({});
   const [gezaehlt, setGezaehlt] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
+
+  // --- Die Bruecke: Strich -> Name ------------------------------------------
+  // "Mit wem?" unter dem gerade getippten Zaehler (Anruf oder Termin). Ohne
+  // Namen bleibt der Standardfall - der Streifen verschwindet von selbst beim
+  // naechsten Tipp.
+  const [bruecke, setBruecke] = useState<{
+    type: "CALL" | "APPOINTMENT_SET";
+    namen: BrueckeName[];
+  } | null>(null);
+  const [brueckeLaeuft, setBrueckeLaeuft] = useState(false);
+  const [terminDialog, setTerminDialog] = useState<{
+    contactId: string;
+    name: string;
+  } | null>(null);
 
   // --- Einheiten ------------------------------------------------------------
   const [menge, setMenge] = useState("");
@@ -174,6 +193,8 @@ export default function Schnellzugriff({
       setMenge("");
       setEinheitenFehler(null);
       setGebucht(false);
+      setBruecke(null);
+      setTerminDialog(null);
     }, 200);
   }, [gezaehlt, router]);
 
@@ -205,6 +226,9 @@ export default function Schnellzugriff({
   const zaehlen = useCallback(
     async (type: QuotaType, richtung: 1 | -1) => {
       setFehler(null);
+      // Jeder neue Tipp raeumt einen offenen Streifen weg - er verschwindet
+      // "von selbst beim naechsten Tipp", wie am Knopf "Ohne Namen".
+      setBruecke(null);
       setDelta((alt) => ({ ...alt, [type]: (alt[type] ?? 0) + richtung }));
       setGezaehlt(true);
 
@@ -236,6 +260,14 @@ export default function Schnellzugriff({
           ...vorherige,
           [type]: (vorherige[type] ?? 0) - richtung,
         }));
+
+        // Die Bruecke: nur nach einem PLUS auf Anruf oder Termin - Nummern
+        // gezogen bekommt keine Frage, der Name IST dort schon der Strich.
+        if (richtung === 1 && (type === "CALL" || type === "APPOINTMENT_SET")) {
+          void brueckeAuswahl()
+            .then((namen) => setBruecke({ type, namen }))
+            .catch(() => {});
+        }
       } catch {
         // Funkloch im Treppenhaus. Die Zahl geht zurueck, damit niemand mit
         // einem Punkt rechnet, der nie ankam.
@@ -244,6 +276,40 @@ export default function Schnellzugriff({
       }
     },
     []
+  );
+
+  // Ein Tipp auf einen Namen im "Mit wem?"-Streifen. Anruf schreibt sofort
+  // (quickLogCall braucht kein weiteres Feld); Termin braucht Datum und
+  // Uhrzeit - dafuer derselbe Dialog wie im Durchlauf (NameDialer).
+  const anNamenHaengen = useCallback(
+    (type: "CALL" | "APPOINTMENT_SET", eintrag: BrueckeName) => {
+      setBruecke(null);
+      if (type === "APPOINTMENT_SET") {
+        setTerminDialog({ contactId: eintrag.id, name: eintrag.name });
+        return;
+      }
+      setBrueckeLaeuft(true);
+      void brueckeAnruf(eintrag.id)
+        .then(() => router.refresh())
+        .catch(() => setFehler("Kam nicht durch. Strich bitte nochmal tippen."))
+        .finally(() => setBrueckeLaeuft(false));
+    },
+    [router]
+  );
+
+  const terminSpeichern = useCallback(
+    (when: string) => {
+      if (!terminDialog) return;
+      setBrueckeLaeuft(true);
+      void brueckeTermin(terminDialog.contactId, when)
+        .then(() => {
+          setTerminDialog(null);
+          router.refresh();
+        })
+        .catch(() => setFehler("Kam nicht durch. Strich bitte nochmal tippen."))
+        .finally(() => setBrueckeLaeuft(false));
+    },
+    [terminDialog, router]
   );
 
   const einheitenBuchen = useCallback(async () => {
@@ -402,10 +468,8 @@ export default function Schnellzugriff({
               {manualQuotaTypes.map((type) => {
                 const zahl = zahlVon(type);
                 return (
-                  <div
-                    key={type}
-                    className="flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5"
-                  >
+                  <div key={type}>
+                  <div className="flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5">
                     <span
                       className={cn(
                         "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
@@ -449,6 +513,34 @@ export default function Schnellzugriff({
                         <PlusIcon className="h-4 w-4" />1
                       </button>
                     </span>
+                  </div>
+                  {bruecke && bruecke.type === type && (
+                    <div className="mt-2 space-y-2 rounded-xl border border-line bg-sunken p-3">
+                      <p className="text-13 font-medium text-ink-muted">Mit wem?</p>
+                      {bruecke.namen.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {bruecke.namen.map((eintrag) => (
+                            <button
+                              key={eintrag.id}
+                              type="button"
+                              disabled={brueckeLaeuft}
+                              onClick={() => anNamenHaengen(bruecke.type, eintrag)}
+                              className="inline-flex min-h-10 items-center rounded-full border border-line bg-surface px-3 text-13 font-medium text-ink transition hover:bg-line disabled:opacity-50"
+                            >
+                              {eintrag.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setBruecke(null)}
+                        className="text-13 font-medium text-ink-muted hover:text-ink"
+                      >
+                        Ohne Namen
+                      </button>
+                    </div>
+                  )}
                   </div>
                 );
               })}
@@ -553,6 +645,16 @@ export default function Schnellzugriff({
           </>
         )}
       </Modal>
+
+      {/* Termin ueber die Bruecke: setContactStage braucht Datum und Uhrzeit,
+          derselbe Dialog wie im Durchlauf (NameDialer / results.ts). */}
+      <AppointmentDialog
+        open={terminDialog !== null}
+        name={terminDialog?.name ?? ""}
+        pending={brueckeLaeuft}
+        onClose={() => setTerminDialog(null)}
+        onSave={terminSpeichern}
+      />
     </>
   );
 }

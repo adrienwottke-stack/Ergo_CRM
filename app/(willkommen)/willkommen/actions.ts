@@ -7,6 +7,9 @@ import { eigene } from "@/lib/scope";
 import { berlinLocalToUtc, berlinToday, shiftDay, startOfWeek, utcToBerlinLocalInput } from "@/lib/dates";
 import { isListKind } from "@/lib/namelist";
 import { quotaTypePoints } from "@/lib/labels";
+import { herkunftAusQuelle } from "@/lib/empfehlungen";
+import type { DialerEntry } from "@/components/NameDialer";
+import type { ListKind } from "@/lib/generated/prisma/enums";
 
 // --- Messen statt hoffen ------------------------------------------------------
 // Je Akt ein Zeitstempel. Ohne das laesst sich am Montag nach dem Launch nie
@@ -64,6 +67,64 @@ export async function versprechenSetzen(termine: number) {
     data: { pledgeTarget: ziel, pledgeSetAt: new Date(), pledgeShownAt: null },
   });
   revalidatePath("/heute");
+}
+
+// --- Akt "anruf": ein echter Anruf ---------------------------------------------
+// Der Sprint sammelt Namen, sagt aber nie "ruf einen davon an". Dieser Akt
+// bettet genau EINEN Namen in den vorhandenen Durchlauf (components/NameDialer)
+// ein - dieselbe Aktion (recordCallResult ueber contacts/results.ts), kein
+// zweiter Schreibpfad.
+export type AnrufAktName = { eintrag: DialerEntry; kind: ListKind };
+
+export async function anrufAktName(): Promise<AnrufAktName | null> {
+  const user = await requireUser();
+  const basis = {
+    ...eigene(user.id).kontakte,
+    stage: "NEU" as const,
+    outcome: "OFFEN" as const,
+    phone: { not: null },
+  };
+  const auswahl = {
+    id: true,
+    name: true,
+    phone: true,
+    note: true,
+    source: true,
+    rating: true,
+    listKinds: true,
+  } as const;
+
+  // Bevorzugt: der juengste NEU-Kontakt der letzten 20 Minuten - der Sprint
+  // liegt dann noch warm, gerade eben eingetippt. Sonst der aelteste NEU mit
+  // Nummer ueberhaupt.
+  const vor20Minuten = new Date(Date.now() - 20 * 60 * 1000);
+  const kontakt =
+    (await prisma.contact.findFirst({
+      where: { ...basis, createdAt: { gte: vor20Minuten } },
+      orderBy: { createdAt: "desc" },
+      select: auswahl,
+    })) ??
+    (await prisma.contact.findFirst({
+      where: basis,
+      orderBy: { createdAt: "asc" },
+      select: auswahl,
+    }));
+
+  if (!kontakt) return null;
+
+  return {
+    eintrag: {
+      id: kontakt.id,
+      name: kontakt.name,
+      phone: kontakt.phone!,
+      rating: kontakt.rating,
+      note: kontakt.note,
+      empfehlungVon: herkunftAusQuelle(kontakt.source),
+      isFirstCall: true,
+      lastActivity: null,
+    },
+    kind: kontakt.listKinds[0] ?? user.startTrack ?? "RECRUITING",
+  };
 }
 
 // --- Blitz-Einstufung ----------------------------------------------------------
