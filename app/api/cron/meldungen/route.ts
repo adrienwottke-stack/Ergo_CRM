@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { ampelKriterien } from "@/lib/ampelKriterien";
+import { AUSBAU_VOLL, ausbaustand } from "@/lib/ausbau";
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
 import { pushEingerichtet, sendeMeldung } from "@/lib/push";
 import {
@@ -99,6 +100,10 @@ export async function GET(request: NextRequest) {
         path: true,
         startedAt: true,
         onboardingDoneAt: true,
+        // Fuer den Liegenbleiber-Link unten: die Push-URL haengt vom Ausbau
+        // ab (ausbaustand() aus lib/ausbau.ts braucht role und ausbau).
+        role: true,
+        ausbau: true,
       },
     }),
     // Offen und faellig: ueberfaellig plus heute.
@@ -254,6 +259,12 @@ export async function GET(request: NextRequest) {
       // wie an Tag 21; "Marco liegt seit 6 Tagen" nicht.
       const aeltester = liegen[0]!;
       const weitere = liegen.length - 1;
+      // Rule 1 aus lib/push.ts: eine Meldung fuehrt auf eine Seite, auf der
+      // es getan werden kann. Auf Ausbau 1 zeigt /heute den Liegenbleiber nur
+      // als eine Zeile (docs/ausbau-plan.md) - /namen zeigt liegtTage je Name
+      // aber schon heute und ist dort die Adresse zum Telefonieren.
+      const kontoAusbau = await ausbaustand(konto);
+      const vollerUmfangKonto = kontoAusbau.stufe >= AUSBAU_VOLL || kontoAusbau.istAdmin;
       meldung = {
         titel:
           weitere === 0
@@ -263,7 +274,7 @@ export async function GET(request: NextRequest) {
           weitere === 0
             ? "Seit dem letzten Schritt nichts passiert. Anrufen oder von der Liste nehmen."
             : `Der älteste ${liegtLabel(aeltester.tage)}. Der Reihe nach von oben.`,
-        url: "/heute",
+        url: vollerUmfangKonto ? "/heute" : "/namen",
         kennung: "tagespensum",
       };
       anLiegen += 1;

@@ -19,6 +19,7 @@ export const FALLBACK_ABSENDER = "Paul Ehlert";
 
 export const AKTE = [
   "boot",
+  "meldungen",
   "chat",
   "rechnung",
   "einwand",
@@ -39,6 +40,7 @@ export type Akt = (typeof AKTE)[number];
 // haben selbst auch eine Stufe und einen Einheiten-Startbestand.
 export const LEADER_AKTE = [
   "boot",
+  "meldungen",
   "chatLeader",
   "fuehrung",
   "karrierestufe",

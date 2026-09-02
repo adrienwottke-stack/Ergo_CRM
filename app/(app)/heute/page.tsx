@@ -663,6 +663,14 @@ export default async function HeutePage() {
           auch noch da ist - dieser Moment nicht. */}
       {gerade && <AusbauAufgegangen />}
 
+      {/* Der Wecker: die Erlaubnis fuer die Morgen-Meldung ("Marco liegt seit
+          6 Tagen"). Unabhaengig vom Ausbau und ganz oben - der Schalter hing
+          vorher tief unten hinter vollerUmfang, und fuenf von sechs Koepfen
+          hatten deshalb kein Abo, obwohl der Cron laengst laeuft und alle
+          sechs die App installiert haben. Selbstblendung (nichts, wenn schon
+          an oder technisch nicht moeglich) sitzt in Meldungen.tsx selbst. */}
+      <Meldungen vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""} />
+
       {/* Was jemand geschrieben hat, steht vor der Arbeit - es dauert zehn
           Sekunden und ist der Grund, warum sich das Werkzeug nach Mannschaft
           anfuehlt und nicht nach Verwaltung. */}
@@ -895,6 +903,23 @@ export default async function HeutePage() {
           </div>
         )}
 
+        {/* Derselbe Liegenbleiber auf Ausbau 1: eine Zeile statt der vollen
+            Karte - kein Zaehler-Kasten, keine Liste. Der Wecker (siehe ganz
+            oben auf der Seite) verspricht diesen Namen; die Seite haelt ihn.
+            Link auf /namen statt /contacts/[id], weil dort auf Ausbau 1
+            telefoniert wird. */}
+        {!vollerUmfang && aeltester && (
+          <Link
+            href="/namen"
+            className={`${flaeche("gefahr")} mt-4 block px-4 py-3 transition hover:schatten-hoch`}
+          >
+            <span className="text-sm text-red-900">
+              <span className="font-semibold">{aeltester.kontakt.name}</span>{" "}
+              {liegtLabel(aeltester.tage)} — zur Namensliste
+            </span>
+          </Link>
+        )}
+
         {/* Nachfuell-Alarm: ohne Namen kein Anruf, egal wie voll der Tag ist. */}
         {vollerUmfang && nachfuellen && (
           <div
@@ -928,12 +953,6 @@ export default async function HeutePage() {
           </Link>
         )}
       </div>
-
-      {/* Fragt nur, wenn noch nicht zugestimmt wurde - und erklaert wofuer,
-          bevor der Browser fragt. */}
-      {vollerUmfang && (
-        <Meldungen vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""} />
-      )}
 
       {/* Auf Ausbau 1 der einzige Blick nach draussen: wo stehe ich. Steht
           NACH dem Tagespensum, weil der Vergleich erst etwas wert ist, wenn

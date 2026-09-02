@@ -125,13 +125,15 @@ sie ging nichts auf, und die Karte erscheint zu Recht nie.
 
 Bleibt: **Tagespensum** (die grosse Zahl und die drei Kacheln), **die
 Aufgabenlisten** (Überfällig / Heute / Diese Woche), **Starterpass** aus
-`ErsteWoche`, und **eine Rangliste-Zeile** — „Platz 7 von 14 diese Woche, über
-dir Marc und Nick". Ohne Link, weil das Ziel auf dieser Stufe zu ist; unter drei
-Köpfen steht sie gar nicht da.
+`ErsteWoche`, **eine Rangliste-Zeile** — „Platz 7 von 14 diese Woche, über dir
+Marc und Nick" (ohne Link, weil das Ziel auf dieser Stufe zu ist; unter drei
+Köpfen steht sie gar nicht da), die **Push-Aufforderung** (der Wecker braucht
+Empfänger, gerade am Anfang) und der **Liegenbleiber-Streifen** als eine Zeile
+(nur der älteste Name mit Link auf `/namen`, ohne Zähler-Kasten und Liste).
 
-Verschwindet: EinheitenKarte, Liegenbleiber-Streifen, Nachfüll-Alarm, „Ohne
-nächsten Schritt", Push-Aufforderung. Im Schnellzugriff (`+`) verschwindet das
-Einheiten-Feld; die drei Zähler und die Punktezeile bleiben.
+Verschwindet: EinheitenKarte, Nachfüll-Alarm, „Ohne nächsten Schritt". Im
+Schnellzugriff (`+`) verschwindet das Einheiten-Feld; die drei Zähler und die
+Punktezeile bleiben.
 
 Der Lagebild-Block hängt weiter an `gefuehrte > 0` und damit an der
 Führungs-Achse. Seine **Einheiten-Zeilen** (Team-Puls, Schwellen-Zeile in

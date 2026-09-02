@@ -17,6 +17,7 @@ import {
   willkommenAbschliessen,
 } from "@/app/(willkommen)/willkommen/actions";
 import type { ListKind } from "@/lib/generated/prisma/enums";
+import MeldungenAkt from "@/components/willkommen/MeldungenAkt";
 import ChatFaden from "@/components/willkommen/ChatFaden";
 import Hochrechnung from "@/components/willkommen/Hochrechnung";
 import EinwandTest from "@/components/willkommen/EinwandTest";
@@ -142,6 +143,9 @@ export default function Willkommen({
       </div>
 
       <div className="min-h-0 flex-1 pt-2">
+        {/* Laeuft in AKTE UND LEADER_AKTE direkt nach "boot" - eine
+            Bedingung reicht, wie bei "karrierestufe" weiter unten. */}
+        {akt === "meldungen" && <MeldungenAkt onDone={weiter} />}
         {akt === "chat" && (
           <ChatFaden
             schritte={
