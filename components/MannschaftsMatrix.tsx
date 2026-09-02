@@ -34,10 +34,10 @@ export default function MannschaftsMatrix({
   personen: Mannschaftsperson[];
   einheiten: Map<string, EinheitenAufteilung>;
   zeigeEinheiten: boolean;
-  /** Vorfuehr-Kuerzel je Namen (Lagebild-Plan, Bauschritt 3b) - eine einzige,
-   *  kollisionssaubere Map, von mannschaft/page.tsx ueber ALLE GP-Namen der
-   *  Seite gerechnet. Ohne Map (kein Aufrufer reicht sie durch) faellt
-   *  GpName auf einfache, nicht kollisionsaufgeloeste Initialen zurueck. */
+  /** Vorfuehr-Zaehlnamen je Namen (Lagebild-Plan, Bauschritt 3b) - eine
+   *  einzige Map mit "GP 1", "GP 2", ..., von mannschaft/page.tsx ueber ALLE
+   *  GP-Namen der Seite gerechnet. Ohne Map (kein Aufrufer reicht sie durch)
+   *  zeigt GpName nur unnummeriertes "GP". */
   kurz?: Map<string, string>;
 }) {
   // Ausgetretene brauchen keine Fuehrung mehr - eine rote Ampel bei jemandem,
@@ -180,10 +180,10 @@ export default function MannschaftsMatrix({
                         className="-my-2.5 flex min-h-11 items-center rounded py-2.5 transition hover:text-navy-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600"
                       >
                         {/* GpName statt blossem Text: laeuft der Vorfuehr-
-                            Schalter (Namen -> Initialen fuers Zeigen vor
+                            Schalter (Namen -> Zaehlnamen fuers Zeigen vor
                             fremden Beratern), macht die Matrix von allein mit.
-                            kurz kommt als kollisionssaubere Server-Map von
-                            mannschaft/page.tsx durch. */}
+                            kurz kommt als Server-Map mit "GP 1", "GP 2", ...
+                            von mannschaft/page.tsx durch. */}
                         <GpName name={person.name} kurz={kurz?.get(person.name)} />
                       </Link>
                     </span>
