@@ -2,6 +2,12 @@ import { requireUser, requireUserPerson } from "@/lib/auth";
 import { ladeGesamtpunkte } from "@/lib/arena";
 import { ladeStufenTitel, stufeVon, STUFEN } from "@/lib/stufen";
 import { FREISCHALTBAR, istFrei } from "@/lib/freischaltung";
+import {
+  QUOTENKOENIG_MINDEST_ANRUFE,
+  TROPHAEEN_ARTEN,
+  TROPHAEEN_ETIKETT,
+  saisonTrophaeen,
+} from "@/lib/trophaeen";
 import { merkeNutzung, schalter } from "@/lib/features";
 import WettbewerbNav from "@/components/WettbewerbNav";
 import { LockIcon, TrophyIcon } from "@/components/icons";
@@ -13,6 +19,11 @@ export default async function SpielPage() {
   const user = await requireUser();
   const person = await requireUserPerson(user.id);
 
+  // Frueh angestossen, spaet abgewartet: die Vitrine haengt an nichts hier
+  // oben und braucht deshalb keine eigene Runde in der Kette. Sie kann nicht
+  // scheitern - saisonTrophaeen faengt selbst ab und liefert dann leer.
+  const vitrine = saisonTrophaeen();
+
   const an = await schalter("stufen", "spiel");
   // Die sechs Stufennamen (AP-25, D18) - eigener Aufruf statt Prop-Umweg,
   // gecacht in lib/stufen.ts wie ladeGesamtpunkte je Anfrage einmal laeuft.
@@ -23,6 +34,8 @@ export default async function SpielPage() {
     name: stufenTitel[i] ?? stufe.name,
   }));
   await merkeNutzung("spiel", person.id);
+  const { abgeschlossen, laufend } = await vitrine;
+  const fuehrt = laufend?.trophaeen.find((t) => t.art === "saisonsieger");
 
   return (
     <div className="space-y-8">
@@ -88,6 +101,88 @@ export default async function SpielPage() {
           </ol>
         </div>
       )}
+
+      {/* --- Die Vitrine ----------------------------------------------------- */}
+      {/* Bewusst ohne Gold und ohne Ton: Gold traegt in diesem Werkzeug genau
+          eine Bedeutung, naemlich das Podium der Wochentabelle. Zwei goldene
+          Stellen auf zwei Seiten heissen zwei verschiedene Dinge, und dann
+          heisst Gold nichts mehr. Hier reichen Name und Zahl. */}
+      <section className="space-y-3">
+        <div>
+          <h2 className={sectionTitle}>Vitrine</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Die Woche ist der Spieltag, der Monat die Saison. Drei Trophäen je
+            Saison — jede trägt ihr Datum und wird im nächsten Monat neu
+            vergeben.
+          </p>
+        </div>
+
+        {laufend && (
+          <p className="rounded-2xl border border-line bg-sunken px-4 py-3 text-sm text-ink-muted">
+            {laufend.monat} läuft.{" "}
+            {fuehrt ? (
+              <>
+                Zwischenstand:{" "}
+                <span className="font-semibold text-ink">{fuehrt.halterName}</span>
+                , <span className="tabular-nums">{fuehrt.wertText}</span>.
+              </>
+            ) : (
+              "Noch keine Punkte in dieser Saison."
+            )}
+          </p>
+        )}
+
+        {abgeschlossen.length === 0 ? (
+          <p className="text-sm text-ink-muted">
+            Noch keine abgeschlossene Saison — die erste Vitrine füllt sich zum
+            Monatsende.
+          </p>
+        ) : (
+          <>
+            <ul className="space-y-3">
+              {abgeschlossen.map((saison) => (
+                <li key={saison.schluessel} className={`${card} p-5`}>
+                  <p className={kicker}>{saison.label}</p>
+
+                  <dl className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-3">
+                    {TROPHAEEN_ARTEN.map((art) => {
+                      const gewinner = saison.trophaeen.find((t) => t.art === art);
+
+                      return (
+                        <div key={art}>
+                          <dt className="text-13 text-ink-soft">
+                            {TROPHAEEN_ETIKETT[art]}
+                          </dt>
+                          <dd className="mt-0.5 text-sm">
+                            {gewinner ? (
+                              <>
+                                <span className="font-semibold text-ink">
+                                  {gewinner.halterName}
+                                </span>{" "}
+                                <span className="tabular-nums text-ink-muted">
+                                  {gewinner.wertText}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-ink-soft">—</span>
+                            )}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                </li>
+              ))}
+            </ul>
+
+            <p className="text-xs text-ink-muted">
+              Der Quotenkönig braucht mindestens {QUOTENKOENIG_MINDEST_ANRUFE}{" "}
+              Anrufe in der Saison — darunter ist eine Quote Zufall. Ein Strich
+              heißt: in diesem Monat hat die Trophäe niemand verdient.
+            </p>
+          </>
+        )}
+      </section>
 
       {/* --- Die Kacheln ----------------------------------------------------- */}
       {an.spiel && (
