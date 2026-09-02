@@ -205,6 +205,11 @@ type GezeichneteSerie = {
   veraenderung: number;
 };
 
+/** Formatter fuer Zaehlgroessen (Anrufe, Termine): der Rohwert IST die Zahl. */
+function ganzeZahl(wert: number): string {
+  return String(wert);
+}
+
 export default function VerlaufsChart({
   sockel,
   tage,
@@ -212,7 +217,8 @@ export default function VerlaufsChart({
   heute,
   monatStart,
   fussnote,
-  format = formatEinheiten,
+  format: formatProp,
+  zahlen = "einheiten",
   einheitWort = "Einheiten",
 }: {
   /** Einserien-Kurzform: `einheitenStart` in Hundertsteln, der Stand vor der
@@ -235,9 +241,17 @@ export default function VerlaufsChart({
   /** Rohwert -> Anzeigetext. Default rechnet Hundertstel in Einheiten um; wer
    *  ganze Anrufe oder Termine zeichnet, gibt String(wert) mit. */
   format?: (wert: number) => string;
+  /** Serialisierbare Alternative zu `format` fuer Server-Komponenten: eine
+   *  Funktion kommt nicht ueber die Server/Client-Grenze (React wirft beim
+   *  Rendern). "ganz" zeichnet Anrufe oder Termine als ganze Zahl. */
+  zahlen?: "einheiten" | "ganz";
   /** Wie die Zahl heisst - nur fuer aria-label und Begleittexte. */
   einheitWort?: string;
 }) {
+  // Eine explizite Funktion gewinnt (Client-Aufrufer), sonst entscheidet
+  // `zahlen` - so kann auch eine Server-Seite die Komponente ohne Funktion
+  // aufrufen.
+  const format = formatProp ?? (zahlen === "ganz" ? ganzeZahl : formatEinheiten);
   const [zeitraum, setZeitraum] = useState<Zeitraum>("monat");
   // Index in den Stuetzpunkten, waehrend ein Finger oder Zeiger auf der Kurve
   // liegt. EIN Index fuer alle Serien - sie teilen sich ihre Stuetzstellen.

@@ -674,7 +674,7 @@ export default async function PersonPage({
             serien={aktivitaetenSerien}
             heute={heute}
             monatStart={monatStartTag}
-            format={(wert) => String(wert)}
+            zahlen="ganz"
             einheitWort="Aktivitäten"
             fussnote="Kumuliert; Termine = vereinbart."
           />
