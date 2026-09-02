@@ -1,6 +1,6 @@
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { ladeGesamtpunkte } from "@/lib/arena";
-import { stufeVon, STUFEN } from "@/lib/stufen";
+import { ladeStufenTitel, stufeVon, STUFEN } from "@/lib/stufen";
 import { FREISCHALTBAR, istFrei } from "@/lib/freischaltung";
 import { merkeNutzung, schalter } from "@/lib/features";
 import WettbewerbNav from "@/components/WettbewerbNav";
@@ -14,7 +14,14 @@ export default async function SpielPage() {
   const person = await requireUserPerson(user.id);
 
   const an = await schalter("stufen", "spiel");
-  const stand = stufeVon(await ladeGesamtpunkte(person.id));
+  // Die sechs Stufennamen (AP-25, D18) - eigener Aufruf statt Prop-Umweg,
+  // gecacht in lib/stufen.ts wie ladeGesamtpunkte je Anfrage einmal laeuft.
+  const stufenTitel = await ladeStufenTitel();
+  const stand = stufeVon(await ladeGesamtpunkte(person.id), stufenTitel);
+  const stufenAnzeige = STUFEN.map((stufe, i) => ({
+    ...stufe,
+    name: stufenTitel[i] ?? stufe.name,
+  }));
   await merkeNutzung("spiel", person.id);
 
   return (
@@ -65,7 +72,7 @@ export default async function SpielPage() {
           </p>
 
           <ol className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3">
-            {STUFEN.map((stufe) => (
+            {stufenAnzeige.map((stufe) => (
               <li
                 key={stufe.nummer}
                 className={`text-xs tabular-nums ${
@@ -90,7 +97,7 @@ export default async function SpielPage() {
           <ul className="grid gap-3 sm:grid-cols-2">
             {FREISCHALTBAR.map((eintrag) => {
               const offen = istFrei(eintrag, stand.stufe.nummer);
-              const noetig = STUFEN.find((s) => s.nummer === eintrag.abStufe);
+              const noetig = stufenAnzeige.find((s) => s.nummer === eintrag.abStufe);
               const fehlt = noetig ? Math.max(0, noetig.ab - stand.gesamt) : 0;
 
               return (

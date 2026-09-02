@@ -36,6 +36,8 @@ import {
   schwellenSpeichern,
 } from "./actions";
 import { AUSBAU_VOLL } from "@/lib/ausbauSicht";
+import { TITEL_SAETZE, ladeStufenTitel } from "@/lib/stufen";
+import StufenTitelFormular from "@/components/StufenTitelFormular";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +86,7 @@ export default async function WerkstattPage() {
     fokusProzent,
     kriterien,
     offeneAnfragen,
+    stufenTitel,
   ] = await Promise.all([
     prisma.feature.findMany({ orderBy: { titel: "asc" } }),
     prisma.featureUse.findMany({
@@ -139,6 +142,9 @@ export default async function WerkstattPage() {
     // Einstellung-Abfrage wie die beiden darueber.
     ampelKriterien(),
     prisma.anfrage.count({ where: { erledigtAt: null } }),
+    // Die sechs Stufennamen (AP-25, D18) - teilt sich dieselbe Einstellung-
+    // Abfrage wie Schwellen, Fokus-Prozentsatz und Ampel-Kriterien oben.
+    ladeStufenTitel(),
   ]);
 
   const kopfZahl = new Map<string, Set<string>>();
@@ -584,6 +590,40 @@ export default async function WerkstattPage() {
           gültige Zahl — dann bleibt der gespeicherte Wert stehen, statt still
           überschrieben zu werden.
         </p>
+      </div>
+
+      {/* --- Stufen-Titel -----------------------------------------------------
+          Die sechs Namen der Wettbewerbsstufen aus lib/stufen.ts - nicht zu
+          verwechseln mit den Karrierestufen-Schwellen oben (die zaehlen
+          Einheiten) oder dem Wochentitel in der Arena (der wechselt jede
+          Woche, CONTEXT.md Glossar "Stufen-Titel"). Emil lehnte
+          Anwaerter/Anrufer/... ab; drei komplette Saetze stehen zur Wahl,
+          Default ist Mix (docs/emil-feedback-runde-2.md, Abschnitt 7, AP-25
+          und D18). */}
+      <div className={`${card} p-5 sm:p-6`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className={sectionTitle}>Stufen-Titel</h2>
+          <span className="text-xs text-ink-muted">Arena · /spiel</span>
+        </div>
+        <p className="mt-2 max-w-2xl text-sm text-ink-muted">
+          Wie die sechs Stufen im Wettbewerb heißen — die, die nie zurückfällt
+          und über Punkte läuft, nicht die Karrierestufen-Schwellen oben. Ohne
+          eigenen Eintrag gilt der Mix-Satz.
+        </p>
+
+        {!einstellungenDa && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-13 text-amber-800">
+            Die Tabelle steht auf dieser Datenbank noch nicht — die Migration
+            läuft beim nächsten Deploy mit. Bis dahin gilt der Mix-Satz, und
+            Übernehmen geht hier noch nicht.
+          </p>
+        )}
+
+        <StufenTitelFormular
+          initial={stufenTitel}
+          saetze={TITEL_SAETZE}
+          gesperrt={!einstellungenDa}
+        />
       </div>
 
       {/* --- Das Navigations-Backlog ----------------------------------------

@@ -13,6 +13,7 @@ import {
 import { einstellungSetzen, ganzzahl } from "@/lib/einstellungen";
 import { AMPEL_FELDER } from "@/lib/ampelKriterien";
 import { AUSBAU_VOLL } from "@/lib/ausbauSicht";
+import { STUFEN, STUFEN_TITEL_SCHLUESSEL } from "@/lib/stufen";
 import type { FeatureState } from "@/lib/generated/prisma/enums";
 
 const zustaende: FeatureState[] = ["TEST", "LAEUFT", "AUS", "ABGERISSEN"];
@@ -188,4 +189,38 @@ export async function ausbauNachziehen(formData: FormData) {
 
   revalidatePath("/werkstatt");
   revalidatePath("/heute");
+}
+
+/**
+ * Die sechs Stufennamen (docs/emil-feedback-runde-2.md, AP-25 und D18).
+ *
+ * Direkter Aufruf aus einer Client-Insel statt eines <form action> wie beim
+ * Rest der Werkstatt: die drei Vorschlags-Knoepfe brauchen ohnehin Zustand
+ * im Browser, und ein leeres Feld soll als Fehlertext sichtbar werden statt
+ * nur die alte Zeile stehen zu lassen - Hausmuster wie bei einheitenBuchen()
+ * in app/(team)/einheiten/actions.ts: awaiten, `.ok` pruefen, Zustand von
+ * Hand setzen.
+ *
+ * Alle sechs oder keiner: eine Luecke waere eine Stufe ohne Namen, und das
+ * ist kein Zustand, den Arena oder /spiel darstellen koennen.
+ */
+export async function stufenTitelSpeichern(
+  titelRoh: string[]
+): Promise<{ ok: true } | { ok: false; fehler: string }> {
+  await requireAdmin();
+
+  const titel = titelRoh.map((name) => name.trim());
+  if (titel.length !== STUFEN.length || titel.some((name) => name.length === 0)) {
+    return {
+      ok: false,
+      fehler: `Genau ${STUFEN.length} Namen, keiner davon leer.`,
+    };
+  }
+
+  await einstellungSetzen(STUFEN_TITEL_SCHLUESSEL, JSON.stringify(titel));
+
+  revalidatePath("/werkstatt");
+  revalidatePath("/arena");
+  revalidatePath("/spiel");
+  return { ok: true };
 }

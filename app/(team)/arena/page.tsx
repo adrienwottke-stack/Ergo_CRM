@@ -18,7 +18,7 @@ import { merkeNutzung, schalter } from "@/lib/features";
 import { merkeAnwesenheit } from "@/lib/anwesenheit";
 import { ladeFeed } from "@/lib/feed";
 import { ladeTitelStaende } from "@/lib/titel";
-import { stufeVon } from "@/lib/stufen";
+import { ladeStufenTitel, stufeVon } from "@/lib/stufen";
 import ArenaTakt from "@/components/ArenaTakt";
 import WettbewerbNav from "@/components/WettbewerbNav";
 import SprintUhr from "@/components/SprintUhr";
@@ -78,6 +78,7 @@ export default async function ArenaPage() {
     gesamtpunkte,
     feed,
     titel,
+    stufenTitel,
   ] = await Promise.all([
     ladeRangliste(wochenStart),
     ladePuls(),
@@ -111,9 +112,12 @@ export default async function ArenaPage() {
     ladeGesamtpunkte(person.id),
     ladeFeed(person.id),
     ladeTitelStaende(heute),
+    // Die sechs Stufennamen (AP-25, D18) - nicht zu verwechseln mit "titel"
+    // oben, dem Wochentitel-Stand aus lib/titel.ts.
+    ladeStufenTitel(),
   ]);
 
-  const stufe = stufeVon(gesamtpunkte);
+  const stufe = stufeVon(gesamtpunkte, stufenTitel);
 
   const kontoVonPerson = new Map(
     konten.filter((eintrag) => eintrag.userId).map((e) => [e.id, e.userId!])
