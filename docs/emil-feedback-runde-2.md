@@ -154,6 +154,7 @@ Die verbindlichen Definitionen stehen in [CONTEXT.md](../CONTEXT.md); hier nur, 
 | 23 | Rename → Tracker | P1 | S–M | 4 | Sonnet | nutzersichtbare Fundstellen |
 | 27 | Team-Challenge + Streak im Arena-Kopf | P2 | M | 5 | Opus | arena/page.tsx, lib/arena.ts, Werkstatt |
 | 28 | Saison-Trophäen + Vitrine | P2 | M | 5 | Opus | neue lib/trophaeen.ts, spiel/page.tsx |
+| 29 | TimeTree schreiben (inoffizielle Web-API) | P0 | L | 6 | Opus | lib/kalender/timetree.ts, neue lib/kalender/spiegel.ts, abgleich.ts, schema + Migration, kalender/quellen |
 
 ---
 
@@ -336,12 +337,36 @@ Die drei Sätze (Stufe 1 → 6):
 
 **Fertig wenn:** /spiel zeigt die Vitrine; ein leerer Monat zeigt „noch keine Saison".
 
+### AP-29 — TimeTree schreiben (Weg 1: die inoffizielle Web-API)
+
+**Anlass:** N10, Adriens Entscheidung vom 02.09.: „Wir wollen TimeTree, unbedingt." Hebt die Runde-1-Regel „kein Schreiben über inoffizielle Endpunkte" ([emil-feedback-plan.md](emil-feedback-plan.md):328) bewusst auf — der Feed-Umweg landet nur im privaten Handy-Kalender, mit Stunden Latenz; in den geteilten Team-Kalender führt nur dieser Weg.
+
+**Befund:** Die Web-App von TimeTree legt Termine über dieselbe API an, die der Tracker zum Lesen benutzt ([`lib/kalender/timetree.ts`](../lib/kalender/timetree.ts): Login `PUT /api/v1/auth/email/signin`, Kopfzeile `X-Timetreea: web/2.1.0/en`, Cookie `_session_id`). Bauplan aus dem offenen Projekt ehs208/timetree-mcp (MIT; Anlegen, Ändern, Löschen laufen dort):
+- `POST /api/v1/calendar/{kalenderId}/event` mit `{ title, all_day, start_at, start_timezone, end_at, end_timezone, label_id?, category: 1, note?, location?, url?, attendees: [], recurrences: [], alerts: [], file_uuids: [] }` — Zeiten in Millisekunden.
+- `PUT /api/v1/calendar/{kalenderId}/event/{uuid}` ändert, `DELETE` auf demselben Pfad löscht.
+- Zusätzliche Kopfzeile `x-csrf-token` (kommt als Antwort-Kopfzeile `x-csrf-token` zurück, z. B. beim Login). Rate-Limit 10 Aufrufe je Sekunde; Sperren melden sich als Code -495.
+- **Per Mitschnitt zu bestätigen** (Adrien loggt sich in der Web-App ein und legt einen Testtermin an): geht eine Client-`uuid` im Body mit, ist der CSRF-Token Pflicht, wie sieht die Antwort aus (Event-`uuid`), welche `category`/`type`-Werte trägt ein normaler Termin.
+
+**Bau:**
+1. `lib/kalender/timetree.ts`: `terminAnlegen(sitzung, kalenderId, termin)`, `terminAendern`, `terminLoeschen` — Sitzung je Lauf wie heute, CSRF aus der Login-Antwort, Fehlercodes durchreichen.
+2. Neues Modell `TimeTreeSpiegel { id, quelleId, contactId, art (TERMIN | WIEDERVORLAGE), eventUuid, von, bis, titel, aktualisiertAt }`, eindeutig je (quelleId, contactId, art) — handgeschriebene, idempotente Migration. Der Spiegel ist der Schlüssel für Ändern/Löschen und für die Echo-Sperre.
+3. `lib/kalender/spiegel.ts`: `spiegeln(userId)` vergleicht die Sollmenge (Kundentermine `appointmentAt`, nicht verloren; Wiedervorlagen mit Uhrzeit — dieselbe Auswahl wie [`lib/kalender/feed.ts`](../lib/kalender/feed.ts)) mit dem Spiegel: neu → anlegen, geändert → ändern, weggefallen → löschen. Läuft nebenbei nach jedem Ergebnis-Dialog (`after()`, wirft nie) und als Nachläufer im Kalender-Cron. Nur für Quellen mit eingeschaltetem „In TimeTree schreiben".
+4. Echo-Sperre in [`lib/kalender/abgleich.ts`](../lib/kalender/abgleich.ts): der Import überspringt alle `fremdUid`, die im Spiegel stehen — sonst stünde jeder eigene Termin ein zweites Mal als Fremdtermin in /kalender.
+5. Quellen-Seite: Schalter je Quelle, Statuszeile („zuletzt geschrieben …", letzter Fehler), Feature-Schlüssel `timetree-schreiben` (vorerst aus). Hinweis dort: Feed-Abo **und** Schreiben zeigt Termine doppelt — einen Weg wählen.
+6. Titel wie im Feed („Termin {Vorname}" bzw. Ersatztitel bei ausgeschaltetem `feedNamen`); keine Notizen, keine Nummern.
+
+**Regeln:** Passwort bleibt Chiffre wie heute, nie eine Sitzung speichern; jeder Fehler an die Quelle, nie nach oben; höchstens ein Schreiblauf je Nutzer und Minute; gelöscht wird nur, was der Spiegel kennt — nie ein fremder Termin. Zuerst nur Adriens Konto (Werkstatt-Schalter), der Feed bleibt als Rückfall.
+
+**Fertig wenn:** „Termin vereinbart, Di 15:00" steht binnen Sekunden im geteilten TimeTree-Kalender; Änderung und Absage folgen; der Import bringt den eigenen Termin nicht zurück.
+
+**Grenzen:** Nur Konten mit E-Mail + Passwort bei TimeTree (Apple-/Google-Anmeldung hat kein Passwort — heute schon die Grenze fürs Lesen; in den TimeTree-Kontoeinstellungen lässt sich ein Passwort nachträglich setzen). TimeTree kann den Weg jederzeit kappen — dann meldet es die Quellen-Seite.
+
 ---
 
 ## 8. Bewusst nicht gebaut
 
 - **Freitext-Parsen von „Dienstag 15 Uhr"** — deterministische Chips statt geratener Termine (D15).
-- **Schreiben nach TimeTree** — technisch nicht möglich (L8); der Feed-Umweg bleibt, die Latenz wird erklärt.
+- ~~**Schreiben nach TimeTree** — technisch nicht möglich (L8); der Feed-Umweg bleibt, die Latenz wird erklärt.~~ **Revidiert 02.09.:** Über die inoffizielle Web-API geht es — siehe AP-29. Adrien nimmt das Bruchrisiko bewusst in Kauf.
 - **`Termin`-Datensatz aus dem Anruf** — `appointmentAt` bleibt die führende Spalte (laden.ts:10–12).
 - **Dauer-Abzeichen** — Runde-1-Regel bleibt; Trophäen verfallen je Saison.
 - **Liga mit Auf-/Abstieg** — erst ab ~10 aktiven Loggern sinnvoll; heute fünf. Vermerkt, nicht gebaut.
@@ -356,7 +381,7 @@ Die drei Sätze (Stufe 1 → 6):
 | # | Frage | Bis dahin |
 |---|---|---|
 | E1 | Welcher Titel-Satz (Mix / Gaming-Flex / Vertriebs-Ironie) — oder eigene Wörter? | Mix läuft; Werkstatt kann wechseln. |
-| E2 | TimeTree bekommt Termine nur über den Handy-Kalender, mit Stunden Latenz. Reicht das, oder soll der Kalender der App selbst der Ort werden? | Feed-Umweg wie gehabt. |
+| E2 | ~~TimeTree bekommt Termine nur über den Handy-Kalender, mit Stunden Latenz. Reicht das?~~ **Entschieden 02.09. (Adrien): Weg 1, direkt in TimeTree schreiben — AP-29.** | Feed-Umweg bleibt Rückfall. |
 | E3 | Wochenziel der Team-Challenge (Anrufe je Woche, Team gesamt)? | Platzhalter 100. |
 | E4 | Liga erst ab ~10 aktiven Loggern — einverstanden? | Nicht gebaut. |
 | E5 | Trophäen-Arten ergänzen oder streichen (Saisonsieger, Quotenkönig, Dauerläufer)? | Die drei. |
