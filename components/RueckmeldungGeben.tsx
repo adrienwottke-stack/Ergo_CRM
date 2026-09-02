@@ -16,7 +16,7 @@
 // weitere Huerde hinter der ersten, und hinter der letzten Huerde steht
 // niemand mehr. Die Stimmung allein ist eine vollstaendige Meldung.
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { rueckmeldungSenden } from "@/app/rueckmeldungAction";
 import Modal from "@/components/Modal";
@@ -30,6 +30,32 @@ import {
   stimmungText,
 } from "@/lib/rueckmeldung";
 import type { Anliegen, Stimmung } from "@/lib/generated/prisma/enums";
+
+// Ersthinweis am Megafon (N17, D21/AP-26): ein kleiner Punkt, der nur am
+// Handy steht - ab sm steht dort schon das Wort "Feedback" daneben, ein
+// zweiter Hinweis waere ueberfluessig. Verschwindet dauerhaft, sobald das
+// Modal einmal geoeffnet wurde. Eigener Schluessel statt eines geteilten:
+// verschiedene Bausteine, verschiedene Lebensdauer.
+const FEEDBACK_GESEHEN_SCHLUESSEL = "tracker-feedback-gesehen";
+
+// Privater Modus oder deaktiviertes localStorage werfen bei jedem Zugriff -
+// deshalb jeder Zugriff einzeln in try/catch. Ohne Speicher gilt der Hinweis
+// als gesehen: lieber nie zeigen als ein Punkt, der nie verschwinden kann.
+function feedbackGesehen(): boolean {
+  try {
+    return localStorage.getItem(FEEDBACK_GESEHEN_SCHLUESSEL) === "1";
+  } catch {
+    return true;
+  }
+}
+
+function feedbackAlsGesehenMerken() {
+  try {
+    localStorage.setItem(FEEDBACK_GESEHEN_SCHLUESSEL, "1");
+  } catch {
+    // Kein Speicher, kein Merken - der Punkt stand ohnehin nie.
+  }
+}
 
 export default function RueckmeldungGeben({
   // Wohin die Meldung geht - kommt aus der Schale (Vorname des Admin-Kontos).
@@ -49,6 +75,15 @@ export default function RueckmeldungGeben({
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [fertig, setFertig] = useState(false);
+  // Serverdurchlauf kennt kein localStorage: wie ueberall sonst in der App
+  // (siehe ThemaSchalter) startet der Zustand auf "gesehen" und holt den
+  // echten Wert erst im Effekt nach dem Mount - sonst weicht das erste
+  // Markup vom Server von dem im Browser ab (Hydration).
+  const [gesehen, setGesehen] = useState(true);
+
+  useEffect(() => {
+    setGesehen(feedbackGesehen());
+  }, []);
 
   const zuruecksetzen = useCallback(() => {
     setStimmung(null);
@@ -65,6 +100,15 @@ export default function RueckmeldungGeben({
     // Erst nach der Schliess-Animation leeren, sonst zuckt der Inhalt.
     setTimeout(zuruecksetzen, 200);
   }, [zuruecksetzen]);
+
+  // Der Ersthinweis-Punkt verschwindet beim OEFFNEN, nicht erst beim
+  // Abschicken: Emil soll ihn nie wiedersehen, egal ob er am Ende etwas
+  // schreibt oder das Fenster gleich wieder zumacht.
+  const oeffnen = useCallback(() => {
+    setOffen(true);
+    feedbackAlsGesehenMerken();
+    setGesehen(true);
+  }, []);
 
   const onAufnahme = useCallback((blob: Blob | null, ms: number) => {
     setAufnahme(blob ? { blob, ms } : null);
@@ -106,12 +150,24 @@ export default function RueckmeldungGeben({
     <>
       <button
         type="button"
-        onClick={() => setOffen(true)}
-        aria-label="Rückmeldung geben"
-        title="Rückmeldung geben"
-        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-sunken hover:text-ink"
+        onClick={oeffnen}
+        aria-label="Feedback geben"
+        title="Feedback geben"
+        className="relative inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium text-ink-muted transition hover:bg-sunken hover:text-ink sm:px-3"
       >
         <MegafonIcon className="h-5 w-5" />
+        {/* Ab sm ist Platz fuer das Wort - Emil hat das blosse Symbol in der
+            vollen Kopfzeile nicht gefunden (N17). Am Handy bleibt es beim
+            Symbol allein, siehe Kommentar an FEEDBACK_GESEHEN_SCHLUESSEL. */}
+        <span className="hidden sm:inline">Feedback</span>
+        {!gesehen && (
+          // Nur am Handy (sm:hidden): ab sm steht schon das Wort daneben.
+          // Absolut positioniert, damit das Verschwinden nichts verschiebt.
+          <span
+            aria-hidden
+            className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-akzent sm:hidden"
+          />
+        )}
       </button>
 
       <Modal

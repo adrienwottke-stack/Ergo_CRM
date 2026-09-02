@@ -30,9 +30,10 @@ import type { User } from "@/lib/generated/prisma/client";
 // sich auf den Seiten selbst - eine Ebene tiefer, wo es hingehoert.
 
 export function navigationFuer(stand: Ausbaustand): NavLink[] {
-  // EINE Liste, in Reihenfolge. Was ein Konto davon sieht, entscheidet
-  // darfSehen() in lib/ausbauSicht.ts - hier steht kein zweites Regelwerk,
-  // sonst zeigte die Leiste irgendwann etwas anderes als der Wegweiser.
+  // EINE Menge Eintraege, in ZWEI moeglichen Reihenfolgen. Was ein Konto davon
+  // sieht, entscheidet weiter allein darfSehen() in lib/ausbauSicht.ts - hier
+  // steht kein zweites Regelwerk, sonst zeigte die Leiste irgendwann etwas
+  // anderes als der Wegweiser.
   //
   // Am Anfang bleiben vier Punkte stehen: Namen, Heute, Kalender, Einladen.
   // Das ist der Beruf am ersten Tag - aufnehmen, anrufen, Termine legen - und
@@ -45,22 +46,32 @@ export function navigationFuer(stand: Ausbaustand): NavLink[] {
   // die Seite nicht, der seine Struktur eintragen will") traegt nicht mehr:
   // "Einladen" steht ab dem ersten Tag da, und ueber eine Einladung entsteht
   // der erste Geschaeftspartner.
-  const alle: NavLink[] = [
-    { href: "/namen", label: "Namen" },
-    { href: "/heute", label: "Heute" },
-    { href: "/kalender", label: "Kalender" },
-    { href: "/einladen", label: "Einladen" },
-    { href: "/trichter", label: "Trichter" },
-    { href: "/mannschaft", label: "Mannschaft" },
-    // Ein Punkt fuer den ganzen Wettbewerb. Rangliste und eigene Aktivitaeten
-    // haengen darunter und markieren denselben Punkt mit.
-    {
-      href: "/arena",
-      label: "Wettbewerb",
-      match: ["/leaderboard", "/log", "/spiel"],
-    },
-    { href: "/team", label: "Team", match: ["/werkstatt"] },
-  ];
+  const namen: NavLink = { href: "/namen", label: "Namen" };
+  const heute: NavLink = { href: "/heute", label: "Heute" };
+  const kalender: NavLink = { href: "/kalender", label: "Kalender" };
+  const einladen: NavLink = { href: "/einladen", label: "Einladen" };
+  const trichter: NavLink = { href: "/trichter", label: "Trichter" };
+  const mannschaft: NavLink = { href: "/mannschaft", label: "Mannschaft" };
+  // Ein Punkt fuer den ganzen Wettbewerb. Rangliste und eigene Aktivitaeten
+  // haengen darunter und markieren denselben Punkt mit.
+  const wettbewerb: NavLink = {
+    href: "/arena",
+    label: "Wettbewerb",
+    match: ["/leaderboard", "/log", "/spiel"],
+  };
+  const team: NavLink = { href: "/team", label: "Team", match: ["/werkstatt"] };
+
+  // Emils Notiz N8: "fuer FK ist nicht mehr so wichtig Namensliste als,
+  // einfacher gestalten viele Kontakte aufzunehmen" - ab dem ersten
+  // Geschaeftspartner ist FUEHREN wichtiger als die eigene Namensliste zu
+  // pflegen (D21, emil-feedback-runde-2.md AP-26). Deshalb ruecken zwei
+  // Punkte um: Mannschaft direkt hinter Heute auf Platz zwei, Namen ans Ende
+  // der Anfangs-Gruppe. Kein Eintrag faellt weg, und darfSehen() greift
+  // danach unveraendert - wer noch auf Ausbaustufe 1 steht, sieht in beiden
+  // Reihenfolgen weiterhin weder Trichter noch Wettbewerb.
+  const alle: NavLink[] = stand.fuehrt
+    ? [heute, mannschaft, kalender, namen, einladen, trichter, wettbewerb, team]
+    : [namen, heute, kalender, einladen, trichter, mannschaft, wettbewerb, team];
 
   return alle.filter((link) => darfSehen(link.href, stand));
 }
