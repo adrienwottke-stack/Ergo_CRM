@@ -218,11 +218,20 @@ export async function recordCallResult(formData: FormData) {
         case "later": {
           // quickLogCall loggt den Anruf, hebt NEU auf KONTAKTIERT und setzt
           // die Wiedervorlage – genau das, was hier gebraucht wird.
+          //
+          // Zwei Formen der Wiedervorlage, und genau eine wird geschickt:
+          // "followUpAt" ist der genaue Zeitpunkt aus dem Spaeter-Dialog
+          // ("2026-09-08T15:00", Berliner Zeit) und landet als einziger im
+          // Kalender; "followUpDays" ist der grobe Abstand und bleibt bei
+          // Mitternacht. Beides zusammen waere ein Widerspruch, den
+          // quickLogCall aufloesen muesste - deshalb hier ein Entweder-oder.
+          const followUpAt = text(formData, "followUpAt");
           const days = result === "unreachable" ? "2" : (text(formData, "days") ?? "7");
           const data = new FormData();
           data.set("contactId", contactId);
           data.set("note", note);
-          data.set("followUpDays", days);
+          if (followUpAt) data.set("followUpAt", followUpAt);
+          else data.set("followUpDays", days);
           await quickLogCall(data);
           break;
         }

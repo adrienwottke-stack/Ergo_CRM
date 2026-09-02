@@ -236,6 +236,17 @@ export async function quickLogCall(formData: FormData) {
   const followUpDaysRaw = formData.get("followUpDays") as string | null;
   const followUpDays = followUpDaysRaw ? parseInt(followUpDaysRaw, 10) : null;
 
+  // Ein genauer Zeitpunkt schlaegt den Abstand in Tagen: "Rueckmeldung,
+  // Dienstag 15 Uhr" ist etwas anderes als "in sieben Tagen". Er kommt als
+  // "2026-09-08T15:00" ohne Zone herein und wird gegen Europe/Berlin
+  // gerechnet, nicht gegen die Server-Zeitzone (auf Vercel UTC).
+  //
+  // Nur eine Wiedervorlage MIT Uhrzeit landet spaeter im Kalender
+  // (lib/kalender/feed.ts). Ohne Uhrzeit bleibt es bei UTC-Mitternacht - so
+  // stehen die hunderte Fristen der Heute-Liste weiterhin in keinem Kalender.
+  const followUpAtRaw = (formData.get("followUpAt") as string | null)?.trim();
+  const followUpAt = followUpAtRaw ? berlinLocalToUtc(followUpAtRaw) : null;
+
   const contact = await prisma.contact.findFirst({
     where: { id: contactId, ...eigene(user.id).kontakte },
     select: { id: true, stage: true },
@@ -281,7 +292,14 @@ export async function quickLogCall(formData: FormData) {
         },
       });
     }
-    if (followUpDays !== null && followUpDays > 0) {
+    if (followUpAt) {
+      updateData.nextStepAt = followUpAt;
+      updateData.nextStepType = "ANRUF";
+      // Nicht noch einmal "Rueckmeldung": im Kalender steht das schon im
+      // Titel, und eine Zeile, die den Titel wiederholt, sieht wie ein Fehler
+      // aus. Hier steht deshalb, was zu tun ist.
+      updateData.nextStepNote = "Wie besprochen zurückrufen";
+    } else if (followUpDays !== null && followUpDays > 0) {
       updateData.nextStepAt = addDays(todayDate, followUpDays);
       updateData.nextStepType = "ANRUF";
       updateData.nextStepNote = "Wiedervorlage-Anruf";

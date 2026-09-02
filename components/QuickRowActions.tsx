@@ -11,8 +11,13 @@
 //   Termin-Schritt  -> gehalten (mit Empfehlungsfrage) oder geplatzt
 //   anderer Schritt -> Erledigt plus Verschiebe-Chips
 // Alles Seltenere liegt hinter "…".
+//
+// Dazu die Frage nach dem Anruf, die es vorher nur im Durchlauf gab: wer aus
+// dieser Zeile heraus telefoniert und zurueckkommt, findet die Ergebnisleiste
+// genau dieser Zeile hervorgehoben vor - in einer Liste mit zwanzig Namen ist
+// das der Unterschied zwischen "eintragen" und "suchen, wo ich war".
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   completeStepQuick,
   recordAppointmentMissed,
@@ -28,8 +33,7 @@ import { frageNachEinheiten } from "@/components/EinheitenNachAbschluss";
 import {
   AppointmentDialog,
   AppointmentHeldDialog,
-  ChoiceDialog,
-  LATER_CHIPS,
+  SpaeterDialog,
 } from "@/components/ResultDialogs";
 import { undoMoeglich } from "@/components/UndoBar";
 import {
@@ -77,6 +81,27 @@ export default function QuickRowActions({
   >(null);
   const [mehr, setMehr] = useState<ActionMode | null>(null);
 
+  // Rueckkehr nach dem Telefonat - dasselbe Muster wie im Durchlauf
+  // (components/NameDialer.tsx): der "Anrufen"-Link merkt sich, dass gewaehlt
+  // wurde, und `visibilitychange` meldet die Rueckkehr in den Browser.
+  //
+  // Bewusst nur Zustand im Browser und kein Feld in der Datenbank: wer die App
+  // wegwischt, verliert die Frage. Das ist die Grenze zu L2 (docs/emil-
+  // feedback-runde-2.md) und kein Versehen - ein persistenter Zustand
+  // "Anruf laeuft" braucht auch einen Weg, ihn wieder loszuwerden.
+  const [zurueck, setZurueck] = useState(false);
+  const angerufen = useRef(false);
+
+  useEffect(() => {
+    const beiSichtbar = () => {
+      if (document.visibilityState === "visible" && angerufen.current) {
+        setZurueck(true);
+      }
+    };
+    document.addEventListener("visibilitychange", beiSichtbar);
+    return () => document.removeEventListener("visibilitychange", beiSichtbar);
+  }, []);
+
   const senden = async (
     action: (data: FormData) => Promise<unknown>,
     felder: Record<string, string>
@@ -90,6 +115,9 @@ export default function QuickRowActions({
       await action(data);
       undoMoeglich();
       setDialog(null);
+      // Ergebnis steht - die Frage hat sich damit erledigt.
+      angerufen.current = false;
+      setZurueck(false);
     } catch (err) {
       setFehler(err instanceof Error ? err.message : "Das hat nicht geklappt.");
     } finally {
@@ -98,12 +126,35 @@ export default function QuickRowActions({
   };
 
   const verloren = contact.outcome === "VERLOREN";
+  // Hervorgehoben wird nur die Anruf-Leiste: dort stehen die drei Ergebnisse,
+  // nach denen nach einem Telefonat gefragt wird.
+  const frage = zurueck && !verloren && istAnruf;
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* Der Ring liegt auf der Leiste selbst, die Frage als volle Zeile
+          darin: so wandert beim Hervorheben nichts in der Zeile, und der
+          negative Aussenabstand faengt den Innenabstand des Rings wieder auf. */}
+      <div
+        className={
+          frage
+            ? "-m-1.5 flex flex-wrap items-center gap-1.5 rounded-2xl p-1.5 ring-2 ring-navy-500"
+            : "flex flex-wrap items-center gap-1.5"
+        }
+      >
+        {frage && (
+          <p className="w-full text-13 font-semibold text-ink">
+            {`Wie lief's mit ${contact.name}?`}
+          </p>
+        )}
         {contact.phone && (
-          <a href={`tel:${contact.phone.replace(/\s/g, "")}`} className={stil.call}>
+          <a
+            href={`tel:${contact.phone.replace(/\s/g, "")}`}
+            onClick={() => {
+              angerufen.current = true;
+            }}
+            className={stil.call}
+          >
             <PhoneIcon className="h-4 w-4" />
             Anrufen
           </a>
@@ -242,16 +293,18 @@ export default function QuickRowActions({
         }}
       />
 
-      <ChoiceDialog
+      {/* Zwei Wege in einem Dialog: der grobe Abstand kostet weiter einen
+          Tipp, der genaue Zeitpunkt schreibt die Wiedervorlage MIT Uhrzeit -
+          und nur die landet danach im Kalender. */}
+      <SpaeterDialog
         open={dialog === "later"}
-        title="Wann nochmal?"
-        subtitle={contact.name}
+        name={contact.name}
         pending={pending}
-        choices={LATER_CHIPS.map((chip) => ({
-          label: chip.label,
-          onPick: () => senden(recordCallResult, { result: "later", days: chip.days }),
-        }))}
         onClose={() => setDialog(null)}
+        onTage={(tage) => senden(recordCallResult, { result: "later", days: tage })}
+        onZeitpunkt={(wann) =>
+          senden(recordCallResult, { result: "later", followUpAt: wann })
+        }
       />
 
       <ContactActionDialog

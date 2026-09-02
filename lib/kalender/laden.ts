@@ -1,10 +1,11 @@
-// Was im Kalender steht - aus drei Quellen zusammengefuehrt.
+// Was im Kalender steht - aus vier Quellen zusammengefuehrt: Kundentermine,
+// zugesagte Rueckmeldungen mit Uhrzeit, eigene Eintraege, fremde Kalender.
 //
 // docs/struktur-plan.md, Abschnitt 7.
 //
 // Die Ansicht kennt danach nur noch EINE Form (KalenderEintrag). Ohne das
-// muesste jede der vier Ansichten - Monat, Woche, Tag, Liste - dreimal
-// unterscheiden, woher ein Eintrag kommt, und die Rasterlogik waere dreifach
+// muesste jede der vier Ansichten - Monat, Woche, Tag, Liste - viermal
+// unterscheiden, woher ein Eintrag kommt, und die Rasterlogik waere vierfach
 // vorhanden.
 //
 // Contact.appointmentAt bleibt dabei die fuehrende Spalte fuer Kundentermine.
@@ -13,12 +14,24 @@
 
 import { prisma } from "@/lib/prisma";
 import { eigene } from "@/lib/scope";
+import { hasTimeOfDay } from "@/lib/dates";
 import type { TerminArt } from "@/lib/generated/prisma/enums";
 
 /** Wie lange ein Kundentermin dauert, wenn niemand etwas anderes sagt. */
 export const TERMIN_DAUER_MINUTEN = 60;
 
-export type Herkunft = "KONTAKT" | "EIGEN" | "FREMD";
+/**
+ * Wie lange eine Wiedervorlage im Raster steht. Ein Rueckruf ist kein
+ * Beratungstermin - eine halbe Stunde ist grosszuegig gerechnet.
+ */
+export const WIEDERVORLAGE_DAUER_MINUTEN = 30;
+
+/**
+ * WIEDERVORLAGE ist die vierte Herkunft: der zugesagte Rueckruf mit Uhrzeit
+ * ("Rueckmeldung, 15 Uhr"). Er kommt aus Contact.nextStepAt und nicht aus
+ * Termin - der Kalender liest, er baut nicht um (siehe Kopf der Datei).
+ */
+export type Herkunft = "KONTAKT" | "EIGEN" | "FREMD" | "WIEDERVORLAGE";
 
 export type KalenderEintrag = {
   id: string;
@@ -27,9 +40,9 @@ export type KalenderEintrag = {
   von: Date;
   bis: Date;
   ganztags: boolean;
-  /** Nur bei KONTAKT: der Sprung in die Kontaktakte. */
+  /** Bei KONTAKT und WIEDERVORLAGE: der Sprung in die Kontaktakte. */
   kontaktId?: string;
-  /** Nur bei KONTAKT: fuer den Anruf-Knopf in der Liste. */
+  /** Bei KONTAKT und WIEDERVORLAGE: fuer den Anruf-Knopf in der Liste. */
   telefon?: string | null;
   /** Zusatzzeile - Notiz zum naechsten Schritt, Ort, Name der Quelle. */
   zusatz?: string | null;
@@ -57,13 +70,20 @@ export async function eintraegeImZeitraum(
   // beginnt, laeuft aber noch hinein - also wird das Fenster um eine
   // Termindauer nach hinten aufgemacht und danach genau gefiltert.
   const kontaktAb = new Date(von.getTime() - TERMIN_DAUER_MINUTEN * 60_000);
+  const rueckAb = new Date(von.getTime() - WIEDERVORLAGE_DAUER_MINUTEN * 60_000);
 
   const [kontakte, eigeneTermine, fremde] = await Promise.all([
+    // Termin und Wiedervorlage in EINER Abfrage: zwei getrennte waeren eine
+    // Runde mehr zur Datenbank fuer dieselbe Tabelle, und dass ein Kontakt
+    // beides traegt, ist der Normalfall.
     prisma.contact.findMany({
       where: {
         ...eigene(userId).kontakte,
         outcome: { not: "VERLOREN" },
-        appointmentAt: { gte: kontaktAb, lt: bis },
+        OR: [
+          { appointmentAt: { gte: kontaktAb, lt: bis } },
+          { nextStepAt: { gte: rueckAb, lt: bis } },
+        ],
       },
       orderBy: { appointmentAt: "asc" },
       select: {
@@ -71,6 +91,8 @@ export async function eintraegeImZeitraum(
         name: true,
         phone: true,
         appointmentAt: true,
+        nextStepAt: true,
+        nextStepType: true,
         nextStepNote: true,
       },
     }),
@@ -92,20 +114,58 @@ export async function eintraegeImZeitraum(
   const eintraege: KalenderEintrag[] = [];
 
   for (const kontakt of kontakte) {
-    const start = kontakt.appointmentAt!;
-    const ende = new Date(start.getTime() + TERMIN_DAUER_MINUTEN * 60_000);
-    if (ende <= von) continue; // war doch nur der Rand von oben
-    eintraege.push({
-      id: `kontakt:${kontakt.id}`,
-      herkunft: "KONTAKT",
-      titel: kontakt.name,
-      von: start,
-      bis: ende,
-      ganztags: false,
-      kontaktId: kontakt.id,
-      telefon: kontakt.phone,
-      zusatz: kontakt.nextStepNote,
-    });
+    const start = kontakt.appointmentAt;
+    if (start && start >= kontaktAb && start < bis) {
+      const ende = new Date(start.getTime() + TERMIN_DAUER_MINUTEN * 60_000);
+      // war doch nur der Rand von oben
+      if (ende > von) {
+        eintraege.push({
+          id: `kontakt:${kontakt.id}`,
+          herkunft: "KONTAKT",
+          titel: kontakt.name,
+          von: start,
+          bis: ende,
+          ganztags: false,
+          kontaktId: kontakt.id,
+          telefon: kontakt.phone,
+          zusatz: kontakt.nextStepNote,
+        });
+      }
+    }
+
+    // Die zugesagte Rueckmeldung - und nur die mit Uhrzeit (D15).
+    //
+    // Fristen auf den Tag liegen als UTC-Mitternacht in nextStepAt; sie
+    // gehoeren in die Heute-Liste, nicht in ein Zeitraster, in dem sie zu
+    // hunderten um 00:00 uebereinander staenden.
+    //
+    // Der Terminschritt bleibt ebenfalls draussen: bei einem vereinbarten
+    // Termin traegt nextStepAt dieselbe Uhrzeit wie appointmentAt
+    // (app/(app)/pipeline/actions.ts) - derselbe Termin staende sonst zweimal
+    // im Raster, einmal als Termin und einmal als Rueckmeldung.
+    const rueck = kontakt.nextStepAt;
+    if (
+      rueck &&
+      kontakt.nextStepType !== "TERMIN" &&
+      hasTimeOfDay(rueck) &&
+      rueck >= rueckAb &&
+      rueck < bis
+    ) {
+      const ende = new Date(rueck.getTime() + WIEDERVORLAGE_DAUER_MINUTEN * 60_000);
+      if (ende > von) {
+        eintraege.push({
+          id: `wiedervorlage:${kontakt.id}`,
+          herkunft: "WIEDERVORLAGE",
+          titel: `Rückmeldung ${kontakt.name}`,
+          von: rueck,
+          bis: ende,
+          ganztags: false,
+          kontaktId: kontakt.id,
+          telefon: kontakt.phone,
+          zusatz: kontakt.nextStepNote,
+        });
+      }
+    }
   }
 
   for (const termin of eigeneTermine) {

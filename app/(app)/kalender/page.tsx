@@ -213,6 +213,15 @@ export default async function KalenderPage({
 
   const wochentage = Array.from({ length: 7 }, (_, i) => shiftDay(mondayOf(tag), i));
 
+  // Rueckmeldungen sind die vierte Herkunft und die einzige, die niemand hier
+  // eingetragen hat: sie entstehen aus "Spaeter, Dienstag 15 Uhr" nach einem
+  // Anruf (lib/kalender/laden.ts). Deshalb steht einmal oben, was der ruhige
+  // graue Eintrag im Raster ist - sonst sucht man den Eintrag, den man nie
+  // angelegt hat.
+  const rueckmeldungen = imFenster.filter(
+    (eintrag) => eintrag.herkunft === "WIEDERVORLAGE"
+  ).length;
+
   // Sync-Zustand der angebundenen Quellen - fuer die Status-Zeile oben.
   // Eine kleine, gezielte Abfrage extra zu den Kalendereintraegen oben: nur
   // die drei Felder, die der Satz braucht, keine Fremdtermine mitgeladen.
@@ -324,6 +333,18 @@ export default async function KalenderPage({
         vor={vor}
         titel={titel}
       />
+
+      {rueckmeldungen > 0 && (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-muted">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-sunken px-2.5 py-1 text-xs font-medium text-ink-muted">
+            <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-slate-500" />
+            Rückmeldung
+          </span>
+          {rueckmeldungen === 1
+            ? "Eine zugesagte Rückmeldung steht hier — aus „Später“ nach einem Anruf."
+            : `${rueckmeldungen} zugesagte Rückmeldungen stehen hier — aus „Später“ nach einem Anruf.`}
+        </p>
+      )}
 
       {ansicht === "monat" && (
         <Monatsraster tag={tag} eintraege={imFenster} heute={heute} />
