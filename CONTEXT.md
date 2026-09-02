@@ -1,6 +1,6 @@
-# Cockpit
+# Tracker
 
-Das Cockpit (früher „Ergo CRM") ist ein Werkzeug für Vertrieb und Führung im Strukturvertrieb: Jede Person pflegt ihre eigene Kontakt-Pipeline, und dieselben Zahlen tragen die Führung der Struktur.
+Der Tracker (früher „Cockpit", davor „Ergo CRM") ist ein Werkzeug für Vertrieb und Führung im Strukturvertrieb: Jede Person pflegt ihre eigene Kontakt-Pipeline, und dieselben Zahlen tragen die Führung der Struktur.
 
 ## Language
 
@@ -43,16 +43,24 @@ Zielbild, noch nicht gebaut: eine abgegrenzte Struktur innerhalb einer gemeinsam
 ### Führung
 
 **Lagebild**:
-Der Erstblick der Führungskraft beim Öffnen — Ampel-Bilanz der eigenen Struktur, Gesamtstand mit Richtung, wer kurz vor der nächsten Karrierestufe steht, danach die Fälle, die heute einen Griff brauchen. Eine Arbeitsliste mit Kopf, keine Auswertung; „Reporting" ist im Cockpit kein Wort der Oberfläche.
+Der Erstblick der Führungskraft beim Öffnen — Ampel-Bilanz der eigenen Struktur, Gesamtstand mit Richtung, wer kurz vor der nächsten Karrierestufe steht, danach die Fälle, die heute einen Griff brauchen. Eine Arbeitsliste mit Kopf, keine Auswertung; „Reporting" ist im Tracker kein Wort der Oberfläche.
 
 **Gesamtstand**:
 Einheiten vor der App plus alles seither Gebuchte. Für eine Struktur gilt: eine Bedeutung, drei Anzeigen — Lagebild-Kopf, „Zusammen" in der Mannschaft, „Du und dein Team zusammen" bei den Einheiten — und eine Rechnungsbasis; weicht eine ab, glaubt niemand mehr den anderen beiden.
 
 **Verlauf**:
-Die kumulierte Einheiten-Kurve über die Zeit — die eigene auf der Einheiten-Seite, die der Struktur in der Mannschaft. Vor dem ersten App-Tag läuft sie flach, weil der Startbestand kein Datum trägt. Ein Storno zieht sie nach unten.
+Die kumulierte Kurve über die Zeit, im Stil eines Depot-Charts. Für Einheiten: die eigene auf der Einheiten-Seite, die der Struktur in der Mannschaft — dort als zwei Linien **Eigen** und **Team**, deren Summe der Gesamtstand ist. Für Aktivitäten: Anrufe und vereinbarte Termine, aus derselben Rechnungsbasis wie die Mannschafts-Tabelle. Vor dem ersten App-Tag läuft die Einheiten-Kurve flach, weil der Startbestand kein Datum trägt. Ein Storno zieht sie nach unten.
 
 **Vorführen**:
-Der Schalter fürs Zeigen vor Fremden: alle Namen der eigenen Leute werden zu Initialen, Zahlen und Kurven bleiben echt. Gilt je Browser-Tab und wird nie gespeichert.
+Der Schalter fürs Zeigen vor Fremden: an der Stelle jedes Namens steht ein **Zählname** („GP 1", „GP 2", …), Zahlen und Kurven bleiben echt. Initialen taugen dafür nicht — wer das Team kennt, löst sie auf. Gilt je Browser-Tab und wird nie gespeichert.
+
+### Direktkontakt
+
+**Direktkontakt**:
+Die Ansprache eines fremden Menschen — auf der Straße, über Instagram — mit dem Ziel, einen Geschäftspartner zu gewinnen. Kein Kontakt der Namensliste, solange keine Nummer da ist.
+
+**Direktkontakttrichter**:
+Die fünf Stufen Angesprochen → Instagram → Nummer → Termin vereinbart → Rekrutiert, von der Führungskraft selbst gezählt, mit Übergangsquoten wie beim Trichter. Ein Werkzeug der Führung, das in keiner Leiste steht.
 
 ### Ausbau
 
@@ -83,10 +91,27 @@ Das Bewerberspezifische an einem Kontakt der Recruiting-Liste — Motiv, Situati
 **Zusage**:
 Die Kandidatur-Phase, in der der Kandidat ja gesagt hat. Der Zusage-Knopf erzeugt im selben Zug die Einladung.
 
+### Wettbewerb
+
+**Saison**:
+Ein Monat im Wettbewerb. Die Woche ist der Spieltag, die Saison das Turnier.
+
+**Stufen-Titel**:
+Der Name einer Wettbewerbsstufe — etwas, das man gern zeigt. Das Team darf die Namen selbst wählen. Nicht zu verwechseln mit dem **Wochentitel**, den jede Woche neu vergibt, wer die beste Zahl hat.
+
+**Team-Challenge**:
+Ein Wochenziel der ganzen Mannschaft, auf das alle einzahlen — gegen das Ziel, nicht gegeneinander.
+
+**Trophäe**:
+Eine Auszeichnung für eine abgeschlossene Saison. Sie wird nicht gesammelt, sondern verliehen, und trägt das Datum ihrer Saison.
+
+**Vitrine**:
+Der Ort der Trophäen vergangener Saisons.
+
 ### Multiplikation
 
 **Multiplizierbar**:
-Ein Berater, den der Betreiber nicht persönlich briefen muss, übernimmt das Cockpit selbst und nutzt es danach von sich aus weiter.
+Ein Berater, den der Betreiber nicht persönlich briefen muss, übernimmt den Tracker selbst und nutzt es danach von sich aus weiter.
 
 **Aktiver Nutzer**:
 Eine Person mit Einträgen an mindestens drei Tagen einer Kalenderwoche. Konten zählen nicht — Nutzung zählt.
@@ -99,6 +124,9 @@ Der teilbare, jederzeit zurückziehbare Link einer Führungskraft mit indexierte
 
 **Teamabend**:
 Der wöchentliche Teamtermin — und der eine Bildschirm im Werkzeug, der dort gezeigt wird.
+
+**Rückblick-Karte**:
+Eine automatisch erzeugte Karte für den Teamabend mit genau einem Highlight einer Person — oder einem Befund des ganzen Teams. Was hakt, steht nie an einem Namen. Die Führungskraft wählt vor dem Abend, welche Karten gezeigt werden.
 
 **Anfrage**:
 Die Nachricht eines außenstehenden Beraters, der einen Zugang will. Kein Konto, kein Kontakt — nur Name, Erreichbarkeit und Anliegen.

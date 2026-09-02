@@ -2,6 +2,7 @@
 
 Stand: 27.08.2026 — **Nachtrag 29.08.2026: ALLE 14 Arbeitspakete sind umgesetzt und committet** (AP-01 `3bd1014`, AP-02/10 `91c106d`, AP-03 `8a26117`, AP-04 `8e86da4`, AP-05 `0214ff1`, AP-06 `71f1ed5`, AP-07 `0762ab6`, AP-08 `5ba9858`, AP-09 `257ec6e`, AP-11 `7be6b1b`, AP-12 `a6e422c`, AP-13 `da26756`, AP-14 `ea48cc5`). Offen sind nur noch die fünf fachlichen Rückfragen an Emil in Abschnitt 7 — alles Konfigurierbare läuft bis dahin mit Platzhaltern.
 Anlass: Emils Brainstorming-Feedback vor dem Teamabend — ausgewertet, gegen die Codebasis geprüft und in Arbeitspakete geschnitten, die eine frische Session ohne Vorwissen umsetzen kann.
+Nachfolger: **Runde 2 vom 31.08.2026** steht in [emil-feedback-runde-2.md](emil-feedback-runde-2.md) — Emils Rückmeldung auf genau diesen umgesetzten Stand.
 
 > **Emil beschreibt selten fehlende Features — meist beschreibt er Features, die er nicht gefunden hat. Erst prüfen, dann bauen.**
 
