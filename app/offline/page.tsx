@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Kein Netz · Cockpit" };
+export const metadata: Metadata = { title: "Kein Netz · Tracker" };
 
 // Wird vom Service Worker ausgeliefert, wenn ein Seitenaufruf ins Leere laeuft
 // (public/sw.js). Bewusst eine echte Seite und kein Dino-Spiel: der Berater

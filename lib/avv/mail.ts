@@ -58,7 +58,7 @@ export async function avvBestaetigungSenden(user: {
         "",
         "Die angenommene Fassung liegt dieser Mail als PDF bei. Bitte bewahren Sie sie auf.",
         "",
-        "Cockpit",
+        "Tracker",
       ].join("\n"),
       attachments: [
         {

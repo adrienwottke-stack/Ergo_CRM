@@ -22,7 +22,7 @@ export async function anfrageSenden(
   if (!(await istAn("anfrage"))) {
     return {
       ok: false,
-      fehler: "Anfragen sind gerade geschlossen. Melde dich direkt bei dem, der dir das Cockpit gezeigt hat.",
+      fehler: "Anfragen sind gerade geschlossen. Melde dich direkt bei dem, der dir den Tracker gezeigt hat.",
     };
   }
 
@@ -70,7 +70,7 @@ export async function anfrageSenden(
     admins.map((konto) => konto.id),
     {
       titel: `Anfrage von ${name}`,
-      text: "Jemand von außen will das Cockpit. Sieh dir die Anfrage an.",
+      text: "Jemand von außen will den Tracker. Sieh dir die Anfrage an.",
       url: "/werkstatt/anfragen",
       kennung: "anfrage",
     }

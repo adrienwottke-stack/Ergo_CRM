@@ -1,5 +1,5 @@
-// Die Anfrage von aussen (Multiplikations-Plan, Kanal 2): ein Berater hat das
-// Cockpit gesehen und will einen Zugang. Kein Konto, keine Sitzung - deshalb
+// Die Anfrage von aussen (Multiplikations-Plan, Kanal 2): ein Berater hat den
+// Tracker gesehen und will einen Zugang. Kein Konto, keine Sitzung - deshalb
 // gelten hier haertere Kappen als bei der Rueckmeldung, die hinter dem Login
 // sitzt.
 //

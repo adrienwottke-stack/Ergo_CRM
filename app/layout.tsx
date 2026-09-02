@@ -29,7 +29,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cockpit",
+  title: "Tracker",
   description: "Kontakt-Tracking für dein Team",
   // Am Handy laeuft die Anwendung ueber "Zum Startbildschirm hinzufuegen"
   // wie eine eigene App: eigenes Symbol, keine Adressleiste.
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   // vorher bei "black-translucent".
   appleWebApp: {
     capable: true,
-    title: "Cockpit",
+    title: "Tracker",
     statusBarStyle: "default",
   },
   icons: { apple: "/apple-touch-icon.png" },

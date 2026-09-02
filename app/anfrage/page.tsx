@@ -10,7 +10,7 @@ import { card, columnNarrow, kicker } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Cockpit — Zugang anfragen",
+  title: "Tracker — Zugang anfragen",
   description:
     "Das Werkzeug hinter Team Dresden: Namensliste, Tagespensum, Einheiten-Kurve und Team-Wettbewerb in einer App.",
 };
@@ -42,7 +42,7 @@ export default async function AnfragePage() {
               Anfragen sind gerade geschlossen.
             </p>
             <p className="mt-1 text-sm text-ink-muted">
-              Melde dich direkt bei dem, der dir das Cockpit gezeigt hat.
+              Melde dich direkt bei dem, der dir den Tracker gezeigt hat.
             </p>
           </div>
         ) : (
@@ -51,7 +51,7 @@ export default async function AnfragePage() {
               <p className="text-base leading-relaxed text-ink">
                 Namensliste, Tagespensum, Termine, Einheiten und der
                 Team-Wettbewerb — in <span className="font-semibold">einer</span> App
-                am Handy. Morgens sagt dir das Cockpit, wer dran ist. Abends
+                am Handy. Morgens sagt dir der Tracker, wer dran ist. Abends
                 siehst du, was es gebracht hat.
               </p>
               <ul className="mt-4 space-y-2 text-sm text-ink-muted">
@@ -67,7 +67,7 @@ export default async function AnfragePage() {
               monatStart={monatStart}
               ueberschrift="So sieht ein halbes Jahr aus"
               startZeitraum="gesamt"
-              fussnote="Beispielkurve, indexiert (Start = 100) — echte Zahlen zeigt das Cockpit nur seinen Nutzern."
+              fussnote="Beispielkurve, indexiert (Start = 100) — echte Zahlen zeigt der Tracker nur seinen Nutzern."
             />
 
             <AnfrageFormular />

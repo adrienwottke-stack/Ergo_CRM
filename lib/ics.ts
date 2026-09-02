@@ -58,7 +58,7 @@ export function icsDatei(termine: IcsTermin[], jetzt = new Date()): string {
   const zeilen: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Cockpit//Termine//DE",
+    "PRODID:-//Tracker//Termine//DE",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
   ];
@@ -145,7 +145,7 @@ export function icsFeed(
   const zeilen: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Cockpit//Termine//DE",
+    "PRODID:-//Tracker//Termine//DE",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     falte(`X-WR-CALNAME:${maskiere(optionen.name)}`),

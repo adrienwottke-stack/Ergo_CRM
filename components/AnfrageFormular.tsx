@@ -93,7 +93,7 @@ export default function AnfrageFormular() {
           name="nachricht"
           rows={3}
           maxLength={500}
-          placeholder="Woher kennst du das Cockpit, für wie viele Leute wäre es?"
+          placeholder="Woher kennst du den Tracker, für wie viele Leute wäre es?"
           className={cn(input, "mt-1 h-auto py-2.5")}
         />
       </div>

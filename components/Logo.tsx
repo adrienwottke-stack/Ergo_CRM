@@ -39,7 +39,7 @@ export function Wordmark({
             onDark ? "text-white" : "text-slate-900"
           }`}
         >
-          Cockpit
+          Tracker
         </span>
         {sub && (
           <span

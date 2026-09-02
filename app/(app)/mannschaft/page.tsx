@@ -549,7 +549,7 @@ export default async function MannschaftPage({
         <MannschaftsKurven saetze={kurven} heute={heute} monatStart={monatStartTag} />
       </section>
 
-      {/* --- Das Team-Cockpit ------------------------------------------------
+      {/* --- Die Teamübersicht -----------------------------------------------
           Emils Wunsch fuer den Teamabend: Ampeln und Kernzahlen der ganzen
           Mannschaft in einer dichten Zeile je Person, direkt unter den Kurven
           und vor allen uebrigen Abschnitten. Reine Anzeige derselben Daten,

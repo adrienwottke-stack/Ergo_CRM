@@ -13,7 +13,7 @@ function tageSeit(datum: Date): number {
   return Math.max(0, Math.floor((Date.now() - datum.getTime()) / TAG_MS));
 }
 
-// Das Team-Cockpit: eine dichte Zeile pro Person statt einer Rechnung, die
+// Die Teamübersicht: eine dichte Zeile pro Person statt einer Rechnung, die
 // sich über Abschnitte verteilt. Genau das wollte Emil fuer den Teamabend -
 // "Ampeln, beieinander" statt eine Karte je Person zum Scrollen.
 //
@@ -71,7 +71,7 @@ export default function MannschaftsMatrix({
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className={kicker}>Team-Cockpit</h2>
+        <h2 className={kicker}>Teamübersicht</h2>
         <span className="text-xs text-ink-muted">nach Dringlichkeit sortiert</span>
       </div>
       {/* Nachgemessen bei 375 px: die Tabelle war 640 px breit, sichtbar waren

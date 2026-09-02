@@ -120,7 +120,7 @@ self.addEventListener("push", (event) => {
     meldung = {};
   }
 
-  const titel = meldung.titel || "Cockpit";
+  const titel = meldung.titel || "Tracker";
   event.waitUntil(
     self.registration.showNotification(titel, {
       body: meldung.text || "",

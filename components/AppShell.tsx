@@ -137,7 +137,7 @@ export default async function AppShell({
                 und an derselben Stelle statt als zweites Symbol daneben. */}
             <Schnellzugriff ausbau={stand} wegweiserAn={wegweiserAn} />
             {/* Nur am Rechner und nur im Browser-Tab: das Symbol erklaert, wie
-                das Cockpit hier in ein eigenes Fenster kommt. Am Handy erscheint
+                der Tracker hier in ein eigenes Fenster kommt. Am Handy erscheint
                 es nie - dort ist die Installation Pflicht und laengst
                 erledigt, bevor jemand diese Kopfzeile ueberhaupt sieht. */}
             <AppInstallieren />

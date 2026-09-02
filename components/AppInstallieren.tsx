@@ -115,8 +115,8 @@ export default function AppInstallieren() {
       <button
         type="button"
         onClick={() => setOffen(true)}
-        title="Cockpit als App auf diesem Rechner"
-        aria-label="Cockpit als App auf diesem Rechner"
+        title="Tracker als App auf diesem Rechner"
+        aria-label="Tracker als App auf diesem Rechner"
         className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent"
       >
         <AppFensterIcon className="h-4.5 w-4.5" />
@@ -125,7 +125,7 @@ export default function AppInstallieren() {
       <Modal
         open={offen}
         onClose={() => setOffen(false)}
-        title={fertig ? "Liegt jetzt bei dir" : "Cockpit auf diesem Rechner"}
+        title={fertig ? "Liegt jetzt bei dir" : "Tracker auf diesem Rechner"}
         subtitle={
           fertig
             ? undefined
@@ -136,7 +136,7 @@ export default function AppInstallieren() {
           <div className="space-y-4">
             <p className="flex items-center gap-2 text-sm font-medium text-ink">
               <CheckIcon className="h-4 w-4 text-fest-erfolg" />
-              Cockpit ist installiert.
+              Tracker ist installiert.
             </p>
             <p className="text-sm leading-relaxed text-ink-muted">
               Du findest es ab jetzt neben deinen anderen Programmen. Dieser Tab
@@ -176,7 +176,7 @@ export default function AppInstallieren() {
                     das Menü des Browsers.
                   </Schritt>
                   <Schritt nummer={2}>
-                    Wähle <Wort>„Cockpit installieren“</Wort>.
+                    Wähle <Wort>„Tracker installieren“</Wort>.
                   </Schritt>
                   <Schritt nummer={3}>
                     Steht dort nichts, hast du die App schon — dann liegt sie
@@ -196,7 +196,7 @@ export default function AppInstallieren() {
                     <Wort>Hinzufügen</Wort>.
                   </Schritt>
                   <Schritt nummer={3}>
-                    Cockpit startest du ab jetzt über das Symbol im Dock.
+                    Tracker startest du ab jetzt über das Symbol im Dock.
                   </Schritt>
                 </Schritte>
                 <p className="text-xs leading-relaxed text-ink-muted">
@@ -225,7 +225,7 @@ export default function AppInstallieren() {
             {weg === "firefox" && (
               <p className="rounded-xl border border-line bg-sunken p-4 text-sm leading-relaxed text-ink-muted">
                 Firefox kann Web-Apps nicht installieren. Arbeite hier im Tab
-                weiter — oder öffne Cockpit einmal in Safari oder Chrome, dann
+                weiter — oder öffne Tracker einmal in Safari oder Chrome, dann
                 steht an dieser Stelle die Anleitung.
               </p>
             )}

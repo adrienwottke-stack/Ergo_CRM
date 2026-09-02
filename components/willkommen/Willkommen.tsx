@@ -195,7 +195,7 @@ export default function Willkommen({
 
         {/* Der kurze Weg fuer Fuehrungskraefte. */}
         {akt === "chatLeader" && (
-          <ChatFaden schritte={leaderChat(vorname)} absender="Cockpit" onDone={weiter} />
+          <ChatFaden schritte={leaderChat(vorname)} absender="Tracker" onDone={weiter} />
         )}
         {akt === "fuehrung" && <FuehrungsKarten onDone={weiter} />}
         {akt === "einladen" && <EinladenAkt onDone={weiter} />}

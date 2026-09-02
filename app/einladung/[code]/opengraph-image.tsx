@@ -61,7 +61,7 @@ export default async function OgBild({
             <rect x="13.4" y="21" width="10.8" height="2.4" rx="1.2" fill="#ffffff" opacity="0.38" />
           </svg>
           <span style={{ fontSize: "36px", fontWeight: 600, color: "#93b4d9" }}>
-            Cockpit
+            Tracker
           </span>
         </div>
 
