@@ -24,7 +24,7 @@ export default async function SpielPage() {
   // scheitern - saisonTrophaeen faengt selbst ab und liefert dann leer.
   const vitrine = saisonTrophaeen();
 
-  const an = await schalter("stufen", "spiel");
+  const an = await schalter("stufen", "spiel", "trophaeen");
   // Die sechs Stufennamen (AP-25, D18) - eigener Aufruf statt Prop-Umweg,
   // gecacht in lib/stufen.ts wie ladeGesamtpunkte je Anfrage einmal laeuft.
   const stufenTitel = await ladeStufenTitel();
@@ -34,6 +34,9 @@ export default async function SpielPage() {
     name: stufenTitel[i] ?? stufe.name,
   }));
   await merkeNutzung("spiel", person.id);
+  // Die Vitrine hat ihren eigenen Schluessel (Regel 1 in lib/features.ts):
+  // ohne Schalter kein Baustein, ohne Zaehlstelle keine Werkstatt-Zahl.
+  if (an.trophaeen) await merkeNutzung("trophaeen", person.id);
   const { abgeschlossen, laufend } = await vitrine;
   const fuehrt = laufend?.trophaeen.find((t) => t.art === "saisonsieger");
 
@@ -107,6 +110,7 @@ export default async function SpielPage() {
           eine Bedeutung, naemlich das Podium der Wochentabelle. Zwei goldene
           Stellen auf zwei Seiten heissen zwei verschiedene Dinge, und dann
           heisst Gold nichts mehr. Hier reichen Name und Zahl. */}
+      {an.trophaeen && (
       <section className="space-y-3">
         <div>
           <h2 className={sectionTitle}>Vitrine</h2>
@@ -183,6 +187,7 @@ export default async function SpielPage() {
           </>
         )}
       </section>
+      )}
 
       {/* --- Die Kacheln ----------------------------------------------------- */}
       {an.spiel && (

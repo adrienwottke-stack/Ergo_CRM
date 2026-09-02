@@ -1218,7 +1218,7 @@ model RueckmeldungAudio {
 
 // --- Anfrage von aussen -------------------------------------------------------
 // Was auf der oeffentlichen Seite /anfrage abgeschickt wird: ein Berater, der
-// das Cockpit gesehen hat und einen Zugang will. Kein Konto, keine Session -
+// den Tracker gesehen hat und einen Zugang will. Kein Konto, keine Session -
 // deshalb steht hier Freitext statt einer Beziehung.
 //
 // BEWUSST OHNE Relation auf User oder Person: die Anfrage kommt von jemandem,

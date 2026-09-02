@@ -65,9 +65,15 @@ END $$;
 -- Kein Baustein ohne Schluessel, Schalter und Zaehlstelle (lib/features.ts,
 -- Regel 1). Fehlt die Zeile, gilt der Baustein ohnehin als AN - dieser INSERT
 -- ist Komfort fuer die Werkstatt, keine Voraussetzung.
+-- Drei Bausteine derselben Runde (AP-21, AP-27, AP-28) - eine Migration, weil
+-- sie noch nirgends gelaufen ist; ein spaeterer Deploy bekommt alle drei.
 INSERT INTO "Feature" ("key", "titel", "beschreibung") VALUES
   ('direktkontakt', 'Direktkontakttrichter',
-   'Der Schnellzähler für die Direktansprache: angesprochen, Instagram, Nummer, Termin vereinbart, rekrutiert — mit Übergangsquoten. Steht in keiner Leiste, nur Führungskräfte kommen hin.')
+   'Der Schnellzähler für die Direktansprache: angesprochen, Instagram, Nummer, Termin vereinbart, rekrutiert — mit Übergangsquoten. Steht in keiner Leiste, nur Führungskräfte kommen hin.'),
+  ('challenge', 'Team-Challenge',
+   'Das Wochenziel der ganzen Mannschaft in der Arena: Anrufe der Woche gegen ein Ziel, das die Werkstatt setzt. Kein Name, keine Punkte — gegen das Ziel, nicht gegeneinander.'),
+  ('trophaeen', 'Saison-Trophäen',
+   'Saisonsieger, Quotenkönig und Dauerläufer je Monat, gerechnet aus den Einträgen: der Zwischenstand in der Arena, die Vitrine auf der Spiel-Seite. Trophäen verfallen nicht, sie tragen ihr Datum.')
 ON CONFLICT ("key") DO NOTHING;
 
 -- --- Rechteentzug ------------------------------------------------------------
