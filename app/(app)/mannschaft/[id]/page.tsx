@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { astLage, fuehrungsSchritt, type Mannschaftsperson } from "@/lib/fuehrung";
+import { astLage, fuehrungsSchritt, tageSeit, type Mannschaftsperson } from "@/lib/fuehrung";
 import Ampel from "@/components/Ampel";
 import Kennzahl from "@/components/Kennzahl";
 import {
@@ -22,7 +22,24 @@ import { SCHNELLTEXTE_FUEHRUNG } from "@/lib/nachrichten";
 import NachrichtSenden from "@/components/NachrichtSenden";
 import KuemmereMich from "@/components/KuemmereMich";
 import { PhoneIcon } from "@/components/icons";
-import { card, kicker, pageTitle } from "@/components/ui";
+import { card, kicker, pageTitle, sectionTitle } from "@/components/ui";
+import { berlinToday } from "@/lib/dates";
+import {
+  eigenerVerlauf,
+  produktionsmonat,
+  strukturVerlauf,
+  type StrukturVerlauf,
+  type Verlaufstag,
+} from "@/lib/einheiten";
+import { eigeneAktivitaeten, type Aktivitaetstag } from "@/lib/aktivitaeten";
+import { schalter } from "@/lib/features";
+import VerlaufsChart, { type Verlaufsserie } from "@/components/VerlaufsChart";
+import { coachingHinweise } from "@/lib/coaching";
+import { initialenKuerzel } from "@/lib/vorfuehren";
+import VorfuehrProvider from "@/components/VorfuehrProvider";
+import VorfuehrSchalter from "@/components/VorfuehrSchalter";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
+import GpName from "@/components/GpName";
 
 export const dynamic = "force-dynamic";
 
@@ -172,7 +189,7 @@ function VerlaufsTag({
   );
 }
 
-function AstZeile({ person }: { person: Mannschaftsperson }) {
+function AstZeile({ person, kurz }: { person: Mannschaftsperson; kurz?: string }) {
   const w = person.werte;
   return (
     <li>
@@ -181,7 +198,9 @@ function AstZeile({ person }: { person: Mannschaftsperson }) {
         className="-mx-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg px-2 py-2 transition hover:bg-sunken"
       >
         <Ampel ampel={person.ampel} variante="punkt" groesse="klein" className="self-center" />
-        <span className="text-sm font-medium text-ink">{person.name}</span>
+        <span className="text-sm font-medium text-ink">
+          <GpName name={person.name} kurz={kurz} />
+        </span>
         {person.fuehrt > 0 && (
           <span className="rounded-full bg-navy-50 px-2 py-0.5 text-11 text-navy-700">
             führt {person.fuehrt}
@@ -196,6 +215,60 @@ function AstZeile({ person }: { person: Mannschaftsperson }) {
       </Link>
     </li>
   );
+}
+
+/**
+ * Der Sockel der eigenen Einheiten-Linie (AP-19).
+ *
+ * Mannschaftsperson traegt kein einheitenStart mit - die Selektion in
+ * mannschaftsLage() (lib/fuehrung.ts) laedt es nicht, das Feld dort fuer alle
+ * Koepfe der Liste anzubauen waere teurer als eine gezielte Abfrage nach
+ * dieser einen Spalte fuer GENAU eine Person. Sieht sich die Fuehrungskraft
+ * selbst an, steht der Wert schon in `user` (requireUser() laedt den ganzen
+ * Datensatz ohne eigene Selektion) - dann entfaellt die Abfrage ganz.
+ */
+async function eigenerEinheitenStart(
+  personId: string,
+  betrachter: { id: string; einheitenStart: number }
+): Promise<number> {
+  if (personId === betrachter.id) return betrachter.einheitenStart;
+  const konto = await prisma.user.findUnique({
+    where: { id: personId },
+    select: { einheitenStart: true },
+  });
+  return konto?.einheitenStart ?? 0;
+}
+
+/**
+ * Eigen und Ast disjunkt, Tag fuer Tag und im Sockel: Ast = die ganze
+ * Struktur der Person (strukturVerlauf, schliesst die Person selbst ein)
+ * MINUS Eigen. Ohne den Abzug zaehlte die eigene Zahl zweimal - einmal in
+ * "Eigen", einmal versteckt im Sockel und in den Tagessummen von "Ast".
+ *
+ * Dieselbe Rechnung wie eigenUndTeam() in app/(app)/mannschaft/page.tsx
+ * (AP-17) - hier als eigene, kleine Kopie statt eines gemeinsamen
+ * lib-Bausteins: jene Datei ist fuer diesen Auftrag tabu (siehe Datei-
+ * Eigentum, docs/emil-feedback-runde-2.md, AP-19), und die Funktion ist klein
+ * genug, dass eine zweite Fassung billiger ist als eine neue Abhaengigkeit
+ * zwischen zwei Seiten, die unabhaengig voneinander weiterentwickelt werden.
+ */
+function eigenUndAst(
+  eigenSockel: number,
+  eigenTage: Verlaufstag[],
+  ast: StrukturVerlauf
+): Verlaufsserie[] {
+  const eigenJeTag = new Map(eigenTage.map((tag) => [tag.tag, tag.hundertstel]));
+  return [
+    { name: "Eigen", sockel: eigenSockel, tage: eigenTage },
+    {
+      name: "Ast",
+      sockel: ast.sockel - eigenSockel,
+      tage: ast.tage.map((tag) => ({
+        tag: tag.tag,
+        hundertstel: tag.hundertstel - (eigenJeTag.get(tag.tag) ?? 0),
+      })),
+    },
+  ];
 }
 
 export default async function PersonPage({
@@ -220,11 +293,37 @@ export default async function PersonPage({
   // Der Zweizeiler oben zeigt IHN, nicht seinen Ast - sonst stuende bei einer
   // Fuehrungskraft der Termin eines Untergebenen als ihr eigener da.
   const nurEr = person.einblick.offen ? [person.id] : [];
-  const [ereignisse, offeneSachen, zuletztJe, naechstesJe] = await Promise.all([
+
+  // Kurven und Coaching (AP-19): ein Platzhalter hat kein Konto und keine
+  // eigene Zahl - die Abfragen entfallen dann ganz, nicht erst ihre Anzeige
+  // ("Platzhalter zeigen keine Kurven"). `schalter("einheiten")` ist derselbe
+  // Admin-Schalter wie auf /mannschaft; `eigenerEinheitenStart` liefert den
+  // Sockel der eigenen Linie fuer den Eigen/Ast-Split (eigenUndAst oben).
+  const zeigenKurven = !person.platzhalter;
+  const [
+    ereignisse,
+    offeneSachen,
+    zuletztJe,
+    naechstesJe,
+    einheitenAn,
+    eigenVerlauf,
+    astVerlauf,
+    aktivitaeten,
+    einheitenStart,
+  ] = await Promise.all([
     verlauf(offeneIds),
     aufriss(offeneIds),
     letzteSchritte(nurEr),
     naechsteSchritte(nurEr),
+    zeigenKurven ? schalter("einheiten") : Promise.resolve({ einheiten: false }),
+    zeigenKurven ? eigenerVerlauf(person.id) : Promise.resolve<Verlaufstag[]>([]),
+    zeigenKurven
+      ? strukturVerlauf(person.id)
+      : Promise.resolve<StrukturVerlauf>({ sockel: 0, tage: [] }),
+    zeigenKurven
+      ? eigeneAktivitaeten(person.id)
+      : Promise.resolve<{ tage: Aktivitaetstag[] }>({ tage: [] }),
+    zeigenKurven ? eigenerEinheitenStart(person.id, user) : Promise.resolve(0),
   ]);
   const zuletzt = zuletztJe.get(person.id) ?? null;
   const naechstes = naechstesJe.get(person.id) ?? null;
@@ -235,6 +334,67 @@ export default async function PersonPage({
     person.id === user.id
       ? 0
       : await prisma.contact.count({ where: { ownerId: person.id } });
+
+  // --- Verlauf-Kurven (AP-19) --------------------------------------------
+  // Einheiten: Eigen/Ast disjunkt (eigenUndAst oben), hinter demselben
+  // zeigeEinheiten-Schalter wie auf /mannschaft PLUS "traegt ueberhaupt
+  // Zahlen" - sonst zeigte jede leere Struktur eine flache Nulllinie.
+  // Aktivitaeten: immer, aus derselben Tagesreihe wie der Coaching-Block
+  // unten - eine Abfrage traegt beides.
+  const heute = berlinToday();
+  const monatStartTag = produktionsmonat(heute).start.toISOString().slice(0, 10);
+  const einheitenVorhanden = astVerlauf.sockel !== 0 || astVerlauf.tage.length > 0;
+  const zeigeEinheitenKurve = zeigenKurven && einheitenAn.einheiten && einheitenVorhanden;
+  // Die zweite Serie "Ast" nur, wenn ueberhaupt ein Ast existiert (fuehrt):
+  // ohne Direkte ist strukturVerlauf() identisch mit dem eigenen Verlauf, und
+  // eigenUndAst rechnete eine Linie, die auf jedem Tag exakt bei null liegt -
+  // eine Kurve, deren zweite Linie nichts zeigt, ist Rauschen, keine Auskunft.
+  const einheitenSerien: Verlaufsserie[] | null = zeigeEinheitenKurve
+    ? fuehrt
+      ? eigenUndAst(einheitenStart, eigenVerlauf, astVerlauf)
+      : [{ name: "Eigen", sockel: einheitenStart, tage: eigenVerlauf }]
+    : null;
+  const aktivitaetenSerien: Verlaufsserie[] = [
+    {
+      name: "Anrufe",
+      sockel: 0,
+      tage: aktivitaeten.tage
+        .filter((tag) => tag.anrufe !== 0)
+        .map((tag) => ({ tag: tag.tag, hundertstel: tag.anrufe })),
+    },
+    {
+      name: "Termine",
+      sockel: 0,
+      tage: aktivitaeten.tage
+        .filter((tag) => tag.vereinbart !== 0)
+        .map((tag) => ({ tag: tag.tag, hundertstel: tag.vereinbart })),
+    },
+  ];
+
+  // --- Coaching-Hinweise (AP-19, N7) --------------------------------------
+  // Reine Regeln auf den EIGENEN Tageswerten der Person (nicht des Astes) -
+  // das 1:1 handelt von genau diesem Menschen. `stillSeitTage` folgt exakt
+  // dem Muster aus mannschaftsLage() (lib/fuehrung.ts): null, wenn es noch
+  // nie eine Aktivitaet gab.
+  const stillSeitTage = person.werte.letzteAktivitaet
+    ? tageSeit(person.werte.letzteAktivitaet)
+    : null;
+  const coachingSaetze = zeigenKurven
+    ? coachingHinweise({ tage: aktivitaeten.tage, stillSeitTage, heute })
+    : [];
+
+  // --- Vorfuehr-Kuerzel (AP-19, D17) ---------------------------------------
+  // Die Person, ihr ganzer Ast und die eigene Fuehrungskraft darueber (das
+  // "über"-Schild im Kopf) - dieselbe Namensmenge, die auf dieser Seite in
+  // einer klaren Namensstelle steht (Titel, Listen). Kontaktnamen (Kunden)
+  // gehoeren NICHT hierher: fuer sie gibt es keine Zaehlnummer, ihre Bloecke
+  // werden stattdessen komplett verdeckt (VorfuehrVerdeckt weiter unten) -
+  // Kundennamen sind schutzwuerdiger als Berater-Namen.
+  const kurzMap = initialenKuerzel([
+    person.name,
+    ...ast.map((eintrag) => eintrag.name),
+    ...(person.ueber ? [person.ueber] : []),
+  ]);
 
   const namen = new Map([person, ...ast].map((eintrag) => [eintrag.id, eintrag.vorname]));
   // Ein Herkunftsschild je Zeile lohnt sich erst, wenn mehr als einer liefert.
@@ -250,20 +410,26 @@ export default async function PersonPage({
   }
 
   return (
+    <VorfuehrProvider>
     <div className="space-y-6">
       <div>
-        <Link href="/mannschaft" className="text-13 font-medium text-navy-700 hover:underline">
-          ← Mannschaft
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link href="/mannschaft" className="text-13 font-medium text-navy-700 hover:underline">
+            ← Mannschaft
+          </Link>
+          <VorfuehrSchalter />
+        </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <Ampel ampel={person.ampel} variante="punkt" groesse="gross" />
-          <h1 className={pageTitle}>{person.name}</h1>
+          <h1 className={pageTitle}>
+            <GpName name={person.name} kurz={kurzMap.get(person.name)} />
+          </h1>
           {/* Der Zustand als Wort direkt hinter dem Namen - das ist die
               Antwort auf die Frage, mit der man diese Seite oeffnet. */}
           <Ampel ampel={person.ampel} variante="text" />
           {person.ueber && (
             <span className="rounded-full bg-sunken px-2.5 py-0.5 text-xs font-medium text-ink-muted">
-              über {person.ueber}
+              über <GpName name={person.ueber} kurz={kurzMap.get(person.ueber)} />
             </span>
           )}
           {person.ausgetreten && <span className="text-xs text-ink-soft">ausgetreten</span>}
@@ -283,9 +449,9 @@ export default async function PersonPage({
         <section className={`${card} p-4 sm:p-5`}>
           <h2 className={kicker}>Noch nicht dabei</h2>
           <p className="mt-1.5 text-sm text-ink-muted">
-            {person.vorname} steht in der Struktur, nutzt die App aber noch nicht.
-            Hier bleibt es leer, bis er sein Konto hat — Nullen wären eine
-            Behauptung über jemanden, der nie gefragt wurde.
+            <GpName name={person.vorname} kurz={kurzMap.get(person.name)} /> steht in der
+            Struktur, nutzt die App aber noch nicht. Hier bleibt es leer, bis er sein Konto
+            hat — Nullen wären eine Behauptung über jemanden, der nie gefragt wurde.
           </p>
           <div className="mt-3">
             <EinladungNachreichen
@@ -297,6 +463,7 @@ export default async function PersonPage({
           </div>
         </section>
       ) : (
+        <VorfuehrVerdeckt hinweis="Beim Vorführen ausgeblendet — Zuletzt/Als Nächstes nennt Kontaktnamen.">
         <section className={`${card} space-y-2 p-4 sm:p-5`}>
           <SchrittZeile
             marke="Zuletzt"
@@ -329,6 +496,7 @@ export default async function PersonPage({
             }
           />
         </section>
+        </VorfuehrVerdeckt>
       )}
 
       {/* --- Was zu tun ist --------------------------------------------------
@@ -395,6 +563,25 @@ export default async function PersonPage({
 
       )}
 
+      {/* --- Fuers 1:1 ---------------------------------------------------
+          Direkt unter "Dein Schritt", regelbasiert aus lib/coaching.ts:
+          Engpass, Trend und Stillstand koennen gleichzeitig stehen; trifft
+          nichts zu, steht ein Satz Anerkennung. Kein Sprachmodell, keine
+          Push-Nachricht - siehe Kopfkommentar der Datei. Keine Namen in den
+          Saetzen, also nichts fuers Vorfuehren zu verdecken. */}
+      {!person.platzhalter && coachingSaetze.length > 0 && (
+        <section className={`${card} p-4 sm:p-5`}>
+          <h2 className={kicker}>Fürs 1:1</h2>
+          <ul className="mt-1.5 space-y-1.5">
+            {coachingSaetze.map((satz, index) => (
+              <li key={index} className="text-sm text-ink">
+                {satz}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* --- Zahlen ----------------------------------------------------------
           Bei einer Fuehrungskraft zwei Bloecke nebeneinander: was SIE selbst
           geschafft hat und was ihr Ast geschafft hat. Zusammengerechnet waere
@@ -457,8 +644,46 @@ export default async function PersonPage({
         </section>
       )}
 
+      {/* --- Verlauf als Kurve (AP-19) ----------------------------------------
+          Steht VOR der Tages-Liste, ersetzt sie nicht (N6: erst der Trend,
+          dann die Ereignisse). Einheiten nur bei Zahlen UND eingeschaltetem
+          Schalter; Aktivitaeten immer, wie auf /mannschaft (AP-17). Keine
+          Namen im Bild - nichts zu verdecken. */}
+      {!person.platzhalter && (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className={sectionTitle}>Verlauf</h2>
+            <span className="text-xs text-ink-muted">tippen und halten zum Ablesen</span>
+          </div>
+          {einheitenSerien && (
+            <VerlaufsChart
+              serien={einheitenSerien}
+              heute={heute}
+              monatStart={monatStartTag}
+              // Eigene Fussnote statt des VerlaufsChart-Standardtexts: der
+              // Standardtext spricht die zweite Person an ("deiner Einheiten")
+              // - richtig auf der eigenen Seite, falsch auf der Seite eines
+              // anderen Menschen, die diese Seite normalerweise zeigt.
+              fussnote={
+                "Kumuliert, inklusive der Einheiten von vor der App — die stehen als eine Zahl ohne Datum, davor läuft die Kurve flach. Ein Storno zieht die Kurve nach unten." +
+                (fuehrt ? " Eigen = selbst gemeldet, Ast = die ganze Struktur ohne Eigen." : "")
+              }
+            />
+          )}
+          <VerlaufsChart
+            serien={aktivitaetenSerien}
+            heute={heute}
+            monatStart={monatStartTag}
+            format={(wert) => String(wert)}
+            einheitWort="Aktivitäten"
+            fussnote="Kumuliert; Termine = vereinbart."
+          />
+        </section>
+      )}
+
       {/* --- Der Verlauf mit Namen ------------------------------------------ */}
       {!(person.platzhalter && !fuehrt) && (
+      <VorfuehrVerdeckt hinweis="Beim Vorführen ausgeblendet — der Tages-Verlauf zeigt Kontaktnamen.">
       <section className={`${card} p-4 sm:p-5`}>
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h2 className={kicker}>
@@ -503,6 +728,7 @@ export default async function PersonPage({
           </p>
         )}
       </section>
+      </VorfuehrVerdeckt>
       )}
 
       {/* --- Was ansteht und was liegt --------------------------------------
@@ -568,11 +794,12 @@ export default async function PersonPage({
       {fuehrt && (
         <section className={`${card} p-4 sm:p-5`}>
           <h2 className={kicker}>
-            {person.vorname}s Direkte ({direkte.length})
+            <GpName name={person.vorname} kurz={kurzMap.get(person.name)} />s Direkte (
+            {direkte.length})
           </h2>
           <ul className="mt-1.5 divide-y divide-line">
             {direkte.map((eintrag) => (
-              <AstZeile key={eintrag.id} person={eintrag} />
+              <AstZeile key={eintrag.id} person={eintrag} kurz={kurzMap.get(eintrag.name)} />
             ))}
           </ul>
 
@@ -589,7 +816,7 @@ export default async function PersonPage({
                 {ast
                   .filter((eintrag) => !direkte.includes(eintrag))
                   .map((eintrag) => (
-                    <AstZeile key={eintrag.id} person={eintrag} />
+                    <AstZeile key={eintrag.id} person={eintrag} kurz={kurzMap.get(eintrag.name)} />
                   ))}
               </ul>
             </details>
@@ -632,5 +859,6 @@ export default async function PersonPage({
         Startfenster.
       </p>
     </div>
+    </VorfuehrProvider>
   );
 }
