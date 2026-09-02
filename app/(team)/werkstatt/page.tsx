@@ -28,9 +28,11 @@ import {
 } from "@/lib/einheiten";
 import { einstellungenStehen } from "@/lib/einstellungen";
 import { AMPEL_FELDER, ampelAnzeigewert, ampelKriterien } from "@/lib/ampelKriterien";
+import { challengeWochenziel } from "@/lib/challenge";
 import {
   ampelKriterienSpeichern,
   ausbauNachziehen,
+  challengeZielSpeichern,
   fokusProzentsatzSpeichern,
   schalten,
   schwellenSpeichern,
@@ -87,6 +89,7 @@ export default async function WerkstattPage() {
     kriterien,
     offeneAnfragen,
     stufenTitel,
+    challengeZiel,
   ] = await Promise.all([
     prisma.feature.findMany({ orderBy: { titel: "asc" } }),
     prisma.featureUse.findMany({
@@ -145,6 +148,9 @@ export default async function WerkstattPage() {
     // Die sechs Stufennamen (AP-25, D18) - teilt sich dieselbe Einstellung-
     // Abfrage wie Schwellen, Fokus-Prozentsatz und Ampel-Kriterien oben.
     ladeStufenTitel(),
+    // Das Wochenziel der Team-Challenge (AP-27, D19) - derselbe Cache, keine
+    // eigene Abfrage.
+    challengeWochenziel(),
   ]);
 
   const kopfZahl = new Map<string, Set<string>>();
@@ -624,6 +630,73 @@ export default async function WerkstattPage() {
           saetze={TITEL_SAETZE}
           gesperrt={!einstellungenDa}
         />
+      </div>
+
+      {/* --- Team-Challenge ---------------------------------------------------
+          Das gemeinsame Wochenziel der Arena (docs/emil-feedback-runde-2.md,
+          AP-27 und D19). Vierter Wert nach demselben Muster wie die drei
+          oben: der Betrieb legt die Zahl fest, nicht der Code (D4). Emil hat
+          seine noch nicht geschickt (Abschnitt 9, E3), bis dahin laeuft der
+          Platzhalter. */}
+      <div className={`${card} p-5 sm:p-6`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className={sectionTitle}>Team-Challenge</h2>
+          <span className="text-xs text-ink-muted">Wochenziel in der Arena</span>
+        </div>
+        <p className="mt-2 max-w-2xl text-sm text-ink-muted">
+          Wie viele Anrufe das ganze Netzwerk in einer Woche zusammenbringen
+          will. Reine Anzeige — es gibt keine Punkte für das Ziel und keinen
+          Vergleich zwischen Namen. Den Block selbst schaltet oben die Zeile
+          &bdquo;challenge&ldquo; ab, sobald sie in der Liste steht; ohne Zeile
+          gilt er als an.
+        </p>
+
+        {!einstellungenDa && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-13 text-amber-800">
+            Die Tabelle steht auf dieser Datenbank noch nicht — die Migration
+            läuft beim nächsten Deploy mit. Bis dahin gilt der Platzhalter aus
+            dem Code, und Eintragen geht hier noch nicht.
+          </p>
+        )}
+
+        <form
+          action={challengeZielSpeichern}
+          className="mt-4 flex flex-wrap items-center gap-3"
+        >
+          <label
+            htmlFor="challenge-wochenziel"
+            className="text-sm font-medium text-ink"
+          >
+            Wochenziel
+          </label>
+          <input
+            id="challenge-wochenziel"
+            name="challenge-wochenziel"
+            type="text"
+            inputMode="numeric"
+            defaultValue={challengeZiel}
+            aria-label="Wochenziel der Team-Challenge in Anrufen"
+            className={cn(inputBlank, "w-24 tabular-nums")}
+          />
+          <span className="text-sm text-ink-soft">Anrufe je Woche</span>
+          <button
+            type="submit"
+            disabled={!einstellungenDa}
+            className={cn(
+              btnSecondary,
+              "disabled:cursor-not-allowed disabled:opacity-40"
+            )}
+          >
+            Übernehmen
+          </button>
+        </form>
+
+        <p className="mt-4 text-xs text-ink-muted">
+          Platzhalter, bis Emil liefert: 100 Anrufe
+          (docs/emil-feedback-runde-2.md, Abschnitt 9, E3). Nur ganze Zahlen ab
+          1. Leer lassen und übernehmen setzt wieder auf diesen Platzhalter
+          zurück.
+        </p>
       </div>
 
       {/* --- Das Navigations-Backlog ----------------------------------------

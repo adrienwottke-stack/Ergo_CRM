@@ -13,6 +13,8 @@ import {
   sprintStand,
   stundenBis,
 } from "@/lib/arena";
+import { challengeSatz, ladeChallenge } from "@/lib/challenge";
+import { saisonTrophaeen } from "@/lib/trophaeen";
 import { abstandInHandlungen, eigenerHinweis, punkteText } from "@/lib/kommentator";
 import { merkeNutzung, schalter } from "@/lib/features";
 import { merkeAnwesenheit } from "@/lib/anwesenheit";
@@ -65,7 +67,9 @@ export default async function ArenaPage() {
     "sprint",
     "stufen",
     "feed",
-    "titel"
+    "titel",
+    "challenge",
+    "trophaeen"
   );
 
   const [
@@ -79,6 +83,8 @@ export default async function ArenaPage() {
     feed,
     titel,
     stufenTitel,
+    challenge,
+    saison,
   ] = await Promise.all([
     ladeRangliste(wochenStart),
     ladePuls(),
@@ -115,9 +121,25 @@ export default async function ArenaPage() {
     // Die sechs Stufennamen (AP-25, D18) - nicht zu verwechseln mit "titel"
     // oben, dem Wochentitel-Stand aus lib/titel.ts.
     ladeStufenTitel(),
+    // Das gemeinsame Wochenziel (AP-27, D19). Nur wenn der Baustein an ist:
+    // eine Aggregation fuer einen Block, den gerade niemand sieht, waere die
+    // Sorte Abfrage, die sich unbemerkt ansammelt.
+    an.challenge ? ladeChallenge(wochenStart) : Promise.resolve(null),
+    // Der Zwischenstand der laufenden Saison (AP-28). Die NULL ist Absicht:
+    // saisonTrophaeen(0) rechnet nur den laufenden Monat und laesst die
+    // Vitrine der abgeschlossenen Saisons weg - die steht auf /spiel. Haengt
+    // in diesem Promise.all und kostet damit keine zusaetzliche Wartezeit.
+    an.trophaeen ? saisonTrophaeen(0) : Promise.resolve(null),
   ]);
 
   const stufe = stufeVon(gesamtpunkte, stufenTitel);
+
+  // Der Saisonsieger wird ueber die ART gesucht und nicht ueber den ersten
+  // Platz der Liste: trophaeenVon() filtert leere Arten heraus, damit stuende
+  // an Stelle 0 im Zweifel eine andere Trophaee.
+  const laufendeSaison = saison?.laufend ?? null;
+  const saisonSieger =
+    laufendeSaison?.trophaeen.find((t) => t.art === "saisonsieger") ?? null;
 
   const kontoVonPerson = new Map(
     konten.filter((eintrag) => eintrag.userId).map((e) => [e.id, e.userId!])
@@ -136,6 +158,8 @@ export default async function ArenaPage() {
   if (an.stufen) gesehen.push(merkeNutzung("stufen", person.id));
   if (an.feed && feed.length > 0) gesehen.push(merkeNutzung("feed", person.id));
   if (an.titel) gesehen.push(merkeNutzung("titel", person.id));
+  if (an.challenge && challenge) gesehen.push(merkeNutzung("challenge", person.id));
+  if (an.trophaeen && saisonSieger) gesehen.push(merkeNutzung("trophaeen", person.id));
   await Promise.all(gesehen);
 
   // --- eigene Lage ---------------------------------------------------------
@@ -145,6 +169,12 @@ export default async function ArenaPage() {
   const vorMir = platzIndex > 0 ? zeilen[platzIndex - 1] : null;
   const hinterMir =
     platzIndex >= 0 && platzIndex < zeilen.length - 1 ? zeilen[platzIndex + 1] : null;
+
+  // Die eigene Serie. BEWUSST AUS DERSELBEN ZEILE wie die Flamme in der
+  // Tabelle unten (AP-27): ladeRangliste rechnet sie einmal mit streakDays
+  // ueber ein 60-Tage-Fenster. Eine zweite Rechnung im Kopf waere eine zweite
+  // Zahl - und zwei Serien auf einem Bildschirm glaubt niemand mehr.
+  const serie = meine?.serie ?? 0;
 
   const ueberholtVon =
     person.lastRank !== null && platz !== null && platz > person.lastRank && vorMir
@@ -184,6 +214,35 @@ export default async function ArenaPage() {
             {stunden > 0 ? `Abpfiff in ${stunden} ${stunden === 1 ? "Stunde" : "Stunden"}` : "Spieltag vorbei"}
           </span>
         </div>
+
+        {/* Die eigene Serie, direkt unter dem Abpfiff: gross, aber ohne
+            Zuspitzung (AP-27). Die Flamme ab zwei Tagen ist dieselbe wie am
+            eigenen Namen in der Tabelle - dasselbe Zeichen fuer dieselbe
+            Zahl. Bei null steht kein "0" da: eine grosse Null waere ein
+            Vorwurf, und Vorwuerfe macht dieses Werkzeug nicht. */}
+        {serie > 0 ? (
+          <p className="mt-2 flex items-center gap-2">
+            {serie >= 2 && (
+              <FlameIcon className="h-5 w-5 shrink-0 text-gold-600" />
+            )}
+            <span className="text-2xl font-semibold leading-none tabular-nums text-ink">
+              {serie}
+            </span>
+            <span className="text-sm text-ink-muted">
+              {serie === 1 ? "Tag in Folge" : "Tage in Folge"}
+            </span>
+          </p>
+        ) : (
+          // Ohne Serie sagt der Hinweis darunter ohnehin schon, was ansteht
+          // ("Du warst heute noch nicht dran.", lib/kommentator.ts) - und
+          // wenn er etwas Dringenderes sagt, gehoert ihm die Zeile erst
+          // recht. Zwei Saetze mit derselben Aussage untereinander liest
+          // niemand zweimal.
+          !hinweis && (
+            <p className="mt-2 text-sm text-ink-muted">Heute noch nichts geloggt</p>
+          )
+        )}
+
         {hinweis && (
           <p className="mt-2 text-sm font-medium text-navy-700">{hinweis}</p>
         )}
@@ -206,6 +265,22 @@ export default async function ArenaPage() {
             )}
           </p>
         )}
+
+        {/* Die Saison, also der Monat (docs/wettbewerb-plan.md, Abschnitt 1:
+            Woche = Spieltag, Monat = Saison). Hier steht NUR der
+            Zwischenstand; die Vitrine der abgeschlossenen Saisons steht auf
+            /spiel (AP-28). Ohne einen einzigen Punkt im Monat steht hier
+            nichts - ein Zwischenstand ohne Namen waere eine leere Zeile mit
+            einem Doppelpunkt. */}
+        {laufendeSaison && saisonSieger && (
+          <p className="mt-2 text-sm text-ink-muted">
+            {laufendeSaison.monat} läuft. Zwischenstand:{" "}
+            <span className="font-semibold text-ink">
+              {saisonSieger.halterName}
+            </span>
+            , <span className="tabular-nums">{saisonSieger.wertText}</span>.
+          </p>
+        )}
       </div>
 
       {nachrichten.length > 0 && (
@@ -218,6 +293,31 @@ export default async function ArenaPage() {
           }))}
           ungelesen={ungelesen}
         />
+      )}
+
+      {/* --- Wochenziel: das eine, worauf alle einzahlen --------------------
+          Der einzige Block der Arena ohne Gegner (AP-27, D19; CONTEXT.md,
+          Glossar "Team-Challenge"). Kein Name, kein Platz, keine Punkte fuer
+          das Ziel - hier steht die Summe des Netzwerks gegen eine Zahl, die
+          der Betrieb festlegt. Wer wie viel beigetragen hat, sagt die
+          Tabelle unten; hier waere es ein zweiter Wettbewerb. */}
+      {an.challenge && challenge && (
+        <div className={`${card} p-5`}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className={sectionTitle}>Wochenziel</h2>
+            <span className={kicker}>Team-Challenge</span>
+          </div>
+          <Fortschritt
+            anteil={challenge.anteil}
+            ton={challenge.erreicht ? "erfolg" : "info"}
+            hoehe="kraeftig"
+            beschriftung={`${challenge.anrufe} von ${challenge.ziel} Anrufen`}
+            className="mt-4"
+          />
+          <p className="mt-3 text-sm text-ink-muted">
+            {challengeSatz(challenge, stunden > 0)}
+          </p>
+        </div>
       )}
 
       {/* --- Titel: mehrere Wege, vorn zu sein ------------------------------ */}

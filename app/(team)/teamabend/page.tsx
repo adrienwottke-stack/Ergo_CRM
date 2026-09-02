@@ -1,6 +1,8 @@
+import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { berlinToday, dayToUtcDate, startOfWeek } from "@/lib/dates";
 import { ladePuls, ladeRangliste } from "@/lib/arena";
+import { strukturKonten } from "@/lib/struktur";
 import { ladeFeed } from "@/lib/feed";
 import { ladeTitelStaende } from "@/lib/titel";
 import { rueckblickKarten } from "@/lib/rueckblick";
@@ -27,6 +29,14 @@ export const dynamic = "force-dynamic";
 // Grosse, aber bestehende Textklassen statt eigenem Zoom-Code: die Karten
 // sind dieselben wie in der Arena, nur mit mehr Schriftgroesse - kein
 // Sonderlayout, das getrennt gepflegt werden muesste.
+//
+// NUR DIE EIGENE STRUKTUR, seit D20 ("Tabelle zeigt je Person nur die eigene
+// Struktur", docs/emil-feedback-runde-2.md). Vor dem Bildschirm steht der
+// eigene Ast, und eine Rangliste mit Namen aus einer fremden Struktur ist
+// dort nicht falsch, sondern gegenstandslos - niemand im Raum kann etwas
+// damit anfangen. Betroffen sind Top 3 und Puls; die WOCHENTITEL bleiben
+// bewusst netzwerkweit (siehe der Block weiter unten und lib/rueckblick.ts:
+// ein Titel, den die Arena nicht zeigt, waere eine Unwahrheit an der Wand).
 
 const vollDatumFormat = new Intl.DateTimeFormat("de-DE", {
   weekday: "long",
@@ -51,6 +61,34 @@ function vorMinuten(at: Date): string {
 
 const blockTitel = "text-xl font-semibold tracking-tight text-ink sm:text-2xl";
 
+/**
+ * Die Personen-Ids der eigenen Struktur - oder undefined fuer "alle".
+ *
+ * Der Weg ist derselbe wie in lib/rueckblick.ts: strukturKonten() liefert die
+ * KONTEN (ich und alles unter mir, Ausgetretene draussen), und EINE Abfrage
+ * uebersetzt sie ueber die Relation User->Person in die Ids, mit denen die
+ * Rangliste rechnet.
+ *
+ * undefined heisst "kein Filter" und ist kein Notausgang, sondern der Fall
+ * "kein eigener Ast": ein Konto ist man selbst, wer niemanden unter sich hat,
+ * sieht den Bildschirm netzwerkweit wie bisher. Das betrifft vor allem den
+ * Admin, der ueber niemandem haengt - fuer ihn aendert sich nichts.
+ */
+async function strukturPersonIds(fkUserId: string): Promise<string[] | undefined> {
+  const konten = await strukturKonten(fkUserId).catch(() => [] as string[]);
+  if (konten.length <= 1) return undefined;
+
+  const personen = await prisma.person
+    .findMany({ where: { userId: { in: konten } }, select: { id: true } })
+    .catch(() => [] as { id: string }[]);
+
+  // Ein leeres Ergebnis kann es eigentlich nicht geben - der Betrachter hat
+  // ein Teamprofil, sonst waere die Seite oben an requireUserPerson
+  // ausgestiegen. Kommt trotzdem nichts zurueck, zeigt der Abend lieber das
+  // Netzwerk als einen leeren Bildschirm vor versammelter Mannschaft.
+  return personen.length > 0 ? personen.map((person) => person.id) : undefined;
+}
+
 export default async function TeamabendPage() {
   const user = await requireUser();
   const person = await requireUserPerson(user.id);
@@ -73,9 +111,15 @@ export default async function TeamabendPage() {
   const wochenStart = startOfWeek(heute);
   const monatStart = produktionsmonat(heute).start.toISOString().slice(0, 10);
 
+  // Erst der eigene Ast, dann alles andere: Rangliste und Puls haengen daran
+  // (D20). Der Rueckblick weiter unten ermittelt ihn ein zweites Mal selbst -
+  // rueckblickKarten() soll fuer sich allein benutzbar bleiben, und die
+  // Signatur von lib/rueckblick.ts anzufassen war nicht Teil dieses Pakets.
+  const nurPersonIds = await strukturPersonIds(user.id);
+
   const [zeilen, puls, titel, feed, ids] = await Promise.all([
-    ladeRangliste(wochenStart),
-    ladePuls(),
+    ladeRangliste(wochenStart, { nurPersonIds }),
+    ladePuls({ nurPersonIds }),
     ladeTitelStaende(heute),
     ladeFeed(person.id),
     aktiveKonten(),
@@ -176,7 +220,9 @@ export default async function TeamabendPage() {
         startZeitraum="gesamt"
       />
 
-      {/* --- Puls: wer heute schon dran war ---------------------------------- */}
+      {/* --- Puls: wer heute schon dran war - beide Zahlen ueber die eigene
+          Struktur (D20). "3 von 4" meint die vier Koepfe im Raum, nicht die
+          elf im Netzwerk. ------------------------------------------------- */}
       <div className={`${card} p-6`}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-lg font-medium text-ink">
@@ -199,7 +245,9 @@ export default async function TeamabendPage() {
       </div>
 
       {/* --- Top 3 der Rangliste, kompakt - Gold nur fuer Platz 1, wie auf
-          /leaderboard --------------------------------------------------- */}
+          /leaderboard. Seit D20 aus der eigenen Struktur: die drei Namen
+          gehoeren damit Leuten, die im Raum sitzen. Die Arena bleibt davon
+          unberuehrt und zeigt weiter das ganze Netzwerk. ----------------- */}
       {top3.length > 0 && (
         <div className={`${card} p-6`}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">

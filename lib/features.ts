@@ -58,7 +58,16 @@ export type ArenaKey =
   // Direktansprache. Steht in keiner Leiste - gerade deshalb braucht er eine
   // Zaehlstelle: bleibt die Zahl bei null, findet ihn niemand, und der Weg
   // dorthin gehoert repariert statt das Werkzeug.
-  | "direktkontakt";
+  | "direktkontakt"
+  // Das Wochenziel der ganzen Mannschaft (AP-27, D19; lib/challenge.ts). Der
+  // einzige Block der Arena, in dem niemand gegen jemanden steht - bleibt die
+  // Zahl bei null, war das gemeinsame Ziel keins.
+  | "challenge"
+  // Die Saison-Trophaeen (AP-28, D19; lib/trophaeen.ts): der Zwischenstand
+  // der laufenden Saison in der Arena und die Vitrine der letzten drei auf
+  // /spiel. EIN Schluessel fuer beide Stellen - es ist eine Sache, und zwei
+  // Schalter fuer eine Sache sind ein Zustand, den niemand mehr ueberblickt.
+  | "trophaeen";
 
 // Eine Abfrage je Anfrage, danach beantwortet der Cache alle weiteren Fragen.
 export const featureStates = cache(async (): Promise<Map<string, FeatureState>> => {

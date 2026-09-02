@@ -60,21 +60,39 @@ export function stundenBis(ziel: Date, jetzt = new Date()): number {
  * Rangliste-Zeile auf /heute, docs/ausbau-plan.md Abschnitt 4), zahlt sie
  * sonst bei jedem Seitenaufruf mit. Die Punkte bleiben in beiden Faellen
  * identisch, damit Zeile und /leaderboard nie zwei Plaetze zeigen.
+ *
+ * `nurPersonIds` schneidet die Tabelle auf einen Ausschnitt zu - gebraucht
+ * vom Teamabend, der je Fuehrungskraft nur die eigene Struktur zeigt
+ * (docs/emil-feedback-runde-2.md, D20). OHNE DEN PARAMETER AENDERT SICH
+ * NICHTS: die Filter fallen dann Feld fuer Feld weg, und die Arena bleibt
+ * netzwerkweit. Eine leere Liste ist eine Aussage ("in diesem Ausschnitt ist
+ * niemand") und ergibt eine leere Tabelle - wer "alle" meint, uebergibt
+ * undefined.
  */
 export async function ladeRangliste(
   start: Date,
-  { mitSerie = true }: { mitSerie?: boolean } = {},
+  {
+    mitSerie = true,
+    nurPersonIds,
+  }: { mitSerie?: boolean; nurPersonIds?: string[] } = {},
 ): Promise<ArenaZeile[]> {
   const heute = berlinToday();
+  // Ein Filter, drei Abfragen und die Anwesenheit - deshalb einmal gebaut und
+  // nicht viermal getippt.
+  const nurDiese = nurPersonIds ? { personId: { in: nurPersonIds } } : {};
+  const erlaubt = nurPersonIds ? new Set(nurPersonIds) : null;
   const [logs, personen, serienLogs, anwesenheit] = await Promise.all([
     prisma.dailyLog.findMany({
-      where: { date: { gte: start } },
+      where: { date: { gte: start }, ...nurDiese },
       select: { personId: true, type: true, count: true, activityId: true },
     }),
-    prisma.person.findMany({ select: { id: true, name: true } }),
+    prisma.person.findMany({
+      where: nurPersonIds ? { id: { in: nurPersonIds } } : {},
+      select: { id: true, name: true },
+    }),
     mitSerie
       ? prisma.dailyLog.findMany({
-          where: { date: { gte: dayToUtcDate(shiftDay(heute, -60)) } },
+          where: { date: { gte: dayToUtcDate(shiftDay(heute, -60)) }, ...nurDiese },
           select: { personId: true, date: true },
         })
       : Promise.resolve([] as { personId: string; date: Date }[]),
@@ -131,6 +149,11 @@ export async function ladeRangliste(
   // ausCrm bleibt unberuehrt. Anwesenheit hat keine activityId und senkt den
   // CRM-Anteil damit ehrlich.
   for (const [personId, tage] of anwesenheit) {
+    // Die Anwesenheitstage kommen fuer alle Koepfe zurueck (eine gruppierte
+    // Abfrage ohne Filter). Der Ausschnitt wird deshalb hier gezogen - sonst
+    // stuenden im Teamabend Namen in der Tabelle, die gar nicht zur Struktur
+    // gehoeren, allein weil sie die App offen hatten.
+    if (erlaubt && !erlaubt.has(personId)) continue;
     const zeile = zeileFuer(personId);
     zeile.anwesend = tage;
     zeile.punkte += tage * ANWESENHEITS_PUNKT;
@@ -151,16 +174,29 @@ export type Puls = {
   zuletzt: { name: string; at: Date }[];
 };
 
-export async function ladePuls(): Promise<Puls> {
+/**
+ * Wer heute schon dran war.
+ *
+ * `nurPersonIds` wie bei ladeRangliste: ohne den Parameter zaehlt der Puls
+ * das ganze Netzwerk, mit ihm nur den Ausschnitt - und zwar in BEIDEN Zahlen.
+ * Ein "3 von 11" neben einer Struktur aus vier Koepfen waere kein Puls,
+ * sondern eine Verwechslung.
+ */
+export async function ladePuls(
+  { nurPersonIds }: { nurPersonIds?: string[] } = {},
+): Promise<Puls> {
   const heute = dayToUtcDate(berlinToday());
+  const nurDiese = nurPersonIds ? { personId: { in: nurPersonIds } } : {};
   const [logs, koepfe] = await Promise.all([
     prisma.dailyLog.findMany({
-      where: { date: heute },
+      where: { date: heute, ...nurDiese },
       select: { personId: true, createdAt: true, person: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: 200,
     }),
-    prisma.person.count(),
+    prisma.person.count({
+      where: nurPersonIds ? { id: { in: nurPersonIds } } : {},
+    }),
   ]);
 
   const gesehen = new Set<string>();

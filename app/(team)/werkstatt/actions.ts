@@ -11,6 +11,7 @@ import {
   schwellenSchluessel,
 } from "@/lib/einheiten";
 import { einstellungSetzen, ganzzahl } from "@/lib/einstellungen";
+import { CHALLENGE_WOCHENZIEL_SCHLUESSEL } from "@/lib/challenge";
 import { AMPEL_FELDER } from "@/lib/ampelKriterien";
 import { AUSBAU_VOLL } from "@/lib/ausbauSicht";
 import { STUFEN, STUFEN_TITEL_SCHLUESSEL } from "@/lib/stufen";
@@ -223,4 +224,43 @@ export async function stufenTitelSpeichern(
   revalidatePath("/arena");
   revalidatePath("/spiel");
   return { ok: true };
+}
+
+/**
+ * Das Wochenziel der Team-Challenge (docs/emil-feedback-runde-2.md, AP-27 und
+ * D19; offene Frage E3 - bis Emil liefert, gilt der Platzhalter 100).
+ *
+ * Ein <form action>, kein Aufruf aus einer Client-Insel wie beim
+ * Stufen-Titel-Formular darueber: hier steht EIN Zahlenfeld, das keinen
+ * Zustand im Browser braucht. Damit ist es derselbe Weg wie beim
+ * Fokus-Prozentsatz weiter oben - und dieselben Festlegungen gelten:
+ *
+ * - LEERES FELD LOESCHT DIE ZEILE und faellt auf den Platzhalter zurueck. Ein
+ *   "aus"-Zustand ergaebe hier keinen Sinn; wer das Ziel nicht sehen will,
+ *   schaltet den Baustein "challenge" oben in der Werkstatt ab.
+ * - NUR EINE ZAHL AB 1 IST EIN ZIEL. Die 0 waere keine Grenze, sondern eine
+ *   Division durch null im Fortschrittsbalken.
+ * - WAS KEINE ZAHL IST, LAESST DIE GESPEICHERTE ZEILE IN RUHE. Nach dem
+ *   revalidatePath steht im Feld wieder der gespeicherte Wert und nicht der
+ *   Tippfehler.
+ */
+export async function challengeZielSpeichern(formData: FormData) {
+  await requireAdmin();
+
+  const roh = formData.get("challenge-wochenziel");
+  if (typeof roh !== "string") return;
+
+  if (!roh.trim()) {
+    await einstellungSetzen(CHALLENGE_WOCHENZIEL_SCHLUESSEL, null);
+    revalidatePath("/werkstatt");
+    revalidatePath("/arena");
+    return;
+  }
+
+  const ziel = ganzzahl(roh);
+  if (ziel === null || ziel < 1) return;
+  await einstellungSetzen(CHALLENGE_WOCHENZIEL_SCHLUESSEL, String(ziel));
+
+  revalidatePath("/werkstatt");
+  revalidatePath("/arena");
 }
