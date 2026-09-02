@@ -435,6 +435,7 @@ Gebaut in einer Session über Sonnet-/Opus-Subagenten mit Datei-Eigentum, in fü
 | `92a36a9` | AP-27 | Team-Challenge, eigene Serie im Arena-Kopf, Saison-Zwischenstand, Teamabend nur eigene Struktur (D20-Rest) |
 | `c1a4d15` | Nachzügler | Vitrine-Schalter + Zählstelle, Feature-Zeilen für direktkontakt/challenge/trophaeen in der Migration |
 | `e05f27a` | AP-19 | Personenseite: Kurven (Eigen/Ast, Anrufe/Termine), Block „Fürs 1:1", vorführfest |
+| `1dabfa1` | Fix | Personenseite reichte der Kurve eine Funktion über die Server-Grenze (React-Laufzeitfehler, von tsc unsichtbar) — VerlaufsChart kennt jetzt `zahlen="ganz"`. Gefunden im Sicht-Check. |
 
 Dazu `c4add9c` (`.codegraph/` ignoriert). Die Commits `37746aa`/`2547a15` stammen von einer parallelen Session (Konto austragen/löschen) und liegen dazwischen.
 
