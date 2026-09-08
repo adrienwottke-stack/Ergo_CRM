@@ -43,8 +43,8 @@ async function inMeinerStruktur(
   role: UserRole
 ): Promise<boolean> {
   if (leaderId === memberId) return false;
-  // Ein Admin sieht auf /mannschaft die ganze Instanz, sobald er selbst
-  // niemanden fuehrt (siehe lib/fuehrung.ts, gesamtstruktur) - dieselbe
+  // Ein Admin sieht auf /mannschaft immer die ganze Instanz, unabhaengig von
+  // der eigenen Struktur (siehe lib/fuehrung.ts, gesamtstruktur) - dieselbe
   // Ausnahme muss hier gelten, sonst laufen Knoepfe ins Leere, die die Seite
   // gerade erst gezeigt hat.
   if (role === "ADMIN") return true;

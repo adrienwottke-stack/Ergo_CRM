@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { cn } from "@/components/ui";
+import { cn, card } from "@/components/ui";
 import { berlinDayOf, berlinMinutesOfDay, dayToUtcDate } from "@/lib/dates";
 import type { KalenderEintrag } from "@/lib/kalender/laden";
 import { beschriftung, stilFuer } from "./eintrag-stil";
@@ -122,7 +122,7 @@ function Block({
   );
 
   const klassen = cn(
-    "absolute overflow-hidden rounded-md px-1.5 py-0.5 text-[11px] leading-tight",
+    "absolute overflow-hidden rounded-md px-1.5 py-0.5 text-11 leading-tight",
     stil.block
   );
   const lage = {
@@ -185,7 +185,7 @@ export function Zeitraster({
   return (
     // Am Handy ist eine Woche schmaler als der Daumen. Sie scrollt hier
     // waagerecht in ihrem eigenen Kasten, statt die Seite zu sprengen.
-    <div className="overflow-x-auto rounded-xl border border-line bg-surface schatten-karte">
+    <div className={cn(card, "overflow-x-auto")}>
       <div className={cn(kompakt && "min-w-[42rem]")}>
         {/* Kopfzeile */}
         <div className="grid border-b border-line" style={{ gridTemplateColumns: spalten }}>
@@ -201,13 +201,13 @@ export function Zeitraster({
                   istHeute && "bg-navy-50"
                 )}
               >
-                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                <div className="text-11 font-medium uppercase tracking-wide text-ink-muted">
                   {wochentagFormat.format(datum)}
                 </div>
                 <div
                   className={cn(
                     "text-sm font-semibold tabular-nums",
-                    istHeute ? "text-navy-700" : "text-slate-900"
+                    istHeute ? "text-navy-700" : "text-ink"
                   )}
                 >
                   {datum.getUTCDate()}
@@ -221,10 +221,10 @@ export function Zeitraster({
             Uhrzeit hat und das Raster sonst den ganzen Tag zupflastern wuerde. */}
         {ganztagsVorhanden && (
           <div
-            className="grid border-b border-line bg-slate-50/60"
+            className="grid border-b border-line bg-sunken"
             style={{ gridTemplateColumns: spalten }}
           >
-            <div className="px-2 py-1 text-right text-[10px] text-slate-400">ganztags</div>
+            <div className="px-2 py-1 text-right text-10 text-ink-soft">ganztags</div>
             {tage.map((tag) => (
               <div key={tag} className="min-h-7 space-y-0.5 border-l border-line p-1">
                 {(jeTag.get(tag) ?? [])
@@ -233,7 +233,7 @@ export function Zeitraster({
                     <div
                       key={eintrag.id}
                       className={cn(
-                        "truncate rounded px-1.5 py-0.5 text-[11px]",
+                        "truncate rounded px-1.5 py-0.5 text-11",
                         stilFuer(eintrag).streifen
                       )}
                     >
@@ -254,7 +254,7 @@ export function Zeitraster({
                 className="relative border-t border-line/60"
                 style={{ height: `${STUNDE_PX}px` }}
               >
-                <span className="absolute -top-2 right-2 text-[10px] tabular-nums text-slate-400">
+                <span className="absolute -top-2 right-2 text-10 tabular-nums text-ink-soft">
                   {String(stunde).padStart(2, "0")}:00
                 </span>
               </div>

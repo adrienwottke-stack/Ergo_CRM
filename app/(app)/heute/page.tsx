@@ -17,11 +17,34 @@ import {
   faelligeAufgaben,
   fuehrungsSchritt,
   mannschaftsLage,
+  type Mannschaftslage,
 } from "@/lib/fuehrung";
 import { ladeHeuteVereinbarungen } from "@/lib/vereinbarungen";
 import { ladeTeamauswertung } from "@/lib/team-auswertung";
 import { ladeRangliste } from "@/lib/arena";
-import { formatEinheiten } from "@/lib/einheiten";
+import {
+  KARRIERESTUFE_MAX,
+  eigenerGesamtstand,
+  eigenerMonatsstand,
+  formatEinheiten,
+  monatsVergleich,
+  produktionsmonat,
+  schwelleFuer,
+  stufenGriffe,
+  stufenStandJe,
+  strukturVerlauf,
+} from "@/lib/einheiten";
+import { initialenKuerzel } from "@/lib/vorfuehren";
+import LageKopf, {
+  type SchwellenZeile,
+  type TeamPuls,
+} from "@/components/LageKopf";
+import VorfuehrProvider from "@/components/VorfuehrProvider";
+import VorfuehrSchalter from "@/components/VorfuehrSchalter";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
+import GpName from "@/components/GpName";
+import EinheitenKarte from "@/components/EinheitenKarte";
+import TerminFrageKarte from "@/components/TerminFrageKarte";
 import { schalter } from "@/lib/features";
 import { startOptions } from "@/lib/start/settings";
 import ArbeitsfokusWahl from "@/components/ArbeitsfokusWahl";
@@ -142,6 +165,108 @@ async function WettbewerbHeute({ userId }: { userId: string }) {
   );
 }
 
+async function TeamLageHeute({
+  lage,
+  userId,
+  heute,
+  einheitenAn,
+}: {
+  lage: Mannschaftslage;
+  userId: string;
+  heute: string;
+  einheitenAn: boolean;
+}) {
+  const bilanz = lage.leute.reduce(
+    (summe, person) => {
+      if (!person.ausgetreten) summe[person.ampel]++;
+      return summe;
+    },
+    { grau: 0, gruen: 0, gelb: 0, rot: 0 },
+  );
+  let puls: TeamPuls | null = null;
+  let schwellenZeile: SchwellenZeile | null = null;
+  if (einheitenAn) {
+    const direkte = lage.leute.filter(
+      (person) =>
+        person.istDirekt && !person.ausgetreten && !person.platzhalter,
+    );
+    const [verlauf, stufen] = await Promise.all([
+      strukturVerlauf(userId),
+      stufenStandJe(direkte.map((person) => person.id)),
+    ]);
+    const monat = produktionsmonat(heute);
+    const vergleich = monatsVergleich(verlauf.tage, heute);
+    const monatsName = new Intl.DateTimeFormat("de-DE", {
+      month: "long",
+      timeZone: "UTC",
+    });
+    let stand = verlauf.sockel;
+    for (const tag of verlauf.tage) {
+      if (dayToUtcDate(tag.tag) < monat.start) stand += tag.hundertstel;
+    }
+    const werte = [stand];
+    for (const tag of verlauf.tage) {
+      const datum = dayToUtcDate(tag.tag);
+      if (datum >= monat.start && datum <= dayToUtcDate(heute)) {
+        stand += tag.hundertstel;
+        werte.push(stand);
+      }
+    }
+    puls = {
+      gesamtstand:
+        verlauf.sockel +
+        verlauf.tage.reduce((summe, tag) => summe + tag.hundertstel, 0),
+      monatLabel: monatsName.format(monat.start),
+      vormonatLabel: vergleich.vormonatLabel,
+      laufend: vergleich.laufend,
+      vormonat: vergleich.vormonat,
+      delta: vergleich.delta,
+      verlaufWerte: werte,
+      traegtZahlen: verlauf.sockel !== 0 || verlauf.tage.length > 0,
+    };
+    const griffe = stufenGriffe(stufen);
+    const kurz = initialenKuerzel(direkte.map((person) => person.name));
+    const knapp = griffe.knapp[0];
+    const erreicht = griffe.erreicht[0];
+    const person = direkte.find(
+      (person) => person.id === (knapp?.userId ?? erreicht?.userId),
+    );
+    if (knapp && person) {
+      schwellenZeile = {
+        art: "knapp",
+        id: person.id,
+        name: person.name,
+        kurz: kurz.get(person.name) ?? person.vorname,
+        stufe: knapp.stufe,
+        rest: knapp.schwelle - knapp.eigenGesamt,
+        prozent: Math.round((knapp.eigenGesamt / knapp.schwelle) * 100),
+        weitere: griffe.knapp.length - 1,
+      };
+    } else if (erreicht && person) {
+      schwellenZeile = {
+        art: "erreicht",
+        id: person.id,
+        name: person.name,
+        kurz: kurz.get(person.name) ?? person.vorname,
+        stufe: erreicht.stufe,
+      };
+    } else if (griffe.fehlt.length > 0) {
+      schwellenZeile = { art: "fehlt", anzahl: griffe.fehlt.length };
+    }
+  }
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xl font-semibold">Deine Struktur im Überblick</h2>
+      <LageKopf
+        bilanz={bilanz}
+        einheitenAn={einheitenAn}
+        puls={puls}
+        schwellenZeile={schwellenZeile}
+      />
+    </section>
+  );
+}
+
 export default async function HeutePage() {
   const user = await requireUser();
   after(() => merkeAnwesenheit(user.id));
@@ -158,6 +283,9 @@ export default async function HeutePage() {
     flags,
     startKonfiguration,
     startState,
+    einheitenMonat,
+    einheitenGesamt,
+    einheitenSchwelle,
   ] = await Promise.all([
     prisma.contact.findMany({
       where: {
@@ -233,15 +361,41 @@ export default async function HeutePage() {
     schalter("einheiten"),
     startOptions(),
     prisma.startProgress.findUnique({ where: { userId: user.id } }),
+    eigenerMonatsstand(user.id),
+    eigenerGesamtstand(user.id, user.einheitenStart),
+    schwelleFuer(user.karrierestufe),
   ]);
   const arbeitslage = arbeitslageFuer(user.arbeitsfokus, aktiveDirekte);
-  const [lage, aufgaben, bericht] = await Promise.all([
+  const [geladeneLage, aufgaben, bericht] = await Promise.all([
     aktiveDirekte > 0 ? mannschaftsLage(user) : null,
     aktiveDirekte > 0 ? faelligeAufgaben(user.id) : [],
     arbeitslage === "FUEHRUNG"
       ? ladeTeamauswertung(user, { zeit: "monat", umfang: "struktur" })
       : null,
   ]);
+  // Die Administration sieht in Team die Instanz. Heute begleitet weiterhin
+  // nur den eigenen Ast und zählt denselben Umfang wie der Einheitenkopf.
+  const eigeneLeute =
+    geladeneLage?.leute.filter((person) =>
+      person.path.startsWith(geladeneLage.ich.path),
+    ) ?? [];
+  const lage = geladeneLage
+    ? {
+        ...geladeneLage,
+        leute: eigeneLeute,
+        dringend: geladeneLage.dringend.filter((person) =>
+          person.path.startsWith(geladeneLage.ich.path),
+        ),
+      }
+    : null;
+  const kuerzel = initialenKuerzel(eigeneLeute.map((person) => person.name));
+  const terminFragen = kontakte.filter(
+    (kontakt) =>
+      kontakt.nextStepType === "TERMIN" &&
+      kontakt.appointmentAt !== null &&
+      kontakt.appointmentAt < new Date(),
+  );
+  const terminFragenIds = new Set(terminFragen.map((kontakt) => kontakt.id));
   const jetzt = kontakte.filter((k) =>
     ["overdue", "today"].includes(dueState(k.nextStepAt!, heute)),
   );
@@ -333,16 +487,20 @@ export default async function HeutePage() {
       : eigeneAktion;
   const betreuung = (
     <div className="space-y-6">
-      <VereinbarungenHeute userId={user.id} />
+      <VorfuehrVerdeckt hinweis="Absprachen und Betreuungsnotizen werden beim Vorführen ausgeblendet.">
+        <VereinbarungenHeute userId={user.id} />
+      </VorfuehrVerdeckt>
       {aufgaben.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-xl font-semibold">Deine Betreuungsaufgaben</h2>
-          <ul className="space-y-3">
-            {aufgaben.map((a) => (
-              <FuehrungsAufgabe key={a.id} aufgabe={a} />
-            ))}
-          </ul>
-        </section>
+        <VorfuehrVerdeckt hinweis="Private Betreuungsaufgaben werden beim Vorführen ausgeblendet.">
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold">Deine Betreuungsaufgaben</h2>
+            <ul className="space-y-3">
+              {aufgaben.map((a) => (
+                <FuehrungsAufgabe key={a.id} aufgabe={a} />
+              ))}
+            </ul>
+          </section>
+        </VorfuehrVerdeckt>
       )}
       {brauchenDich.length > 0 && (
         <section className="space-y-3">
@@ -355,12 +513,19 @@ export default async function HeutePage() {
                 className="crm-list-row"
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block font-semibold">{p.name}</span>
+                  <span className="block font-semibold">
+                    <GpName name={p.name} kurz={kuerzel.get(p.name)} />
+                  </span>
                   <span className="mt-1 block text-sm text-ink-muted">
-                    {fuehrungsSchritt(p)}
-                    {!p.istDirekt && p.ueber
-                      ? ` · Mit ${p.ueber} besprechen`
-                      : ""}
+                    {p.istDirekt || !p.ueber ? (
+                      fuehrungsSchritt(p)
+                    ) : (
+                      <>
+                        Mit{" "}
+                        <GpName name={p.ueber} kurz={kuerzel.get(p.ueber)} />{" "}
+                        gemeinsam besprechen.
+                      </>
+                    )}
                   </span>
                 </span>
                 <ArrowRightIcon className="h-5 w-5 shrink-0" />
@@ -372,184 +537,249 @@ export default async function HeutePage() {
     </div>
   );
   return (
-    <div className={`${column} space-y-7`}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="mb-2 text-sm text-ink-muted">
-            {datum.format(new Date())}
-          </p>
-          <h1 className={pageTitle}>Heute</h1>
-        </div>
-        <ArbeitsfokusWahl
-          wert={user.arbeitsfokus}
-          aktiveDirekte={aktiveDirekte}
-        />
-      </div>
-      {startVorne ? (
-        <StartHinweis phase={activeStart.phase} />
-      ) : (
-        <section className="space-y-5 py-2" aria-labelledby="naechste-handlung">
+    <VorfuehrProvider>
+      <div className={`${column} space-y-7`}>
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-ink-muted">
-              {hauptaktion.titel}
+            <p className="mb-2 text-sm text-ink-muted">
+              {datum.format(new Date())}
             </p>
-            <h2
-              id="naechste-handlung"
-              className="mt-2 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl"
-            >
-              {hauptaktion.text}
-            </h2>
+            <h1 className={pageTitle}>Heute</h1>
           </div>
-          <Link href={hauptaktion.href} className="crm-primary-action">
-            {hauptaktion.label}
-            <ArrowRightIcon className="h-5 w-5" />
-          </Link>
-          {arbeitslage !== "FUEHRUNG" && jetzt.length > 0 && (
-            <p className="text-sm text-ink-muted">
-              {jetzt.length} offene Schritte
-              {ueberfaellig.length > 0
-                ? ` · ${ueberfaellig.length} überfällig`
-                : ""}
-            </p>
-          )}
-        </section>
-      )}
-      {(arbeitslage !== "START" || absprachen.length > 0) && betreuung}
-      {arbeitslage === "FUEHRUNG" && bericht && (
-        <Link href="/mannschaft/auswertung" className={`${card} block p-5`}>
-          <span className="text-sm text-ink-muted">
-            Dein Team · dieser Monat
-          </span>
-          <span className="mt-2 block text-3xl font-semibold tabular-nums">
-            {formatEinheiten(bericht.team.einheitenZeitraum)}{" "}
-            <span className="text-base font-normal">Einheiten</span>
-          </span>
-          <span className="mt-3 block text-sm text-navy-700">
-            Entwicklung ansehen →
-          </span>
-        </Link>
-      )}
-      <section className="space-y-3" id="eigene-arbeit">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-xl font-semibold">
-            {arbeitslage === "FUEHRUNG"
-              ? "Dein eigenes Geschäft"
-              : "Anrufe und Termine"}
-          </h2>
-          <Link
-            href="/kalender"
-            className="inline-flex min-h-11 items-center text-sm text-navy-700"
-          >
-            Kalender →
-          </Link>
+          <ArbeitsfokusWahl
+            wert={user.arbeitsfokus}
+            aktiveDirekte={aktiveDirekte}
+          />
         </div>
-        {jetzt.length > 0 ? (
-          <Arbeitsliste kontakte={jetzt.map(lite)} />
-        ) : (
-          <p className={`${card} p-5 text-ink-muted`}>
-            Für heute sind keine Kontaktschritte offen.
-          </p>
+        {lage && arbeitslage !== "START" && (
+          <div className="flex justify-end">
+            <VorfuehrSchalter />
+          </div>
         )}
-        {spaeter.length > 0 && (
-          <details className={`${card} p-5`}>
-            <summary className="cursor-pointer py-1 font-medium">
-              Diese Woche · {spaeter.length} weitere Schritte
-            </summary>
-            <div className="mt-4">
-              <Arbeitsliste kontakte={spaeter.map(lite)} />
-            </div>
-          </details>
-        )}
-        {ohneSchritt.length > 0 && (
-          <details className={`${card} p-5`}>
-            <summary className="cursor-pointer py-1 font-medium">
-              Nächsten Schritt festlegen · {ohneSchritt.length}
-              {ohneSchritt.length === 25 ? "+" : ""}
-            </summary>
-            <div className="mt-4">
-              <Arbeitsliste kontakte={ohneSchritt.map(lite)} />
-            </div>
-          </details>
-        )}
-      </section>
-      {activeStart && !startVorne && arbeitslage !== "FUEHRUNG" && (
-        <StartHinweis phase={activeStart.phase} />
-      )}
-      <section className="space-y-4">
-        <h2 className="text-xl font-semibold">Dein Fortschritt</h2>
-        <ZielHeute userId={user.id} />
-        {flags.einheiten && (
-          <>
-            <EinheitenErinnerungen userId={user.id} />
-            <Link
-              href="/einheiten"
-              className="inline-flex min-h-11 items-center font-medium text-navy-700"
+        <VorfuehrVerdeckt hinweis="Deine persönliche nächste Handlung wird beim Vorführen ausgeblendet.">
+          {startVorne ? (
+            <StartHinweis phase={activeStart.phase} />
+          ) : (
+            <section
+              className="space-y-5 py-2"
+              aria-labelledby="naechste-handlung"
             >
-              Einheiten eintragen →
-            </Link>
-          </>
+              <div>
+                <p className="text-sm font-medium text-ink-muted">
+                  {hauptaktion.titel}
+                </p>
+                <h2
+                  id="naechste-handlung"
+                  className="mt-2 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl"
+                >
+                  {hauptaktion.text}
+                </h2>
+              </div>
+              <Link href={hauptaktion.href} className="crm-primary-action">
+                {hauptaktion.label}
+                <ArrowRightIcon className="h-5 w-5" />
+              </Link>
+              {arbeitslage !== "FUEHRUNG" && jetzt.length > 0 && (
+                <p className="text-sm text-ink-muted">
+                  {jetzt.length} offene Schritte
+                  {ueberfaellig.length > 0
+                    ? ` · ${ueberfaellig.length} überfällig`
+                    : ""}
+                </p>
+              )}
+            </section>
+          )}
+        </VorfuehrVerdeckt>
+        {(arbeitslage !== "START" || absprachen.length > 0) && betreuung}
+        {arbeitslage === "FUEHRUNG" && lage && (
+          <TeamLageHeute
+            lage={lage}
+            userId={user.id}
+            heute={heute}
+            einheitenAn={flags.einheiten}
+          />
         )}
-        <WettbewerbHeute userId={user.id} />
-      </section>
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          {
-            href: `/namen/sammeln${liste}`,
-            label: "Namen sammeln",
-            icon: SparkIcon,
-          },
-          { href: `/namen/anrufen${liste}`, label: "Anrufen", icon: PhoneIcon },
-          { href: "/kalender", label: "Termine", icon: CalendarCheckIcon },
-        ].map((a) => (
-          <Link
-            key={a.label}
-            href={a.href}
-            className="flex min-h-24 flex-col items-center justify-center gap-3 rounded-2xl border border-line bg-surface p-3 text-center text-sm font-medium"
-          >
-            <a.icon className="h-6 w-6 text-navy-700" />
-            {a.label}
+        {arbeitslage === "FUEHRUNG" && bericht && (
+          <Link href="/mannschaft/auswertung" className={`${card} block p-5`}>
+            <span className="text-sm text-ink-muted">
+              Dein Team · dieser Monat
+            </span>
+            <span className="mt-2 block text-3xl font-semibold tabular-nums">
+              {formatEinheiten(bericht.team.einheitenZeitraum)}{" "}
+              <span className="text-base font-normal">Einheiten</span>
+            </span>
+            <span className="mt-3 block text-sm text-navy-700">
+              Entwicklung ansehen →
+            </span>
           </Link>
-        ))}
-      </div>
-      {arbeitslage === "FUEHRUNG" ? (
-        activeStart && (
+        )}
+        <VorfuehrVerdeckt hinweis="Eigene Kontaktdaten werden beim Vorführen ausgeblendet.">
+          <section className="space-y-3" id="eigene-arbeit">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-xl font-semibold">
+                {arbeitslage === "FUEHRUNG"
+                  ? "Dein eigenes Geschäft"
+                  : "Anrufe und Termine"}
+              </h2>
+              <Link
+                href="/kalender"
+                className="inline-flex min-h-11 items-center text-sm text-navy-700"
+              >
+                Kalender →
+              </Link>
+            </div>
+            <TerminFrageKarte
+              fragen={terminFragen.map((kontakt) => ({
+                contact: lite(kontakt),
+                appointmentAt: kontakt.appointmentAt!,
+              }))}
+            />
+            {jetzt.length > 0 ? (
+              <Arbeitsliste
+                kontakte={jetzt
+                  .filter((kontakt) => !terminFragenIds.has(kontakt.id))
+                  .map(lite)}
+              />
+            ) : (
+              <p className={`${card} p-5 text-ink-muted`}>
+                Für heute sind keine Kontaktschritte offen.
+              </p>
+            )}
+            {spaeter.length > 0 && (
+              <details className={`${card} p-5`}>
+                <summary className="cursor-pointer py-1 font-medium">
+                  Diese Woche · {spaeter.length} weitere Schritte
+                </summary>
+                <div className="mt-4">
+                  <Arbeitsliste kontakte={spaeter.map(lite)} />
+                </div>
+              </details>
+            )}
+            {ohneSchritt.length > 0 && (
+              <details className={`${card} p-5`}>
+                <summary className="cursor-pointer py-1 font-medium">
+                  Nächsten Schritt festlegen · {ohneSchritt.length}
+                  {ohneSchritt.length === 25 ? "+" : ""}
+                </summary>
+                <div className="mt-4">
+                  <Arbeitsliste kontakte={ohneSchritt.map(lite)} />
+                </div>
+              </details>
+            )}
+          </section>
+        </VorfuehrVerdeckt>
+        {arbeitslage === "AUFBAU" && lage && (
+          <TeamLageHeute
+            lage={lage}
+            userId={user.id}
+            heute={heute}
+            einheitenAn={flags.einheiten}
+          />
+        )}
+        {activeStart && !startVorne && arbeitslage !== "FUEHRUNG" && (
+          <StartHinweis phase={activeStart.phase} />
+        )}
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold">Dein Fortschritt</h2>
+          <ZielHeute userId={user.id} />
+          {flags.einheiten && (
+            <>
+              <VorfuehrVerdeckt hinweis="Erinnerungen mit Kontaktdaten werden beim Vorführen ausgeblendet.">
+                <EinheitenErinnerungen userId={user.id} />
+              </VorfuehrVerdeckt>
+              <EinheitenKarte
+                monat={formatEinheiten(einheitenMonat)}
+                monatLabel={produktionsmonat(heute).label}
+                gesamt={formatEinheiten(einheitenGesamt)}
+                schwelle={
+                  einheitenSchwelle === null
+                    ? null
+                    : formatEinheiten(einheitenSchwelle)
+                }
+                naechsteStufe={
+                  user.karrierestufe === null ||
+                  user.karrierestufe >= KARRIERESTUFE_MAX
+                    ? null
+                    : user.karrierestufe + 1
+                }
+                karrierestufeFehlt={user.karrierestufe === null}
+              />
+              <Link
+                href="/einheiten"
+                className="inline-flex min-h-11 items-center font-medium text-navy-700"
+              >
+                Einheiten eintragen →
+              </Link>
+            </>
+          )}
+          <WettbewerbHeute userId={user.id} />
+        </section>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            {
+              href: `/namen/sammeln${liste}`,
+              label: "Namen sammeln",
+              icon: SparkIcon,
+            },
+            {
+              href: `/namen/anrufen${liste}`,
+              label: "Anrufen",
+              icon: PhoneIcon,
+            },
+            { href: "/kalender", label: "Termine", icon: CalendarCheckIcon },
+          ].map((a) => (
+            <Link
+              key={a.label}
+              href={a.href}
+              className="flex min-h-24 flex-col items-center justify-center gap-3 rounded-2xl border border-line bg-surface p-3 text-center text-sm font-medium"
+            >
+              <a.icon className="h-6 w-6 text-navy-700" />
+              {a.label}
+            </Link>
+          ))}
+        </div>
+        {arbeitslage === "FUEHRUNG" ? (
+          activeStart && (
+            <details className={`${card} p-5`}>
+              <summary className="min-h-11 cursor-pointer py-2 font-medium text-ink-muted">
+                Deinen Einstieg fortsetzen
+              </summary>
+              <div className="mt-3">
+                <StartHinweis phase={activeStart.phase} />
+              </div>
+            </details>
+          )
+        ) : (
           <details className={`${card} p-5`}>
             <summary className="min-h-11 cursor-pointer py-2 font-medium text-ink-muted">
-              Deinen Einstieg fortsetzen
+              Deine erste Woche und dein Einstieg
             </summary>
             <div className="mt-3">
-              <StartHinweis phase={activeStart.phase} />
+              <ErsteWoche
+                user={{
+                  ...user,
+                  pledgeTarget: null,
+                  pledgeSetAt: null,
+                  pledgeShownAt: null,
+                }}
+              />
             </div>
           </details>
-        )
-      ) : (
-        <details className={`${card} p-5`}>
-          <summary className="min-h-11 cursor-pointer py-2 font-medium text-ink-muted">
-            Deine erste Woche und dein Einstieg
-          </summary>
-          <div className="mt-3">
-            <ErsteWoche
-              user={{
-                ...user,
-                pledgeTarget: null,
-                pledgeSetAt: null,
-                pledgeShownAt: null,
-              }}
+        )}
+        {nachrichten.length > 0 && (
+          <VorfuehrVerdeckt hinweis="Persönliche Nachrichten werden beim Vorführen ausgeblendet.">
+            <Postfach
+              nachrichten={nachrichten.map((n) => ({
+                id: n.id,
+                von: n.von.name,
+                text: n.text,
+                neu: n.gelesenAt === null,
+              }))}
+              ungelesen={nachrichten.filter((n) => n.gelesenAt === null).length}
             />
-          </div>
-        </details>
-      )}
-      {nachrichten.length > 0 && (
-        <Postfach
-          nachrichten={nachrichten.map((n) => ({
-            id: n.id,
-            von: n.von.name,
-            text: n.text,
-            neu: n.gelesenAt === null,
-          }))}
-          ungelesen={nachrichten.filter((n) => n.gelesenAt === null).length}
-        />
-      )}
-    </div>
+          </VorfuehrVerdeckt>
+        )}
+      </div>
+    </VorfuehrProvider>
   );
 }

@@ -9,6 +9,7 @@ import { STUETZEN } from "@/lib/gedaechtnisstuetzen";
 import { NAME_TARGET, andereListe, listKindListLabels } from "@/lib/namelist";
 import type { collectionView } from "@/lib/start/service";
 import { btnPrimary, btnSecondary, card, input } from "@/components/ui";
+import Fortschritt from "@/components/Fortschritt";
 
 type Round = Awaited<ReturnType<typeof collectionView>>;
 
@@ -83,9 +84,9 @@ export default function NamenSammeln({ initial, userId, guided }: { initial: Rou
   if (round.completedAt) {
     const next = round.callable > 0 ? `/namen/startklar?liste=${round.kind}` : `/namen/nummern?liste=${round.kind}${guided ? "&start=1" : ""}`;
     return <div className={`${card} space-y-5 p-6`}>
-      <p className="text-sm text-slate-500">Sammlung abgeschlossen</p>
+      <p className="text-sm text-ink-muted">Sammlung abgeschlossen</p>
       <h2 className="text-3xl font-semibold">{saved.length === 0 ? "Keine neuen Namen" : `${saved.length} ${saved.length === 1 ? "Name" : "Namen"} dazu`}</h2>
-      <p className="text-base text-slate-600">Jetzt stehen {round.names} {round.names === 1 ? "Name" : "Namen"} auf deiner {listKindListLabels[round.kind]}.</p>
+      <p className="text-base text-ink-muted">Jetzt stehen {round.names} {round.names === 1 ? "Name" : "Namen"} auf deiner {listKindListLabels[round.kind]}.</p>
       {errors}
       {round.names > 0 ? <Link href={next} className={`${btnPrimary} min-h-14 w-full`}>{round.callable > 0 ? "Erste Anrufe vorbereiten" : "Nummern ergänzen"}</Link>
         : <button className={`${btnPrimary} min-h-14 w-full`} disabled={pending} onClick={() => run(async () => { router.replace(await sammlungBeginnen(round.kind, true)); })}>Namen sammeln</button>}
@@ -96,7 +97,7 @@ export default function NamenSammeln({ initial, userId, guided }: { initial: Rou
       </div>
       {saved.length > 0 && <details className="border-t border-line pt-4">
         <summary className="cursor-pointer text-sm">Liste ändern</summary>
-        <p className="mt-3 text-sm text-slate-600">Die {saved.length} zusätzlichen Namen dieser Runde auf die andere Liste verschieben.</p>
+        <p className="mt-3 text-sm text-ink-muted">Die {saved.length} zusätzlichen Namen dieser Runde auf die andere Liste verschieben.</p>
         <button disabled={pending} className={`${btnSecondary} mt-3`} onClick={() => run(async () => {
           const next = await sammlungVerschieben(round.id, andereListe(round.kind));
           setRound(next);
@@ -107,23 +108,24 @@ export default function NamenSammeln({ initial, userId, guided }: { initial: Rou
   }
 
   return <div className="space-y-5">
-    <div className="flex justify-between gap-3 text-sm text-slate-500"><span>Bereich {sceneIndex + 1} von {STUETZEN.length}</span><span>{round.names} Namen gespeichert</span></div>
+    <div className="flex justify-between gap-3 text-sm text-ink-muted"><span>Bereich {sceneIndex + 1} von {STUETZEN.length}</span><span>{round.names} Namen gespeichert</span></div>
+    <Fortschritt anteil={(sceneIndex + 1) / STUETZEN.length} hoehe="duenn" beschriftung={`Bereich ${sceneIndex + 1} von ${STUETZEN.length}`} />
     <div className={`${card} space-y-5 p-5 sm:p-6`}>
-      <p className="text-sm font-medium text-slate-600">{listKindListLabels[round.kind]}</p>
+      <p className="text-sm font-medium text-ink-muted">{listKindListLabels[round.kind]}</p>
       {round.operations.length === 0 && <button disabled={pending} className="text-sm underline" onClick={() => run(async () => { router.replace(await sammlungBeginnen(andereListe(round.kind))); })}>Andere Liste wählen</button>}
       <h2 className="text-3xl font-semibold tracking-tight">{scene.titel}</h2>
-      <p className="text-lg leading-relaxed text-slate-700">{scene.fragen[0]}</p>
-      <details className="text-sm text-slate-500"><summary className="min-h-11 cursor-pointer">Mehr Gedächtnisstützen</summary><ul className="space-y-2">{scene.fragen.slice(1).map(q => <li key={q}>{q}</li>)}</ul></details>
-      {round.operations.length === 0 && <p className="text-sm text-slate-500">Name eingeben und auf Hinzufügen tippen. Telefonnummern kommen danach.</p>}
+      <p className="text-lg leading-relaxed text-ink-muted">{scene.fragen[0]}</p>
+      <details className="text-sm text-ink-muted"><summary className="min-h-11 cursor-pointer">Mehr Gedächtnisstützen</summary><ul className="space-y-2">{scene.fragen.slice(1).map(q => <li key={q}>{q}</li>)}</ul></details>
+      {round.operations.length === 0 && <p className="text-sm text-ink-muted">Name eingeben und auf Hinzufügen tippen. Telefonnummern kommen danach.</p>}
       <form onSubmit={e => { e.preventDefault(); run(saveDraft); }} className="flex flex-wrap gap-2">
         <label className="min-w-0 flex-1"><span className="sr-only">Name</span><input ref={field} value={name} onChange={e => changeName(e.target.value)} disabled={pending} maxLength={120} autoFocus autoComplete="off" enterKeyHint="done" placeholder="Name" className={`${input} min-h-14 w-full text-base`} /></label>
         <button type="submit" disabled={pending || !name.trim()} className={`${btnPrimary} min-h-14`}>{pending ? "Speichern …" : "Hinzufügen"}</button>
       </form>
-      {hint && <p role="status" className="text-sm text-slate-600">{hint}</p>}
+      {hint && <p role="status" className="text-sm text-ink-muted">{hint}</p>}
       {errors}
       {inScene.length > 0 && <ul aria-label="In diesem Bereich gespeichert" className="flex flex-wrap gap-2">{inScene.map(o => <li key={o.id} className="rounded-lg bg-sunken px-3 py-2 text-sm">{o.contact!.name}</li>)}</ul>}
     </div>
-    {round.names >= NAME_TARGET && <p className="text-sm text-slate-600">{round.names} Namen stehen. Du kannst weiter sammeln oder mit ihnen loslegen.</p>}
+    {round.names >= NAME_TARGET && <p className="text-sm text-ink-muted">{round.names} Namen stehen. Du kannst weiter sammeln oder mit ihnen loslegen.</p>}
     <div className="flex gap-3">
       {sceneIndex > 0 && <button className={btnSecondary} disabled={pending} onClick={() => run(async () => { await saveDraft(); const result = await sammlungSzene(round.id, round.revision, STUETZEN[sceneIndex - 1].key); setRound(r => ({ ...r, ...result })); setHint(null); })}>Zurück</button>}
       <button className={`${btnPrimary} min-h-14 flex-1`} disabled={pending} onClick={() => run(async () => {

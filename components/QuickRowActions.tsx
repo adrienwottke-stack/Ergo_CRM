@@ -7,7 +7,7 @@
 // drei Tipps und vierzehn Anschlaege. Jetzt ist er ein Tipp.
 //
 // Drei Modi, weil nicht jeder faellige Schritt ein Anruf ist:
-//   Anruf-Schritt   -> die vier Gespraechsergebnisse
+//   Anruf-Schritt   -> die drei Gespraechsergebnisse
 //   Termin-Schritt  -> gehalten (mit Empfehlungsfrage) oder geplatzt
 //   anderer Schritt -> Erledigt plus Verschiebe-Chips
 // Alles Seltenere liegt hinter "…".
@@ -30,7 +30,6 @@ import {
   AppointmentHeldDialog,
   ChoiceDialog,
   LATER_CHIPS,
-  LOST_CHIPS,
 } from "@/components/ResultDialogs";
 import { undoMoeglich } from "@/components/UndoBar";
 import {
@@ -43,14 +42,14 @@ import {
 } from "@/components/icons";
 
 const knopf =
-  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 text-13 font-medium transition active:scale-[0.98] disabled:opacity-50";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3 text-13 font-medium transition active:scale-[0.98] disabled:opacity-50";
 
 const stil = {
   call: `${knopf} bg-emerald-50 text-emerald-700 hover:bg-emerald-100`,
   primaer: `${knopf} bg-akzent text-white hover:bg-akzent-stark`,
   erfolg: `${knopf} bg-fest-erfolg text-white hover:bg-fest-erfolg-stark`,
-  neutral: `${knopf} border border-slate-300 bg-surface text-slate-700 hover:bg-slate-50`,
-  weich: `${knopf} bg-slate-100 text-slate-600 hover:bg-slate-200`,
+  neutral: `${knopf} border border-line-strong bg-surface text-ink hover:bg-sunken`,
+  weich: `${knopf} bg-sunken text-ink-muted hover:bg-line`,
   warm: `${knopf} bg-amber-100 text-amber-900 hover:bg-amber-200`,
 };
 
@@ -77,7 +76,7 @@ export default function QuickRowActions({
   const [pending, setPending] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [dialog, setDialog] = useState<
-    null | "appointment" | "later" | "lost" | "gehalten"
+    null | "appointment" | "later" | "gehalten"
   >(null);
   const [mehr, setMehr] = useState<ActionMode | null>(null);
 
@@ -138,14 +137,6 @@ export default function QuickRowActions({
               className={stil.erfolg}
             >
               <CalendarCheckIcon className="h-4 w-4" /> Termin
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => setDialog("lost")}
-              className={stil.neutral}
-            >
-              <XIcon className="h-4 w-4" /> Kein Interesse
             </button>
           </>
         )}
@@ -262,19 +253,6 @@ export default function QuickRowActions({
         choices={LATER_CHIPS.map((chip) => ({
           label: chip.label,
           onPick: () => senden(recordCallResult, { result: "later", days: chip.days }),
-        }))}
-        onClose={() => setDialog(null)}
-      />
-
-      <ChoiceDialog
-        open={dialog === "lost"}
-        title="Woran lag's?"
-        subtitle={contact.name}
-        pending={pending}
-        choices={LOST_CHIPS.map((chip) => ({
-          label: chip.label,
-          onPick: () =>
-            senden(recordCallResult, { result: "lost", lostReason: chip.reason }),
         }))}
         onClose={() => setDialog(null)}
       />

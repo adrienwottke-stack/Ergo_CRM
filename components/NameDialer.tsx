@@ -10,7 +10,6 @@ import {
   AppointmentDialog,
   ChoiceDialog,
   LATER_CHIPS,
-  LOST_CHIPS,
 } from "@/components/ResultDialogs";
 import { undoMoeglich } from "@/components/UndoBar";
 import {
@@ -24,9 +23,9 @@ import {
   PhoneIcon,
   PhoneOffIcon,
   TrophyIcon,
-  XIcon,
 } from "@/components/icons";
-import { btnPrimary, btnSecondary, card } from "@/components/ui";
+import { btnPrimary, btnSecondary, card, inputBlank } from "@/components/ui";
+import Fortschritt from "@/components/Fortschritt";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
 
 export type DialerEntry = {
@@ -41,7 +40,7 @@ export type DialerEntry = {
   lastActivity: string | null;
 };
 
-type Result = "appointment" | "unreachable" | "later" | "lost";
+type Result = "appointment" | "unreachable" | "later";
 
 type Tally = Record<Result | "skipped", number>;
 
@@ -49,7 +48,6 @@ const EMPTY_TALLY: Tally = {
   appointment: 0,
   unreachable: 0,
   later: 0,
-  lost: 0,
   skipped: 0,
 };
 
@@ -79,7 +77,7 @@ export default function NameDialer({
   const [showNote, setShowNote] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [dialog, setDialog] = useState<null | "appointment" | "later" | "lost">(null);
+  const [dialog, setDialog] = useState<null | "appointment" | "later">(null);
 
   // Rueckkehr nach dem Telefonat: wer auf "Anrufen" tippt, verlaesst den
   // Browser. Kommt er zurueck, soll die Ergebnisfrage sofort da stehen –
@@ -144,7 +142,7 @@ export default function NameDialer({
   // --- Ende des Durchlaufs --------------------------------------------------
 
   if (!current) {
-    const done = tally.appointment + tally.unreachable + tally.later + tally.lost;
+    const done = tally.appointment + tally.unreachable + tally.later;
     return (
       <div className={`${card} space-y-5 p-8 text-center`}>
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -155,10 +153,10 @@ export default function NameDialer({
           )}
         </div>
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+          <h2 className="text-xl font-semibold tracking-tight text-ink">
             {done === 0 ? "Nichts zu tun" : "Durchlauf geschafft"}
           </h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-ink-muted">
             {done === 0
               ? "In dieser Auswahl steht gerade kein Name mit Nummer."
               : `${done} ${done === 1 ? "Gespräch" : "Gespräche"} geführt.`}
@@ -166,11 +164,10 @@ export default function NameDialer({
         </div>
 
         {done > 0 && (
-          <dl className="grid grid-cols-2 gap-2 text-left sm:grid-cols-4">
+          <dl className="grid grid-cols-3 gap-2 text-left">
             <Stat label="Termine" value={tally.appointment} tone="emerald" />
             <Stat label="Nicht erreicht" value={tally.unreachable} tone="slate" />
             <Stat label="Später" value={tally.later} tone="amber" />
-            <Stat label="Kein Interesse" value={tally.lost} tone="slate" />
           </dl>
         )}
 
@@ -195,18 +192,13 @@ export default function NameDialer({
   return (
     <div className="space-y-4">
       <div className={`${card} space-y-2 p-4`}>
-        <div className="flex justify-between text-xs font-medium tabular-nums text-slate-600">
+        <div className="flex justify-between text-xs font-medium tabular-nums text-ink-muted">
           <span>
             Name {index + 1} von {items.length}
           </span>
           <span>{percent} %</span>
         </div>
-        <div className="h-[3px] w-full overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-navy-700 transition-all duration-300"
-            style={{ width: `${percent}%` }}
-          />
-        </div>
+        <Fortschritt anteil={percent / 100} ton="info" hoehe="duenn" />
       </div>
 
       <div className={`${card} space-y-5 p-5 sm:p-6`}>
@@ -220,10 +212,10 @@ export default function NameDialer({
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <h2 className="text-2xl font-semibold leading-tight tracking-tight text-slate-900">
+            <h2 className="text-2xl font-semibold leading-tight tracking-tight text-ink">
               {current.name}
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs text-ink-muted">
               {current.rating ? ratingLabels[current.rating] : "Nicht eingestuft"}
               {current.isFirstCall ? " · Erstanruf" : " · schon einmal versucht"}
             </p>
@@ -237,7 +229,7 @@ export default function NameDialer({
           onClick={() => {
             calledRef.current = true;
           }}
-          className="flex min-h-16 items-center justify-center gap-3 rounded-xl bg-fest-erfolg text-xl font-semibold tracking-tight tabular-nums text-white transition hover:bg-fest-erfolg-stark active:scale-[0.99]"
+          className="flex min-h-16 items-center justify-center gap-3 rounded-full bg-fest-erfolg text-xl font-semibold tracking-tight tabular-nums text-white transition hover:bg-fest-erfolg-stark active:scale-[0.99]"
         >
           <PhoneIcon className="h-6 w-6" />
           {current.phone}
@@ -287,27 +279,27 @@ export default function NameDialer({
 
         {/* Einmal aufgeklappt bleibt der Leitfaden offen – wer ihn braucht,
             braucht ihn bei allen Namen. */}
-        <div className="rounded-xl border border-slate-200">
+        <div className="rounded-xl border border-line">
           <button
             type="button"
             onClick={() => setShowGuide((value) => !value)}
             className="flex min-h-12 w-full items-center justify-between px-3.5 text-left"
           >
-            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-muted">
               {showGuide ? (
-                <ChevronDownIcon className="h-4 w-4 text-slate-400" />
+                <ChevronDownIcon className="h-4 w-4 text-ink-soft" />
               ) : (
-                <ChevronRightIcon className="h-4 w-4 text-slate-400" />
+                <ChevronRightIcon className="h-4 w-4 text-ink-soft" />
               )}
               {guideTitle}
             </span>
           </button>
           {showGuide && (
-            <div className="space-y-4 border-t border-slate-100 px-3.5 py-3">
+            <div className="space-y-4 border-t border-line px-3.5 py-3">
               <GuideBody body={guideBody} />
               {/* Die Einwaende gehoeren genau hierhin: mitten ins Gespraech,
                   nicht in einen Test von vor zwei Wochen. */}
-              <div className="border-t border-slate-100 pt-3">
+              <div className="border-t border-line pt-3">
                 <Einwandhilfe kind={kind} />
               </div>
             </div>
@@ -321,17 +313,17 @@ export default function NameDialer({
           returned ? "ring-2 ring-navy-500 ring-offset-2" : ""
         }`}
       >
-        <p className="text-sm font-semibold text-slate-900">
+        <p className="text-sm font-semibold text-ink">
           {returned ? `Wie lief's mit ${current.name}?` : "Ergebnis"}
         </p>
 
         {error && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             disabled={pending}
@@ -344,7 +336,7 @@ export default function NameDialer({
             type="button"
             disabled={pending}
             onClick={() => submit("unreachable")}
-            className={`${bigButton} bg-slate-100 text-slate-700 hover:bg-slate-200`}
+            className={`${bigButton} bg-sunken text-ink-muted hover:bg-line`}
           >
             <PhoneOffIcon className="h-5 w-5" /> Nicht erreicht
           </button>
@@ -356,14 +348,6 @@ export default function NameDialer({
           >
             <ClockIcon className="h-5 w-5" /> Später
           </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => setDialog("lost")}
-            className={`${bigButton} border border-slate-300 bg-surface text-slate-600 hover:bg-slate-50`}
-          >
-            <XIcon className="h-5 w-5" /> Kein Interesse
-          </button>
         </div>
 
         {showNote ? (
@@ -373,13 +357,13 @@ export default function NameDialer({
             value={note}
             onChange={(event) => setNote(event.target.value)}
             placeholder="Was war noch wichtig?"
-            className="w-full rounded-lg border border-slate-300 p-2.5 text-sm focus:border-navy-500 focus:outline-none"
+            className={inputBlank}
           />
         ) : (
           <button
             type="button"
             onClick={() => setShowNote(true)}
-            className="text-xs font-medium text-slate-500 hover:text-slate-800"
+            className="text-xs font-medium text-ink-muted hover:text-ink"
           >
             + Notiz
           </button>
@@ -388,7 +372,7 @@ export default function NameDialer({
         <button
           type="button"
           onClick={() => advance("skipped")}
-          className="min-h-11 w-full text-sm font-medium text-slate-400 transition hover:text-slate-700"
+          className="min-h-11 w-full text-sm font-medium text-ink-soft transition hover:text-ink-muted"
         >
           <span className="inline-flex items-center justify-center gap-1">
             Überspringen
@@ -416,18 +400,6 @@ export default function NameDialer({
         }))}
         onClose={() => setDialog(null)}
       />
-
-      <ChoiceDialog
-        open={dialog === "lost"}
-        title="Woran lag's?"
-        subtitle={current.name}
-        pending={pending}
-        choices={LOST_CHIPS.map((chip) => ({
-          label: chip.label,
-          onPick: () => submit("lost", { lostReason: chip.reason }),
-        }))}
-        onClose={() => setDialog(null)}
-      />
     </div>
   );
 }
@@ -446,7 +418,7 @@ function Stat({
   const tones = {
     emerald: "bg-emerald-50 text-emerald-800",
     amber: "bg-amber-50 text-amber-800",
-    slate: "bg-slate-50 text-slate-700",
+    slate: "bg-sunken text-ink-muted",
   };
   return (
     <div className={`rounded-xl px-3 py-2.5 ${tones[tone]}`}>

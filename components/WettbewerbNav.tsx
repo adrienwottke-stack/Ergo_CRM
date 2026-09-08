@@ -10,14 +10,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { cn, segmentGruppe, segmentKnopf } from "@/components/ui";
 
 const PUNKTE = [
   { href: "/arena", label: "Arena" },
   { href: "/leaderboard", label: "Rangliste" },
   { href: "/log", label: "Meine Aktivitäten" },
-  // Direkt neben den Taetigkeiten, und das mit Absicht: die eine Seite zaehlt,
-  // was man getan hat, die andere, was dabei herausgekommen ist.
-  { href: "/einheiten", label: "Einheiten" },
   { href: "/spiel", label: "Spiel" },
 ];
 
@@ -25,7 +23,7 @@ export default function WettbewerbNav() {
   const pathname = usePathname();
 
   return (
-    <div className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto rounded-full bg-slate-100 p-1">
+    <div className={cn(segmentGruppe, "no-scrollbar w-full overflow-x-auto")}>
       {PUNKTE.map((punkt) => {
         const aktiv = pathname === punkt.href;
         return (
@@ -33,11 +31,7 @@ export default function WettbewerbNav() {
             key={punkt.href}
             href={punkt.href}
             aria-current={aktiv ? "page" : undefined}
-            className={`flex min-h-11 flex-1 shrink-0 items-center justify-center whitespace-nowrap rounded-full px-4 text-sm font-semibold transition ${
-              aktiv
-                ? "bg-surface text-navy-900 ring-1 ring-slate-200"
-                : "text-slate-500 hover:text-slate-800"
-            }`}
+            className={cn(segmentKnopf(aktiv), "flex-1 shrink-0 whitespace-nowrap")}
           >
             {punkt.label}
           </Link>

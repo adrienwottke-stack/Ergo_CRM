@@ -31,7 +31,14 @@ import {
 } from "@/lib/rueckmeldung";
 import type { Anliegen, Stimmung } from "@/lib/generated/prisma/enums";
 
-export default function RueckmeldungGeben() {
+export default function RueckmeldungGeben({
+  // Wohin die Meldung geht - kommt aus der Schale (Vorname des Admin-Kontos).
+  // Vorher stand "Adrien" fest im Text: in jeder weiteren Instanz haette die
+  // Meldung damit den Falschen versprochen.
+  empfaenger = "den Admin",
+}: {
+  empfaenger?: string;
+}) {
   const pfad = usePathname();
 
   const [offen, setOffen] = useState(false);
@@ -102,7 +109,7 @@ export default function RueckmeldungGeben() {
         onClick={() => setOffen(true)}
         aria-label="Rückmeldung geben"
         title="Rückmeldung geben"
-        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-navy-200 transition hover:bg-white/10 hover:text-white"
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-sunken hover:text-ink"
       >
         <MegafonIcon className="h-5 w-5" />
       </button>
@@ -122,7 +129,7 @@ export default function RueckmeldungGeben() {
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
               <CheckIcon className="h-6 w-6" />
             </span>
-            <p className="text-sm font-medium text-slate-900">Ist raus. Danke.</p>
+            <p className="text-sm font-medium text-ink">Ist raus. Danke.</p>
           </div>
         ) : !stimmung ? (
           // --- Bildschirm 1: die Stimmung ---------------------------------
@@ -137,7 +144,7 @@ export default function RueckmeldungGeben() {
                 onClick={() => setStimmung(eintrag.wert)}
                 className={cn(
                   flaeche(eintrag.ton),
-                  "flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm font-medium text-slate-900 transition hover:schatten-hoch active:scale-[0.99]",
+                  "flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm font-medium text-ink transition hover:schatten-hoch active:scale-[0.99]",
                 )}
               >
                 <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", punkt[eintrag.ton])} />
@@ -151,13 +158,13 @@ export default function RueckmeldungGeben() {
             <button
               type="button"
               onClick={() => setStimmung(null)}
-              className="inline-flex items-center gap-2 text-[13px] font-medium text-slate-500 transition hover:text-slate-900"
+              className="inline-flex items-center gap-2 text-13 font-medium text-ink-muted transition hover:text-ink"
             >
               <span className={cn("h-2 w-2 rounded-full", punkt[
                 STIMMUNGEN.find((e) => e.wert === stimmung)?.ton ?? "neutral"
               ])} />
               {stimmungText(stimmung)}
-              <span className="text-slate-400">· ändern</span>
+              <span className="text-ink-soft">· ändern</span>
             </button>
 
             <div>
@@ -197,7 +204,7 @@ export default function RueckmeldungGeben() {
             </div>
 
             {fehler && (
-              <p className={cn(flaeche("gefahr"), "px-3 py-2 text-[13px] text-red-800")}>
+              <p className={cn(flaeche("gefahr"), "px-3 py-2 text-13 text-red-800")}>
                 {fehler}
               </p>
             )}
@@ -223,8 +230,9 @@ export default function RueckmeldungGeben() {
               </button>
               {/* Ohne Beschoenigung. Wer glaubt, anonym zu schreiben, und es
                   dann nicht ist, sagt beim naechsten Mal gar nichts mehr. */}
-              <p className="text-center text-xs text-slate-500">
-                Geht nur an Adrien — mit deinem Namen, damit er nachfragen kann.
+              <p className="text-center text-xs text-ink-muted">
+                Geht nur an {empfaenger} — mit deinem Namen, damit Nachfragen
+                möglich sind.
               </p>
             </div>
           </div>

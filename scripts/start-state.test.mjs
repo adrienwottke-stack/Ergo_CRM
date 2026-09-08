@@ -15,6 +15,8 @@ test('finishing with eight names leads to phone preparation, not another twenty-
   assert.equal(afterCollection({ names: 0, callable: 0 }), 'DONE');
   assert.equal(introSuccessor('chat'), 'storno');
   assert.equal(introSuccessor('storno'), 'rechnung');
+  assert.equal(introSuccessor('einstufung'), 'karrierestufe');
+  assert.equal(introSuccessor('karrierestufe'), 'rangliste');
   assert.equal(startRoute({ phase: 'PHONES', paused: false, kind: null, collectionId: null }), '/namen/sammeln');
 });
 import { startFeatures } from '../lib/start/model.ts';

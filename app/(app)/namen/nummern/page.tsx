@@ -75,7 +75,7 @@ export default async function NummernPage({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className={pageTitle}>Nummern nachtragen</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             {listKindLabels[kind]} · ohne Nummer kein Anruf
           </p>
         </div>

@@ -142,7 +142,7 @@ export default function NamenSprint({ track, userId, demo, persistent, initialEn
     rec.onend=() => setListening(false);
     try { rec.start(); setListening(true); } catch { setError("Das Mikrofon ist nicht verfügbar. Du kannst Namen eintippen."); }
   }
-  const primary="min-h-14 w-full rounded-xl bg-gold-400 px-4 text-lg font-semibold text-navy-950 disabled:opacity-40";
+  const primary="min-h-14 w-full rounded-xl bg-akzent px-4 text-lg font-semibold text-white disabled:opacity-40";
   return <div className="flex h-full flex-col justify-center gap-5 overflow-y-auto py-4 text-white">
     {phase === "intro" ? <>
       {sprintIntro.map((line,i) => <p key={line} className={i ? "text-slate-300" : "text-3xl font-bold"}>{line}</p>)}
@@ -152,13 +152,13 @@ export default function NamenSprint({ track, userId, demo, persistent, initialEn
       <div className="flex items-end justify-between"><p className={`text-5xl font-bold ${rest <= 10 ? "text-red-300" : ""}`}>{rest}</p><p>{count} Namen gespeichert</p></div>
       <form className="flex gap-2" onSubmit={e => { e.preventDefault(); submit(); }}>
         <label className="min-w-0 flex-1"><span className="sr-only">Name</span><input ref={input} value={draft} onChange={e => change(e.target.value)} onPaste={e => { const v=e.clipboardData.getData("text"); if (/[\n,;]/.test(v)) { e.preventDefault(); enqueue(v); } }} autoComplete="off" autoCapitalize="words" enterKeyHint="next" placeholder="Name, Enter, nächster" className="min-h-14 w-full rounded-xl border border-white/25 bg-white/5 px-3 text-lg" /></label>
-        <button type="submit" aria-label="Name eintragen" className="min-h-14 min-w-14 rounded-xl bg-gold-400 text-2xl text-navy-950">+</button>
+        <button type="submit" aria-label="Name eintragen" className="min-h-14 min-w-14 rounded-xl bg-akzent text-2xl text-white">+</button>
         {microphone && <button type="button" onClick={toggleMicrophone} aria-label={listening ? "Aufnahme stoppen" : "Namen einsprechen"} className={`min-h-14 min-w-11 rounded-xl ${listening ? "bg-red-600" : "bg-white/10"}`}>🎤</button>}
       </form>
       <ul className="space-y-2 text-center text-slate-300">{recent.map((name,i) => <li key={i}>{name}</li>)}</ul>
       <button onClick={finish} className="min-h-11 text-sm text-slate-300">Mir fällt keiner mehr ein</button>
     </> : <>
-      <p className="text-6xl font-bold text-gold-400">{count}</p>
+      <p className="text-6xl font-bold text-[#82b3ff]">{count}</p>
       <h2 className="text-2xl font-semibold">{count === 1 ? "Name gespeichert." : "Namen gespeichert."}</h2>
       <p className="text-slate-300">{demo ? "Das war eine Übungsrunde." : count ? "Diese Namen stehen auf deiner Liste. Gleich sammeln wir mit Gedächtnisstützen weiter." : "Kein Druck. Gleich helfen dir Gedächtnisstützen beim Sammeln."}</p>
       <button disabled={saving || waiting > 0} onClick={() => onDone(count)} className={primary}>Weiter</button>

@@ -4,6 +4,35 @@ import { testDatabase } from './start-test-db.mjs';
 import { ensureStart, finishIntro, beginCollection, saveName, collectionView, moveScene, finishCollection } from '../lib/start/service.ts';
 import { saveStartPhone, finishPhones, prepareCalls, planCalls, chooseStorno, advanceIntro, answerIntro, pauseStart, resumeStart, moveCollection, beginSprint } from '../lib/start/service.ts';
 
+test('career setup resumes after contact rating and is safe to acknowledge twice', async () => {
+  const fixture = await testDatabase(); const db = fixture.client;
+  try {
+    const user = await db.user.create({ data: { name: 'Career Setup', startTrack: 'VERKAUF' } });
+    await ensureStart(db, user.id);
+    await db.startProgress.update({ where: { userId: user.id }, data: { introAct: 'einstufung' } });
+    await advanceIntro(db, user.id, 'einstufung');
+    assert.equal((await ensureStart(db, user.id)).introAct, 'karrierestufe');
+    await advanceIntro(db, user.id, 'karrierestufe');
+    await advanceIntro(db, user.id, 'karrierestufe');
+    assert.equal((await ensureStart(db, user.id)).introAct, 'rangliste');
+    const account = await db.user.findUniqueOrThrow({ where: { id: user.id } });
+    assert.equal(account.karrierestufe, null, 'A checkpoint never invents a career level');
+    assert.equal(account.einheitenStart, 0, 'A checkpoint never books opening units');
+  } finally { await fixture.close(); }
+});
+
+test('an unactivated invitation placeholder does not switch a new member to leader onboarding', async () => {
+  const fixture = await testDatabase(); const db = fixture.client;
+  try {
+    const user = await db.user.create({ data: { name: 'New Partner' } });
+    await db.user.create({ data: { name: 'Invitation Placeholder', leaderId: user.id } });
+    assert.equal((await ensureStart(db, user.id)).phase, 'INTRO');
+    const leader = await db.user.create({ data: { name: 'Activated Team Leader' } });
+    await db.user.create({ data: { name: 'Activated Partner', leaderId: leader.id, passwordHash: 'fixture-access' } });
+    assert.equal(await ensureStart(db, leader.id), null);
+  } finally { await fixture.close(); }
+});
+
 test('pausing, stale tabs, list correction and existing appointments preserve user intent', async()=>{
   const fixture=await testDatabase();const db=fixture.client;
   try {

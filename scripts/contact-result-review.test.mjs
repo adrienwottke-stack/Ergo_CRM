@@ -21,6 +21,9 @@ const { recordAppointmentResult, recordCallResult } = await import("../app/(app)
 const { setContactStage } = await import("../app/(app)/pipeline/actions.ts");
 const { undoAusfuehren, offenerUndoEintrag } = await import("../lib/undo.ts");
 const { bucheZugeordneteEinheiten } = await import("../lib/einheiten-erinnerung.ts");
+const { einheitenBuchen, einheitSchnellBuchen } = await import("../app/(team)/einheiten/actions.ts");
+const { speichereZiel } = await import("../lib/ziele-service.ts");
+const { berlinToday } = await import("../lib/dates.ts");
 
 test("a repeated appointment result records one meeting, held point, win and reminder", async () => {
   const user = await fixture.client.user.create({ data: { name: "Retry Review", person: { create: { name: "Retry Review" } } } });
@@ -131,6 +134,43 @@ test("direct stage changes and call appointments each create one complete undo o
   assert.equal((await fixture.client.contact.findUniqueOrThrow({ where: { id: contact.id } })).stage, "KONTAKTIERT");
   assert.equal(await fixture.client.activity.count({ where: { contactId: contact.id } }), 0);
   assert.equal(await fixture.client.dailyLog.count({ where: { person: { userId: user.id } } }), 0);
+});
+
+test("merged units actions reject imprecise amounts and keep corrections on the requested day", async () => {
+  const user = await fixture.client.user.create({ data: { name: "Einheitenprüfung", person: { create: { name: "Einheitenprüfung" } } } });
+  globalThis.contactReviewUser = user;
+  for (const eingabe of ["12,5", "300", "12,501", "32 67", "abc", "0,00"]) {
+    const schnell = await einheitSchnellBuchen(eingabe);
+    const formular = await einheitenBuchen(eingabe, berlinToday(), "Fehleingabe");
+    assert.equal(schnell.ok, false, eingabe);
+    assert.equal(formular.ok, false, eingabe);
+    assert.ok(schnell.fehler, "A rejected value gives a visible error");
+  }
+  assert.equal(await fixture.client.einheitenbuchung.count({ where: { userId: user.id } }), 0);
+  assert.deepEqual(await einheitenBuchen("-12,50", berlinToday(), "Korrektur"), { ok: true });
+  const buchung = await fixture.client.einheitenbuchung.findFirstOrThrow({ where: { userId: user.id } });
+  assert.equal(buchung.hundertstel, -1250);
+  assert.equal(buchung.tag.toISOString().slice(0, 10), berlinToday());
+});
+
+test("merged completion booking returns current month, total and goal without duplicating retries", async () => {
+  const user = await fixture.client.user.create({ data: { name: "Einheitenabschluss", einheitenStart: 10000, person: { create: { name: "Einheitenabschluss" } } } });
+  globalThis.contactReviewUser = user;
+  await speichereZiel(user.id, { kennzahl: "UNITS", zielwert: "25", zeitraum: "MONAT", tag: berlinToday(), hauptziel: true });
+  const contact = await fixture.client.contact.create({ data: { name: "Zugeordneter Abschluss", ownerId: user.id, stage: "TERMIN_VEREINBART", appointmentAt: new Date(), appointmentLoggedAt: new Date() } });
+  const form = new FormData(); form.set("contactId", contact.id); form.set("result", "abschluss");
+  const result = await recordAppointmentResult(form);
+  const zuerst = await einheitSchnellBuchen("25,00", "Abschluss", result.einheiten.id);
+  assert.equal(zuerst.ok, true);
+  assert.equal(zuerst.monat, "25,00");
+  assert.equal(zuerst.gesamt, "125,00");
+  assert.match(zuerst.zielstand, /Ziel erreicht/);
+  assert.deepEqual(await einheitSchnellBuchen("25,00", "Abschluss", result.einheiten.id), zuerst);
+  assert.equal(await fixture.client.einheitenbuchung.count({ where: { userId: user.id } }), 1);
+  const foreign = await fixture.client.user.create({ data: { name: "Fremde Buchung" } });
+  globalThis.contactReviewUser = foreign;
+  assert.equal((await einheitSchnellBuchen("25,00", "Fremde Erinnerung", result.einheiten.id)).ok, false);
+  assert.equal(await fixture.client.einheitenbuchung.count({ where: { userId: foreign.id } }), 0);
 });
 
 test.after(async () => { delete globalThis.prisma; delete globalThis.contactReviewUser; await fixture.close(); });

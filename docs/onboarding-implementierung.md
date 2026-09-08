@@ -58,6 +58,8 @@ Die Migration legt `startfuehrung` und `stornoStart` jeweils ausdrücklich als `
 
 Abschlussstand im Quell-Worktree: acht automatisierte Fach-/Datenbanktests grün, alle 32 Spielverläufe geprüft, mobiler Browserdurchlauf einschließlich Sprint-Übertragungsfehler und Desktop-Regression grün. Prisma-Validierung, TypeScript, Lint und isolierter Produktionsbuild waren dort erfolgreich.
 
+Im gemeinsamen Review mit `main` (`ad63a1a`) sind zehn Onboardingtests und der erweiterte Browserlauf grün. Hinzugekommen sind die persistente Karrierestufen-Szene aus `main`, Wiederholung nach fehlgeschlagener Übertragung, eine schreibfreie Karrierestufen-Vorschau bei 320 px und die Abgrenzung nicht aktivierter Einladungsplatzhalter. Der vollständige Review-Stand ist in [Review: Arbeitslagen und Onboarding](review-arbeitslagen-onboarding.md) beschrieben.
+
 Automatisierte Prüfungen:
 
 - `npm run test:start`: Routing und Übergänge, alle 32 Storno-Entscheidungsfolgen, vollständige Migrationen in einer neuen Testdatenbank, Wiederholungen, fremde Konten, alte Revisionen, Listenkorrektur, Nummern und bestätigte Planung.

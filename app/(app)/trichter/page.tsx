@@ -6,6 +6,8 @@ import { berlinToday, dayToUtcDate, shiftDay, startOfWeek } from "@/lib/dates";
 import type { LostReason } from "@/lib/generated/prisma/enums";
 import { lostReasonLabels } from "@/lib/pipeline";
 import { card, filterPill, kicker, pageTitle } from "@/components/ui";
+import Fortschritt from "@/components/Fortschritt";
+import TrichterGrafik, { type TrichterStufe } from "@/components/TrichterGrafik";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,17 @@ function quote(teil: number, ganz: number): string {
   return `${Math.round((teil / ganz) * 100)} %`;
 }
 
+// Verlorene Koepfe zwischen zwei Stufen - echtes Minuszeichen (U+2212), nicht
+// der Bindestrich der Tastatur, sonst sieht "-12" neben den randgleichen
+// Zahlen wie ein Tippfehler aus. "+N" bei einem Zuwachs (moeglich, wenn eine
+// Buchung im Nachhinein korrigiert wurde), "±0" wenn sich nichts bewegt hat.
+function dropOffText(vorher: number, wert: number): string {
+  const differenz = vorher - wert;
+  if (differenz > 0) return `−${differenz}`;
+  if (differenz < 0) return `+${-differenz}`;
+  return "±0";
+}
+
 export default async function TrichterPage({
   searchParams,
 }: {
@@ -50,57 +63,70 @@ export default async function TrichterPage({
         ? dayToUtcDate(shiftDay(heute, -30))
         : null;
 
-  const [zaehler, verluste, gefragt, ausEmpfehlung, multiplikatoren] = await Promise.all([
-    // Gezaehlt wird ueber DailyLog - dieselbe Quelle wie die Rangliste. Zwei
-    // Zaehlwege waeren zwei Wahrheiten.
-    prisma.dailyLog.groupBy({
-      by: ["type"],
-      where: { personId: person.id, ...(ab ? { date: { gte: ab } } : {}) },
-      _sum: { count: true },
-    }),
-    prisma.contact.groupBy({
-      by: ["lostReason"],
-      where: {
-        ...eigene(user.id).kontakte,
-        outcome: "VERLOREN",
-        lostReason: { not: null },
-        ...(ab ? { lostAt: { gte: ab } } : {}),
-      },
-      _count: { _all: true },
-    }),
-    // Bei wie vielen Terminen die Frage gestellt wurde. Die Fuehrungskraft
-    // sieht diese Quote laengst (lib/fuehrung.ts) - der Berater selbst bis
-    // hierhin nicht. Wer sie nie stellt, verschenkt den Motor und merkt es
-    // nur, wenn ihn jemand darauf anspricht.
-    prisma.contact.count({
-      where: {
-        ...eigene(user.id).kontakte,
-        referralsAskedAt: ab ? { gte: ab } : { not: null },
-      },
-    }),
-    // Was aus den Empfehlungen geworden ist. Gezaehlt am ENTSTEHUNGSDATUM des
-    // empfohlenen Kontakts, nicht am Ergebnis: sonst waeren Empfehlungen aus
-    // dem Zeitraum unsichtbar, die noch nicht durch sind.
-    prisma.contact.groupBy({
-      by: ["stage"],
-      where: {
-        ...eigene(user.id).kontakte,
-        referredById: { not: null },
-        ...(ab ? { createdAt: { gte: ab } } : {}),
-      },
-      _count: { _all: true },
-    }),
-    // Die staerksten Multiplikatoren - bewusst OHNE Zeitfenster. "Wer hat mir
-    // ueberhaupt am meisten gebracht" ist die Frage; ein Multiplikator dieser
-    // Woche ist keine Erkenntnis, sondern ein Zufall.
-    prisma.contact.groupBy({
-      by: ["referredById"],
-      where: { ...eigene(user.id).kontakte, referredById: { not: null } },
-      _count: { _all: true },
-      orderBy: { _count: { referredById: "desc" } },
-      take: 5,
-    }),
-  ]);
+  const [zaehler, verluste, gefragt, ausEmpfehlung, multiplikatoren, teamZaehler] =
+    await Promise.all([
+      // Gezaehlt wird ueber DailyLog - dieselbe Quelle wie die Rangliste. Zwei
+      // Zaehlwege waeren zwei Wahrheiten.
+      prisma.dailyLog.groupBy({
+        by: ["type"],
+        where: { personId: person.id, ...(ab ? { date: { gte: ab } } : {}) },
+        _sum: { count: true },
+      }),
+      prisma.contact.groupBy({
+        by: ["lostReason"],
+        where: {
+          ...eigene(user.id).kontakte,
+          outcome: "VERLOREN",
+          lostReason: { not: null },
+          ...(ab ? { lostAt: { gte: ab } } : {}),
+        },
+        _count: { _all: true },
+      }),
+      // Bei wie vielen Terminen die Frage gestellt wurde. Die Fuehrungskraft
+      // sieht diese Quote laengst (lib/fuehrung.ts) - der Berater selbst bis
+      // hierhin nicht. Wer sie nie stellt, verschenkt den Motor und merkt es
+      // nur, wenn ihn jemand darauf anspricht.
+      prisma.contact.count({
+        where: {
+          ...eigene(user.id).kontakte,
+          referralsAskedAt: ab ? { gte: ab } : { not: null },
+        },
+      }),
+      // Was aus den Empfehlungen geworden ist. Gezaehlt am ENTSTEHUNGSDATUM des
+      // empfohlenen Kontakts, nicht am Ergebnis: sonst waeren Empfehlungen aus
+      // dem Zeitraum unsichtbar, die noch nicht durch sind.
+      prisma.contact.groupBy({
+        by: ["stage"],
+        where: {
+          ...eigene(user.id).kontakte,
+          referredById: { not: null },
+          ...(ab ? { createdAt: { gte: ab } } : {}),
+        },
+        _count: { _all: true },
+      }),
+      // Die staerksten Multiplikatoren - bewusst OHNE Zeitfenster. "Wer hat mir
+      // ueberhaupt am meisten gebracht" ist die Frage; ein Multiplikator dieser
+      // Woche ist keine Erkenntnis, sondern ein Zufall.
+      prisma.contact.groupBy({
+        by: ["referredById"],
+        where: { ...eigene(user.id).kontakte, referredById: { not: null } },
+        _count: { _all: true },
+        orderBy: { _count: { referredById: "desc" } },
+        take: 5,
+      }),
+      // Dieselben vier Zahlen wie ganz oben, aber instanzweit statt nur fuer
+      // mich - der Massstab fuer "Team X %" unter jeder Stufe. Platzhalter
+      // (kein Passwort) und deaktivierte Konten zaehlen nicht mit: sie haben
+      // nie gearbeitet, dieselbe Ausnahme wie in astVergleich (lib/fuehrung.ts).
+      prisma.dailyLog.groupBy({
+        by: ["type"],
+        where: {
+          person: { user: { is: { deactivatedAt: null, passwordHash: { not: null } } } },
+          ...(ab ? { date: { gte: ab } } : {}),
+        },
+        _sum: { count: true },
+      }),
+    ]);
 
   const geberNamen = new Map(
     (
@@ -115,55 +141,91 @@ export default async function TrichterPage({
 
   const summe = (typ: string) =>
     zaehler.find((zeile) => zeile.type === typ)?._sum.count ?? 0;
+  const teamSumme = (typ: string) =>
+    teamZaehler.find((zeile) => zeile.type === typ)?._sum.count ?? 0;
 
   const anrufe = summe("CALL");
   const vereinbart = summe("APPOINTMENT_SET");
   const gehalten = summe("APPOINTMENT_HELD");
   const abschluesse = summe("DEAL_WON");
 
+  const teamAnrufe = teamSumme("CALL");
+  const teamVereinbart = teamSumme("APPOINTMENT_SET");
+  const teamGehalten = teamSumme("APPOINTMENT_HELD");
+  const teamAbschluesse = teamSumme("DEAL_WON");
+
+  // `vorstufe` buendelt die eigene UND die Team-Zahl der Vorstufe in einem
+  // Feld - eine Stufe hat entweder beide oder keine, nie nur eine davon. Das
+  // haelt TypeScript beim spaeteren Zugriff automatisch mit, ohne Handarbeit
+  // per Non-Null-Assertion an zwei Stellen statt einer.
   const stufen = [
     {
       key: "anrufe",
       titel: "Anrufe",
       wert: anrufe,
-      vorher: null as number | null,
+      teamWert: teamAnrufe,
+      vorstufe: null as null | { wert: number; teamWert: number },
       hinweis: "Der Anfang. Ohne Anrufe passiert nichts dahinter.",
     },
     {
       key: "vereinbart",
       titel: "Termine vereinbart",
       wert: vereinbart,
-      vorher: anrufe,
+      teamWert: teamVereinbart,
+      vorstufe: { wert: anrufe, teamWert: teamAnrufe },
       hinweis: "Hakt es hier, liegt es am Einstieg ins Gespräch.",
     },
     {
       key: "gehalten",
       titel: "Termine gehalten",
       wert: gehalten,
-      vorher: vereinbart,
+      teamWert: teamGehalten,
+      vorstufe: { wert: vereinbart, teamWert: teamVereinbart },
       hinweis: "Hakt es hier, platzen Termine — Vorbereitung und Erinnerung.",
     },
     {
       key: "abschluesse",
       titel: "Abschlüsse",
       wert: abschluesse,
-      vorher: gehalten,
+      teamWert: teamAbschluesse,
+      vorstufe: { wert: gehalten, teamWert: teamGehalten },
       hinweis: "Hakt es hier, liegt es am Termin selbst — nicht an der Menge.",
     },
   ];
 
   const groesste = Math.max(1, anrufe, vereinbart, gehalten, abschluesse);
 
-  // Der schwaechste Uebergang ist die Antwort auf "woran hakt es".
+  // Der schwaechste Uebergang ist die Antwort auf "woran hakt es" - gemessen
+  // an der EIGENEN Quote, nicht am Team-Vergleich (der steht nur daneben).
   const uebergaenge = stufen
-    .filter((stufe) => stufe.vorher !== null && stufe.vorher > 0)
-    .map((stufe) => ({ ...stufe, anteil: stufe.wert / stufe.vorher! }));
+    .filter((stufe) => stufe.vorstufe !== null && stufe.vorstufe.wert > 0)
+    .map((stufe) => ({ ...stufe, anteil: stufe.wert / stufe.vorstufe!.wert }));
   const engpass =
     uebergaenge.length > 0
       ? uebergaenge.reduce((schwaechster, stufe) =>
           stufe.anteil < schwaechster.anteil ? stufe : schwaechster
         )
       : null;
+
+  // Die Ansicht fuer <TrichterGrafik/>: dieselben vier Stufen, jetzt mit
+  // Anteil (fuer die Fuellung) und fertig formatiertem Uebergang (fuer die
+  // Zeile in der Luecke und das Detail-Panel). Die Komponente selbst rechnet
+  // nichts nach, siehe ihr Kopfkommentar.
+  const trichterStufen: TrichterStufe[] = stufen.map((stufe) => ({
+    key: stufe.key,
+    titel: stufe.titel,
+    wert: stufe.wert,
+    anteil: stufe.wert / groesste,
+    hinweis: stufe.hinweis,
+    uebergang: stufe.vorstufe
+      ? {
+          quote: quote(stufe.wert, stufe.vorstufe.wert),
+          teamQuote: quote(stufe.teamWert, stufe.vorstufe.teamWert),
+          dropOff: dropOffText(stufe.vorstufe.wert, stufe.wert),
+          engpass: engpass?.key === stufe.key,
+        }
+      : null,
+  }));
 
   const verlustSumme = verluste.reduce(
     (summe, zeile) => summe + (zeile._count._all ?? 0),
@@ -196,7 +258,7 @@ export default async function TrichterPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className={pageTitle}>Trichter</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Vier Zahlen. Der schwächste Übergang sagt, woran es hakt.
           </p>
         </div>
@@ -215,60 +277,22 @@ export default async function TrichterPage({
 
       {anrufe === 0 && vereinbart === 0 && gehalten === 0 && abschluesse === 0 ? (
         <div className={`${card} px-6 py-12 text-center`}>
-          <p className="text-sm font-medium text-slate-900">
+          <p className="text-sm font-medium text-ink">
             In diesem Zeitraum ist noch nichts passiert
           </p>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Die Zahlen entstehen von selbst, sobald du telefonierst.
           </p>
         </div>
       ) : (
         <>
           <section className={`${card} p-6 sm:p-7`}>
-            <ul className="space-y-5">
-              {stufen.map((stufe) => (
-                <li key={stufe.key}>
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium text-slate-800">
-                      {stufe.titel}
-                    </span>
-                    <span className="text-sm tabular-nums text-slate-900">
-                      <span className="text-lg font-semibold">{stufe.wert}</span>
-                      {stufe.vorher !== null && (
-                        <span className="ml-2 text-xs text-slate-500">
-                          {quote(stufe.wert, stufe.vorher)} von zuvor
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className={`h-full rounded-full ${
-                        engpass?.key === stufe.key ? "bg-amber-500" : "bg-navy-700"
-                      }`}
-                      style={{
-                        width: `${stufe.wert > 0 ? Math.max((stufe.wert / groesste) * 100, 2) : 0}%`,
-                      }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            {engpass && (
-              <p className="mt-6 border-t border-slate-100 pt-4 text-sm text-slate-700">
-                {/* Nicht kleinschreiben: "Engpass: abschlüsse" ist ein
-                    Substantiv in Kleinschreibung und stand auf jeder
-                    Trichter-Seite. */}
-                <span className="font-semibold">Engpass: {engpass.titel}.</span>{" "}
-                {engpass.hinweis}
-              </p>
-            )}
+            <TrichterGrafik stufen={trichterStufen} />
           </section>
 
           {verlustSumme > 0 && (
             <section className={`${card} p-6 sm:p-7`}>
-              <h2 className="text-sm font-semibold text-slate-900">
+              <h2 className="text-sm font-semibold text-ink">
                 Woran es gescheitert ist
               </h2>
               <ul className="mt-4 space-y-3">
@@ -280,24 +304,22 @@ export default async function TrichterPage({
                     return (
                       <li key={zeile.lostReason}>
                         <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm text-slate-700">
+                          <span className="text-sm text-ink-muted">
                             {lostReasonLabels[zeile.lostReason as LostReason]}
                           </span>
-                          <span className="text-sm font-semibold tabular-nums text-slate-900">
+                          <span className="text-sm font-semibold tabular-nums text-ink">
                             {anzahl}
-                            <span className="ml-1.5 font-normal text-slate-400">
+                            <span className="ml-1.5 font-normal text-ink-soft">
                               · {quote(anzahl, verlustSumme)}
                             </span>
                           </span>
                         </div>
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className="h-full rounded-full bg-slate-400"
-                            style={{
-                              width: `${Math.max((anzahl / verlustSumme) * 100, 2)}%`,
-                            }}
-                          />
-                        </div>
+                        <Fortschritt
+                          anteil={Math.max(anzahl / verlustSumme, 0.02)}
+                          ton="neutral"
+                          hoehe="normal"
+                          className="mt-1.5"
+                        />
                       </li>
                     );
                   })}
@@ -309,10 +331,10 @@ export default async function TrichterPage({
 
       {schleifeZeigen && (
         <section className={`${card} p-6 sm:p-7`}>
-          <h2 className="text-sm font-semibold text-slate-900">
+          <h2 className="text-sm font-semibold text-ink">
             Füllt sich der Trichter selbst nach?
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Jeder gehaltene Termin ist eine Gelegenheit zu fragen. Ohne sie
             leert sich die Namensliste — mit ihr füllt sie sich aus der Arbeit.
           </p>
@@ -320,18 +342,18 @@ export default async function TrichterPage({
           <dl className="mt-5 grid gap-4 sm:grid-cols-3">
             <div>
               <dt className={kicker}>Gefragt</dt>
-              <dd className="mt-1 text-sm tabular-nums text-slate-900">
+              <dd className="mt-1 text-sm tabular-nums text-ink">
                 <span className="text-lg font-semibold">{gefragt}</span>
-                <span className="ml-2 text-xs text-slate-500">
+                <span className="ml-2 text-xs text-ink-muted">
                   von {gehalten} gehaltenen Terminen
                 </span>
               </dd>
             </div>
             <div>
               <dt className={kicker}>Namen daraus</dt>
-              <dd className="mt-1 text-sm tabular-nums text-slate-900">
+              <dd className="mt-1 text-sm tabular-nums text-ink">
                 <span className="text-lg font-semibold">{empfohlenGesamt}</span>
-                <span className="ml-2 text-xs text-slate-500">
+                <span className="ml-2 text-xs text-ink-muted">
                   {gefragt > 0
                     ? `${(empfohlenGesamt / gefragt).toFixed(1).replace(".", ",")} je Frage`
                     : "noch nicht gefragt"}
@@ -340,9 +362,9 @@ export default async function TrichterPage({
             </div>
             <div>
               <dt className={kicker}>Daraus geworden</dt>
-              <dd className="mt-1 text-sm tabular-nums text-slate-900">
+              <dd className="mt-1 text-sm tabular-nums text-ink">
                 <span className="text-lg font-semibold">{empfohlenGehalten}</span>
-                <span className="ml-2 text-xs text-slate-500">
+                <span className="ml-2 text-xs text-ink-muted">
                   Termine · {empfohlenAbschluss} Abschlüsse
                 </span>
               </dd>
@@ -350,7 +372,7 @@ export default async function TrichterPage({
           </dl>
 
           {gehalten > 0 && gefragt < gehalten && (
-            <p className="mt-5 border-t border-slate-100 pt-4 text-sm text-slate-700">
+            <p className="mt-5 border-t border-line pt-4 text-sm text-ink-muted">
               <span className="font-semibold">
                 {gehalten - gefragt}{" "}
                 {gehalten - gefragt === 1 ? "Termin" : "Termine"} ohne Frage.
@@ -360,7 +382,7 @@ export default async function TrichterPage({
           )}
 
           {multiplikatoren.length > 0 && (
-            <div className="mt-5 border-t border-slate-100 pt-4">
+            <div className="mt-5 border-t border-line pt-4">
               <p className={kicker}>Wer dir am meisten bringt · insgesamt</p>
               <ul className="mt-3 space-y-2">
                 {multiplikatoren.map((zeile) => (
@@ -370,20 +392,20 @@ export default async function TrichterPage({
                   >
                     <Link
                       href={`/contacts/${zeile.referredById}`}
-                      className="text-sm text-slate-700 hover:text-navy-700 hover:underline"
+                      className="text-sm text-ink-muted hover:text-navy-700 hover:underline"
                     >
                       {geberNamen.get(zeile.referredById!) ?? "Unbekannt"}
                     </Link>
-                    <span className="text-sm font-semibold tabular-nums text-slate-900">
+                    <span className="text-sm font-semibold tabular-nums text-ink">
                       {zeile._count._all ?? 0}
-                      <span className="ml-1.5 font-normal text-slate-400">
+                      <span className="ml-1.5 font-normal text-ink-soft">
                         {(zeile._count._all ?? 0) === 1 ? "Name" : "Namen"}
                       </span>
                     </span>
                   </li>
                 ))}
               </ul>
-              <p className="mt-3 text-xs text-slate-500">
+              <p className="mt-3 text-xs text-ink-muted">
                 Die ruft man wieder an. Wer einmal empfohlen hat, empfiehlt
                 wieder — vorausgesetzt, er erfährt, was daraus geworden ist.
               </p>
@@ -394,7 +416,9 @@ export default async function TrichterPage({
 
       <p className={kicker}>
         Gezählt wird aus deinen Einträgen — dieselbe Quelle wie die Rangliste.
-        Woche ab Montag, Berliner Kalender.
+        Woche ab Montag, Berliner Kalender. Team-Quoten zählen aus den Summen
+        aller aktiven Berater der Instanz — Platzhalter ohne Zugang zählen
+        nicht mit.
       </p>
     </div>
   );

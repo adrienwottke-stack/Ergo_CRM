@@ -62,16 +62,20 @@ export default function Modal({
         onClick={(event) => event.stopPropagation()}
         className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl sm:max-w-lg sm:rounded-xl"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+        {/* Grabber: signalisiert am Handy "das hier ist ein Sheet, zieh mich
+            runter". Rein optisch - gezogen wird noch nicht, das Schliessen
+            laeuft weiter ueber Backdrop, X oder Escape. */}
+        <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-line-strong" aria-hidden />
+        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-            {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+            <h2 className="text-base font-semibold text-ink">{title}</h2>
+            {subtitle && <p className="mt-0.5 text-sm text-ink-soft">{subtitle}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Schließen"
-            className="-mr-2 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="-mr-2 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sunken text-ink-soft transition hover:text-ink"
           >
             <XIcon className="h-5 w-5" />
           </button>

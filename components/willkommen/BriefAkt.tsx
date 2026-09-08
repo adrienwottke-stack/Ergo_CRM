@@ -45,7 +45,7 @@ export default function BriefAkt({ onDone, demo = false, initialText = "" }: { o
         onChange={(event) => setText(event.target.value)}
         maxLength={2000}
         placeholder="Ich mach das, weil …"
-        className="w-full rounded-xl border border-white/25 bg-white/5 px-4 py-3 text-15 leading-relaxed text-white placeholder:text-slate-500 focus:border-gold-400 focus:outline-none"
+        className="w-full rounded-xl border border-white/25 bg-white/5 px-4 py-3 text-15 leading-relaxed text-white placeholder:text-slate-500 focus:border-akzent focus:outline-none"
       />
 
       {error && <p role="alert" className="text-red-300">Der Brief wurde noch nicht gespeichert. Bitte erneut versuchen.</p>}
@@ -54,7 +54,7 @@ export default function BriefAkt({ onDone, demo = false, initialText = "" }: { o
           type="button"
           onClick={weglegen}
           disabled={pending || text.trim().length === 0}
-          className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98] disabled:opacity-40"
+          className="min-h-12 w-full rounded-xl bg-akzent text-15 font-bold text-white transition hover:bg-akzent-stark active:scale-[0.98] disabled:opacity-40"
         >
           {pending ? "Wird weggelegt …" : "Weglegen"}
         </button>

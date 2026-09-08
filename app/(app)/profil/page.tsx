@@ -12,7 +12,7 @@ import { card, pageTitle, btnSecondary, columnNarrow } from "@/components/ui";
 
 export default async function ProfilPage() {
   const user = await requireUser();
-  const [aktiveDirekte, leader] = await Promise.all([
+  const [aktiveDirekte, leader, admin] = await Promise.all([
     prisma.user.count({
       where: {
         leaderId: user.id,
@@ -26,6 +26,11 @@ export default async function ProfilPage() {
           select: { name: true },
         })
       : null,
+    prisma.user.findFirst({
+      where: { role: "ADMIN", deactivatedAt: null },
+      orderBy: { createdAt: "asc" },
+      select: { name: true },
+    }),
   ]);
   return (
     <div className={`${columnNarrow} space-y-7`}>
@@ -57,6 +62,9 @@ export default async function ProfilPage() {
         <Link href="/mannschaft" className="crm-list-row">
           Team und Einblick <span className="ml-auto">›</span>
         </Link>
+        <Link href="/konto/export" className="crm-list-row">
+          Eigene Daten exportieren <span className="ml-auto">›</span>
+        </Link>
         {user.role === "ADMIN" && (
           <>
             <Link href="/team" className="crm-list-row">
@@ -78,7 +86,7 @@ export default async function ProfilPage() {
           <span className="flex-1 text-sm">Darstellung</span>
           <ThemaSchalter />
           <AppInstallieren />
-          <RueckmeldungGeben />
+          <RueckmeldungGeben empfaenger={admin?.name.split(" ")[0]} />
         </div>
       </section>
       <form action={logout}>

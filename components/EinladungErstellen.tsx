@@ -68,7 +68,7 @@ export default function EinladungErstellen() {
         </div>
       </div>
 
-      <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-slate-700">
+      <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-muted">
         <input type="checkbox" name="mehrfach" value="1" className="h-4 w-4 accent-navy-800" />
         Mehrfach-Code für den Infoabend — beliebig viele können ihn scannen
       </label>

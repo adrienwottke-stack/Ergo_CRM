@@ -1,10 +1,10 @@
 "use server";
 
-// Die vier Gespraechsergebnisse als Ein-Tipp-Aktionen.
+// Die drei Gespraechsergebnisse als Ein-Tipp-Aktionen.
 //
 // Sie lagen bisher in app/(app)/namen/actions.ts und waren damit nur von der
 // Namensliste aus zu finden. Sie sind aber nicht namenslisten-spezifisch: die
-// Heute-Liste braucht genau dieselben vier Knoepfe.
+// Heute-Liste braucht genau dieselben drei Knoepfe.
 //
 // Phasen und Punkte teilen den internen Schreibweg mit der Pipeline. Ein
 // Terminergebnis bleibt samt Empfehlungen in einer gesperrten Transaktion.
@@ -14,29 +14,25 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { offenerUndoEintrag, undoAusfuehren, withUndo } from "@/lib/undo";
 import { addDays, berlinLocalToUtc, berlinToday, dayToUtcDate } from "@/lib/dates";
-import { isLostReason } from "@/lib/pipeline";
 import { empfehlungenAnlegen, empfehlungenAusFormular } from "@/lib/empfehlungen";
 import { meldeNebenbei } from "@/lib/push";
 import { fortschrittJetzt } from "@/lib/liegenbleiber";
 import { createActivity, quickLogCall } from "@/app/(app)/contacts/actions";
-import { markContactLost } from "@/app/(app)/pipeline/actions";
 import { schreibeKontaktPhase, sperreEigenenKontakt } from "@/lib/pipeline-schreiben";
 import { ladeHauptziel } from "@/lib/ziele";
 
-export type CallResult = "appointment" | "unreachable" | "later" | "lost";
+export type CallResult = "appointment" | "unreachable" | "later";
 
 const RESULT_NOTES: Record<CallResult, string> = {
   appointment: "Termin vereinbart",
   unreachable: "Nicht erreicht",
   later: "Später nochmal ansprechen",
-  lost: "Kein Interesse",
 };
 
 const RESULT_LABELS: Record<CallResult, string> = {
   appointment: "Termin vereinbart",
   unreachable: "Nicht erreicht",
   later: "Auf später gelegt",
-  lost: "Kein Interesse",
 };
 
 function text(formData: FormData, field: string): string | null {
@@ -262,24 +258,6 @@ export async function recordCallResult(formData: FormData) {
             });
             await tx.contact.update({ where: { id: contactId }, data: fortschrittJetzt() });
           });
-          break;
-        }
-
-        case "lost": {
-          const call = new FormData();
-          call.set("contactId", contactId);
-          call.set("type", "CALL");
-          call.set("text", note);
-          await createActivity(call);
-
-          const reason = text(formData, "lostReason");
-          const lost = new FormData();
-          lost.set("contactId", contactId);
-          lost.set(
-            "lostReason",
-            reason && isLostReason(reason) ? reason : "KEIN_INTERESSE"
-          );
-          await markContactLost(lost);
           break;
         }
       }

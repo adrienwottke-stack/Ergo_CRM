@@ -27,10 +27,10 @@ export default function FeedReaktion({
             daten.set("text", reaktion.text);
             startTransition(() => feedReagieren(daten));
           }}
-          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition disabled:opacity-50 ${
+          className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition disabled:opacity-50 ${
             reaktion.vonMir
               ? "bg-navy-800 text-white"
-              : "border border-slate-200 text-slate-600 hover:border-navy-400 hover:text-navy-800"
+              : "border border-line-strong text-ink-muted hover:border-navy-400 hover:text-navy-800"
           }`}
         >
           {reaktion.text}

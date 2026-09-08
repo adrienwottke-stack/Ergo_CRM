@@ -23,23 +23,24 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: -apple-system, BlinkMacSystemFont, var(--font-inter), "Segoe UI", Roboto,
+    sans-serif;
+  --font-mono: ui-monospace, "SF Mono", var(--font-geist-mono), monospace;
 }
 
 @theme {
-  /* Marken-Navy: Struktur, Buttons, Links */
-  --color-navy-50: #f2f6fb;
-  --color-navy-100: #e0eaf6;
-  --color-navy-200: #bed3ea;
-  --color-navy-300: #93b4d9;
-  --color-navy-400: #5f8dc0;
-  --color-navy-500: #3a6ba4;
-  --color-navy-600: #2b5387;
-  --color-navy-700: #22426c;
-  --color-navy-800: #1a3253;
-  --color-navy-900: #12233c;
-  --color-navy-950: #0a1628;
+  /* Blaue Akzente; die dunklen Stufen tragen die feste Navy-Oberflaeche. */
+  --color-navy-50: #eef6ff;
+  --color-navy-100: #d9ebff;
+  --color-navy-200: #b3d6ff;
+  --color-navy-300: #80bbff;
+  --color-navy-400: #3d97ff;
+  --color-navy-500: #007aff;
+  --color-navy-600: #0066d9;
+  --color-navy-700: #0053b0;
+  --color-navy-800: #003f86;
+  --color-navy-900: #0a2e5c;
+  --color-navy-950: #0a1f3e;
 
   /* Zwischenstufen, die das Standardraster nicht kennt. Als rem, damit sie
      mit der Wurzel mitwachsen - eine feste px-Angabe waere sonst der einzige
@@ -58,23 +59,37 @@
 
   /* ---- Semantische Tokens: die Sprache fuer neuen Code ---- */
 
-  /* Flaechen */
-  --color-canvas: #f4f6fa;
+  /* Blickdichte Flaechen halten Schrift und Bedienelemente klar getrennt. */
+  --color-canvas: #eef2f8;
   --color-surface: #ffffff;
-  --color-sunken: #eef1f7;
+  --color-sunken: #e5ebf3;
 
   /* Linien */
-  --color-line: #e1e6ef;
-  --color-line-strong: #c8d1de;
+  --color-line: rgba(16, 32, 56, 0.1);
+  --color-line-strong: rgba(16, 32, 56, 0.16);
 
   /* Schrift */
-  --color-ink: #0f172a;
-  --color-ink-muted: #4d5a70;
-  --color-ink-soft: #7b8698;
+  --color-ink: #0b1220;
+  --color-ink-muted: #46536a;
+  --color-ink-soft: #78849a;
 
-  /* Akzent: Hauptknopf und alles, was fuehrt */
-  --color-akzent: #12233c;
-  --color-akzent-stark: #0a1628;
+  /* Akzent: Hauptknopf und alles, was fuehrt - iOS-Blau, der einzige Akzent
+     der Oberflaeche. */
+  --color-akzent: #2465d1;
+  --color-akzent-stark: #1d55b4;
+  --color-link: #1d55b4;
+  --color-link-stark: #16448f;
+
+  /* iOS-Pivots: Tailwind liefert diese Stufen sonst als Standardfarben aus
+     (reines Rot/Bernstein/Gruen). Ein paar Stellen greifen direkt auf sie zu
+     (bg-red-500, bg-amber-400, ...) - hier kippen nur diese eine Stufe pro
+     Rampe auf die iOS-Systemfarbe, damit sie zum Rest der Oberflaeche passt.
+     Die anderen Stufen derselben Rampen (100, 700, 800, ...) bleiben
+     Tailwind-Standard, genauso die fest-erfolg/-gefahr/-warnung-Tokens unten. */
+  --color-red-500: #ff3b30;
+  --color-amber-400: #ff9f0a;
+  --color-amber-500: #ff9500;
+  --color-emerald-500: #34c759;
 
   /* ---- Gefuellte Ton-Knoepfe ----
      "Anrufen" (gruen), "Loeschen" (rot), "Namen sammeln" (gelb).
@@ -104,9 +119,10 @@
    Als normale Eigenschaft plus @utility bleibt die Variable zur Laufzeit
    erhalten und kippt mit. */
 :root {
-  --schatten-karte: 0 1px 2px rgb(16 32 56 / 0.04), 0 1px 3px rgb(16 32 56 / 0.06);
-  --schatten-hoch: 0 2px 4px rgb(16 32 56 / 0.05), 0 8px 20px -6px rgb(16 32 56 / 0.14);
-  --schatten-pop: 0 2px 8px rgb(16 32 56 / 0.1), 0 12px 32px -8px rgb(16 32 56 / 0.24);
+  --schatten-karte: 0 1px 1px rgb(10 22 40 / 0.03), 0 4px 16px rgb(10 22 40 / 0.06);
+  --schatten-hoch: 0 2px 6px rgb(10 22 40 / 0.05), 0 12px 32px -8px rgb(10 22 40 / 0.12);
+  --schatten-pop: 0 4px 12px rgb(10 22 40 / 0.08), 0 20px 48px -12px rgb(10 22 40 / 0.22);
+
 }
 
 @utility schatten-karte {
@@ -119,6 +135,19 @@
 
 @utility schatten-pop {
   box-shadow: var(--schatten-pop);
+}
+
+/* Kompatibilitaet fuer bestehende Komponenten: feste Flaechen ohne Filter. */
+@utility glas {
+  background: var(--color-surface);
+}
+
+@utility glas-stark {
+  background: var(--color-surface);
+}
+
+@utility glas-dunkel {
+  background: #0d1626;
 }
 
 /* ---------------------------------------------------------------------------
@@ -144,18 +173,18 @@
   --color-slate-900: #eaf0f7;
   --color-slate-950: #f6f9fc;
 
-  /* Navy: 50-300 Flaeche, ab 400 Schrift und Balken */
-  --color-navy-50: #16243a;
-  --color-navy-100: #1b2c46;
-  --color-navy-200: #24395a;
-  --color-navy-300: #2f4c76;
-  --color-navy-400: #5f8dc0;
-  --color-navy-500: #6fa0d0;
-  --color-navy-600: #7fb0dd;
-  --color-navy-700: #93bfe8;
-  --color-navy-800: #a9cdf0;
-  --color-navy-900: #c0daf5;
-  --color-navy-950: #d6e7fa;
+  /* Navy: 50-300 Flaeche, ab 400 Schrift und Balken - iOS-Blau, siehe @theme */
+  --color-navy-50: #0f1e33;
+  --color-navy-100: #132540;
+  --color-navy-200: #1a3154;
+  --color-navy-300: #224170;
+  --color-navy-400: #4a97ff;
+  --color-navy-500: #5ea6ff;
+  --color-navy-600: #74b3ff;
+  --color-navy-700: #8fc2ff;
+  --color-navy-800: #abd2ff;
+  --color-navy-900: #c7e1ff;
+  --color-navy-950: #e0efff;
 
   /* Gold: die 400 ist die Marke und bleibt, wie sie ist */
   --color-gold-100: #2e2512;
@@ -167,7 +196,7 @@
   --color-emerald-200: #1e4433;
   --color-emerald-300: #2a5f47;
   --color-emerald-400: #34d399;
-  --color-emerald-500: #22c58e;
+  --color-emerald-500: #30d158;
   --color-emerald-600: #45d49b;
   --color-emerald-700: #6ce0ae;
   --color-emerald-800: #92e9c4;
@@ -179,7 +208,7 @@
   --color-red-200: #4d2328;
   --color-red-300: #6b2f36;
   --color-red-400: #f87171;
-  --color-red-500: #ef4444;
+  --color-red-500: #ff453a;
   --color-red-600: #f8807f;
   --color-red-700: #fb9b9b;
   --color-red-800: #fdb8b8;
@@ -189,7 +218,7 @@
   --color-amber-100: #382a12;
   --color-amber-200: #4b3817;
   --color-amber-300: #6b4f1e;
-  --color-amber-400: #fbbf24;
+  --color-amber-400: #ff9f0a;
   --color-amber-500: #f5b026;
   --color-amber-600: #f7c052;
   --color-amber-700: #f9d182;
@@ -208,6 +237,33 @@
   --color-teal-800: #9aece2;
   --color-teal-900: #c4f4ee;
 
+  /* Kalenderfarben: violet (Begleitung) und sky (Schulung) kippten hier
+     bisher gar nicht mit - Alt-Fehler, der erst auffiel, seit Dunkel
+     gleichwertig ist. Dieselbe Struktur wie die teal-Rampe direkt darueber:
+     50 dunkle getoente Flaeche, 400/500 kraeftige Mitteltoene, 700-900 helle
+     Textstufen. */
+  --color-violet-50: #110d24;
+  --color-violet-100: #181230;
+  --color-violet-200: #1f1743;
+  --color-violet-300: #2c1f5d;
+  --color-violet-400: #a78bfa;
+  --color-violet-500: #521fc5;
+  --color-violet-600: #773fd6;
+  --color-violet-700: #9b6ee2;
+  --color-violet-800: #ba9aec;
+  --color-violet-900: #d7c4f4;
+
+  --color-sky-50: #0d1b24;
+  --color-sky-100: #122430;
+  --color-sky-200: #173443;
+  --color-sky-300: #1f495d;
+  --color-sky-400: #38bdf8;
+  --color-sky-500: #1f91c5;
+  --color-sky-600: #3fa3d6;
+  --color-sky-700: #6eb9e2;
+  --color-sky-800: #9acfec;
+  --color-sky-900: #c4e2f4;
+
   /* Semantik */
   --color-canvas: #071426;
   --color-surface: #10223a;
@@ -218,9 +274,11 @@
   --color-ink-muted: #bfccdd;
   --color-ink-soft: #a6b7cd;
 
-  /* Der Hauptknopf wird heller statt dunkler - sonst verschwindet er. */
+  /* Sattes Blau mit ausreichendem Kontrast zur weissen Beschriftung. */
   --color-akzent: #2465d1;
   --color-akzent-stark: #1d55b4;
+  --color-link: #82b3ff;
+  --color-link-stark: #b3d2ff;
 
   /* Gefuellte Ton-Knoepfe: satt und dunkel genug fuer weisse Schrift, aber
      heller als die Karte dahinter - sonst verschwaende der Knopf im Grund. */
@@ -323,8 +381,29 @@
   --color-ink: #ffffff;
   --color-ink-muted: #bed3ea;
   --color-ink-soft: #93b4d9;
-  --color-akzent: #d4a942;
-  --color-akzent-stark: #a97f24;
+  /* War Gold, ist jetzt derselbe Akzent wie der Rest der Oberflaeche. */
+  --color-akzent: #0a84ff;
+  --color-akzent-stark: #3d9aff;
+}
+
+/* Buehnen-Lichtflecken (Welle 7): dieselben blauen Lichtflecken wie der
+   Tapeten-Canvas (body::before), diesmal fest in den Bestand-Gradienten der
+   dauerhaft dunklen Layouts (Willkommen, AVV) eingebacken. Ein Element traegt
+   immer nur EIN "background-image" - zwei Utility-Klassen mit je einem
+   eigenen Gradienten wuerden sich nicht uebereinanderlegen, sondern die
+   zweite ersetzt die erste. Deshalb hier alle drei Ebenen (zwei Flecken,
+   ein linearer Verlauf) als eine einzige Deklaration, statt mit einem
+   zusaetzlichen ::before-Element zu arbeiten - das braeuchte einen eigenen
+   Stapelkontext, nur um denselben Effekt umstaendlicher zu erreichen.
+   Statisch, keine Animation - wie beim App-Canvas. Ersetzt dort, wo sie
+   verwendet wird, die drei Klassen "bg-gradient-to-b from-navy-950
+   via-navy-900 to-navy-800" (gleicher Verlauf, jetzt nur als CSS statt als
+   Tailwind-Utilities). */
+@utility buehne-flecken {
+  background-image:
+    radial-gradient(60rem 40rem at 12% -8%, rgb(10 132 255 / 0.12), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 12%, rgb(100 210 255 / 0.06), transparent 55%),
+    linear-gradient(to bottom, var(--color-navy-950), var(--color-navy-900) 50%, var(--color-navy-800));
 }
 
 html {
@@ -423,15 +502,16 @@ input[type="number"]::-webkit-outer-spin-button {
     }
   }
 
-  /* Nur fuer den roten Zustand "braucht dich". Ein einziger Punkt in der
-     ganzen App darf atmen, sonst wird die Seite unruhig. */
+  /* Nur fuer den roten Zustand "braucht dich". Atmen duerfen in der App nur
+     zwei Stellen - dieser Punkt und der Trichter-Engpass (engpass-puls,
+     unten) - sonst wird die Seite unruhig. */
   @keyframes halo {
     0%,
     100% {
-      box-shadow: 0 0 0 0 rgb(239 68 68 / 0.45);
+      box-shadow: 0 0 0 0 rgb(255 59 48 / 0.45);
     }
     50% {
-      box-shadow: 0 0 0 5px rgb(239 68 68 / 0);
+      box-shadow: 0 0 0 5px rgb(255 59 48 / 0);
     }
   }
 
@@ -491,6 +571,24 @@ input[type="number"]::-webkit-outer-spin-button {
   .animate-spruch {
     animation: spruch-auftritt 0.4s ease-out both;
   }
+
+  /* Der Engpass im Trichter - die einzige Stufe, die von allen Uebergaengen
+     am schwaechsten ist. Anders als halo (Box-Shadow-Ping) atmet hier die
+     Deckkraft selbst: das Segment ist schon rot, der Puls zieht nur die
+     Aufmerksamkeit dorthin, wo es tatsaechlich hakt. */
+  @keyframes engpass-puls {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  .animate-engpass {
+    animation: engpass-puls 2.4s ease-in-out infinite;
+  }
 }
 
 /* Druck-Layout (Tätigkeitsbericht als PDF/Ausdruck) */
@@ -504,6 +602,24 @@ input[type="number"]::-webkit-outer-spin-button {
   body {
     background: #fff;
     color: #0f172a;
+  }
+
+  /* Kein Tapeten-Canvas und kein Glas auf Papier - beides ist Bildschirm-Deko
+     und wuerde auf dem Ausdruck nur wie ein Druckfehler aussehen. */
+  body::before {
+    display: none;
+  }
+
+  :root {
+    --color-surface: #fff;
+    --color-canvas: #fff;
+  }
+
+  .glas,
+  .glas-stark {
+    background: #fff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   main {

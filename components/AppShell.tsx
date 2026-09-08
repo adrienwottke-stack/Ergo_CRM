@@ -37,7 +37,7 @@ export default function AppShell({
         <div
           className={`${shell} ${gutter} flex h-16 items-center justify-between gap-3`}
         >
-          <Link href="/heute" aria-label="Ergo CRM · Heute">
+          <Link href="/heute" aria-label="Cockpit · Heute">
             <Wordmark />
           </Link>
           <div className="flex items-center gap-2">

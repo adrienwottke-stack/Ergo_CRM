@@ -4,7 +4,8 @@ import { normalisiereCode } from "@/lib/einladung";
 
 // Das Vorschaubild, das WhatsApp unter den Einladungslink haengt. Der wahre
 // erste Eindruck passiert VOR dem ersten Klick - eine nackte URL wirbt fuer
-// nichts. Navy, Gold, der Name des Einladenden: mehr braucht es nicht.
+// nichts. iOS-Blau, das Zeichen der Wortmarke, der Name des Einladenden: mehr
+// braucht es nicht.
 
 export const alt = "Einladung ins Team";
 export const size = { width: 1200, height: 630 };
@@ -34,12 +35,14 @@ export default async function OgBild({
           flexDirection: "column",
           justifyContent: "center",
           padding: "80px",
-          background: "linear-gradient(160deg, #0a1628 0%, #12233c 60%, #1a3253 100%)",
+          background: "linear-gradient(160deg, #0a1f3e 0%, #0a2e5c 60%, #0053b0 100%)",
           color: "#ffffff",
           fontFamily: "sans-serif",
         }}
       >
-        {/* Signet: aufsteigender Kurs im Rondell, wie in der Wortmarke. */}
+        {/* Signet: der Namenslisten-Glyph der Wortmarke (components/Logo.tsx,
+            LogoMark) - drei Zeilen, Punkt und Balken, die oberste voll
+            deckend. Kein Kurs-Chart mehr. */}
         <div
           style={{
             display: "flex",
@@ -49,24 +52,16 @@ export default async function OgBild({
           }}
         >
           <svg width="72" height="72" viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="9" fill="#1a3253" />
-            <path
-              d="M8 20.5 13.5 15l3.5 3.5 7-7.5"
-              stroke="#d4a942"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M20.5 11h3.5v3.5"
-              stroke="#d4a942"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <rect width="32" height="32" rx="8" fill="#0a84ff" />
+            <circle cx="9.6" cy="9.8" r="1.8" fill="#ffffff" />
+            <rect x="13.4" y="8.6" width="10.8" height="2.4" rx="1.2" fill="#ffffff" />
+            <circle cx="9.6" cy="16" r="1.8" fill="#ffffff" opacity="0.38" />
+            <rect x="13.4" y="14.8" width="10.8" height="2.4" rx="1.2" fill="#ffffff" opacity="0.38" />
+            <circle cx="9.6" cy="22.2" r="1.8" fill="#ffffff" opacity="0.38" />
+            <rect x="13.4" y="21" width="10.8" height="2.4" rx="1.2" fill="#ffffff" opacity="0.38" />
           </svg>
           <span style={{ fontSize: "36px", fontWeight: 600, color: "#93b4d9" }}>
-            Ergo CRM
+            Cockpit
           </span>
         </div>
 
@@ -86,7 +81,7 @@ export default async function OgBild({
             width: "220px",
             height: "10px",
             borderRadius: "5px",
-            background: "#d4a942",
+            background: "#0a84ff",
           }}
         />
       </div>

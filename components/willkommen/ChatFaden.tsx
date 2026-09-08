@@ -129,7 +129,7 @@ export default function ChatFaden({
     <div className="flex h-full min-h-0 flex-col">
       {/* Kopf wie in einem Messenger: wer spricht, und dass er "da" ist. */}
       <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gold-400 text-sm font-bold text-navy-950">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-akzent text-sm font-bold text-white">
           {absender
             .split(" ")
             .map((teil) => teil[0])
@@ -151,7 +151,7 @@ export default function ChatFaden({
             <p
               className={`animate-rise max-w-[85%] rounded-2xl px-3.5 py-2.5 text-15 leading-snug ${
                 nachricht.von === "ich"
-                  ? "rounded-br-md bg-gold-400 text-navy-950"
+                  ? "rounded-br-md bg-akzent text-white"
                   : "rounded-bl-md bg-white/10 text-white"
               }`}
             >

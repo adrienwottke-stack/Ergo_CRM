@@ -68,7 +68,7 @@ export default function Einheitenkurve({
           points={linie}
           fill="none"
           stroke="currentColor"
-          className="text-akzent"
+          className="text-link"
           strokeWidth="3"
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -79,7 +79,7 @@ export default function Einheitenkurve({
           cy={y(ende.kumuliert)}
           r="5"
           fill="currentColor"
-          className="text-akzent"
+          className="text-link"
         />
       </svg>
       <figcaption className="mt-2 flex justify-between text-xs text-ink-muted">

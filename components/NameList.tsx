@@ -360,6 +360,9 @@ export default function NameList({
               {alleGewaehlt ? "Keine auswählen" : "Alle auswählen"}
             </button>}
           </div>
+          {kind === "RECRUITING" && !auswaehlend && (
+            <p className="text-sm text-ink-muted">In der Kandidatur hältst du Gespräche fest. Bei einer Zusage entsteht die Einladung direkt dort.</p>
+          )}
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
             {open.map((entry) => (
               <NameRow
@@ -492,6 +495,7 @@ function NameRow({ entry, ziel, auswaehlend, gewaehlt, onCycleRating, onToggle, 
             <button type="button" disabled={!istEcht(entry.id)} onClick={() => setEditingPhone(true)} className="inline-flex min-h-11 items-center text-sm font-medium text-navy-700 disabled:opacity-50">Nummer ergänzen</button>
           )}
           {entry.liegtTage !== null && <p className="mt-1 text-xs text-ink-muted">{liegtLabel(entry.liegtTage)} · Nächsten Schritt festlegen</p>}
+          {ziel === "VERKAUF" && istEcht(entry.id) && <Link href={`/contacts/${entry.id}#kandidatur`} className="inline-flex min-h-11 items-center text-sm font-medium text-navy-700">Kandidatur öffnen</Link>}
         </div>
         <button type="button" disabled={!istEcht(entry.id)} onClick={() => setShowMore((value) => !value)} aria-label={`Mehr zu ${entry.name}`} aria-expanded={showMore} aria-controls={`name-mehr-${entry.id}`} className="min-h-11 shrink-0 rounded-lg px-2 text-sm font-medium text-ink-muted disabled:opacity-50">{showMore ? "Schließen" : "Mehr"}</button>
       </div>

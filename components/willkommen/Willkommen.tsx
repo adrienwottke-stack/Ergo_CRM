@@ -15,6 +15,7 @@ import EinwandTest from "./EinwandTest";
 import BriefAkt from "./BriefAkt";
 import NamenSprint from "./NamenSprint";
 import Einstufung from "./Einstufung";
+import Karrierestufe from "./Karrierestufe";
 import RanglisteMoment from "./RanglisteMoment";
 import Ankunft from "./Ankunft";
 import { FuehrungsKarten, EinladenAkt } from "./FuehrungsAkte";
@@ -22,11 +23,12 @@ import { FuehrungsKarten, EinladenAkt } from "./FuehrungsAkte";
 export type Sozialbeweis = { name: string; tage: number; termine: number } | null;
 
 export default function Willkommen({ userId, progress, gameEnabled, guidanceEnabled, initialLetter, initialGoal,
-  vorname, einlader, greeting, startTrack, leaderFlow, sozialbeweis, namenVorhanden, schonFertig,
+  vorname, einlader, greeting, startTrack, leaderFlow, sozialbeweis, namenVorhanden, schonFertig, karrierestufe, einheitenStartVorbelegt,
 }: {
   userId: string; progress: StartProgress | null; gameEnabled: boolean; guidanceEnabled: boolean;
   initialLetter: string; initialGoal: number | null; vorname: string; einlader: string; greeting: string | null;
   startTrack: ListKind | null; leaderFlow: boolean; sozialbeweis: Sozialbeweis; namenVorhanden: number; schonFertig: boolean;
+  karrierestufe: number | null; einheitenStartVorbelegt: string;
 }) {
   const router = useRouter();
   const akte: readonly string[] = leaderFlow ? LEADER_AKTE : AKTE.filter(a => a !== "storno" || gameEnabled);
@@ -84,7 +86,7 @@ export default function Willkommen({ userId, progress, gameEnabled, guidanceEnab
 
   return <div className="mx-auto flex h-dvh max-w-md flex-col px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(.75rem,env(safe-area-inset-top))]">
     <div className="flex items-center gap-3">
-      <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10" aria-label={`Schritt ${stufe} von ${akte.length-1}`}><div className="h-full bg-gold-400 transition-all" style={{ width:`${Math.round(stufe/(akte.length-1)*100)}%` }} /></div>
+      <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10" aria-label={`Schritt ${stufe} von ${akte.length-1}`}><div className="h-full bg-akzent transition-all" style={{ width:`${Math.round(stufe/(akte.length-1)*100)}%` }} /></div>
       <button disabled={pending || sprintBusy} onClick={ueberspringen} className="min-h-11 text-xs text-slate-400 disabled:opacity-40">{demo ? "Vorschau beenden" : "Überspringen"}</button>
     </div>
     {demo && <p className="py-2 text-xs text-slate-300">Vorschau · Deine gespeicherten Daten bleiben erhalten.</p>}
@@ -97,12 +99,13 @@ export default function Willkommen({ userId, progress, gameEnabled, guidanceEnab
       {akt === "brief" && <BriefAkt demo={demo} initialText={initialLetter} onDone={weiter} />}
       {akt === "sprint" && <NamenSprint track={track ?? "VERKAUF"} userId={userId} demo={demo} persistent={!!progress} initialEndAt={progress?.sprintEndAt?.toISOString() ?? null} onPendingChange={setSprintBusy} onDone={count => { setSprintAnzahl(count); weiter(); }} />}
       {akt === "einstufung" && <Einstufung track={track} demo={demo} onDone={weiter} />}
+      {akt === "karrierestufe" && <Karrierestufe karrierestufe={karrierestufe} einheitenStartVorbelegt={einheitenStartVorbelegt} demo={demo} onDone={weiter} />}
       {akt === "rangliste" && <RanglisteMoment onDone={weiter} />}
       {akt === "ankunft" && <Ankunft track={track} demo={demo} guidance={guidanceEnabled} initialGoal={initialGoal} sprintAnzahl={sprintAnzahl || namenVorhanden} />}
-      {akt === "chatLeader" && <ChatFaden schritte={leaderChat(vorname)} absender="Ergo CRM" onDone={weiter} />}
+      {akt === "chatLeader" && <ChatFaden schritte={leaderChat(vorname)} absender="Cockpit" onDone={weiter} />}
       {akt === "fuehrung" && <FuehrungsKarten onDone={weiter} />}
-      {akt === "einladen" && (demo ? <div className="flex h-full flex-col justify-center gap-6 text-white"><h2 className="text-2xl">Deine Einladungen</h2><p>Über „Einladen“ holst du neue Leute in dein Team.</p><button onClick={weiter} className="min-h-12 rounded-xl bg-gold-400 text-navy-950">Weiter</button></div> : <EinladenAkt onDone={weiter} />)}
-      {akt === "ankunftLeader" && <div className="flex h-full flex-col items-center justify-center gap-6 text-center"><h2 className="text-3xl font-bold text-white">Deine Zentrale steht.</h2><p className="text-slate-300">Neue Leute starten über deinen Einladungslink und erscheinen danach in deiner Mannschaft.</p><button onClick={ueberspringen} className="min-h-14 w-full rounded-xl bg-gold-400 text-lg font-bold text-navy-950">Zur Mannschaft</button></div>}
+      {akt === "einladen" && (demo ? <div className="flex h-full flex-col justify-center gap-6 text-white"><h2 className="text-2xl">Deine Einladungen</h2><p>Über „Einladen“ holst du neue Leute in dein Team.</p><button onClick={weiter} className="min-h-12 rounded-xl bg-akzent text-white">Weiter</button></div> : <EinladenAkt onDone={weiter} />)}
+      {akt === "ankunftLeader" && <div className="flex h-full flex-col items-center justify-center gap-6 text-center"><h2 className="text-3xl font-bold text-white">Deine Zentrale steht.</h2><p className="text-slate-300">Neue Leute starten über deinen Einladungslink und erscheinen danach in deiner Mannschaft.</p><button onClick={ueberspringen} className="min-h-14 w-full rounded-xl bg-akzent text-lg font-bold text-white">Zur Mannschaft</button></div>}
     </div>
   </div>;
 }

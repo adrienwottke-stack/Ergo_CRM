@@ -16,7 +16,7 @@ function ConfirmButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-fest-gefahr px-5 py-2 text-sm font-medium text-white transition hover:bg-fest-gefahr-stark active:scale-[0.99] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-fest-gefahr px-5 py-2 text-sm font-medium text-white transition hover:bg-fest-gefahr-stark active:scale-[0.99] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"
     >
       {pending ? "Löscht …" : "Endgültig löschen"}
     </button>
@@ -71,7 +71,7 @@ export default function DeleteContactButton({
         <form action={deleteContact}>
           <input type="hidden" name="contactId" value={contactId} />
 
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-ink-muted">
             Das lässt sich nicht rückgängig machen.
             {mitgeloescht.length > 0
               ? ` Mit gelöscht werden ${mitgeloescht.join(" und ")}.`
@@ -79,7 +79,7 @@ export default function DeleteContactButton({
           </p>
 
           {referralCount > 0 && (
-            <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            <p className="mt-3 rounded-lg bg-sunken px-3 py-2 text-sm text-ink-muted">
               {referralCount === 1
                 ? "Der empfohlene Kontakt bleibt"
                 : `Die ${referralCount} empfohlenen Kontakte bleiben`}{" "}
@@ -92,7 +92,7 @@ export default function DeleteContactButton({
             „Verloren“ – dann bleibt auswertbar, wo Kontakte abspringen.
           </p>
 
-          <div className="mt-5 flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+          <div className="mt-5 flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => setOpen(false)}

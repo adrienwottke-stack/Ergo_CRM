@@ -10,7 +10,7 @@ import { useState, useTransition } from "react";
 import Modal from "@/components/Modal";
 import { nachrichtSenden } from "@/app/(team)/nachrichtAction";
 import { NACHRICHT_MAX_ZEICHEN, SCHNELLTEXTE } from "@/lib/nachrichten";
-import { input } from "@/components/ui";
+import { btnPrimary, inputBlank } from "@/components/ui";
 
 export default function NachrichtSenden({
   anId,
@@ -55,7 +55,7 @@ export default function NachrichtSenden({
         <button
           type="button"
           onClick={() => setOffen(true)}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-3.5 text-13 font-medium text-slate-700 transition hover:border-navy-400 hover:bg-navy-50/40 hover:text-navy-800"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-13 font-medium text-ink-muted transition hover:bg-sunken hover:text-ink"
         >
           <span aria-hidden className="text-base leading-none">
             ✉
@@ -68,7 +68,7 @@ export default function NachrichtSenden({
           onClick={() => setOffen(true)}
           aria-label={`${name} etwas schreiben`}
           title="Etwas schreiben"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-100 hover:text-navy-700"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-soft transition hover:bg-sunken hover:text-navy-700"
         >
           <span aria-hidden className="text-base leading-none">
             ✉
@@ -95,14 +95,14 @@ export default function NachrichtSenden({
                   type="button"
                   disabled={pending}
                   onClick={() => senden(text)}
-                  className="flex min-h-12 w-full items-center rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-800 transition hover:border-navy-400 hover:bg-navy-50/50 disabled:opacity-50"
+                  className="flex min-h-14 w-full items-center rounded-full bg-sunken px-4 text-sm font-semibold text-ink-muted transition hover:bg-akzent hover:text-white disabled:opacity-50"
                 >
                   {text}
                 </button>
               ))}
             </div>
 
-            <div className="border-t border-slate-100 pt-4">
+            <div className="border-t border-line pt-4">
               <input
                 type="text"
                 value={eigener}
@@ -115,13 +115,13 @@ export default function NachrichtSenden({
                   }
                 }}
                 placeholder="Oder selbst schreiben …"
-                className={`${input} mt-0`}
+                className={inputBlank}
               />
               <button
                 type="button"
                 disabled={pending || eigener.trim().length === 0}
                 onClick={() => senden(eigener)}
-                className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-akzent text-sm font-semibold text-white transition hover:bg-akzent-stark disabled:opacity-40"
+                className={`${btnPrimary} mt-2 w-full disabled:opacity-40`}
               >
                 Senden
               </button>

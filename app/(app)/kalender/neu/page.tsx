@@ -47,7 +47,7 @@ export default async function NeuerTerminPage({
     <div className={`${columnNarrow} space-y-6`}>
       <div>
         <h1 className={pageTitle}>Eintrag anlegen</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           Alles, was kein Kundentermin ist. Kundentermine entstehen im{" "}
           <Link href="/namen" className="font-medium text-navy-600 hover:underline">
             Durchlauf
@@ -65,7 +65,7 @@ export default async function NeuerTerminPage({
             {ARTEN.map((art) => (
               <label
                 key={art.wert}
-                className="cursor-pointer has-[:checked]:border-navy-600 has-[:checked]:bg-navy-50 has-[:checked]:text-navy-800 inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-surface px-4 text-sm font-medium text-slate-600 transition hover:border-slate-400"
+                className="cursor-pointer has-[:checked]:border-navy-600 has-[:checked]:bg-navy-50 has-[:checked]:text-navy-800 inline-flex min-h-11 items-center rounded-full border border-line-strong bg-surface px-4 text-sm font-medium text-ink-muted transition hover:border-line-strong hover:text-ink"
               >
                 <input
                   type="radio"
@@ -104,24 +104,24 @@ export default async function NeuerTerminPage({
               defaultValue={`${tag}T10:00`}
               className={input}
             />
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-ink-soft">
               Leer lassen heißt eine Stunde.
             </p>
           </div>
         </div>
 
-        <label className="flex min-h-11 items-center gap-2.5 text-sm text-slate-700">
+        <label className="flex min-h-11 items-center gap-2.5 text-sm text-ink-muted">
           <input
             type="checkbox"
             name="ganztags"
-            className="h-4 w-4 rounded border-line-strong text-akzent focus:ring-navy-600/20"
+            className="h-4 w-4 rounded border-line-strong text-link focus:ring-navy-600/20"
           />
           Ganzer Tag — dann zählen die Uhrzeiten oben nicht.
         </label>
 
         <div>
           <label className={label} htmlFor="titel">
-            Titel <span className="font-normal text-slate-400">(freiwillig)</span>
+            Titel <span className="font-normal text-ink-soft">(freiwillig)</span>
           </label>
           <input
             id="titel"
@@ -134,7 +134,7 @@ export default async function NeuerTerminPage({
 
         <div>
           <label className={label} htmlFor="ort">
-            Ort <span className="font-normal text-slate-400">(freiwillig)</span>
+            Ort <span className="font-normal text-ink-soft">(freiwillig)</span>
           </label>
           <input id="ort" name="ort" type="text" className={input} />
         </div>

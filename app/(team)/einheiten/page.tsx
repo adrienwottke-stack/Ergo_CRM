@@ -4,27 +4,29 @@ import { berlinToday, dayDisplayFormat } from "@/lib/dates";
 import {
   KARRIERESTUFE_MAX,
   KARRIERESTUFE_MIN,
+  eigenerVerlauf,
   formatEinheiten,
   ladeEinheiten,
   produktionsmonat,
   teamEinheiten,
 } from "@/lib/einheiten";
 import { merkeNutzung, schalter } from "@/lib/features";
-import WettbewerbNav from "@/components/WettbewerbNav";
+import SeitenKopf from "@/components/SeitenKopf";
 import Fortschritt from "@/components/Fortschritt";
+import EinheitenEintragen from "@/components/EinheitenEintragen";
+import EinheitenHilfe from "@/components/EinheitenHilfe";
+import VerlaufsChart from "@/components/VerlaufsChart";
 import {
-  btnPrimary,
   btnSecondary,
   card,
   input,
   kicker,
   label,
-  pageTitle,
   sectionTitle,
   td,
   th,
 } from "@/components/ui";
-import { buchungLoeschen, einheitenBuchen, standSpeichern } from "./actions";
+import { buchungLoeschen, standSpeichern } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +44,7 @@ export default async function EinheitenPage() {
   const user = await requireUser();
   const heute = berlinToday();
 
-  const [seite, person, an, team] = await Promise.all([
+  const [seite, person, an, team, verlauf] = await Promise.all([
     ladeEinheiten(
       {
         id: user.id,
@@ -58,6 +60,7 @@ export default async function EinheitenPage() {
     }),
     schalter("einheiten"),
     teamEinheiten(user.id, produktionsmonat(heute)),
+    eigenerVerlauf(user.id),
   ]);
 
   const buchungen = await prisma.einheitenbuchung.findMany({
@@ -70,21 +73,24 @@ export default async function EinheitenPage() {
 
   const { ich, monat, schwelle } = seite;
   const offen = schwelle === null ? null : schwelle - ich.gesamt;
-  const naechsteStufe = user.karrierestufe === null ? null : user.karrierestufe + 1;
+  const naechsteStufe =
+    user.karrierestufe === null || user.karrierestufe >= KARRIERESTUFE_MAX
+      ? null
+      : user.karrierestufe + 1;
 
   return (
     <div className="space-y-8">
-      <WettbewerbNav />
-
-      <div>
-        <h1 className={pageTitle}>Einheiten</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Deine Zahl, selbst gemeldet.{" "}
-          {user.karrierestufe === null
-            ? "Trag deine Karrierestufe ein — dann siehst du, wer sonst noch auf deiner Stufe steht."
-            : `Karrierestufe ${user.karrierestufe}. Wer dieselbe Stufe hat, sieht deine Einheiten — Name und Zahl, sonst nichts.`}
-        </p>
-      </div>
+      <SeitenKopf
+        titel="Einheiten"
+        unterzeile={
+          <>
+            Deine Zahl, selbst gemeldet.{" "}
+            {user.karrierestufe === null
+              ? "Trag deine Karrierestufe ein — dann siehst du, wer sonst noch auf deiner Stufe steht."
+              : `Karrierestufe ${user.karrierestufe}. Wer dieselbe Stufe hat, sieht deine Einheiten — Name und Zahl, sonst nichts.`}
+          </>
+        }
+      />
 
       {/* --- Die zwei Zahlen -------------------------------------------------
           Links das Laufende, rechts das Erarbeitete. Der Balken haengt bewusst
@@ -92,10 +98,10 @@ export default async function EinheitenPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className={`${card} p-5`}>
           <span className={kicker}>Produktionsmonat {monat.label}</span>
-          <p className="mt-3 text-4xl font-semibold tracking-tight tabular-nums text-slate-900">
+          <p className="mt-3 text-4xl font-semibold tracking-tight tabular-nums text-ink">
             {formatEinheiten(ich.monat)}
           </p>
-          <p className="mt-1 text-13 font-medium text-slate-600">
+          <p className="mt-1 text-13 font-medium text-ink-muted">
             Einheiten diesen Monat
           </p>
         </div>
@@ -106,10 +112,10 @@ export default async function EinheitenPage() {
               ? "Gesamt"
               : `Schritte Richtung Karrierestufe ${naechsteStufe}`}
           </span>
-          <p className="mt-3 text-4xl font-semibold tracking-tight tabular-nums text-slate-900">
+          <p className="mt-3 text-4xl font-semibold tracking-tight tabular-nums text-ink">
             {formatEinheiten(ich.gesamt)}
           </p>
-          <p className="mt-1 text-13 font-medium text-slate-600">
+          <p className="mt-1 text-13 font-medium text-ink-muted">
             Eigeneinheiten insgesamt
           </p>
 
@@ -121,7 +127,7 @@ export default async function EinheitenPage() {
                 hoehe="kraeftig"
                 beschriftung={`${formatEinheiten(ich.gesamt)} von ${formatEinheiten(schwelle)} Einheiten`}
               />
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-ink-muted">
                 {offen <= 0
                   ? `${formatEinheiten(schwelle)} sind geschafft — trag deine neue Karrierestufe ein.`
                   : `noch ${formatEinheiten(offen)} von ${formatEinheiten(schwelle)} bis Karrierestufe ${naechsteStufe}`}
@@ -131,11 +137,34 @@ export default async function EinheitenPage() {
           {schwelle === null && user.karrierestufe !== null && (
             // Lieber nichts als ein Balken auf ein erfundenes Ziel: eine
             // falsche Schwelle sagt jemandem, er sei fast da.
-            <p className="mt-4 text-xs text-slate-400">
+            <p className="mt-4 text-xs text-ink-soft">
               Für Karrierestufe {naechsteStufe} ist noch keine Schwelle hinterlegt.
             </p>
           )}
         </div>
+      </div>
+
+      {/* --- Der Verlauf ----------------------------------------------------
+          Emils "Erfolgsdiagramm, wie so ETF-Chart"
+          (docs/emil-feedback-plan.md, AP-08). Steht bewusst DIREKT unter den
+          beiden Zahlen: die Kurve endet auf demselben Wert, der eine Karte
+          weiter oben als "Eigeneinheiten insgesamt" steht - nebeneinander
+          kann man das nachsehen, drei Abschnitte weiter unten nicht mehr.
+          Beide Zahlen entstehen aus derselben Rechnung (einheitenStart plus
+          alle Buchungen), nur einmal als Summe und einmal als Weg dorthin. */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className={sectionTitle}>Dein Verlauf</h2>
+          <span className="text-xs text-ink-muted">
+            tippen und halten zum Ablesen
+          </span>
+        </div>
+        <VerlaufsChart
+          sockel={user.einheitenStart}
+          tage={verlauf}
+          heute={heute}
+          monatStart={monat.start.toISOString().slice(0, 10)}
+        />
       </div>
 
       {/* --- Was das Team darunter geschrieben hat ---------------------------
@@ -147,24 +176,24 @@ export default async function EinheitenPage() {
         <div className={`${card} p-5 sm:p-6`}>
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <span className={kicker}>Dein Team</span>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink-muted">
               alles unter dir, über alle Ebenen
             </span>
           </div>
           <div className="mt-3 flex flex-wrap gap-x-10 gap-y-4">
             <div>
-              <p className="text-3xl font-semibold tracking-tight tabular-nums text-slate-900">
+              <p className="text-3xl font-semibold tracking-tight tabular-nums text-ink">
                 {formatEinheiten(team.monat)}
               </p>
-              <p className="mt-1 text-13 font-medium text-slate-600">
+              <p className="mt-1 text-13 font-medium text-ink-muted">
                 Team-Einheiten im {monat.label}
               </p>
             </div>
             <div>
-              <p className="text-3xl font-semibold tracking-tight tabular-nums text-slate-900">
+              <p className="text-3xl font-semibold tracking-tight tabular-nums text-ink">
                 {formatEinheiten(team.gesamt)}
               </p>
-              <p className="mt-1 text-13 font-medium text-slate-600">
+              <p className="mt-1 text-13 font-medium text-ink-muted">
                 Team-Einheiten insgesamt
               </p>
             </div>
@@ -172,12 +201,12 @@ export default async function EinheitenPage() {
               <p className="text-3xl font-semibold tracking-tight tabular-nums text-navy-900">
                 {formatEinheiten(ich.gesamt + team.gesamt)}
               </p>
-              <p className="mt-1 text-13 font-medium text-slate-600">
+              <p className="mt-1 text-13 font-medium text-ink-muted">
                 Du und dein Team zusammen
               </p>
             </div>
           </div>
-          <p className="mt-4 text-xs text-slate-500">
+          <p className="mt-4 text-xs text-ink-muted">
             Zählt nicht auf deine Karrierestufe — dafür zählen deine
             Eigeneinheiten. Wer unter dir einträgt, läuft hier automatisch mit
             hoch.
@@ -185,63 +214,12 @@ export default async function EinheitenPage() {
         </div>
       )}
 
-      {/* --- Eintragen ------------------------------------------------------ */}
-      <form action={einheitenBuchen} className={`${card} space-y-5 p-6 sm:p-8`}>
-        <div>
-          <h2 className={sectionTitle}>Einheiten eintragen</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Was dazugekommen ist. Ein Storno trägst du mit Minus ein
-            (&bdquo;-12,5&ldquo;).
-          </p>
-        </div>
-        <div className="grid gap-5 sm:grid-cols-3">
-          <div>
-            <label htmlFor="menge" className={label}>
-              Einheiten
-            </label>
-            <input
-              id="menge"
-              name="menge"
-              type="text"
-              inputMode="decimal"
-              placeholder="z. B. 12,5"
-              required
-              className={input}
-            />
-          </div>
-          <div>
-            <label htmlFor="tag" className={label}>
-              Tag
-            </label>
-            <input
-              id="tag"
-              name="tag"
-              type="date"
-              defaultValue={heute}
-              max={heute}
-              className={input}
-            />
-          </div>
-          <div>
-            <label htmlFor="notiz" className={label}>
-              Notiz (optional)
-            </label>
-            <input
-              id="notiz"
-              name="notiz"
-              type="text"
-              maxLength={120}
-              placeholder="z. B. BU Schmidt"
-              className={input}
-            />
-          </div>
-        </div>
-        <div className="flex justify-end border-t border-slate-100 pt-5">
-          <button type="submit" className={btnPrimary}>
-            Speichern
-          </button>
-        </div>
-      </form>
+      {/* --- Eintragen ------------------------------------------------------
+          Kleine Client-Insel statt eines <form action>: sie zeigt den
+          Rueckgabewert der Server-Aktion an, statt eine Fehleingabe
+          kommentarlos verschwinden zu lassen (docs/emil-feedback-plan.md,
+          AP-03). */}
+      <EinheitenEintragen heute={heute} />
 
       {/* --- Karrierestufe und Startbestand --------------------------------------
           Steht offen, solange keine Stufe eingetragen ist - ohne sie ist die
@@ -249,7 +227,7 @@ export default async function EinheitenPage() {
       <details open={user.karrierestufe === null} className={`${card} p-6 sm:p-8`}>
         <summary className="cursor-pointer list-none">
           <span className={sectionTitle}>Deine Karrierestufe</span>
-          <span className="ml-2 text-sm text-slate-500">
+          <span className="ml-2 text-sm text-ink-muted">
             {user.karrierestufe === null
               ? "noch nicht eingetragen"
               : `Stufe ${user.karrierestufe}`}
@@ -273,15 +251,18 @@ export default async function EinheitenPage() {
                 placeholder="1"
                 className={input}
               />
-              <p className="mt-1.5 text-xs text-slate-500">
+              <p className="mt-1.5 text-xs text-ink-muted">
                 Entscheidet, mit wem du in einer Runde stehst. Leer lassen heißt:
                 keine Runde.
               </p>
             </div>
             <div>
-              <label htmlFor="einheitenStart" className={label}>
-                Einheiten vor der App
-              </label>
+              <span className="flex items-center gap-1.5">
+                <label htmlFor="einheitenStart" className={label}>
+                  Einheiten vor der App
+                </label>
+                <EinheitenHilfe />
+              </span>
               <input
                 id="einheitenStart"
                 name="einheitenStart"
@@ -293,13 +274,13 @@ export default async function EinheitenPage() {
                 placeholder="0"
                 className={input}
               />
-              <p className="mt-1.5 text-xs text-slate-500">
+              <p className="mt-1.5 text-xs text-ink-muted">
                 Dein Stand beim Start. Zählt zu &bdquo;insgesamt&ldquo; dazu,
                 nicht zum Monat.
               </p>
             </div>
           </div>
-          <div className="flex justify-end border-t border-slate-100 pt-5">
+          <div className="flex justify-end border-t border-line pt-5">
             <button type="submit" className={btnSecondary}>
               Übernehmen
             </button>
@@ -315,45 +296,45 @@ export default async function EinheitenPage() {
               Karrierestufe {user.karrierestufe} — {seite.runde.length}{" "}
               {seite.runde.length === 1 ? "Person" : "Leute"}
             </h2>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink-muted">
               sortiert nach {monat.label}
             </span>
           </div>
 
           {seite.runde.length === 1 ? (
             <div className={`${card} px-6 py-10 text-center`}>
-              <p className="text-sm font-medium text-slate-900">
+              <p className="text-sm font-medium text-ink">
                 Noch niemand sonst auf Karrierestufe {user.karrierestufe}
               </p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-ink-muted">
                 Sobald jemand seine Stufe einträgt, steht er hier neben dir.
               </p>
             </div>
           ) : (
             <div className={`${card} overflow-x-auto`}>
               <table className="w-full min-w-120 text-left text-sm">
-                <thead className="border-b border-slate-200/80 bg-slate-50/60">
+                <thead className="border-b border-line/80 bg-sunken/60">
                   <tr>
                     <th className={th}>Name</th>
                     <th className={`${th} text-right`}>{monat.label}</th>
                     <th className={`${th} text-right`}>Insgesamt</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line">
                   {seite.runde.map((stand) => (
                     <tr
                       key={stand.userId}
                       className={stand.istDu ? "bg-navy-50/40" : undefined}
                     >
-                      <td className={`${td} font-medium text-slate-900`}>
+                      <td className={`${td} font-medium text-ink`}>
                         {stand.istDu ? "Du" : stand.name}
                       </td>
                       <td
-                        className={`${td} text-right font-semibold tabular-nums text-slate-900`}
+                        className={`${td} text-right font-semibold tabular-nums text-ink`}
                       >
                         {formatEinheiten(stand.monat)}
                       </td>
-                      <td className={`${td} text-right tabular-nums text-slate-600`}>
+                      <td className={`${td} text-right tabular-nums text-ink-muted`}>
                         {formatEinheiten(stand.gesamt)}
                       </td>
                     </tr>
@@ -370,15 +351,15 @@ export default async function EinheitenPage() {
         <h2 className={sectionTitle}>Deine letzten Einträge</h2>
         {buchungen.length === 0 ? (
           <div className={`${card} px-6 py-10 text-center`}>
-            <p className="text-sm font-medium text-slate-900">
+            <p className="text-sm font-medium text-ink">
               Noch nichts eingetragen
             </p>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-ink-muted">
               Die erste Meldung dauert zehn Sekunden.
             </p>
           </div>
         ) : (
-          <ul className={`${card} divide-y divide-slate-100`}>
+          <ul className={`${card} divide-y divide-line`}>
             {buchungen.map((buchung) => (
               <li
                 key={buchung.id}
@@ -387,28 +368,33 @@ export default async function EinheitenPage() {
                 <span className="min-w-0">
                   <span
                     className={`font-semibold tabular-nums ${
-                      buchung.hundertstel < 0 ? "text-red-600" : "text-slate-900"
+                      buchung.hundertstel < 0 ? "text-red-600" : "text-ink"
                     }`}
                   >
                     {buchung.hundertstel > 0 ? "+" : ""}
                     {formatEinheiten(buchung.hundertstel)}
                   </span>{" "}
-                  <span className="text-slate-600">Einheiten</span>
+                  <span className="text-ink-muted">Einheiten</span>
                   {buchung.notiz && (
-                    <span className="block truncate text-xs text-slate-500">
+                    <span className="block truncate text-xs text-ink-muted">
                       {buchung.notiz}
                     </span>
                   )}
                 </span>
                 <span className="flex shrink-0 items-center gap-4">
-                  <span className="text-xs tabular-nums text-slate-500">
+                  <span className="text-xs tabular-nums text-ink-muted">
                     {dayDisplayFormat.format(buchung.tag)}
                   </span>
+                  {/* Nachgemessen bei 375 px: 48 x 16 Pixel. Ein Loeschknopf,
+                      kleiner als eine Fingerkuppe, direkt neben dem Datum -
+                      und dahinter ein deleteMany ohne Rueckweg. Die 44 Pixel
+                      kommen als Polster mit negativem Rand, damit die Zeile
+                      nicht hoeher wird. */}
                   <form action={buchungLoeschen}>
                     <input type="hidden" name="buchungId" value={buchung.id} />
                     <button
                       type="submit"
-                      className="text-xs font-medium text-slate-500 transition hover:text-red-600"
+                      className="-my-3.5 inline-flex min-h-11 items-center py-3.5 text-xs font-medium text-ink-muted transition hover:text-red-600"
                     >
                       Löschen
                     </button>
@@ -420,7 +406,7 @@ export default async function EinheitenPage() {
         )}
       </div>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-muted">
         Einheiten sind selbst gemeldet und zählen in keiner Rangliste mit —
         Punkte bleiben Tätigkeit. Sichtbar sind nur Namen und Zahlen.
       </p>

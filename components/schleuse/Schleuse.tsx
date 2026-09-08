@@ -62,13 +62,13 @@ export default function Schleuse({
           titel="Dein Zugang entsteht auf dem Handy"
           text={
             <p>
-              Ergo CRM arbeitet dort, wo du telefonierst. Scann den Code mit deiner
+              Cockpit arbeitet dort, wo du telefonierst. Scann den Code mit deiner
               Handykamera – dann geht es dort weiter, wo es hingehört.
             </p>
           }
           fuss={
             <>
-              <p className="break-all rounded-lg bg-white/5 px-3 py-2 font-mono text-xs text-navy-200 ring-1 ring-inset ring-white/10">
+              <p className="glas-dunkel break-all rounded-2xl border border-white/10 px-3 py-2 font-mono text-xs text-navy-200">
                 {link}
               </p>
               {/* Der Rechner bleibt fuer die EINLADUNG zu - ein Konto entsteht
@@ -81,7 +81,7 @@ export default function Schleuse({
                 Du hast schon ein Konto?{" "}
                 <a
                   href="/login"
-                  className="font-medium text-amber-300 underline underline-offset-4 hover:text-amber-200"
+                  className="font-medium text-link underline underline-offset-4 hover:text-link-stark"
                 >
                   Hier am Rechner anmelden
                 </a>

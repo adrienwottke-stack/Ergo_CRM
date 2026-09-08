@@ -10,7 +10,7 @@
     "postinstall": "prisma generate",
     "build:check": "next build",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --import ./scripts/alias-hook.mjs --test scripts/arbeitslagen.test.mjs scripts/vereinbarungen-test.mjs scripts/vereinbarungen-service-test.mjs scripts/team-auswertung-probe.mjs scripts/team-auswertung-db.test.mjs scripts/contact-result-review.test.mjs lib/ziele-modell.test.mjs lib/ziele-service.test.mjs scripts/einheiten-meldungen.test.mjs scripts/fuehrung-scope-db.test.mjs scripts/start-state.test.mjs scripts/start-service.test.mjs scripts/storno-tutorial.test.mjs",
+    "test": "node --import ./scripts/alias-hook.mjs --test scripts/arbeitslagen.test.mjs scripts/vereinbarungen-test.mjs scripts/vereinbarungen-service-test.mjs scripts/team-auswertung-probe.mjs scripts/team-auswertung-db.test.mjs scripts/contact-result-review.test.mjs lib/ziele-modell.test.mjs lib/ziele-service.test.mjs scripts/einheiten-meldungen.test.mjs scripts/cron-meldungen.test.mjs scripts/fuehrung-scope-db.test.mjs scripts/start-state.test.mjs scripts/start-service.test.mjs scripts/storno-tutorial.test.mjs",
     "test:browser": "node --import ./scripts/alias-hook.mjs scripts/arbeitslagen-browser.mjs",
     "test:start": "node --import ./scripts/alias-hook.mjs --test scripts/start-state.test.mjs scripts/start-service.test.mjs scripts/storno-tutorial.test.mjs",
     "test:start:browser": "node --import ./scripts/alias-hook.mjs scripts/start-browser.test.mjs",

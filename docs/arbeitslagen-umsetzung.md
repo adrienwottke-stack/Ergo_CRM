@@ -53,13 +53,15 @@ Zwei additive Migrationen ergänzen den Bestand:
 
 Der Prisma-Client wurde regeneriert. Es wurde keine produktive Migration und kein Deployment ausgeführt. Fach- und Datenbanktests verwenden ausschließlich neue Speicherdatenbanken mit allen Migrationen.
 
+Der Review enthält außerdem `main` bis `ad63a1a`, einschließlich `20260828120000_einstellungen` und `20260829120000_ausbau_buendel`. Konfigurierte Karrierestufen, Kandidaturen, Teamabend, Berichts-Link und Datenexport bleiben erhalten. Die Details der Konfliktauflösung stehen im [Review-Protokoll](review-arbeitslagen-onboarding.md).
+
 | Prüfung | Aktueller Stand / Befehl |
 | --- | --- |
-| Gesamte automatisierte Suite | **42 Tests grün**, `npm test`; enthält die Onboardingtests |
+| Gesamte automatisierte Suite | **51 Tests grün**, `npm test`; enthält die Onboardingtests |
 | Onboarding separat | `npm run test:start` |
 | TypeScript | **Grün**, `npm run typecheck` |
 | ESLint | **0 Fehler**, eine vorbestehende Warnung in `scripts/_audit/probe.mjs`; `npm run lint` |
-| Gemeinsamer Browserlauf | **Grün**, beide Durchläufe; Arbeitslagen zusätzlich gegen den Produktionsbuild, mit 16 Screenshots und 320/390/430/1440 px |
+| Gemeinsamer Browserlauf | **Grün**, beide Durchläufe; Arbeitslagen zusätzlich gegen den Produktionsbuild, mit 17 Screenshots und 320/390/430/1440 px |
 | Isolierter Produktionsbuild | **Grün**, `npm run build:start:check` |
 
 Die Browserbefehle starten lokale Instanzen mit fiktiven Konten. `build:start:check` verwendet eine neue isolierte Datenbank. **`npm run build` enthält `prisma migrate deploy` und wird für diese Abnahme nicht verwendet.** Der finale Browserlauf verwendet `CRM_TEST_PRODUCTION=1 npm run test:browser` nach dem isolierten Build. Er prüft den vollständigen Anruf-/Termin-/Empfehlungs-/Einheitenablauf, vorgeschlagene Ziele, bestätigte Absprachen mit Verlauf, Suchberechtigungen, gespeicherten Schwerpunkt und Teammeeting. Ergebnis und Screenshots liegen in `test-results/arbeitslagen/`; es gab keine Clientfehler. Die integrierte Startstrecke wurde separat mit `npm run test:start:browser` geprüft, einschließlich Pause/Neustart, Nummern, bestätigter Planung und fehlgeschlagener Übertragung mit Wiederholung.

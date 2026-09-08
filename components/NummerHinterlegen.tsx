@@ -37,15 +37,15 @@ export default function NummerHinterlegen({ fuehrungskraft }: { fuehrungskraft: 
   if (!offen) {
     return (
       <div className={`${card} flex flex-wrap items-center justify-between gap-3 p-4`}>
-        <p className="text-sm text-slate-600">
-          <span className="font-medium text-slate-900">Deine Handynummer fehlt.</span>{" "}
+        <p className="text-sm text-ink-muted">
+          <span className="font-medium text-ink">Deine Handynummer fehlt.</span>{" "}
           Damit {fuehrungskraft} dich anrufen kann, wenn es hakt.
         </p>
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={() => setOffen(true)}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-surface px-3.5 text-13 font-medium text-slate-700 transition hover:border-navy-400 hover:text-navy-800"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-13 font-medium text-ink-muted transition hover:border-navy-400 hover:text-navy-800"
           >
             <PhoneIcon className="h-4 w-4" />
             Nachtragen
@@ -55,7 +55,7 @@ export default function NummerHinterlegen({ fuehrungskraft }: { fuehrungskraft: 
           <button
             type="button"
             onClick={() => setWeg(true)}
-            className="min-h-11 rounded-lg px-2.5 text-13 font-medium text-slate-400 transition hover:text-slate-700"
+            className="min-h-11 rounded-lg px-2.5 text-13 font-medium text-ink-soft transition hover:text-ink-muted"
           >
             Nicht jetzt
           </button>
@@ -66,7 +66,7 @@ export default function NummerHinterlegen({ fuehrungskraft }: { fuehrungskraft: 
 
   return (
     <div className={`${card} p-4`}>
-      <label htmlFor="eigeneNummer" className="text-sm font-medium text-slate-900">
+      <label htmlFor="eigeneNummer" className="text-sm font-medium text-ink">
         Deine Handynummer
       </label>
       <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -96,7 +96,7 @@ export default function NummerHinterlegen({ fuehrungskraft }: { fuehrungskraft: 
           Speichern
         </button>
       </div>
-      <p className="mt-1.5 text-xs text-slate-500">
+      <p className="mt-1.5 text-xs text-ink-muted">
         Sieht nur {fuehrungskraft} — sie steht in keiner Rangliste und in keinem Bericht.
       </p>
     </div>

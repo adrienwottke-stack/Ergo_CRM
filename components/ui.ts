@@ -14,9 +14,6 @@ export const card = "rounded-2xl border border-line bg-surface";
 /** Karte, die auf einen Klick wartet: hebt sich unter dem Zeiger leicht an. */
 export const cardInteractive = `${card} transition duration-200 hover:-translate-y-px hover:border-line-strong hover:schatten-hoch`;
 
-/** Eingesenkte Flaeche - fuer Balken-Rinnen, Segment-Gruppen, Code. */
-export const surfaceSunken = "bg-sunken";
-
 // Spaltenbreiten. Eine Seite waehlt nicht mehr selbst eine Zahl, sondern die
 // Rolle ihrer Spalte - dann wachsen alle Seiten gleich mit dem Bildschirm.
 //
@@ -50,10 +47,10 @@ export const btnPrimary =
   "inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-akzent px-5 py-3 text-base font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600 disabled:opacity-60";
 
 export const btnSecondary =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink transition hover:border-line-strong hover:bg-sunken hover:text-ink active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent";
 
 export const btnGhost =
-  "text-sm font-medium text-slate-500 transition hover:text-slate-900";
+  "text-sm font-medium text-link transition hover:text-link-stark";
 
 const inputBasis =
   "min-h-12 w-full rounded-xl border border-line-strong bg-surface px-3.5 py-3 text-base text-ink transition placeholder:text-ink-soft focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/25";
@@ -70,23 +67,19 @@ export const input = `mt-1.5 ${inputBasis}`;
 // ausgesehen.
 export const inputBlank = inputBasis;
 
-export const label = "block text-[13px] font-medium text-slate-600";
+export const label = "block text-13 font-medium text-ink-muted";
 
 export const pageTitle =
   "text-3xl font-semibold tracking-[-0.035em] text-ink sm:text-4xl";
 
-export const sectionTitle = "text-base font-semibold tracking-tight text-slate-900";
+export const sectionTitle = "text-[1.0625rem] font-semibold tracking-tight text-ink";
 
 export const th =
-  "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 first:pl-5 last:pr-5";
+  "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-soft first:pl-5 last:pr-5";
 
 // Kleines Überschriften-Label über Kennzahlen ("Zahlen-DNA")
 export const kicker =
-  "text-[11px] font-semibold uppercase tracking-wider text-slate-500";
-
-// Kennzahlen: gross, ruhig, Ziffern buendig untereinander.
-export const statValue =
-  "font-semibold tabular-nums tracking-tight text-slate-900";
+  "text-[11px] font-semibold uppercase tracking-wider text-ink-soft";
 
 export const td = "px-4 py-3.5 first:pl-5 last:pr-5";
 
@@ -94,7 +87,18 @@ export const filterPill = (active: boolean) =>
   `inline-flex min-h-9 items-center rounded-full px-3.5 text-sm font-medium transition ${
     active
       ? "bg-akzent text-white schatten-karte"
-      : "border border-line-strong bg-surface text-slate-600 hover:border-slate-400 hover:text-slate-900"
+      : "border border-line-strong bg-surface text-ink-muted hover:text-ink"
+  }`;
+
+// Die EINE Segmented-Control der App: zwei bis vier gleichwertige
+// Ansichten nebeneinander, in einer eingesenkten Kapsel. Umschalter.tsx und
+// WettbewerbNav.tsx bauen ihre Umschalter bisher noch selbst - die stellen
+// erst eine spaetere Welle auf diesen Baustein um.
+export const segmentGruppe = "inline-flex items-center gap-0.5 rounded-full bg-sunken p-1";
+
+export const segmentKnopf = (aktiv: boolean) =>
+  `inline-flex min-h-11 items-center justify-center rounded-full px-3.5 text-sm font-medium transition${
+    aktiv ? " bg-surface text-ink schatten-karte" : " text-ink-muted hover:text-ink"
   }`;
 
 /**
@@ -116,10 +120,10 @@ const flaechen: Record<Ton, string> = {
 
 /** Getoente Flaeche mit passender Kante. */
 export const flaeche = (ton: Ton = "neutral") =>
-  `rounded-xl border schatten-karte ${flaechen[ton]}`;
+  `rounded-2xl border schatten-karte ${flaechen[ton]}`;
 
 const chips: Record<Ton, string> = {
-  neutral: "bg-slate-100 text-slate-600",
+  neutral: "bg-sunken text-ink-muted",
   info: "bg-navy-50 text-navy-700",
   erfolg: "bg-emerald-50 text-emerald-700",
   warnung: "bg-amber-50 text-amber-800",

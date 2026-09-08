@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { berlinLocalToUtc, berlinToday, dayToUtcDate, shiftDay } from "@/lib/dates";
 import type { TerminArt } from "@/lib/generated/prisma/enums";
+import { faelligeQuellenAbgleichen } from "@/lib/kalender/abgleich";
 
 // Eigene Kalendereintraege - alles, was kein Kundentermin ist.
 //
@@ -91,5 +92,24 @@ export async function terminLoeschen(formData: FormData) {
   // Umbau der Seite.
   await prisma.termin.deleteMany({ where: { id, ownerId: user.id } });
 
+  revalidatePath("/kalender");
+}
+
+/**
+ * "Jetzt nachsehen" auf /kalender - ein duenner, drossel-treuer Wrapper.
+ *
+ * Bewusst NICHT dieselbe Handlung wie quelleAktualisieren auf
+ * /kalender/quellen: die dort ignoriert die 15-Minuten-Drossel absichtlich,
+ * weil "von Hand" dort heisst "ich habe gerade das Passwort korrigiert". Hier
+ * heisst der Klick nur "lass mal kurz nachsehen" - deshalb bleibt die
+ * Drossel aus faelligeQuellenAbgleichen (lib/kalender/abgleich.ts) in Kraft,
+ * und eine bereits stillgelegte Quelle ruehrt dieser Aufruf nicht an (die
+ * Funktion filtert auf aktiv:true). Kein zweiter Sync-Weg, nur ein
+ * synchroner Aufruf derselben Funktion, die nach jedem Seitenbesuch ohnehin
+ * ueber after() laeuft.
+ */
+export async function jetztAbgleichen() {
+  const user = await requireUser();
+  await faelligeQuellenAbgleichen(user.id);
   revalidatePath("/kalender");
 }

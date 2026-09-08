@@ -158,7 +158,7 @@ export default async function AuswertungPage({
           {!meeting && bericht.wurzel.istDu && (
             <Link
               href="/einladen"
-              className="mt-4 inline-flex min-h-11 items-center font-medium text-akzent"
+              className="mt-4 inline-flex min-h-11 items-center font-medium text-link"
             >
               Partner einladen →
             </Link>

@@ -56,6 +56,21 @@ try {
   }
   assert.equal((await db.startProgress.findUnique({where:{userId:user.id}})).stornoChoices.length,5);
   await page.getByRole('button',{name:'Weiter mit deinem Start'}).click();
+  // The merged career scene persists only confirmed input and remains retryable.
+  await db.startProgress.update({where:{userId:user.id},data:{introAct:'karrierestufe'}});
+  await page.reload();
+  await page.getByRole('button',{name:'3',exact:true}).click();
+  await page.getByLabel('Einheiten vor der App').fill('120,50');
+  await page.route('**/willkommen',route=>route.request().method()==='POST' ? route.abort('failed') : route.continue());
+  await page.getByRole('button',{name:'Übernehmen',exact:true}).click();
+  await page.getByRole('button',{name:'Erneut versuchen',exact:true}).waitFor();
+  assert.equal((await db.user.findUnique({where:{id:user.id}})).karrierestufe,null);
+  await page.unroute('**/willkommen');
+  await page.getByRole('button',{name:'Erneut versuchen',exact:true}).click();
+  await page.waitForFunction(()=>!document.body.innerText.includes('Eine Sache noch: deine Stufe.'));
+  const career=await db.user.findUniqueOrThrow({where:{id:user.id}});
+  assert.equal(career.karrierestufe,3);assert.equal(career.einheitenStart,12050);
+  assert.equal((await db.startProgress.findUnique({where:{userId:user.id}})).introAct,'rangliste');
   // Resume the final intro act to exercise arrival without replaying unrelated quizzes.
   await db.startProgress.update({where:{userId:user.id},data:{introAct:'ankunft'}});
   await page.reload();
@@ -93,6 +108,19 @@ try {
   await page.getByRole('button',{name:'Vorschau beenden'}).click();await page.waitForURL('**/heute');
   assert.equal((await db.startProgress.findUnique({where:{userId:user.id}})).phase,'DONE');
   assert.equal(await db.contact.count({where:{ownerId:user.id}}),1);
+  // A career scene in a completed account is a preview, even when its old checkpoint survives.
+  const preview=await db.user.create({data:{name:'Career Preview',onboardingDoneAt:new Date(),karrierestufe:2,einheitenStart:4500,startTrack:'VERKAUF',startProgress:{create:{phase:'INTRO',introAct:'karrierestufe',kind:'VERKAUF'}}}});
+  await context.clearCookies();await context.addCookies([{name:authCookieName,value:await createSession(preview.id),url:origin}]);
+  await page.goto(`${origin}/willkommen`);
+  await page.setViewportSize({width:320,height:568});
+  await page.getByRole('button',{name:'6',exact:true}).click();
+  await page.getByLabel('Einheiten vor der App').fill('999,00');
+  await page.getByRole('button',{name:'Weiter',exact:true}).click();
+  await page.waitForFunction(()=>!document.body.innerText.includes('Eine Sache noch: deine Stufe.'));
+  const unchanged=await db.user.findUniqueOrThrow({where:{id:preview.id}});
+  assert.equal(unchanged.karrierestufe,2);assert.equal(unchanged.einheitenStart,4500);
+  assert.equal((await db.startProgress.findUnique({where:{userId:preview.id}})).introAct,'karrierestufe');
+  await page.setViewportSize({width:390,height:844});
   // The full game remains independently playable.
   await page.goto(`${origin}/storno.html`);
   await page.locator('#startBtn').click();await page.locator('#btnL').waitFor({state:'visible'});
@@ -133,7 +161,7 @@ try {
   await page.goto(`${origin}/willkommen`);
   await page.screenshot({path:new URL('desktop.png',output).pathname.replace(/^\/([A-Z]:)/,'$1'),fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('PASS: mobile Storno → collection → postpone/resume → phone → explicit call plan; demo; ordinary game; early skip; offline sprint retry and reload; desktop.');
+  console.log('PASS: mobile Storno → career setup/retry → collection → postpone/resume → phone → explicit call plan; career demo; ordinary game; early skip; offline sprint retry and reload; desktop.');
 } catch(e) {
   console.error(e);
   if(browser) for(const context of browser.contexts()) for(const page of context.pages()) {

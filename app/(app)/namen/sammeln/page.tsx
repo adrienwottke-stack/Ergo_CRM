@@ -31,11 +31,11 @@ function Kopf({ unterzeile, zurueck }: { unterzeile: string; zurueck: string }) 
     <div className="flex items-start justify-between gap-3">
       <div>
         <h1 className={pageTitle}>Namen sammeln</h1>
-        <p className="mt-1 text-sm text-slate-500">{unterzeile}</p>
+        <p className="mt-1 text-sm text-ink-muted">{unterzeile}</p>
       </div>
       <Link
         href={zurueck}
-        className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
+        className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
       >
         <XIcon className="h-4 w-4" />
         Beenden
@@ -98,30 +98,30 @@ export default async function SammelnPage({
             >
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-2">
-                  <span className="text-base font-semibold text-slate-900">
+                  <span className="text-base font-semibold text-ink">
                     {listKindListLabels[wert]}
                   </span>
                   {user.startTrack === wert && (
                     <span className={chip("info")}>Dein Ziel</span>
                   )}
                 </span>
-                <span className="mt-1 block text-sm text-slate-600">
+                <span className="mt-1 block text-sm text-ink-muted">
                   {listKindHints[wert]}
                 </span>
-                <span className="mt-2 block text-13 text-slate-400">
+                <span className="mt-2 block text-13 text-ink-soft">
                   {anzahl[wert] === 0
                     ? "Noch keine Namen"
                     : `${anzahl[wert]} ${anzahl[wert] === 1 ? "Name steht" : "Namen stehen"} schon dort`}
                 </span>
               </span>
-              <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-300" />
+              <ChevronRightIcon className="h-5 w-5 shrink-0 text-ink-soft" />
             </Link>
           ))}
         </div>
 
         {/* Der Satz nimmt der Frage das Gewicht: falsch tippen kostet hier
             keinen Abend mehr, seit der Abschluss die ganze Runde umhaengt. */}
-        <p className={`${card} px-4 py-3 text-13 text-slate-500`}>
+        <p className={`${card} px-4 py-3 text-13 text-ink-muted`}>
           Zehn Fragen, danach stehen die Namen auf dieser Liste. Vertippt? Am
           Ende der Runde hängst du alle mit einem Tipp um.
         </p>

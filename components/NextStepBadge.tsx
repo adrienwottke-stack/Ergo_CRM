@@ -15,10 +15,10 @@ const timeFormat = new Intl.DateTimeFormat("de-DE", {
 });
 
 const dueStyles: Record<DueState, string> = {
-  overdue: "bg-red-50 text-red-700 ring-red-600/20",
-  today: "bg-amber-50 text-amber-800 ring-amber-600/20",
-  week: "bg-slate-100 text-slate-700 ring-slate-500/15",
-  later: "bg-slate-50 text-slate-500 ring-slate-400/15",
+  overdue: "bg-red-50 text-red-700",
+  today: "bg-amber-50 text-amber-800",
+  week: "bg-sunken text-ink-muted",
+  later: "bg-sunken text-ink-soft",
 };
 
 export function formatDue(at: string | Date, withTime: boolean): string {
@@ -41,7 +41,7 @@ export default function NextStepBadge({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${dueStyles[state]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${dueStyles[state]}`}
     >
       {nextStepLabels[type]}
       <span className="opacity-70">·</span>

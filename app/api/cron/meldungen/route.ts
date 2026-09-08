@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { berlinToday, dayToUtcDate } from "@/lib/dates";
-import { SCHWELLEN } from "@/lib/signale";
+import { berlinLocalToUtc, berlinToday, dayToUtcDate, endOfBerlinDay } from "@/lib/dates";
+import { ampelKriterien } from "@/lib/ampelKriterien";
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
 import { pushEingerichtet, sendeMeldung } from "@/lib/push";
 import {
@@ -78,8 +78,15 @@ export async function GET(request: NextRequest) {
   }
 
   const heute = berlinToday();
-  const heuteStart = dayToUtcDate(heute);
-  const stilleGrenze = new Date(Date.now() - SCHWELLEN.stilleTage * TAG_MS);
+  // Termine und Wiedervorlagen sind echte Zeitpunkte. Ihre Tagesgrenzen
+  // liegen in Berlin; nur DailyLog und Einheiten verwenden UTC-Tagesmarker.
+  const heuteStart = berlinLocalToUtc(`${heute}T00:00`)!;
+  const heuteEnde = endOfBerlinDay(heute);
+  // Dieselben Kriterien wie in der Mannschafts-Ampel (Werkstatt-Werte, sonst
+  // Platzhalter) - der Morgen-Anstoss darf nicht bei anderen Zahlen anschlagen
+  // als die Seite, auf die er zeigt.
+  const schwellen = await ampelKriterien();
+  const stilleGrenze = new Date(Date.now() - schwellen.stilleTage * TAG_MS);
 
   const [konten, faellig, offeneNamen, aktivHeute, termineHeute, liegende] =
     await Promise.all([
@@ -107,7 +114,7 @@ export async function GET(request: NextRequest) {
       where: {
         outcome: "OFFEN",
         nextStepType: { not: null },
-        nextStepAt: { lt: new Date(heuteStart.getTime() + TAG_MS) },
+        nextStepAt: { lt: heuteEnde },
       },
       _count: { _all: true },
     }),
@@ -135,7 +142,7 @@ export async function GET(request: NextRequest) {
         outcome: { not: "VERLOREN" },
         appointmentAt: {
           gte: heuteStart,
-          lt: new Date(heuteStart.getTime() + TAG_MS),
+          lt: heuteEnde,
         },
       },
       orderBy: { appointmentAt: "asc" },
@@ -304,7 +311,7 @@ export async function GET(request: NextRequest) {
   // einen Konflikt.
   const nameVon = new Map(konten.map((konto) => [konto.id, konto.name]));
   const kontoVon = new Map(konten.map((konto) => [konto.id, konto]));
-  const ankunftGrenze = new Date(Date.now() - SCHWELLEN.ankunftFristTage * TAG_MS);
+  const ankunftGrenze = new Date(Date.now() - schwellen.ankunftFristTage * TAG_MS);
 
   const auffaellig = (konto: (typeof konten)[number]): string | null => {
     // Wer den Start nie beendet hat, ist der haeufigste stille Abgang - und
@@ -316,7 +323,7 @@ export async function GET(request: NextRequest) {
     }
     const zuletzt = letzteJe.get(konto.id);
     if (!zuletzt || zuletzt < stilleGrenze) return "hat zuletzt keine Aktivität eingetragen";
-    if (pipelineFreigegeben(konto.visibility) && (namenJe.get(konto.id) ?? 0) < NACHFUELL_SCHWELLE) return "hat wenige offene Namen";
+    if (pipelineFreigegeben(konto.visibility) && (namenJe.get(konto.id) ?? 0) < schwellen.pipelineMindestbestand) return "hat wenige offene Namen";
     return null;
   };
 
@@ -339,7 +346,9 @@ export async function GET(request: NextRequest) {
 
   for (const leaderId of fuehrende) {
     const leader = kontoVon.get(leaderId);
-    if (!leader) continue;
+    // '/' ist ein noch nicht initialisierter Pfad, keine Freigabe für alle
+    // Konten. Die Grenze entspricht strukturKonten/lib/scope.
+    if (!leader || !leader.path.startsWith("/") || !leader.path.endsWith(`/${leader.id}/`)) continue;
 
     const treffer = konten
       .filter(

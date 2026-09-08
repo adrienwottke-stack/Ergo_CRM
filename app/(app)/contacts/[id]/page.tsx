@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
+import { istAn, merkeNutzung } from "@/lib/features";
+import { kandidaturKarteSelect, type KandidaturKarteDaten } from "@/lib/kandidatur";
 import {
   berlinToday,
   dueState,
@@ -15,6 +19,8 @@ import NextStepBadge, { formatDue } from "@/components/NextStepBadge";
 import ContactActions from "@/components/ContactActions";
 import QuickRowActions from "@/components/QuickRowActions";
 import DeleteContactButton from "@/components/DeleteContactButton";
+import KandidaturKarte from "@/components/KandidaturKarte";
+import QrCode from "@/components/schleuse/QrCode";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import { contactStageHints, lostReasonLabels } from "@/lib/pipeline";
 import { activityTypeLabels } from "@/lib/labels";
@@ -53,9 +59,9 @@ function ActivityIcon({ type }: { type: ActivityType }) {
 }
 
 const activityDotStyles: Record<ActivityType, string> = {
-  CALL: "bg-navy-50 text-navy-700 ring-navy-600/15",
-  MEETING: "bg-teal-50 text-teal-700 ring-teal-600/15",
-  EMAIL: "bg-slate-100 text-slate-500 ring-slate-500/15",
+  CALL: "bg-navy-50 text-navy-700",
+  MEETING: "bg-teal-50 text-teal-700",
+  EMAIL: "bg-sunken text-ink-muted",
 };
 
 export default async function ContactDetailPage({
@@ -79,6 +85,38 @@ export default async function ContactDetailPage({
 
   if (!contact) {
     notFound();
+  }
+
+  // Aufbau-Trichter (docs/recruiting-plan.md, §2.1): die Kandidatur-Karte
+  // erscheint NUR, wenn der Kontakt auf der Recruiting-Liste steht - Position
+  // statt Rolle, kein zweiter Modus-Schalter. Der Baustein-Schalter kommt
+  // trotzdem oben drauf: AUS heisst, hier taucht nichts auf.
+  const zeigtAufbau =
+    contact.listKinds.includes("RECRUITING") && (await istAn("aufbau"));
+
+  let kandidatur: KandidaturKarteDaten | null = null;
+  let herkunft = "";
+  let qrCode: ReactNode = null;
+  if (zeigtAufbau) {
+    const [gefundeneKandidatur, kopfzeilen, person] = await Promise.all([
+      prisma.kandidatur.findFirst({
+        where: { contactId: contact.id, ownerId: user.id, outcome: "OFFEN" },
+        select: kandidaturKarteSelect,
+      }),
+      headers(),
+      // Weich statt requireUserPerson: eine fehlende Zaehlstelle darf diese
+      // Seite nicht zum Absturz bringen (Regel 2, lib/features.ts).
+      prisma.person.findUnique({ where: { userId: user.id }, select: { id: true } }),
+    ]);
+    kandidatur = gefundeneKandidatur;
+    herkunft = `${kopfzeilen.get("x-forwarded-proto") ?? "http"}://${kopfzeilen.get("host") ?? ""}`;
+    // Die Herkunft kommt vom Server, nicht aus window.location - sonst zeigt
+    // der erste Frame einen halben Link (dasselbe Muster wie in
+    // app/(app)/einladen/page.tsx und components/PersonAufnehmen.tsx).
+    if (kandidatur?.invite) {
+      qrCode = <QrCode text={`${herkunft}/einladung/${kandidatur.invite.code}`} />;
+    }
+    await merkeNutzung("aufbau", person?.id ?? null);
   }
 
   const today = berlinToday();
@@ -108,7 +146,7 @@ export default async function ContactDetailPage({
       <div>
         <Link
           href="/heute"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Zurück zu Heute
@@ -123,7 +161,7 @@ export default async function ContactDetailPage({
                 <h1 className={pageTitle}>{contact.name}</h1>
                 <StageBadge stage={contact.stage} outcome={contact.outcome} />
               </div>
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="mt-0.5 text-sm text-ink-muted">
                 {contact.source ? `${contact.source} · ` : ""}
                 Kontakt seit {dateFormat.format(contact.createdAt)}
               </p>
@@ -157,17 +195,17 @@ export default async function ContactDetailPage({
                   withTime={hasTimeOfDay(contact.nextStepAt)}
                 />
                 {contact.nextStepNote && (
-                  <span className="text-sm text-slate-600">{contact.nextStepNote}</span>
+                  <span className="text-sm text-ink-muted">{contact.nextStepNote}</span>
                 )}
               </div>
             ) : contact.outcome === "VERLOREN" ? (
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-ink-muted">
                 Verloren
                 {contact.lostReason ? ` · ${lostReasonLabels[contact.lostReason]}` : ""}
                 {contact.lostAt ? ` am ${dateFormat.format(contact.lostAt)}` : ""}
               </p>
             ) : contact.stage === "ABSCHLUSS" ? (
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-ink-muted">
                 Schleife durchlaufen – abgeschlossen.
               </p>
             ) : (
@@ -175,29 +213,44 @@ export default async function ContactDetailPage({
                 Kein nächster Schritt gesetzt.
               </p>
             )}
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-ink-muted">
               {contactStageHints[contact.stage]}
             </p>
           </div>
         </div>
-        <div className="mt-4 border-t border-slate-100 pt-4">
+        <div className="mt-4 border-t border-line pt-4">
           {(istTermin || istAnruf) && <div className="space-y-3">
-            <p className="text-base font-semibold text-slate-900">{istTermin ? "Wie ist der Termin gelaufen?" : "Anrufergebnis festhalten"}</p>
+            <p className="text-base font-semibold text-ink">{istTermin ? "Wie ist der Termin gelaufen?" : "Anrufergebnis festhalten"}</p>
             <QuickRowActions contact={lite} istAnruf={istAnruf} istTermin={istTermin} zeigeWeitere={false} />
           </div>}
-          <details className={istTermin || istAnruf ? "mt-4 border-t border-slate-100 pt-2" : ""}>
-            <summary className="flex min-h-12 cursor-pointer list-item items-center py-3 text-base font-medium text-slate-700">Weitere Kontaktaktionen</summary>
+          <details className={istTermin || istAnruf ? "mt-4 border-t border-line pt-2" : ""}>
+            <summary className="flex min-h-12 cursor-pointer list-item items-center py-3 text-base font-medium text-ink-muted">Weitere Kontaktaktionen</summary>
             <div className="pb-2 pt-2"><ContactActions contact={lite} /></div>
           </details>
         </div>
       </section>
+
+      {/* Aufbau-Trichter: nur fuer Kontakte auf der Recruiting-Liste, gut
+          sichtbar direkt unter dem Verkaufs-Schritt, aber ohne ihn zu
+          verdraengen - Verkauf bleibt fuer jeden Kontakt der erste Block. */}
+      {zeigtAufbau && (
+        <section id="kandidatur" className="scroll-mt-24">
+          <KandidaturKarte
+            contactId={contact.id}
+            contactName={contact.name}
+            kandidatur={kandidatur}
+            herkunft={herkunft}
+            qrCode={qrCode}
+          />
+        </section>
+      )}
 
       {/* Was vor einem Anruf zaehlt - mehr nicht. Alles Weitere stand hier
           frueher, weil es das Feld gab, nicht weil es jemand braucht. */}
       <div className={`${card} grid gap-x-8 gap-y-5 p-6 sm:grid-cols-2 sm:p-8`}>
         <div>
           <p className={kicker}>Telefon</p>
-          <p className="mt-1 text-sm text-slate-900">
+          <p className="mt-1 text-sm text-ink">
             {contact.phone ? (
               <a
                 href={`tel:${contact.phone}`}
@@ -212,12 +265,12 @@ export default async function ContactDetailPage({
         </div>
         <div>
           <p className={kicker}>Beruf</p>
-          <p className="mt-1 text-sm text-slate-900">{contact.job ?? "–"}</p>
+          <p className="mt-1 text-sm text-ink">{contact.job ?? "–"}</p>
         </div>
         {contact.appointmentAt && (
           <div>
             <p className={kicker}>Termin</p>
-            <p className="mt-1 text-sm text-slate-900">
+            <p className="mt-1 text-sm text-ink">
               {formatDue(contact.appointmentAt, hasTimeOfDay(contact.appointmentAt))}
             </p>
           </div>
@@ -226,7 +279,7 @@ export default async function ContactDetailPage({
         {contact.email && (
           <div>
             <p className={kicker}>E-Mail</p>
-            <p className="mt-1 text-sm text-slate-900">
+            <p className="mt-1 text-sm text-ink">
               <a
                 href={`mailto:${contact.email}`}
                 className="font-medium text-navy-600 hover:underline"
@@ -239,7 +292,7 @@ export default async function ContactDetailPage({
         {contact.note && (
           <div className="sm:col-span-2">
             <p className={kicker}>Notiz</p>
-            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">
               {contact.note}
             </p>
           </div>
@@ -261,7 +314,7 @@ export default async function ContactDetailPage({
         <section className={`${card} space-y-4 p-6 sm:p-8`}>
           <h2 className={sectionTitle}>Empfehlungen</h2>
           {contact.referredBy && (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-ink-muted">
               Empfohlen von{" "}
               <Link
                 href={`/contacts/${contact.referredBy.id}`}
@@ -274,14 +327,14 @@ export default async function ContactDetailPage({
           {contact.referrals.length > 0 && (
             <div>
               <p className={kicker}>Hat empfohlen ({contact.referrals.length})</p>
-              <ul className="mt-2 divide-y divide-slate-100">
+              <ul className="mt-2 divide-y divide-line">
                 {contact.referrals.map((referral) => (
                   <li key={referral.id}>
                     <Link
                       href={`/contacts/${referral.id}`}
                       className="flex min-h-11 items-center justify-between gap-3"
                     >
-                      <span className="text-sm font-medium text-slate-900">
+                      <span className="text-sm font-medium text-ink">
                         {referral.name}
                       </span>
                       <StageBadge stage={referral.stage} outcome={referral.outcome} />
@@ -299,15 +352,15 @@ export default async function ContactDetailPage({
       <div className="space-y-5">
         <h2 className={sectionTitle}>
           Vorgeschichte{" "}
-          <span className="font-normal text-slate-400">
+          <span className="font-normal text-ink-soft">
             ({contact.activities.length})
           </span>
         </h2>
 
         {contact.activities.length === 0 ? (
           <div className={`${card} px-6 py-12 text-center`}>
-            <p className="text-sm font-medium text-slate-900">Noch nichts passiert</p>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="text-sm font-medium text-ink">Noch nichts passiert</p>
+            <p className="mt-1 text-sm text-ink-muted">
               Jeder Anruf und jeder Termin landet hier automatisch.
             </p>
           </div>
@@ -318,24 +371,24 @@ export default async function ContactDetailPage({
                 {index < contact.activities.length - 1 && (
                   <span
                     aria-hidden
-                    className="absolute left-[calc(1rem-1px)] top-9 h-[calc(100%-1.5rem)] w-px bg-slate-200"
+                    className="absolute left-[calc(1rem-1px)] top-9 h-[calc(100%-1.5rem)] w-px bg-line"
                   />
                 )}
                 <span
-                  className={`relative z-10 mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ring-inset ${activityDotStyles[activity.type]}`}
+                  className={`relative z-10 mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${activityDotStyles[activity.type]}`}
                 >
                   <ActivityIcon type={activity.type} />
                 </span>
                 <div className={`${card} flex-1 px-5 py-4`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-13 font-semibold text-slate-900">
+                    <span className="text-13 font-semibold text-ink">
                       {activityTypeLabels[activity.type]}
                     </span>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-ink-soft">
                       {dateTimeFormat.format(activity.date)}
                     </span>
                   </div>
-                  <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                  <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">
                     {activity.text}
                   </p>
                 </div>

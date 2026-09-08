@@ -52,7 +52,20 @@ export const config = {
   // abonnierter Kalender im Handy schickt kein Cookie mit, sondern holt die
   // Adresse stumpf ab. Geschuetzt ist er ueber den Schluessel im Pfad, der sich
   // jederzeit zurueckziehen laesst.
+  //
+  // /bericht ist der Berichts-Link (docs/adr/0002-berichts-link.md) - aus
+  // demselben Grund oeffentlich: wer ihn teilt, teilt ihn an Leute ohne eigenes
+  // Konto. Geschuetzt ist er ueber den Token im Pfad, nicht ueber eine Sitzung.
+  // Der Verwaltungspfad /mannschaft/bericht faengt mit "mannschaft" an, nicht
+  // mit "bericht", und bleibt damit hinter dem Login - dieser Eintrag hier
+  // wirkt nur auf Pfade, die WOERTLICH mit "bericht" beginnen.
+  //
+  // /anfrage ist die oeffentliche Anfrage-Seite (Multiplikations-Plan): wer
+  // dort landet, hat per Definition kein Konto. Geschuetzt ist der Schreibpfad
+  // ueber Honeypot und Tageskappe in app/anfrage/actions.ts; das
+  // Admin-Postfach dazu liegt unter /werkstatt/anfragen und damit hinterm
+  // Login.
   matcher: [
-    "/((?!login|einladung|neues-passwort|start|offline|api/cron|kalender/feed|manifest\\.webmanifest|sw\\.js|icon-|apple-touch-icon\\.png|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)",
+    "/((?!login|einladung|neues-passwort|start|offline|api/cron|kalender/feed|bericht|anfrage|manifest\\.webmanifest|sw\\.js|icon-|apple-touch-icon\\.png|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)",
   ],
 };

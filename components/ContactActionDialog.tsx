@@ -99,7 +99,7 @@ export default function ContactActionDialog({
     };
 
   const footer = (submitLabel: string) => (
-    <div className="mt-5 flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+    <div className="mt-5 flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
       <button type="button" onClick={onClose} className={btnSecondary}>
         Abbrechen
       </button>
@@ -136,7 +136,7 @@ export default function ContactActionDialog({
                 </option>
               ))}
             </select>
-            <p className="mt-1.5 text-xs text-slate-500">{contactStageHints[stage]}</p>
+            <p className="mt-1.5 text-xs text-ink-muted">{contactStageHints[stage]}</p>
           </div>
 
           {needsAppointment && (
@@ -225,14 +225,14 @@ export default function ContactActionDialog({
                 </option>
               ))}
             </select>
-            <p className="mt-1.5 text-xs text-slate-500">
+            <p className="mt-1.5 text-xs text-ink-muted">
               Die Phase bleibt stehen – so ist später auswertbar, wo Kontakte
               verloren gehen. „Später nochmal“ meldet sich in 6 Monaten von selbst zurück.
             </p>
           </div>
-          <label className="mt-4 flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 px-3">
+          <label className="mt-4 flex min-h-11 items-center gap-3 rounded-xl border border-line px-3">
             <input type="checkbox" name="askReferral" className="h-4 w-4" />
-            <span className="text-sm text-slate-700">
+            <span className="text-sm text-ink-muted">
               Trotzdem nach Empfehlungen fragen (Schritt in 2 Tagen)
             </span>
           </label>
@@ -256,7 +256,7 @@ export default function ContactActionDialog({
       <form onSubmit={submit(addReferrals)}>
         <input type="hidden" name="contactId" value={contact.id} />
         <EmpfehlungsBlock key={contact.id} geberName={contact.name} />
-        <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+        <p className="mt-4 rounded-lg bg-sunken px-3 py-2 text-xs text-ink-muted">
           Auch ohne Namen speichern: die Frage gilt dann als gestellt und steht
           morgen nicht wieder da.
         </p>

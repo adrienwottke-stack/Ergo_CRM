@@ -100,7 +100,7 @@ export default async function TeamPage({
     <div className={`${columnWide} space-y-8`}>
       <div>
         <h1 className={pageTitle}>Struktur verwalten</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           Wer Berater unter sich hat, ist Führungskraft – eine eigene Rolle dafür gibt es
           nicht. Eine Führungskraft sieht Zahlen und Pipeline, bei frisch Gestarteten
           30 Tage lang auch die Vornamen ihrer Kontakte. Notizen, Telefonnummern und
@@ -109,42 +109,42 @@ export default async function TeamPage({
       </div>
 
       {error && (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-600/10">
+        <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
           {fehlertexte[error] ?? fehlertexte.invalid}
         </p>
       )}
       {moved && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Berater wurde umgehängt.
         </p>
       )}
       {invited && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Einladung erzeugt – der Link steht unten.
         </p>
       )}
       {revoked && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Einladung zurückgenommen.
         </p>
       )}
       {ausgetragen && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Konto ausgetragen. Es bleibt im Baum stehen und zählt nirgends mehr mit.
         </p>
       )}
       {zurueck && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Konto wieder aufgenommen.
         </p>
       )}
       {geloescht && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Konto gelöscht. Wer darunter hing, ist eine Ebene hochgerückt.
         </p>
       )}
       {umbenannt && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/10">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           Name geändert.
         </p>
       )}
@@ -153,10 +153,10 @@ export default async function TeamPage({
           Nachricht, in der er verschickt wurde. */}
       {reset && (
         <section className={`${card} space-y-2 p-5`}>
-          <p className="text-sm font-semibold text-slate-900">
+          <p className="text-sm font-semibold text-ink">
             Link zum Passwort-Setzen
           </p>
-          <code className="block break-all rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-800">
+          <code className="block break-all rounded-lg bg-sunken px-3 py-2 text-sm text-ink">
             {herkunft}/neues-passwort/{reset}
           </code>
           <p className={kicker}>
@@ -169,7 +169,7 @@ export default async function TeamPage({
       <section className={`${card} space-y-5 p-6 sm:p-8`}>
         <div>
           <h2 className={sectionTitle}>Einladen</h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Der Eingeladene setzt Name und Passwort selbst und hängt danach automatisch
             unter der gewählten Führungskraft. Ein Code, eine Nutzung, 14 Tage gültig.
             Der Willkommens-Ablauf führt ihn durch den ersten Tag.
@@ -201,14 +201,14 @@ export default async function TeamPage({
         </form>
 
         {offeneInvites.length > 0 && (
-          <ul className="space-y-3 border-t border-slate-100 pt-5">
+          <ul className="space-y-3 border-t border-line pt-5">
             {offeneInvites.map((invite) => (
               <li key={invite.id} className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <code className="block break-all text-sm font-medium text-slate-900">
+                  <code className="block break-all text-sm font-medium text-ink">
                     {herkunft}/einladung/{invite.code}
                   </code>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <p className="mt-0.5 text-xs text-ink-muted">
                     für {invite.leader.name}
                     {invite.note ? ` · ${invite.note}` : ""} · gültig bis{" "}
                     {createdFormat.format(invite.expiresAt)}
@@ -228,7 +228,7 @@ export default async function TeamPage({
                     <input type="hidden" name="on" value={invite.browserFreigabe ? "0" : "1"} />
                     <button
                       type="submit"
-                      className="min-h-11 rounded-lg px-3 text-xs font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                      className="min-h-11 rounded-lg px-3 text-xs font-medium text-ink-soft hover:bg-sunken hover:text-ink-muted"
                     >
                       {invite.browserFreigabe ? "App-Pflicht zurück" : "Ohne App erlauben"}
                     </button>
@@ -237,7 +237,7 @@ export default async function TeamPage({
                     <input type="hidden" name="inviteId" value={invite.id} />
                     <button
                       type="submit"
-                      className="min-h-11 rounded-lg px-3 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-red-700"
+                      className="min-h-11 rounded-lg px-3 text-sm font-medium text-ink-muted hover:bg-sunken hover:text-red-700"
                     >
                       Zurücknehmen
                     </button>
@@ -252,14 +252,14 @@ export default async function TeamPage({
       <section className={`${card} overflow-x-auto`}>
         <div className="p-6 pb-0 sm:p-8 sm:pb-0">
           <h2 className={sectionTitle}>Struktur ({users.length})</h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Einrückung zeigt die Ebene. Umhängen schreibt den ganzen Ast mit.
           </p>
           {/* Der haeufigste Griff, der nicht selbsterklaerend ist: jemanden
               UEBER sich einhaengen. Die Reihenfolge macht lib/struktur.ts
               inzwischen selbst - hier steht nur noch, was dabei passiert. */}
-          <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-            <span className="font-medium text-slate-800">
+          <p className="mt-2 rounded-lg bg-sunken px-3 py-2 text-sm text-ink-muted">
+            <span className="font-medium text-ink">
               Jemanden über dir einhängen
             </span>{" "}
             (deine eigene Führungskraft): in deiner Zeile auswählen und{" "}
@@ -269,7 +269,7 @@ export default async function TeamPage({
           </p>
         </div>
         <table className="mt-4 w-full min-w-190 text-left text-sm">
-          <thead className="border-y border-slate-200/80 bg-slate-50/60">
+          <thead className="border-y border-line/80 bg-sunken/60">
             <tr>
               <th className={th}>Name</th>
               <th className={th}>E-Mail</th>
@@ -281,7 +281,7 @@ export default async function TeamPage({
               <th className={th}>Konto</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line">
             {users.map((user) => {
               // Kandidaten: alle ausser dem Berater selbst. Eigene Nachfahren
               // stehen bewusst mit drin - das ist der Fall "jemanden ueber sich
@@ -291,7 +291,7 @@ export default async function TeamPage({
               const kandidaten = users.filter((kandidat) => kandidat.id !== user.id);
               return (
                 <tr key={user.id} className="transition hover:bg-navy-50/40">
-                  <td className={`${td} font-medium text-slate-900`}>
+                  <td className={`${td} font-medium text-ink`}>
                     <span style={{ paddingLeft: `${ebene(user.path) * 16}px` }} className="inline-block">
                       {user.name}
                       {user._count.team > 0 && (
@@ -300,14 +300,14 @@ export default async function TeamPage({
                         </span>
                       )}
                       {user.deactivatedAt && (
-                        <span className="ml-2 text-xs font-normal text-slate-400">ausgetreten</span>
+                        <span className="ml-2 text-xs font-normal text-ink-soft">ausgetreten</span>
                       )}
                     </span>
                   </td>
-                  <td className={`${td} text-slate-600`}>{user.email}</td>
+                  <td className={`${td} text-ink-muted`}>{user.email}</td>
                   <td className={td}>{user.role === "ADMIN" ? "Admin" : "Mitglied"}</td>
-                  <td className={`${td} text-right tabular-nums text-slate-600`}>{user._count.contacts}</td>
-                  <td className={`${td} text-right tabular-nums text-slate-600`}>{user.person?._count.dailyLogs ?? 0}</td>
+                  <td className={`${td} text-right tabular-nums text-ink-muted`}>{user._count.contacts}</td>
+                  <td className={`${td} text-right tabular-nums text-ink-muted`}>{user.person?._count.dailyLogs ?? 0}</td>
                   <td className={td}>
                     <form action={beraterUmhaengen} className="flex items-center gap-2">
                       <input type="hidden" name="userId" value={user.id} />
@@ -315,7 +315,7 @@ export default async function TeamPage({
                         name="leaderId"
                         defaultValue={user.leaderId ?? ""}
                         aria-label={`Führungskraft von ${user.name}`}
-                        className="min-h-11 rounded-lg border border-slate-200 bg-surface px-2 text-sm text-slate-700"
+                        className="min-h-11 rounded-xl border border-line bg-surface px-2 text-sm text-ink-muted"
                       >
                         <option value="">— keine (Wurzel)</option>
                         {kandidaten.map((kandidat) => (
@@ -339,7 +339,7 @@ export default async function TeamPage({
                       <span className="sr-only">{nameById.get(user.leaderId) ?? ""}</span>
                     )}
                   </td>
-                  <td className={`${td} text-slate-500`}>
+                  <td className={`${td} text-ink-muted`}>
                     {createdFormat.format(user.startedAt ?? user.createdAt)}
                   </td>
                   <td className={td}>

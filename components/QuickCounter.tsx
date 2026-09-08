@@ -77,19 +77,19 @@ export default function QuickCounter({
         </span>
         <span className={kicker}>Heute</span>
       </div>
-      <p className="mt-4 overflow-hidden text-4xl font-semibold tracking-tight tabular-nums text-slate-900">
+      <p className="mt-4 overflow-hidden text-4xl font-semibold tracking-tight tabular-nums text-ink">
         <span key={optimisticCount} className="inline-block animate-tick">
           {optimisticCount}
         </span>
       </p>
-      <p className="mt-1 text-13 font-medium text-slate-600">{label}</p>
+      <p className="mt-1 text-13 font-medium text-ink-muted">{label}</p>
       <div className="mt-4 flex items-center gap-2">
         <button
           type="button"
           onClick={handleZurueck}
           disabled={optimisticCount <= 0}
           aria-label={`${label} eins zurück`}
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-slate-400 hover:text-slate-900 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-slate-200 disabled:hover:text-slate-500 disabled:active:scale-100"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-line text-ink-muted transition hover:border-line-strong hover:text-ink active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-line disabled:hover:text-ink-muted disabled:active:scale-100"
         >
           <MinusIcon className="h-4 w-4" />
         </button>
@@ -97,7 +97,7 @@ export default function QuickCounter({
           type="button"
           onClick={handleClick}
           disabled={isPending && optimisticCount - count > 3}
-          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 transition hover:border-navy-300 hover:bg-navy-50 hover:text-navy-700 active:scale-[0.97]"
+          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line bg-sunken px-3 text-sm font-semibold text-ink transition hover:border-navy-300 hover:bg-navy-50 hover:text-navy-700 active:scale-[0.97]"
         >
           <PlusIcon className="h-4 w-4" />1
         </button>

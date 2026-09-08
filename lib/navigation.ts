@@ -34,7 +34,7 @@ export const HAUPTNAVIGATION: NavLink[] = [
       "/trichter",
     ],
   },
-  { href: "/mannschaft", label: "Team", symbol: "team", match: ["/einladen"] },
+  { href: "/mannschaft", label: "Team", symbol: "team", match: ["/einladen", "/teamabend"] },
 ];
 
 export function navAktiv(link: NavLink, pathname: string): boolean {

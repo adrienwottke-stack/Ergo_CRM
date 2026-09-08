@@ -26,7 +26,7 @@ export function FuehrungsKarten({ onDone }: { onDone: () => void }) {
       <button
         type="button"
         onClick={() => (letzte ? onDone() : setIndex(index + 1))}
-        className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+        className="min-h-12 w-full rounded-xl bg-akzent text-15 font-bold text-white transition hover:bg-akzent-stark active:scale-[0.98]"
       >
         {letzte ? "Dann lad ich mal ein" : "Weiter"}
       </button>
@@ -74,14 +74,14 @@ export function EinladenAkt({ onDone }: { onDone: () => void }) {
             value={greeting}
             onChange={(event) => setGreeting(event.target.value)}
             placeholder="Max, du hast gesagt du willst raus aus dem Lager. Los geht's."
-            className="mt-1.5 w-full rounded-xl border border-white/25 bg-white/5 px-4 py-3 text-15 text-white placeholder:text-slate-500 focus:border-gold-400 focus:outline-none"
+            className="mt-1.5 w-full rounded-xl border border-white/25 bg-white/5 px-4 py-3 text-15 text-white placeholder:text-slate-500 focus:border-akzent focus:outline-none"
           />
         </div>
         <button
           type="button"
           onClick={erzeugen}
           disabled={pending}
-          className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98] disabled:opacity-40"
+          className="min-h-12 w-full rounded-xl bg-akzent text-15 font-bold text-white transition hover:bg-akzent-stark active:scale-[0.98] disabled:opacity-40"
         >
           {pending ? "Wird erzeugt …" : "Link erzeugen"}
         </button>
@@ -105,7 +105,7 @@ export function EinladenAkt({ onDone }: { onDone: () => void }) {
           Infoabend gibt es unter „Einladen“.
         </p>
       </div>
-      <code className="block break-all rounded-xl bg-white/5 px-4 py-3 text-sm text-white ring-1 ring-inset ring-white/10">
+      <code className="glas-dunkel block break-all rounded-2xl border border-white/10 px-4 py-3 text-sm text-white">
         {link}
       </code>
       <div className="space-y-3">
@@ -115,7 +115,7 @@ export function EinladenAkt({ onDone }: { onDone: () => void }) {
           )}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex min-h-12 w-full items-center justify-center rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100"
+          className="flex min-h-12 w-full items-center justify-center rounded-xl bg-akzent text-15 font-bold text-white transition hover:bg-akzent-stark"
         >
           Per WhatsApp verschicken
         </a>

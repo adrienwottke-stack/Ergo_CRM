@@ -1,11 +1,11 @@
-// Schlanke Outline-Icons (stroke 1.75) – bewusst ohne Icon-Library.
+// Schlanke Outline-Icons (stroke 1.5) – bewusst ohne Icon-Library.
 
 function iconProps(className?: string) {
   return {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    strokeWidth: 1.75,
+    strokeWidth: 1.5,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
     className: className ?? "h-5 w-5",

@@ -80,6 +80,54 @@ test("Echte Abfragen aggregieren vier Ebenen einmal und trennen Startbestand sow
   assert.equal(bericht.team.kurve.at(-1).kumuliert, 6500);
 });
 
+test("Einheitenseite, Strukturverlauf und Faltung zählen aktive Nachfahren unter fehlenden Führungsknoten gleich", async () => {
+  const db = fixture.client;
+  const { teamEinheiten, einheitenFuerStruktur, strukturVerlauf, monatsDeltaJe, produktionsmonat, teamVerlauf, teamSockel } = await import("../lib/einheiten.ts");
+  const { berlinToday, dayToUtcDate, addMonths, startOfMonth } = await import("../lib/dates.ts");
+  const heute = berlinToday();
+  const tag = dayToUtcDate(heute);
+  const vormonat = addMonths(startOfMonth(heute), -1);
+  for (const data of [
+    { id: "einheiten-lead", path: "/einheiten-lead/", passwordHash: "nur-test" },
+    { id: "einheiten-platzhalter", path: "/einheiten-lead/einheiten-platzhalter/", leaderId: "einheiten-lead", einheitenStart: 50000 },
+    { id: "einheiten-inaktiv", path: "/einheiten-lead/einheiten-inaktiv/", leaderId: "einheiten-lead", passwordHash: "nur-test", deactivatedAt: tag, einheitenStart: 80000 },
+    { id: "einheiten-aktiv", path: "/einheiten-lead/einheiten-inaktiv/einheiten-aktiv/", leaderId: "einheiten-inaktiv", passwordHash: "nur-test" },
+    { id: "einheiten-unter-platzhalter", path: "/einheiten-lead/einheiten-platzhalter/einheiten-unter-platzhalter/", leaderId: "einheiten-platzhalter", passwordHash: "nur-test" },
+  ]) await db.user.create({ data: { name: data.id, ...data } });
+  await db.einheitenbuchung.createMany({ data: [
+    { userId: "einheiten-aktiv", hundertstel: 2500, tag },
+    { userId: "einheiten-aktiv", hundertstel: -500, tag },
+    { userId: "einheiten-aktiv", hundertstel: 700, tag: vormonat },
+    { userId: "einheiten-unter-platzhalter", hundertstel: 400, tag },
+    { userId: "einheiten-inaktiv", hundertstel: 80000, tag },
+    { userId: "einheiten-platzhalter", hundertstel: 50000, tag },
+  ] });
+  const personen = await db.user.findMany({ where: { path: { startsWith: "/einheiten-lead/" } }, select: { id: true, path: true } });
+  // Ein versehentlich doppelt gelieferter Kopf darf den Ast nicht verdoppeln.
+  personen.push(personen.find(person => person.id === "einheiten-aktiv"));
+  const [seite, faltung, verlauf, delta, bericht] = await Promise.all([
+    teamEinheiten("einheiten-lead", produktionsmonat(heute)),
+    einheitenFuerStruktur(personen, produktionsmonat(heute)),
+    strukturVerlauf("einheiten-lead"),
+    monatsDeltaJe(personen, heute),
+    ladeTeamauswertung({ id: "einheiten-lead", role: "MEMBER" }, { umfang: "struktur", zeit: "monat", tag: heute }),
+  ]);
+  assert.deepEqual(seite, { gesamt: 3100, monat: 2400 });
+  assert.equal(bericht.team.einheitenGesamt, seite.gesamt);
+  assert.equal(bericht.team.einheitenZeitraum, seite.monat);
+  assert.equal(faltung.get("einheiten-lead").astGesamt, seite.gesamt);
+  assert.equal(faltung.get("einheiten-lead").astMonat, seite.monat);
+  assert.equal(faltung.has("einheiten-platzhalter"), false);
+  assert.equal(faltung.has("einheiten-inaktiv"), false);
+  assert.equal(verlauf.sockel, 0, "Undatierter Platzhalter-Startbestand zählt nicht");
+  assert.equal(verlauf.tage.reduce((summe, zeile) => summe + zeile.hundertstel, verlauf.sockel), seite.gesamt);
+  assert.deepEqual(delta.get("einheiten-lead"), { astMonat: 2400, astVormonat: 700 });
+  // Auch ein Aufrufer, der inaktive IDs mitgibt, erweitert die Zählquelle nicht.
+  assert.equal(await teamSockel(personen.map(person => person.id)), 0);
+  assert.equal((await teamVerlauf(personen.map(person => person.id))).reduce((summe, zeile) => summe + zeile.hundertstel, 0), 3100);
+  assert.equal(await teamEinheiten("einheiten-aktiv", produktionsmonat(heute)), null);
+});
+
 test("ZAHLEN und NAMEN geben Aktivitätssummen frei, fehlende Profile bleiben eine Datenlücke", async () => {
   const bericht = await ladeTeamauswertung(betrachter, filter);
   assert.equal(bericht.team.aktivitaetsKonten, 4);

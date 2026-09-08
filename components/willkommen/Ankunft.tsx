@@ -27,7 +27,7 @@ export default function Ankunft({ track, demo, guidance, initialGoal }: {
     router.replace(demo ? paused ? "/heute" : `/namen/sammeln${track ? `?liste=${track}` : ""}` : await startAnkommen(paused,track));
     router.refresh();
   });
-  const primary = "min-h-14 w-full rounded-xl bg-gold-400 px-4 text-lg font-semibold text-navy-950 disabled:opacity-40";
+  const primary = "min-h-14 w-full rounded-xl bg-akzent px-4 text-lg font-semibold text-white disabled:opacity-40";
   return <div className="flex h-full flex-col justify-center gap-6 overflow-y-auto py-4 text-white">
     {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
     {goal === "offen" ? <>

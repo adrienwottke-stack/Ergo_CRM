@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies, headers } from "next/headers";
 import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import {
   addMonths,
   berlinToday,
@@ -14,12 +15,21 @@ import {
 } from "@/lib/dates";
 import { eintraegeImZeitraum } from "@/lib/kalender/laden";
 import { faelligeQuellenAbgleichen } from "@/lib/kalender/abgleich";
-import { kicker, pageTitle, shell, btnPrimary, btnSecondary } from "@/components/ui";
-import { CalendarCheckIcon, PlusIcon } from "@/components/icons";
+import {
+  kicker,
+  pageTitle,
+  shell,
+  btnPrimary,
+  btnSecondary,
+  flaeche,
+  punkt,
+} from "@/components/ui";
+import { ArrowRightIcon, CalendarCheckIcon, PlusIcon } from "@/components/icons";
 import { Umschalter, type Ansicht } from "@/components/kalender/Umschalter";
 import { Zeitraster } from "@/components/kalender/Zeitraster";
 import { Monatsraster } from "@/components/kalender/Monatsraster";
 import { Agenda } from "@/components/kalender/Agenda";
+import { jetztAbgleichen } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -54,8 +64,60 @@ const kurzFormat = new Intl.DateTimeFormat("de-DE", {
   timeZone: "UTC",
 });
 
+// Fuer die Sync-Status-Zeile unten - dieselben Feldoptionen wie das
+// "zuletzt"-Datum auf /kalender/quellen, nur in dieser Datei noch einmal
+// angelegt: page.tsx-Module exportieren ihre internen Konstanten nicht.
+const zuletztFormat = new Intl.DateTimeFormat("de-DE", {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "Europe/Berlin",
+});
+
 function istAnsicht(wert: string | undefined): wert is Ansicht {
   return wert === "monat" || wert === "woche" || wert === "tag" || wert === "liste";
+}
+
+type QuellenZeile = { name: string; letzterLauf: Date | null; letzterFehler: string | null };
+
+/**
+ * Der Sync-Zustand als ein Satz - fuer die Zeile oben auf der Seite.
+ *
+ * "Gestoert" heisst hier: der letzte Lauf dieser Quelle ist fehlgeschlagen
+ * (letzterFehler gesetzt). Das trifft sowohl die Quelle, die nach drei
+ * Fehllaeufen stillgelegt wurde, als auch die, die es noch einmal versucht -
+ * quelleAbgleichen setzt letzterFehler und fehlerZaehler immer gemeinsam
+ * (lib/kalender/abgleich.ts), nie eines ohne das andere.
+ */
+function kalenderSyncZustand(
+  quellen: QuellenZeile[]
+): { zeitText: string; gestoerte: QuellenZeile[] } | null {
+  if (quellen.length === 0) return null;
+
+  const gestoerte = quellen.filter((quelle) => quelle.letzterFehler);
+
+  const laeufe = quellen
+    .map((quelle) => quelle.letzterLauf)
+    .filter((datum): datum is Date => datum !== null);
+  const letzterLauf =
+    laeufe.length > 0
+      ? new Date(Math.max(...laeufe.map((datum) => datum.getTime())))
+      : null;
+
+  if (!letzterLauf) {
+    return { zeitText: "Noch nicht abgeglichen", gestoerte };
+  }
+
+  const minuten = Math.floor((Date.now() - letzterLauf.getTime()) / 60_000);
+  const zeitText =
+    minuten < 1
+      ? "Zuletzt abgeglichen gerade eben"
+      : minuten < 60
+        ? `Zuletzt abgeglichen vor ${minuten} Min.`
+        : `Zuletzt abgeglichen ${zuletztFormat.format(letzterLauf)}`;
+
+  return { zeitText, gestoerte };
 }
 
 export default async function KalenderPage({
@@ -151,13 +213,24 @@ export default async function KalenderPage({
 
   const wochentage = Array.from({ length: 7 }, (_, i) => shiftDay(mondayOf(tag), i));
 
+  // Sync-Zustand der angebundenen Quellen - fuer die Status-Zeile oben.
+  // Eine kleine, gezielte Abfrage extra zu den Kalendereintraegen oben: nur
+  // die drei Felder, die der Satz braucht, keine Fremdtermine mitgeladen.
+  const quellenZeilen = await prisma.kalenderquelle.findMany({
+    where: { ownerId: user.id },
+    select: { name: true, letzterLauf: true, letzterFehler: true },
+  });
+  const syncZustand = kalenderSyncZustand(quellenZeilen);
+
   // Angebundene Kalender nachfassen - NACH der Antwort, nicht davor.
   //
   // Vor dem Rendern haette der Aufruf jeden Seitenaufruf um die Anmeldung bei
   // TimeTree verlaengert, also um Sekunden, die niemand fuer fremde Termine
   // ausgeben will. So ist das Ergebnis erst beim naechsten Aufruf da - dafuer
-  // ist die Seite sofort da. Wer nicht warten will, hat auf der Quellen-Seite
-  // den Knopf "Jetzt holen".
+  // ist die Seite sofort da. Wer nicht warten will, tippt oben "Jetzt
+  // nachsehen" (haelt sich weiter an die 15-Minuten-Drossel) oder geht auf
+  // die Quellen-Seite und drueckt dort "Jetzt holen" (bricht die Drossel
+  // bewusst, siehe dort).
   //
   // Der Cron in vercel.json reicht dafuer nicht: auf dem Hobby-Tarif darf er
   // nur einmal am Tag laufen.
@@ -175,7 +248,7 @@ export default async function KalenderPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className={pageTitle}>Kalender</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             {imFenster.length === 0
               ? "Nichts in diesem Zeitraum."
               : `${imFenster.length} ${imFenster.length === 1 ? "Eintrag" : "Einträge"}.`}
@@ -192,6 +265,56 @@ export default async function KalenderPage({
           </Link>
         </div>
       </div>
+
+      {syncZustand && (
+        <div
+          className={
+            syncZustand.gestoerte.length > 0
+              ? `${flaeche("gefahr")} flex flex-wrap items-center justify-between gap-3 px-4 py-3`
+              : "flex flex-wrap items-center justify-between gap-3"
+          }
+        >
+          <p
+            className={`flex items-center gap-2 text-sm ${
+              syncZustand.gestoerte.length > 0 ? "text-red-900" : "text-ink-muted"
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`h-2 w-2 shrink-0 rounded-full ${
+                syncZustand.gestoerte.length > 0 ? punkt.gefahr : punkt.erfolg
+              }`}
+            />
+            {syncZustand.zeitText}
+            {syncZustand.gestoerte.length > 0 &&
+              ` · ${
+                syncZustand.gestoerte.length === 1
+                  ? `${syncZustand.gestoerte[0]!.name} gestört`
+                  : `${syncZustand.gestoerte.length} Quellen gestört`
+              }`}
+          </p>
+
+          {/* Beide Knoepfe tragen ihre 44 Pixel selbst: "Jetzt nachsehen" stand
+              vorher auf btnGhost, und das ist reiner Text ohne Mindesthoehe -
+              rund 20 Pixel Trefferflaeche an genau der Stelle, an der am Handy
+              getippt wird. */}
+          {syncZustand.gestoerte.length > 0 ? (
+            <Link
+              href="/kalender/quellen"
+              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-fest-gefahr px-4 text-sm font-semibold text-white transition hover:bg-fest-gefahr-stark"
+            >
+              Reparieren
+              <ArrowRightIcon className="h-4 w-4" />
+            </Link>
+          ) : (
+            <form action={jetztAbgleichen}>
+              <button type="submit" className={`${btnSecondary} shrink-0`}>
+                Jetzt nachsehen
+              </button>
+            </form>
+          )}
+        </div>
+      )}
 
       <Umschalter
         ansicht={ansicht}

@@ -9,9 +9,9 @@ export default function manifest(): MetadataRoute.Manifest {
     // start_url aus, und ohne gleiche id hielte Chrome das fuer eine zweite
     // App und legte ein zweites Symbol an.
     id: "/",
-    name: "Ergo CRM",
-    short_name: "Ergo CRM",
-    description: "Namensliste und Kontakt-Tracking für das Ergo-Netzwerk",
+    name: "Cockpit",
+    short_name: "Cockpit",
+    description: "Namensliste und Kontakt-Tracking für dein Team",
     // Nicht direkt auf eine Seite, sondern auf die Weiche: /start entscheidet
     // je nach Anmeldung, wo es weitergeht (app/start/route.ts).
     start_url: "/start",
@@ -20,8 +20,8 @@ export default function manifest(): MetadataRoute.Manifest {
     // Gilt nur fuer Handys - Fenster am Rechner dreht niemand hochkant, und
     // Chrome wie Safari ignorieren die Angabe dort.
     orientation: "portrait",
-    background_color: "#0a1628",
-    theme_color: "#0a1628",
+    background_color: "#0a101c",
+    theme_color: "#0a101c",
     lang: "de",
     // Ein Fenster, nicht zehn. Ohne diese Zeile oeffnet jeder Klick auf einen
     // Link - aus einer Meldung, aus einer Mail - am Rechner ein weiteres

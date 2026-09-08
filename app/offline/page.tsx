@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Kein Netz · Ergo CRM" };
+export const metadata: Metadata = { title: "Kein Netz · Cockpit" };
 
 // Wird vom Service Worker ausgeliefert, wenn ein Seitenaufruf ins Leere laeuft
 // (public/sw.js). Bewusst eine echte Seite und kein Dino-Spiel: der Berater
@@ -9,7 +9,7 @@ export default function OfflinePage() {
   return (
     <div className="buehne flex min-h-screen items-center justify-center bg-navy-950 px-6 text-center">
       <div className="max-w-sm">
-        <p className="text-sm font-medium uppercase tracking-wider text-amber-300">
+        <p className="text-sm font-medium uppercase tracking-wider text-link">
           Kein Netz
         </p>
         <h1 className="mt-3 text-2xl font-semibold text-white">

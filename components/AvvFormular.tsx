@@ -14,7 +14,7 @@ function Knopf({ bereit }: { bereit: boolean }) {
     <button
       type="submit"
       disabled={!bereit || pending}
-      className="min-h-14 w-full rounded-xl bg-gold-400 text-lg font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/40 disabled:hover:bg-white/15 disabled:active:scale-100"
+      className="min-h-14 w-full rounded-xl bg-akzent text-lg font-bold text-white transition hover:bg-akzent-stark active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/40 disabled:hover:bg-white/15 disabled:active:scale-100"
     >
       {pending ? "Wird gespeichert …" : "Vertrag verbindlich annehmen"}
     </button>
@@ -40,7 +40,7 @@ export default function AvvFormular({ email }: { email: string | null }) {
             name="avv"
             checked={avv}
             onChange={(e) => setAvv(e.target.checked)}
-            className="mt-0.5 h-5 w-5 shrink-0 accent-gold-400"
+            className="mt-0.5 h-5 w-5 shrink-0 accent-akzent"
           />
           <span className="text-sm leading-relaxed">
             Ich habe den Vertrag zur Auftragsverarbeitung gelesen und nehme ihn

@@ -41,11 +41,11 @@ export default function Feed({
         {zeilen.map((zeile) => (
           <li key={zeile.id} className={`${card} p-4`}>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-sm text-slate-900">
+              <p className="text-sm text-ink">
                 <span className="font-semibold">{zeile.name}</span>{" "}
                 {zeile.text.charAt(0).toLowerCase() + zeile.text.slice(1)}
               </p>
-              <span className="text-xs text-slate-400">{wann(zeile.createdAt)}</span>
+              <span className="text-xs text-ink-soft">{wann(zeile.createdAt)}</span>
             </div>
 
             {/* Auf die eigene Meldung reagiert man nicht selbst. */}

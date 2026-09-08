@@ -99,7 +99,7 @@ try {
   assert.ok(erinnerung.faelligAm);
   await page.goto(`${origin}/fortschritt/einheiten-offen`);
   await page.getByRole('button', { name: 'Eintragen', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Einheiten', exact: true }).fill('12,5');
+  await page.getByRole('textbox', { name: 'Einheiten', exact: true }).fill('12,50');
   await page.getByRole('dialog').getByRole('button', { name: 'Eintragen', exact: true }).click();
   await page.getByRole('heading', { name: 'Einheiten eingetragen', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Weiter', exact: true }).click();
@@ -204,6 +204,10 @@ try {
   await page.reload(); assert.equal(await page.getByLabel('Schwerpunkt der Startseite').inputValue(), 'EIGEN');
   assert.equal((await db.user.findUnique({ where: { id: 'lead' } })).arbeitsfokus, 'EIGEN');
   await page.goto(`${origin}/mannschaft`); await noOverflow(); await capture('08-team');
+  await page.goto(`${origin}/mannschaft?bereich=ueberblick`);
+  await page.getByRole('link', { name: /Teamabend/ }).waitFor();
+  await page.locator('a[href="/mannschaft/bericht"]').waitFor();
+  await noOverflow(); await capture('08a-team-ueberblick');
   await page.goto(`${origin}/mannschaft/auswertung`); await page.getByRole('heading', { level: 1 }).waitFor(); await noOverflow(); await capture('09-auswertung');
   await page.goto(`${origin}/mannschaft/auswertung?ansicht=meeting`);
   assert.equal(await page.getByText('Anna Beispiel', { exact: true }).count(), 0);
@@ -212,8 +216,11 @@ try {
   await page.setViewportSize({ width: 430, height: 932 }); await page.goto(`${origin}/mannschaft/auswertung`); await noOverflow(); await capture('10a-iphone-gross');
   await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto(`${origin}/mannschaft/auswertung`); await noOverflow(); await capture('11-desktop');
   await page.goto(`${origin}/profil`); await capture('12-profil');
+  await page.getByRole('link', { name: /Eigene Daten exportieren/ }).click();
+  await page.getByRole('heading', { level: 1 }).waitFor();
+  assert.ok(page.url().endsWith('/konto/export'), 'Data export remains reachable through the profile');
   assert.deepEqual(errors, [], 'No client rendering errors');
-  await writeFile(new URL('result.json', output), JSON.stringify({ passed: true, mode: production ? 'production' : 'development', profiles: 3, mobileWidths: [320, 390, 430], desktopWidth: 1440, screenshots: 16, contactId: anna.id, agreementId: abspracheVorschlag.id }, null, 2));
+  await writeFile(new URL('result.json', output), JSON.stringify({ passed: true, mode: production ? 'production' : 'development', profiles: 3, mobileWidths: [320, 390, 430], desktopWidth: 1440, screenshots: 17, contactId: anna.id, agreementId: abspracheVorschlag.id }, null, 2));
   console.log('Browser acceptance passed: three work contexts, navigation, goals, shared agreement confirmation and history, privacy, calendar and reporting.');
 } catch (error) {
   await writeFile(new URL('failure.log', output), `${error.stack}\n${serverLog.slice(-8000)}`);

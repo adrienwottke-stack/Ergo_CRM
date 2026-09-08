@@ -5,6 +5,7 @@ import { startRoute } from "@/lib/start/model";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { FALLBACK_ABSENDER } from "@/lib/willkommen";
+import { formatEinheiten } from "@/lib/einheiten";
 import Willkommen from "@/components/willkommen/Willkommen";
 
 export const dynamic = "force-dynamic";
@@ -61,14 +62,16 @@ export default async function WillkommenPage() {
           select: { greeting: true, stake: true, leader: { select: { name: true } } },
         })
       : Promise.resolve(null),
-    prisma.user.count({ where: { leaderId: user.id, deactivatedAt: null } }),
+    prisma.user.count({ where: { leaderId: user.id, deactivatedAt: null, passwordHash: { not: null } } }),
     prisma.contact.count({
       where: { ownerId: user.id, listKinds: { isEmpty: false } },
     }),
   ]);
 
-  // Ohne Einladung (Admin, Altkonten) spricht die direkte Fuehrungskraft -
-  // und ganz ohne die der Fallback aus dem Drehbuch.
+  // Ohne Einladung (Admin, Altkonten) spricht die direkte Fuehrungskraft, ohne
+  // die der Admin dieser Instanz - und erst ganz ohne beides der Fallback aus
+  // dem Drehbuch. Vorher endete die Kette direkt in der Konstante: in jeder
+  // weiteren Instanz haette dann ein fremder Name gesprochen.
   const einlader =
     herkunft?.leader.name ??
     (user.leaderId
@@ -77,8 +80,16 @@ export default async function WillkommenPage() {
             where: { id: user.leaderId },
             select: { name: true },
           })
-        )?.name ?? FALLBACK_ABSENDER
-      : FALLBACK_ABSENDER);
+        )?.name
+      : null) ??
+    (
+      await prisma.user.findFirst({
+        where: { role: "ADMIN", deactivatedAt: null, id: { not: user.id } },
+        orderBy: { createdAt: "asc" },
+        select: { name: true },
+      })
+    )?.name ??
+    FALLBACK_ABSENDER;
 
   const sozialbeweis = await sozialbeweisFuer(user.id, user.leaderId);
 
@@ -107,6 +118,12 @@ export default async function WillkommenPage() {
       sozialbeweis={sozialbeweis}
       namenVorhanden={namenVorhanden}
       schonFertig={user.onboardingDoneAt !== null}
+      karrierestufe={user.karrierestufe}
+      // Leer statt "0,00" fuer den unbelegten Standardwert - dasselbe
+      // ?-lasse-leer-Muster wie im echten Formular (einheiten/page.tsx).
+      einheitenStartVorbelegt={
+        user.einheitenStart ? formatEinheiten(user.einheitenStart) : ""
+      }
     />
   );
 }

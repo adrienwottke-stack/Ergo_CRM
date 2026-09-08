@@ -6,7 +6,7 @@
 // muessen. Ein Partner, der gerade "Abschluss" getippt hat, hat die Zahl im
 // Kopf - zwei Minuten spaeter nicht mehr, und in zwei Wochen fehlt sie im
 // Monat. Also wird hier gefragt und nicht darauf gehofft, dass er den Weg
-// ueber Wettbewerb -> Einheiten von selbst findet.
+// zu den Einheiten von selbst findet.
 //
 // Vier Regeln, die den Rest erklaeren:
 //
@@ -31,6 +31,7 @@ import { useRouter } from "next/navigation";
 import { einheitSchnellBuchen } from "@/app/(team)/einheiten/actions";
 import { einheitenSpaeter } from "@/app/(app)/fortschritt/einheitenActions";
 import Modal from "@/components/Modal";
+import EinheitenHilfe from "@/components/EinheitenHilfe";
 import { btnGhost, cn, inputBlank } from "@/components/ui";
 
 const ABSCHLUSS_EVENT = "crm:abschluss";
@@ -59,6 +60,7 @@ export default function EinheitenNachAbschluss() {
   const [fehler, setFehler] = useState<string | null>(null);
   const [erfolg, setErfolg] = useState<{
     monat: string;
+    gesamt: string;
     zielstand: string | null;
   } | null>(null);
 
@@ -105,7 +107,7 @@ export default function EinheitenNachAbschluss() {
         setFehler(antwort.fehler);
         return;
       }
-      setErfolg({ monat: antwort.monat, zielstand: antwort.zielstand });
+      setErfolg({ monat: antwort.monat, gesamt: antwort.gesamt, zielstand: antwort.zielstand });
       // Zeigt die Seite im Hintergrund Einheiten, steht dort sonst noch der
       // Stand von vorhin.
       router.refresh();
@@ -157,8 +159,11 @@ export default function EinheitenNachAbschluss() {
             <p className="text-2xl font-semibold">
               {erfolg.monat} Einheiten im Monat
             </p>
+            <p className="text-base text-ink-muted">
+              {erfolg.gesamt} Einheiten insgesamt
+            </p>
             {erfolg.zielstand && (
-              <p className="text-base text-slate-600">
+              <p className="text-base text-ink-muted">
                 Dein Ziel: {erfolg.zielstand}
               </p>
             )}
@@ -184,10 +189,13 @@ export default function EinheitenNachAbschluss() {
       subtitle={name}
     >
       <div className="space-y-4">
-        <p className="text-sm text-slate-600">
-          Wie viele Einheiten sind das? Jetzt eingetragen, solange die Zahl noch
-          im Kopf ist.
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm text-ink-muted">
+            Wie viele Einheiten sind das? Jetzt eingetragen, solange die Zahl
+            noch im Kopf ist.
+          </p>
+          <EinheitenHilfe />
+        </div>
 
         <div className="flex items-center gap-2">
           <input
@@ -206,23 +214,23 @@ export default function EinheitenNachAbschluss() {
               }
             }}
             aria-label="Einheiten"
-            placeholder="12,5"
+            placeholder="12,50"
             className={cn(inputBlank, "flex-1 tabular-nums")}
           />
           <button
             type="button"
             onClick={() => void buchen()}
             disabled={!menge.trim() || laeuft}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-fest-erfolg px-4 text-sm font-semibold text-white transition hover:bg-fest-erfolg-stark active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-35 disabled:active:scale-100"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-fest-erfolg px-4 text-sm font-semibold text-white transition hover:bg-fest-erfolg-stark active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-35 disabled:active:scale-100"
           >
             {laeuft ? "…" : "Eintragen"}
           </button>
         </div>
 
-        {fehler && <p className="text-[13px] text-red-700">{fehler}</p>}
+        {fehler && <p className="text-13 text-red-700">{fehler}</p>}
 
-        <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="text-xs text-slate-500">
+        <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
+          <p className="text-xs text-ink-muted">
             {erinnerungId
               ? "Bei „Später“ erinnern wir dich morgen auf Heute."
               : "Auch unter Fortschritt › Einheiten erreichbar."}

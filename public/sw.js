@@ -120,7 +120,7 @@ self.addEventListener("push", (event) => {
     meldung = {};
   }
 
-  const titel = meldung.titel || "Ergo CRM";
+  const titel = meldung.titel || "Cockpit";
   event.waitUntil(
     self.registration.showNotification(titel, {
       body: meldung.text || "",

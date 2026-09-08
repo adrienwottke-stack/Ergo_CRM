@@ -54,7 +54,7 @@ export type StagePalette = {
 //   navy    = in Arbeit
 //   emerald = Erfolg
 const slatePalette: StagePalette = {
-  pill: "bg-slate-100 text-slate-700 ring-slate-500/15",
+  pill: "bg-slate-100 text-slate-700",
   dot: "bg-slate-400",
   bg: "bg-slate-50",
   border: "border-slate-200",
@@ -64,7 +64,7 @@ const slatePalette: StagePalette = {
 };
 
 const amberPalette: StagePalette = {
-  pill: "bg-amber-50 text-amber-800 ring-amber-600/20",
+  pill: "bg-amber-50 text-amber-800",
   dot: "bg-amber-500",
   bg: "bg-amber-50/50",
   border: "border-amber-200",
@@ -74,7 +74,7 @@ const amberPalette: StagePalette = {
 };
 
 const tealPalette: StagePalette = {
-  pill: "bg-teal-50 text-teal-800 ring-teal-600/15",
+  pill: "bg-teal-50 text-teal-800",
   dot: "bg-teal-500",
   bg: "bg-teal-50/50",
   border: "border-teal-200",
@@ -84,7 +84,7 @@ const tealPalette: StagePalette = {
 };
 
 const navyPalette: StagePalette = {
-  pill: "bg-navy-50 text-navy-800 ring-navy-600/15",
+  pill: "bg-navy-50 text-navy-800",
   dot: "bg-navy-500",
   bg: "bg-navy-50/50",
   border: "border-navy-200",
@@ -94,7 +94,7 @@ const navyPalette: StagePalette = {
 };
 
 const emeraldPalette: StagePalette = {
-  pill: "bg-emerald-50 text-emerald-800 ring-emerald-600/15",
+  pill: "bg-emerald-50 text-emerald-800",
   dot: "bg-emerald-500",
   bg: "bg-emerald-50/50",
   border: "border-emerald-200",

@@ -5,7 +5,7 @@ export function startFeatures(states: ReadonlyMap<string,string>) {
   return { guidance:enabled("startfuehrung"), game:enabled("stornoStart") };
 }
 
-export const INTRO_ACTS = ["boot", "chat", "storno", "rechnung", "einwand", "brief", "sprint", "einstufung", "rangliste", "ankunft"] as const;
+export const INTRO_ACTS = ["boot", "chat", "storno", "rechnung", "einwand", "brief", "sprint", "einstufung", "karrierestufe", "rangliste", "ankunft"] as const;
 export type IntroAct = typeof INTRO_ACTS[number];
 
 export function introSuccessor(act: string): IntroAct {

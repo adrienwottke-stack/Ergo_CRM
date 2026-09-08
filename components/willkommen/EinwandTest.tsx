@@ -46,7 +46,7 @@ export default function EinwandTest({
         <button
           type="button"
           onClick={onDone}
-          className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+          className="min-h-12 w-full rounded-xl bg-akzent text-15 font-bold text-white transition hover:bg-akzent-stark active:scale-[0.98]"
         >
           Weiter
         </button>
@@ -104,13 +104,13 @@ export default function EinwandTest({
       <div className="min-h-23">
         {aufgeloest && (
           <div className="animate-rise space-y-3">
-            <p className="rounded-xl bg-white/5 px-4 py-3 text-sm leading-relaxed text-slate-200 ring-1 ring-inset ring-white/10">
+            <p className="glas-dunkel rounded-2xl border border-white/10 px-4 py-3 text-sm leading-relaxed text-slate-200">
               {einwand.begruendung}
             </p>
             <button
               type="button"
               onClick={weiter}
-              className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
+              className="min-h-12 w-full rounded-xl bg-akzent text-15 font-bold text-white transition hover:bg-akzent-stark active:scale-[0.98]"
             >
               {index + 1 < einwaende.length ? "Nächster Einwand" : "Verstanden"}
             </button>

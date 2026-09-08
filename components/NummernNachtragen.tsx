@@ -6,6 +6,7 @@ import Link from "next/link";
 import { startNummer, nummernFertig, startVertagen } from "@/app/startActions";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
 import { btnPrimary, btnSecondary, card, input } from "@/components/ui";
+import Fortschritt from "@/components/Fortschritt";
 
 export type NummerEintrag = { id: string; name: string; rating: ContactRating | null; herkunft: string | null };
 
@@ -49,20 +50,21 @@ export default function NummernNachtragen({ queue, kind, schonAnrufbar, guided =
   return <div className="space-y-5">
     {errors}
     {current ? <>
-      <p className="text-sm text-slate-500">Name {index+1} von {items.length} · {callable} anrufbar</p>
+      <p className="text-sm text-ink-muted">Name {index+1} von {items.length} · {callable} anrufbar</p>
+      <Fortschritt anteil={index / items.length} hoehe="duenn" beschriftung={`${index} von ${items.length} Namen bearbeitet`} />
       <div className={`${card} space-y-5 p-6`}>
         <h2 className="text-3xl font-semibold">{current.name}</h2>
-        {current.herkunft && <p className="text-sm text-slate-500">{current.herkunft}</p>}
+        {current.herkunft && <p className="text-sm text-ink-muted">{current.herkunft}</p>}
         <form onSubmit={e=>{e.preventDefault();run(()=>save());}} className="space-y-4">
           <label className="block text-sm font-medium">Telefonnummer<input ref={field} type="tel" inputMode="tel" value={phone} onChange={e=>change(e.target.value)} disabled={pending} autoComplete="off" enterKeyHint="next" className={`${input} min-h-14 text-lg`} /></label>
-          <p className="text-sm text-slate-500">Schau in Kontakte, WhatsApp oder die Anrufliste deines Handys.</p>
+          <p className="text-sm text-ink-muted">Schau in Kontakte, WhatsApp oder die Anrufliste deines Handys.</p>
           <div className="flex gap-3"><button type="button" disabled={pending} onClick={()=>run(()=>save(true))} className={`${btnSecondary} min-h-14`}>Hab ich nicht</button><button type="submit" disabled={pending} className={`${btnPrimary} min-h-14 flex-1`}>{pending ? "Speichern …" : "Nummer speichern"}</button></div>
         </form>
       </div>
       {callable > 0 && <button disabled={pending} onClick={()=>run(async()=>{if(phone.trim()) await save(); await next();})} className={`${btnSecondary} min-h-12 w-full`}>Mit vorhandenen Nummern weiter</button>}
     </> : <div className={`${card} space-y-5 p-6`}>
       <h2 className="text-2xl font-semibold">{callable ? `${callable} ${callable === 1 ? "Name ist" : "Namen sind"} anrufbar.` : "Für Anrufe fehlen noch Nummern."}</h2>
-      <p className="text-slate-600">{callable ? "Bereite jetzt deinen ersten Anruf vor." : "Deine Namen bleiben gespeichert. Du kannst die Nummern später ergänzen."}</p>
+      <p className="text-ink-muted">{callable ? "Bereite jetzt deinen ersten Anruf vor." : "Deine Namen bleiben gespeichert. Du kannst die Nummern später ergänzen."}</p>
       <button disabled={pending} onClick={()=>run(next)} className={`${btnPrimary} min-h-14 w-full`}>{callable ? "Erste Anrufe vorbereiten" : "Für heute fertig"}</button>
       {!callable && <Link href={`/namen/sammeln?liste=${kind}`} className={`${btnSecondary} w-full`}>Weitere Namen sammeln</Link>}
     </div>}

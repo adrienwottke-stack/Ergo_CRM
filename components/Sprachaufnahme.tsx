@@ -185,13 +185,13 @@ export default function Sprachaufnahme({
     return (
       <div className={cn(flaeche("info"), "space-y-3 p-3")}>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[13px] font-medium text-slate-700">
+          <span className="text-13 font-medium text-ink-muted">
             Aufnahme · {laengeText(sekunden * 1000)}
           </span>
           <button
             type="button"
             onClick={verwerfen}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-slate-500 transition hover:bg-white/70 hover:text-slate-900"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-13 font-medium text-ink-muted transition hover:bg-white/70 hover:text-ink"
           >
             <XIcon className="h-4 w-4" />
             Nochmal
@@ -224,17 +224,17 @@ export default function Sprachaufnahme({
         onContextMenu={(ereignis) => ereignis.preventDefault()}
         aria-label={laeuft ? "Loslassen und Aufnahme beenden" : "Halten und sprechen"}
         className={cn(
-          "flex min-h-14 w-full touch-none select-none items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition",
+          "flex min-h-14 w-full touch-none select-none items-center justify-center gap-2 rounded-full border px-4 text-sm font-medium transition",
           laeuft
             ? "border-red-300 bg-red-50 text-red-700"
-            : "border-line-strong bg-surface text-slate-700 hover:border-slate-400 hover:bg-slate-50",
+            : "border-line-strong bg-surface text-ink-muted hover:border-line-strong hover:bg-sunken",
         )}
       >
         <MikrofonIcon className={cn("h-5 w-5", laeuft && "animate-pulse")} />
         {laeuft ? `Ich höre … ${laengeText(sekunden * 1000)}` : "Halten und sprechen"}
       </button>
       {laeuft && (
-        <p className="text-center text-xs text-slate-500" aria-live="polite">
+        <p className="text-center text-xs text-ink-muted" aria-live="polite">
           {rest > 10 ? "Loslassen, wenn du fertig bist." : `Noch ${rest} Sekunden.`}
         </p>
       )}

@@ -25,7 +25,16 @@ export type Akt = (typeof AKTE)[number];
 // Fuehrungskraefte (bestehende Konten mit Leuten darunter) bekommen einen
 // eigenen, kuerzeren Weg: verstehen, was sie sehen - und die ersten
 // Einladungen verschicken. Der Sprint waere fuer sie Beschaeftigungstherapie.
-export const LEADER_AKTE = ["boot", "chatLeader", "fuehrung", "einladen", "ankunftLeader"] as const;
+// "karrierestufe" laeuft in BEIDEN Drehbuechern (AP-12) - Fuehrungskraefte
+// haben selbst auch eine Stufe und einen Einheiten-Startbestand.
+export const LEADER_AKTE = [
+  "boot",
+  "chatLeader",
+  "fuehrung",
+  "karrierestufe",
+  "einladen",
+  "ankunftLeader",
+] as const;
 
 export type LeaderAkt = (typeof LEADER_AKTE)[number];
 

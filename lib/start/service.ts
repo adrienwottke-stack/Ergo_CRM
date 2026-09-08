@@ -36,7 +36,7 @@ export async function ensureStart(db: DB, userId: string) {
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
     const current = await tx.startProgress.findUnique({ where: { userId } });
     if (current || user.onboardingDoneAt) return current;
-    if (user.role === "ADMIN" || await tx.user.count({ where: { leaderId: userId, deactivatedAt: null } })) return null;
+    if (user.role === "ADMIN" || await tx.user.count({ where: { leaderId: userId, deactivatedAt: null, passwordHash: { not: null } } })) return null;
     // Legacy measurements only establish where to resume, never successful completion.
     const reached = object(user.onboardingSteps ?? {});
     const previous = [...INTRO_ACTS].reverse().find((act) => reached[act]);

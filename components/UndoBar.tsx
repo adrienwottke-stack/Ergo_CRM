@@ -80,14 +80,17 @@ export default function UndoBar() {
 
   return (
     <div className="crm-undo pointer-events-none fixed inset-x-0 z-40 flex justify-center px-4 pb-4">
-      <div className="buehne pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl bg-navy-950 py-2 pl-4 pr-2 text-white shadow-lg">
-        <div role="status" className="min-w-0 flex-1 text-sm"><p className="truncate">{eintrag.label}</p>{eintrag.zielstand && <p className="mt-1 text-xs text-navy-200">{eintrag.zielstand}</p>}</div>
-        <span className="shrink-0 text-xs tabular-nums text-slate-400">{rest}s</span>
+      <div className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border border-[#49617d] bg-[#10223a] py-2 pl-4 pr-2 text-white schatten-pop">
+        <div role="status" className="min-w-0 flex-1 text-sm"><p className="truncate">{eintrag.label}</p>{eintrag.zielstand && <p className="mt-1 text-xs text-white/80">{eintrag.zielstand}</p>}</div>
+        <span className="shrink-0 text-xs tabular-nums text-white/60">{rest}s</span>
         <button
           type="button"
           onClick={zurueck}
           disabled={pending}
-          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-gold-400 transition hover:bg-white/10 disabled:opacity-50"
+          // Feste helle Akzentfarbe statt des Tokens "akzent": die Pille bleibt
+          // in beiden Ansichten dunkel - das helle iOS-Blau des
+          // Hellmodus (#007aff) haette darauf zu wenig Kontrast.
+          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-[#6cb2ff] transition hover:bg-white/10 disabled:opacity-50"
         >
           <UndoIcon className="h-4 w-4" />
           {pending ? "…" : "Rückgängig"}

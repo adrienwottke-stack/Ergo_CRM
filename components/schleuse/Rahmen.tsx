@@ -17,7 +17,7 @@ export default function Rahmen({
 }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-300">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-link">
         {kicker}
       </p>
       <h1 className="mt-3 text-[1.7rem] font-semibold leading-tight tracking-tight text-white">
@@ -42,7 +42,7 @@ export function Schritt({
 }) {
   return (
     <li className="flex gap-3.5">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-300 text-sm font-semibold text-navy-950">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-akzent text-sm font-semibold text-white">
         {nummer}
       </span>
       <span className="pt-0.5 text-15 leading-relaxed text-white">{children}</span>

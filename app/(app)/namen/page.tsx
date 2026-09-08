@@ -14,7 +14,7 @@ import { liegtSeit } from "@/lib/liegenbleiber";
 import { lostReasonLabels } from "@/lib/pipeline";
 import NameList, { type NameEntry } from "@/components/NameList";
 import GuidePanel from "@/components/GuidePanel";
-import { pageTitle, column } from "@/components/ui";
+import { cn, pageTitle, column, segmentGruppe, segmentKnopf } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -81,23 +81,20 @@ export default async function NamenPage({
     <div className={`${column} space-y-6`}>
       <div>
         <h1 className={pageTitle}>Kontakte</h1>
-        <p className="mt-1 text-sm text-slate-500">{listKindHints[kind]}</p>
+        <p className="mt-1 text-sm text-ink-muted">{listKindHints[kind]}</p>
       </div>
 
       {/* Reiter: serverseitig gefiltert, damit der Zustand in der Adresse steht
-          und ein Neuladen nichts verliert. */}
-      <div className="flex gap-1 rounded-full bg-slate-100 p-1">
+          und ein Neuladen nichts verliert. Dieselbe Segmented-Control wie im
+          Rest der App (components/ui.ts), statt einer eigenen Pillengruppe. */}
+      <div className={cn(segmentGruppe, "w-full")}>
         {LIST_KINDS.map((value) => {
           const active = value === kind;
           return (
             <Link
               key={value}
               href={`/namen?liste=${value}`}
-              className={`flex min-h-11 flex-1 items-center justify-center rounded-full text-sm font-semibold transition ${
-                active
-                  ? "bg-surface text-navy-900 ring-1 ring-slate-200"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
+              className={cn(segmentKnopf(active), "flex-1")}
             >
               {listKindLabels[value]}
             </Link>

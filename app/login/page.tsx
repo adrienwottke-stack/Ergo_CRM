@@ -23,10 +23,10 @@ export default async function LoginPage({
         <div className={`${card} p-8`}>
           <div className="flex flex-col items-center text-center">
             <LogoMark className="h-12 w-12" />
-            <h1 className="mt-4 text-xl font-semibold tracking-[-0.02em] text-slate-900">
-              {isFirstSetup ? "Admin-Konto einrichten" : "Ergo CRM"}
+            <h1 className="mt-4 text-xl font-semibold tracking-[-0.02em] text-ink">
+              {isFirstSetup ? "Admin-Konto einrichten" : "Cockpit"}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-ink-soft">
               {isFirstSetup
                 ? "Nutze das bisherige APP_PASSWORD, um die vorhandenen Daten zu übernehmen."
                 : "Melde dich mit deinem persönlichen Teamkonto an."}
@@ -56,7 +56,7 @@ export default async function LoginPage({
             </div>
 
             {error && (
-              <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-600/10">
+              <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
                 Anmeldedaten sind nicht korrekt. Bitte erneut versuchen.
               </p>
             )}
@@ -67,7 +67,7 @@ export default async function LoginPage({
             </button>
           </form>
           {!isFirstSetup && (
-            <p className="mt-5 border-t border-slate-100 pt-4 text-center text-xs text-slate-500">
+            <p className="mt-5 border-t border-line pt-4 text-center text-xs text-ink-soft">
               Passwort vergessen? Melde dich bei deiner Führungskraft — sie
               schickt dir einen Link, mit dem du ein neues setzt.
             </p>
@@ -78,7 +78,7 @@ export default async function LoginPage({
             ueber einen Admin. Hier stand vorher das Gegenteil - ausgerechnet
             auf der Seite, auf der ein Eingeladener landet, wenn er den Link
             verlegt hat. */}
-        <p className="mt-4 text-center text-xs text-slate-400">
+        <p className="mt-4 text-center text-xs text-ink-soft">
           Noch kein Konto? Du brauchst den Einladungslink deiner Führungskraft.
         </p>
       </div>

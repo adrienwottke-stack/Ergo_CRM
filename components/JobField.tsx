@@ -29,7 +29,7 @@ export default function JobField({ defaultValue }: { defaultValue?: string | nul
         className={input}
       />
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-xs font-medium text-slate-500">Bausteine:</span>
+        <span className="mr-1 text-xs font-medium text-ink-muted">Bausteine:</span>
         {JOB_BLOCKS.map((block) => {
           const active = isJobBlock(job, block);
           return (
@@ -41,7 +41,7 @@ export default function JobField({ defaultValue }: { defaultValue?: string | nul
               className={`inline-flex min-h-9 items-center rounded-full px-3 text-xs font-medium transition ${
                 active
                   ? "bg-akzent text-white"
-                  : "bg-slate-100 text-slate-700 hover:bg-navy-50 hover:text-navy-700"
+                  : "bg-sunken text-ink-muted hover:bg-navy-50 hover:text-navy-700"
               }`}
             >
               {block}

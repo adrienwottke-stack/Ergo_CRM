@@ -46,6 +46,7 @@ import { suchlauf } from "@/app/wegweiserAction";
 import type { SchnellStand } from "@/lib/stats";
 import { sucheImWegweiser, type WegweiserEintrag } from "@/lib/wegweiser";
 import Modal from "@/components/Modal";
+import EinheitenHilfe from "@/components/EinheitenHilfe";
 import {
   ArrowRightIcon,
   CalendarCheckIcon,
@@ -286,7 +287,7 @@ export default function Schnellzugriff({
         title={wegweiserAn ? "Eintragen oder suchen (Strg+K)" : "Aktivität zählen"}
         // Leichte Flaeche statt nur Umriss: daneben stehen Einstellungen
         // (Thema, Abmelden), das hier ist die eine Handlung in der Leiste.
-        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-akzent text-white transition hover:bg-akzent-stark"
       >
         <PlusIcon className="h-5 w-5" />
       </button>
@@ -344,28 +345,28 @@ export default function Schnellzugriff({
                   className={cn(
                     "flex min-h-14 w-full items-center gap-3 rounded-xl border px-4 text-left transition",
                     i === markiert
-                      ? "border-navy-400 bg-navy-50/50"
-                      : "border-line bg-surface hover:border-line-strong"
+                      ? "border-line bg-sunken"
+                      : "border-line bg-surface hover:bg-sunken"
                   )}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-slate-900">
+                    <span className="block truncate text-sm font-semibold text-ink">
                       {eintrag.titel}
                     </span>
                     {/* Der Bereich beantwortet nebenbei die Frage, die nach dem
                         Finden kommt: wo haette ich suchen sollen? */}
-                    <span className="block truncate text-[13px] text-slate-500">
+                    <span className="block truncate text-13 text-ink-muted">
                       {eintrag.bereich}
                     </span>
                   </span>
-                  <ArrowRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
+                  <ArrowRightIcon className="h-4 w-4 shrink-0 text-ink-soft" />
                 </button>
               ))}
             </div>
           ) : (
             // Keine Sackgasse: was hier fehlt, landet als Zeile in der
             // Werkstatt und ist damit die naechste Aufgabe, kein Achselzucken.
-            <p className="rounded-xl border border-line bg-sunken px-4 py-6 text-center text-[13px] text-slate-500">
+            <p className="rounded-xl border border-line bg-sunken px-4 py-6 text-center text-13 text-ink-muted">
               Dazu finde ich nichts. Das ist notiert — schreib es zur Sicherheit
               übers Megafon dazu.
             </p>
@@ -390,12 +391,12 @@ export default function Schnellzugriff({
                     </span>
 
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-13 font-medium text-slate-600">
+                      <span className="block truncate text-13 font-medium text-ink-muted">
                         {quotaTypeLabels[type]}
                       </span>
-                      <span className="block text-2xl font-semibold tabular-nums leading-tight text-slate-900">
+                      <span className="block text-2xl font-semibold tabular-nums leading-tight text-ink">
                         {zahl === null ? (
-                          <span className="text-slate-300">—</span>
+                          <span className="text-ink-soft">—</span>
                         ) : (
                           <span key={zahl} className="inline-block animate-tick">
                             {zahl}
@@ -410,7 +411,7 @@ export default function Schnellzugriff({
                         onClick={() => void zaehlen(type, -1)}
                         disabled={zahl === null || zahl <= 0}
                         aria-label={`${quotaTypeLabels[type]} eins zurück`}
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-line-strong text-slate-500 transition hover:border-slate-400 hover:text-slate-900 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-line-strong disabled:hover:text-slate-500 disabled:active:scale-100"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-sunken text-ink transition hover:bg-line active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-sunken disabled:active:scale-100"
                       >
                         <MinusIcon className="h-4 w-4" />
                       </button>
@@ -418,7 +419,7 @@ export default function Schnellzugriff({
                         type="button"
                         onClick={() => void zaehlen(type, 1)}
                         aria-label={`${quotaTypeLabels[type]} plus eins`}
-                        className="inline-flex h-11 w-16 items-center justify-center gap-1 rounded-lg bg-akzent text-sm font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.97]"
+                        className="inline-flex h-11 w-16 items-center justify-center gap-1 rounded-full bg-akzent text-sm font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.97]"
                       >
                         <PlusIcon className="h-4 w-4" />1
                       </button>
@@ -432,7 +433,7 @@ export default function Schnellzugriff({
               <p
                 className={cn(
                   flaeche("gefahr"),
-                  "mt-3 px-3 py-2 text-[13px] text-red-800"
+                  "mt-3 px-3 py-2 text-13 text-red-800"
                 )}
               >
                 {fehler}
@@ -443,17 +444,18 @@ export default function Schnellzugriff({
                 Unter der Trennlinie und mit eigenem Feld statt +1: eine
                 Einheit ist keine Strichliste. Rueckwirkend buchen geht auf
                 /einheiten - hier zaehlt der heutige Tag. */}
-            <div className="mt-4 border-t border-slate-100 pt-4">
+            <div className="mt-4 border-t border-line pt-4">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-13 font-medium text-slate-600">
+                <span className="flex items-center gap-1.5 text-13 font-medium text-ink-muted">
                   Einheiten eintragen
+                  <EinheitenHilfe />
                 </span>
-                <span className="text-[13px] text-slate-500">
+                <span className="text-13 text-ink-muted">
                   {stand === null ? (
-                    <span className="text-slate-300">—</span>
+                    <span className="text-ink-soft">—</span>
                   ) : (
                     <>
-                      <span className="font-semibold tabular-nums text-slate-900">
+                      <span className="font-semibold tabular-nums text-ink">
                         {stand.einheitenMonat}
                       </span>{" "}
                       diesen Monat
@@ -479,7 +481,7 @@ export default function Schnellzugriff({
                     }
                   }}
                   aria-label="Einheiten"
-                  placeholder="12,5"
+                  placeholder="12,50"
                   className={cn(inputBlank, "flex-1 tabular-nums")}
                 />
                 <button
@@ -493,18 +495,18 @@ export default function Schnellzugriff({
               </div>
 
               {einheitenFehler ? (
-                <p className="mt-2 text-[13px] text-red-700">{einheitenFehler}</p>
+                <p className="mt-2 text-13 text-red-700">{einheitenFehler}</p>
               ) : gebucht ? (
-                <p className="mt-2 text-[13px] text-emerald-700">
+                <p className="mt-2 text-13 text-emerald-700">
                   Eingetragen. Ein Storno trägst du mit Minus ein.
                 </p>
               ) : null}
             </div>
 
             {/* Der Grund zum Tippen, in einer Zeile. Kein zweiter Bildschirm. */}
-            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-3 text-13 text-slate-500">
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-3 text-13 text-ink-muted">
               <span>
-                <span className="font-semibold tabular-nums text-slate-900">
+                <span className="font-semibold tabular-nums text-ink">
                   {punkte === null ? "—" : punkte}
                 </span>{" "}
                 Punkte heute

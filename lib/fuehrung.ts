@@ -12,22 +12,30 @@
 import { prisma } from "@/lib/prisma";
 import { sichtbarkeit } from "@/lib/scope";
 import { ebene, elternIdVon } from "@/lib/struktur";
-import { berlinToday, dayToUtcDate, startOfMonth, startOfWeek } from "@/lib/dates";
+import {
+  berlinToday,
+  dayToUtcDate,
+  startOfMonth,
+  startOfWeek,
+} from "@/lib/dates";
 import { quotaTypePoints } from "@/lib/labels";
 import {
-  SCHWELLEN,
   ampelVon,
   dringlichkeit,
   signaleFuer,
   type Ampel,
   type Signal,
 } from "@/lib/signale";
+import { ampelKriterien } from "@/lib/ampelKriterien";
 import { starterpassStand } from "@/lib/starterpass";
 import { einblickFuer, type Einblick } from "@/lib/einblick";
 import { pipelineFreigegeben } from "@/lib/einblick-regeln";
 import { statusVon } from "@/lib/einladung";
 import type { Bewegung } from "@/lib/fuehrungsaufgaben";
-import type { LeadershipTaskType, UserRole } from "@/lib/generated/prisma/enums";
+import type {
+  LeadershipTaskType,
+  UserRole,
+} from "@/lib/generated/prisma/enums";
 
 // Wie weit zurueck "letzte Aktivitaet" ueberhaupt gesucht wird. Alles davor
 // heisst ohnehin nur noch "lange nichts" - und begrenzt die Abfrage.
@@ -159,10 +167,8 @@ export type Mannschaftslage = {
   ruhend: Mannschaftsperson[];
   fuehrtNiemanden: boolean;
   /**
-   * Admin ohne eigene Struktur: `baum` zeigt hier ausnahmsweise die GANZE
-   * Instanz statt nichts. Ein Admin soll die Struktur immer sehen koennen,
-   * auch wenn unter ihm selbst niemand haengt - siehe lib/scope.ts, Umfang
-   * "ALLE".
+   * Nur Admin: `baum` zeigt die ganze Instanz, unabhängig von eigenen
+   * Partnern. Jede Führungskraft sieht ihren eigenen Ast (ADR-0004).
    */
   gesamtstruktur: boolean;
   /**
@@ -220,30 +226,45 @@ export async function mannschaftsLage(betrachter: {
   id: string;
   role: UserRole;
 }): Promise<Mannschaftslage> {
-  let sicht = await sichtbarkeit(betrachter, "STRUKTUR");
+  const eigeneSicht = await sichtbarkeit(betrachter, "STRUKTUR");
   // Private Betreuungsaufgaben gehören weiterhin zur eigenen Führungskette,
   // auch wenn ein Admin unten die gesamte Instanz betrachten darf.
-  const eigeneMitgliederIds = sicht.beraterIds.filter((id) => id !== betrachter.id);
-  // Ein Admin ohne eigene Leute soll trotzdem die Struktur sehen koennen -
-  // sonst zeigt die Seite nur die Einladen-Karte, obwohl das ganze Netzwerk
-  // laengst steht. `beraterIds` enthaelt immer mindestens den Betrachter
-  // selbst; genau ein Eintrag heisst also "fuehrt niemanden".
-  const gesamtstruktur = betrachter.role === "ADMIN" && sicht.beraterIds.length <= 1;
-  if (gesamtstruktur) {
-    sicht = await sichtbarkeit(betrachter, "ALLE");
-  }
+  const eigeneMitgliederIds = eigeneSicht.beraterIds.filter(
+    (id) => id !== betrachter.id,
+  );
+  // Der Admin sieht IMMER die ganze Instanz, unabhaengig von der eigenen
+  // Struktur - Systemverwaltung ist keine Fuehrungsposition mit Sonderfall,
+  // sondern ein eigener, bedingungsloser Umfang (lib/scope.ts, Umfang "ALLE").
+  // Jede andere Person - auch eine Fuehrungskraft mit grosser eigener
+  // Struktur - sieht nur sich selbst und alles darunter: "ALLE" faellt fuer
+  // Nicht-Admins in `beraterIds()` von selbst auf "STRUKTUR" zurueck, ein
+  // zweiter Aufruf mit anderem Umfang ist dafuer nicht noetig.
+  const gesamtstruktur = betrachter.role === "ADMIN";
+  const sicht = gesamtstruktur
+    ? await sichtbarkeit(betrachter, "ALLE")
+    : eigeneSicht;
 
   const heute = berlinToday();
   const heuteStart = dayToUtcDate(heute);
   const wochenStart = startOfWeek(heute);
   const monatsStart = startOfMonth(heute);
-  const vierzehnTage = new Date(Date.now() - SCHWELLEN.terminFensterTage * TAG_MS);
-  const dreissigTage = new Date(Date.now() - SCHWELLEN.empfehlungTage * TAG_MS);
+  // Die Kriterien kommen seit der Multiplikations-Runde aus der Werkstatt
+  // (lib/ampelKriterien.ts); ohne Eintrag gilt weiter der Platzhalter aus
+  // lib/signale.ts. Einmal je Lage geladen, gilt fuer Zeitfenster UND Signale.
+  const schwellen = await ampelKriterien();
+  const vierzehnTage = new Date(
+    Date.now() - schwellen.terminFensterTage * TAG_MS,
+  );
+  const dreissigTage = new Date(Date.now() - schwellen.empfehlungTage * TAG_MS);
   const rueckblick = new Date(Date.now() - RUECKBLICK_TAGE * TAG_MS);
   // Eine Abfrage fuer drei Zeitfenster: ab dem fruehesten holen, danach in
   // JavaScript in Woche / 14 Tage / Monat einsortieren.
   const zaehlerAb = new Date(
-    Math.min(wochenStart.getTime(), monatsStart.getTime(), vierzehnTage.getTime())
+    Math.min(
+      wochenStart.getTime(),
+      monatsStart.getTime(),
+      vierzehnTage.getTime(),
+    ),
   );
 
   const [
@@ -292,7 +313,10 @@ export async function mannschaftsLage(betrachter: {
     }),
     prisma.dailyLog.groupBy({
       by: ["personId", "type", "date"],
-      where: { date: { gte: zaehlerAb }, person: { userId: { in: sicht.beraterIds } } },
+      where: {
+        date: { gte: zaehlerAb },
+        person: { userId: { in: sicht.beraterIds } },
+      },
       _sum: { count: true },
     }),
     // Abschluesse seit jeher: Grundlage fuer "dabei, aber noch nie abgeschlossen".
@@ -383,7 +407,13 @@ export async function mannschaftsLage(betrachter: {
         doneAt: null,
       },
       orderBy: { dueAt: "asc" },
-      select: { id: true, memberId: true, dueAt: true, note: true, signal: true },
+      select: {
+        id: true,
+        memberId: true,
+        dueAt: true,
+        note: true,
+        signal: true,
+      },
     }),
     // Einladungen, die auf einen Platzhalter im Baum zeigen. Daraus wird
     // "eingeladen, wartet" statt "noch nicht eingeladen" - der Unterschied
@@ -402,7 +432,9 @@ export async function mannschaftsLage(betrachter: {
     prisma.nachricht.findMany({
       where: {
         vonId: betrachter.id,
-        createdAt: { gte: new Date(Date.now() - NACHRICHT_FENSTER_TAGE * TAG_MS) },
+        createdAt: {
+          gte: new Date(Date.now() - NACHRICHT_FENSTER_TAGE * TAG_MS),
+        },
       },
       orderBy: { createdAt: "desc" },
       select: { anId: true, gelesenAt: true },
@@ -412,11 +444,16 @@ export async function mannschaftsLage(betrachter: {
   // Der Wettbewerb zaehlt auf die Person, das CRM auf das Konto. Hier laufen
   // beide zusammen.
   const userIdVonPerson = new Map(
-    personen.filter((person) => person.userId).map((person) => [person.id, person.userId!])
+    personen
+      .filter((person) => person.userId)
+      .map((person) => [person.id, person.userId!]),
   );
 
-  const werte = new Map<string, Werte>(berater.map((person) => [person.id, leereWerte()]));
-  const fuer = (ownerId: string | null) => (ownerId ? werte.get(ownerId) : undefined);
+  const werte = new Map<string, Werte>(
+    berater.map((person) => [person.id, leereWerte()]),
+  );
+  const fuer = (ownerId: string | null) =>
+    ownerId ? werte.get(ownerId) : undefined;
 
   for (const zeile of zaehler) {
     const eintrag = fuer(userIdVonPerson.get(zeile.personId) ?? null);
@@ -427,7 +464,8 @@ export async function mannschaftsLage(betrachter: {
     const in14 = zeit >= vierzehnTage.getTime();
     const imMonat = zeit >= monatsStart.getTime();
 
-    if (inWoche) eintrag.punkteWoche += summe * (quotaTypePoints[zeile.type] ?? 0);
+    if (inWoche)
+      eintrag.punkteWoche += summe * (quotaTypePoints[zeile.type] ?? 0);
     if (zeile.type === "CALL" && inWoche) eintrag.anrufeWoche += summe;
     if (zeile.type === "APPOINTMENT_SET") {
       if (inWoche) eintrag.vereinbartWoche += summe;
@@ -449,7 +487,8 @@ export async function mannschaftsLage(betrachter: {
   // Absteigend sortiert, der erste Treffer je Konto ist damit der juengste.
   for (const aktivitaet of aktivitaeten) {
     const eintrag = fuer(aktivitaet.contact.ownerId);
-    if (eintrag && !eintrag.letzteAktivitaet) eintrag.letzteAktivitaet = aktivitaet.date;
+    if (eintrag && !eintrag.letzteAktivitaet)
+      eintrag.letzteAktivitaet = aktivitaet.date;
   }
 
   for (const zeile of letzterZaehler) {
@@ -506,7 +545,8 @@ export async function mannschaftsLage(betrachter: {
   // Vorgangsverwaltung - vorgenommen hat man sich eine Sache.
   const aufgabeJe = new Map<string, (typeof offeneAufgaben)[number]>();
   for (const aufgabe of offeneAufgaben) {
-    if (!aufgabeJe.has(aufgabe.memberId)) aufgabeJe.set(aufgabe.memberId, aufgabe);
+    if (!aufgabeJe.has(aufgabe.memberId))
+      aufgabeJe.set(aufgabe.memberId, aufgabe);
   }
 
   const einladungJe = new Map<string, string>();
@@ -525,7 +565,8 @@ export async function mannschaftsLage(betrachter: {
   }
 
   const nameVon = new Map(berater.map((person) => [person.id, person.name]));
-  const eigenerPfad = berater.find((person) => person.id === betrachter.id)?.path ?? "/";
+  const eigenerPfad =
+    berater.find((person) => person.id === betrachter.id)?.path ?? "/";
   const eigeneTiefe = ebene(eigenerPfad);
 
   // Die Kette ueber dem Betrachter: der Pfad traegt sie schon, ohne
@@ -538,33 +579,43 @@ export async function mannschaftsLage(betrachter: {
           select: { id: true, name: true },
         })
       : [];
-  const obenNameVon = new Map(obenKonten.map((konto) => [konto.id, konto.name]));
+  const obenNameVon = new Map(
+    obenKonten.map((konto) => [konto.id, konto.name]),
+  );
   const oben = obenIds.map((id) => ({ id, name: obenNameVon.get(id) ?? "?" }));
 
   const alle: Mannschaftsperson[] = berater.map((person) => {
     const w = werte.get(person.id) ?? leereWerte();
-    const pipelineSichtbar = person.id === betrachter.id || pipelineFreigegeben(person.visibility);
+    const pipelineSichtbar =
+      person.id === betrachter.id || pipelineFreigegeben(person.visibility);
     const platzhalter = person.passwordHash === null;
     const angekommen = person.onboardingDoneAt !== null;
     const tageDabei = person.startedAt ? tageSeit(person.startedAt) : null;
-    const signale = signaleFuer({
-      platzhalter,
-      tageSeitAktivitaet: w.letzteAktivitaet ? tageSeit(w.letzteAktivitaet) : null,
-      termineVereinbart14: w.vereinbart14,
-      termineGehalten14: w.gehalten14,
-      termineGehaltenMonat: w.gehaltenMonat,
-      abschluesseMonat: w.abschluesseMonat,
-      abschluesseGesamt: w.abschluesseGesamt,
-      tageDabei,
-      angekommen,
-      pipelineSichtbar,
-      kontakteInAkquise: w.inAkquise,
-      ueberfaelligeSchritte: w.ueberfaellig,
-      termineOhneEmpfehlung: w.termineOhneEmpfehlung,
-    });
+    const signale = signaleFuer(
+      {
+        platzhalter,
+        tageSeitAktivitaet: w.letzteAktivitaet
+          ? tageSeit(w.letzteAktivitaet)
+          : null,
+        termineVereinbart14: w.vereinbart14,
+        termineGehalten14: w.gehalten14,
+        termineGehaltenMonat: w.gehaltenMonat,
+        abschluesseMonat: w.abschluesseMonat,
+        abschluesseGesamt: w.abschluesseGesamt,
+        tageDabei,
+        angekommen,
+        pipelineSichtbar,
+        kontakteInAkquise: w.inAkquise,
+        ueberfaelligeSchritte: w.ueberfaellig,
+        termineOhneEmpfehlung: w.termineOhneEmpfehlung,
+      },
+      schwellen,
+    );
     // Der Starterpass steht nur bei frisch Gestarteten und nur, solange er
     // nicht durch ist. Danach waere er eine Zeile, die nichts mehr sagt.
-    const seitStart = person.onboardingDoneAt ? tageSeit(person.onboardingDoneAt) : null;
+    const seitStart = person.onboardingDoneAt
+      ? tageSeit(person.onboardingDoneAt)
+      : null;
     const roh =
       !platzhalter && seitStart !== null && seitStart <= STARTERPASS_TAGE
         ? starterpassStand({
@@ -602,7 +653,9 @@ export async function mannschaftsLage(betrachter: {
           ? (nameVon.get(person.leaderId) ?? null)
           : null,
       ueberId:
-        person.leaderId && person.leaderId !== betrachter.id ? person.leaderId : null,
+        person.leaderId && person.leaderId !== betrachter.id
+          ? person.leaderId
+          : null,
       fuehrt: person._count.team,
       ausgetreten: person.deactivatedAt !== null,
       platzhalter,
@@ -611,7 +664,8 @@ export async function mannschaftsLage(betrachter: {
       angekommen,
       installiert: person.installedAt !== null,
       frischGestartet:
-        person.onboardingDoneAt !== null && tageSeit(person.onboardingDoneAt) <= 2,
+        person.onboardingDoneAt !== null &&
+        tageSeit(person.onboardingDoneAt) <= 2,
       pipelineSichtbar,
       tageDabei,
       werte: w,
@@ -686,18 +740,30 @@ export async function mannschaftsLage(betrachter: {
       .join("/");
   const baum = alle
     .filter((person) => !person.istDu)
-    .sort((a, b) => nameSchluessel(a.path).localeCompare(nameSchluessel(b.path), "de"));
+    .sort((a, b) =>
+      nameSchluessel(a.path).localeCompare(nameSchluessel(b.path), "de"),
+    );
   // Ausgetretene stehen immer unten: sie zaehlen nirgends mehr mit.
   const leute = [...baum].sort(
     (a, b) =>
       Number(a.ausgetreten) - Number(b.ausgetreten) ||
       a.rang - b.rang ||
-      a.name.localeCompare(b.name, "de")
+      a.name.localeCompare(b.name, "de"),
   );
 
   const auffaellig = leute.filter(
-    (person) => !person.ausgetreten && person.ampel !== "gruen"
+    (person) => !person.ausgetreten && person.ampel !== "gruen",
   );
+
+  // "Fuehrt niemanden" fragt nach der EIGENEN Struktur, nicht nach der Groesse
+  // von `baum` - fuer den Admin ist `baum` seit der Umstellung auf Umfang
+  // "ALLE" immer die ganze Instanz, auch wenn er persoenlich keine einzige
+  // Person unter sich hat. `ich.path` traegt die eigene Id am Ende; alles
+  // darunter erkennt man am Praefix, unabhaengig davon, wessen Struktur
+  // `baum` sonst noch enthaelt. Die Wache auf "/" fängt den Betrachter-nicht-
+  // gefunden-Fallback ab - sonst waere er ein Praefix-Treffer auf jeden Pfad.
+  const fuehrtEigeneLeute =
+    ich.path !== "/" && baum.some((person) => person.path.startsWith(ich.path));
 
   return {
     ich,
@@ -708,7 +774,7 @@ export async function mannschaftsLage(betrachter: {
     // wenn man arbeitet - und nicht erst, wenn der andere sich bewegt.
     dringend: auffaellig.filter((person) => !person.betreuung?.ruht),
     ruhend: auffaellig.filter((person) => person.betreuung?.ruht),
-    fuehrtNiemanden: baum.length === 0,
+    fuehrtNiemanden: !fuehrtEigeneLeute,
     gesamtstruktur,
     oben,
   };
@@ -739,11 +805,16 @@ export type FaelligeAufgabe = {
   anrufen: { name: string; vorname: string; telefon: string } | null;
 };
 
-export async function faelligeAufgaben(leaderId: string): Promise<FaelligeAufgabe[]> {
+export async function faelligeAufgaben(
+  leaderId: string,
+): Promise<FaelligeAufgabe[]> {
   // Ein alter privater Merkzettel ist keine dauerhafte Freigabe. Nach einem
   // Strukturwechsel dürfen darüber weder neue Aktivitäten noch die Nummer
   // einer neuen Führungskraft aus einem fremden Ast gelesen werden.
-  const sicht = await sichtbarkeit({ id: leaderId, role: "MEMBER" }, "STRUKTUR");
+  const sicht = await sichtbarkeit(
+    { id: leaderId, role: "MEMBER" },
+    "STRUKTUR",
+  );
   const strukturIds = new Set(sicht.beraterIds);
   const memberIds = sicht.beraterIds.filter((id) => id !== leaderId);
   if (memberIds.length === 0) return [];
@@ -788,7 +859,7 @@ export async function faelligeAufgaben(leaderId: string): Promise<FaelligeAufgab
   // Zeitpunkt, danach je Aufgabe in JavaScript eingegrenzt.
   const aeltestes = aufgaben.reduce(
     (frueh, aufgabe) => (aufgabe.createdAt < frueh ? aufgabe.createdAt : frueh),
-    aufgaben[0]!.createdAt
+    aufgaben[0]!.createdAt,
   );
   const personIds = aufgaben
     .map((aufgabe) => aufgabe.member.person?.id)
@@ -796,7 +867,10 @@ export async function faelligeAufgaben(leaderId: string): Promise<FaelligeAufgab
   const logs =
     personIds.length > 0
       ? await prisma.dailyLog.findMany({
-          where: { personId: { in: personIds }, date: { gte: dayStart(aeltestes) } },
+          where: {
+            personId: { in: personIds },
+            date: { gte: dayStart(aeltestes) },
+          },
           select: { personId: true, type: true, count: true, date: true },
         })
       : [];
@@ -806,7 +880,12 @@ export async function faelligeAufgaben(leaderId: string): Promise<FaelligeAufgab
   return aufgaben.map((aufgabe) => {
     const personId = aufgabe.member.person?.id;
     const seit = dayStart(aufgabe.createdAt).getTime();
-    const bewegung: Bewegung = { anrufe: 0, termine: 0, abschluesse: 0, etwas: false };
+    const bewegung: Bewegung = {
+      anrufe: 0,
+      termine: 0,
+      abschluesse: 0,
+      etwas: false,
+    };
     if (personId) {
       for (const log of logs) {
         if (log.personId !== personId || log.date.getTime() < seit) continue;
@@ -833,7 +912,9 @@ export async function faelligeAufgaben(leaderId: string): Promise<FaelligeAufgab
       bewegung,
       anrufen: (() => {
         const dazwischen =
-          aufgabe.member.leaderId && aufgabe.member.leaderId !== leaderId && strukturIds.has(aufgabe.member.leaderId)
+          aufgabe.member.leaderId &&
+          aufgabe.member.leaderId !== leaderId &&
+          strukturIds.has(aufgabe.member.leaderId)
             ? aufgabe.member.leader
             : null;
         const ziel = dazwischen
@@ -883,12 +964,17 @@ export type AstVergleich = {
   abstand: number;
 };
 
-export async function astVergleich(userId: string): Promise<AstVergleich | null> {
+export async function astVergleich(
+  userId: string,
+): Promise<AstVergleich | null> {
   const ich = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, leaderId: true },
+    select: { id: true, leaderId: true, role: true },
   });
-  if (!ich) return null;
+  // Der benannte Vergleich liest Geschwister außerhalb des eigenen Astes.
+  // ADR-0004 erlaubt diesen Umfang nur dem Admin. Die Rolle wird hier aus
+  // dem Konto gelesen, damit kein Aufrufer die Grenze allein im UI zieht.
+  if (!ich || ich.role !== "ADMIN") return null;
 
   // Die Geschwister: alle mit derselben Fuehrungskraft, mich eingeschlossen.
   const wurzeln = await prisma.user.findMany({
@@ -917,17 +1003,20 @@ export async function astVergleich(userId: string): Promise<AstVergleich | null>
     const punkte = (zeile._sum.count ?? 0) * (quotaTypePoints[zeile.type] ?? 0);
     punkteJePerson.set(
       zeile.personId,
-      (punkteJePerson.get(zeile.personId) ?? 0) + punkte
+      (punkteJePerson.get(zeile.personId) ?? 0) + punkte,
     );
   }
 
   const aeste: Ast[] = wurzeln
     .map((wurzel) => {
-      const imAst = konten.filter((konto) => konto.path.startsWith(wurzel.path));
+      const imAst = konten.filter((konto) =>
+        konto.path.startsWith(wurzel.path),
+      );
       const punkte = imAst.reduce(
         (summe, konto) =>
-          summe + (konto.person ? (punkteJePerson.get(konto.person.id) ?? 0) : 0),
-        0
+          summe +
+          (konto.person ? (punkteJePerson.get(konto.person.id) ?? 0) : 0),
+        0,
       );
       return {
         id: wurzel.id,
@@ -1071,7 +1160,7 @@ export function astSummen(personen: Mannschaftsperson[]): Map<string, AstWert> {
   }
 
   const vonUntenNachOben = [...personen].sort(
-    (a, b) => ebene(b.path) - ebene(a.path)
+    (a, b) => ebene(b.path) - ebene(a.path),
   );
   for (const person of vonUntenNachOben) {
     const elternId = elternIdVon(person.path);
@@ -1088,7 +1177,7 @@ export function astSummen(personen: Mannschaftsperson[]): Map<string, AstWert> {
 
 export async function astLage(
   betrachter: { id: string; role: UserRole },
-  personId: string
+  personId: string,
 ): Promise<AstLage | null> {
   const lage = await mannschaftsLage(betrachter);
   const alle = [lage.ich, ...lage.baum];
@@ -1099,7 +1188,8 @@ export async function astLage(
   if (!person) return null;
 
   const ast = lage.baum.filter(
-    (eintrag) => eintrag.id !== person.id && eintrag.path.startsWith(person.path)
+    (eintrag) =>
+      eintrag.id !== person.id && eintrag.path.startsWith(person.path),
   );
   const gesamt = [person, ...ast];
 
@@ -1111,7 +1201,9 @@ export async function astLage(
     // Der Pfad traegt die eigene Id am Ende - "direkt unter X" ist damit eine
     // exakte Gleichheit statt einer Ebenenrechnung. `ueberId` taugt hier
     // nicht: es steht absichtlich auf null, wenn der Betrachter selbst fuehrt.
-    direkte: ast.filter((eintrag) => eintrag.path === `${person.path}${eintrag.id}/`),
+    direkte: ast.filter(
+      (eintrag) => eintrag.path === `${person.path}${eintrag.id}/`,
+    ),
     summe: summeWerte(gesamt),
     koepfe: zaehlend.length,
     wartende: gesamt.length - zaehlend.length,

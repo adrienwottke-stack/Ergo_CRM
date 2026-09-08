@@ -47,7 +47,7 @@ export default function Postfach({
         onClick={() => setOffen((wert) => !wert)}
         className="flex min-h-12 w-full items-center justify-between gap-3 px-4 text-left"
       >
-        <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
+        <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
           {/* Nicht "von deinen Leuten": aus der Mannschafts-Uebersicht
               schreibt die Fuehrungskraft nach unten, und die Zeile stand dann
               falsch herum. */}
@@ -62,11 +62,11 @@ export default function Postfach({
       </button>
 
       {offen && (
-        <ul className="divide-y divide-slate-100 border-t border-slate-100">
+        <ul className="divide-y divide-line border-t border-line">
           {nachrichten.map((nachricht) => (
             <li key={nachricht.id} className="px-4 py-3">
-              <p className="text-sm text-slate-800">{nachricht.text}</p>
-              <p className="mt-0.5 text-xs text-slate-400">{nachricht.von}</p>
+              <p className="text-sm text-ink">{nachricht.text}</p>
+              <p className="mt-0.5 text-xs text-ink-soft">{nachricht.von}</p>
             </li>
           ))}
         </ul>

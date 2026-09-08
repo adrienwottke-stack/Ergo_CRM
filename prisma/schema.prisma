@@ -118,66 +118,68 @@ enum ListKind {
 
 // Fortsetzungsstand: fachliche Checkpoints, getrennt von onboardingSteps (Messung).
 model StartProgress {
-  userId String @id
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  version Int @default(1)
-  revision Int @default(0)
-  phase String @default("INTRO")
-  paused Boolean @default(false)
-  kind ListKind?
-  collectionId String?
-  introAct String @default("chat")
-  answers Json @default("{}")
-  stornoChoices String[] @default([])
-  stornoSkipped Boolean @default(false)
-  sprintEndAt DateTime?
-  phoneSkipped String[] @default([])
-  plannedAt DateTime?
-  milestones Json @default("{}")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  userId        String    @id
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version       Int       @default(1)
+  revision      Int       @default(0)
+  phase         String    @default("INTRO")
+  paused        Boolean   @default(false)
+  kind          ListKind?
+  collectionId  String?
+  introAct      String    @default("chat")
+  answers       Json      @default("{}")
+  stornoChoices String[]  @default([])
+  stornoSkipped Boolean   @default(false)
+  sprintEndAt   DateTime?
+  phoneSkipped  String[]  @default([])
+  plannedAt     DateTime?
+  milestones    Json      @default("{}")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model NameCollection {
-  id String @id @default(cuid())
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  kind ListKind
-  scene String @default("familie")
-  revision Int @default(0)
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        ListKind
+  scene       String          @default("familie")
+  revision    Int             @default(0)
   completedAt DateTime?
-  createdAt DateTime @default(now())
-  operations NameOperation[]
+  createdAt   DateTime        @default(now())
+  operations  NameOperation[]
+
   @@index([userId, kind, completedAt])
 }
 
 // Ein Vorgangsschlüssel schützt auch bei verlorener HTTP-Antwort vor doppelten Aktivitäten.
 model NameOperation {
-  id String @id @default(cuid())
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  key String
-  fingerprint String
-  contactId String?
-  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  id           String          @id @default(cuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key          String
+  fingerprint  String
+  contactId    String?
+  contact      Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
   collectionId String?
-  collection NameCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
-  scene String?
-  kind ListKind
-  result String
-  createdAt DateTime @default(now())
+  collection   NameCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  scene        String?
+  kind         ListKind
+  result       String
+  createdAt    DateTime        @default(now())
+
   @@unique([userId, key])
   @@index([collectionId])
 }
 
 model Contact {
   nameOperations NameOperation[]
-  id     String  @id @default(cuid())
-  name   String
-  phone  String?
-  email  String?
-  source String?
-  note   String?
+  id             String          @id @default(cuid())
+  name           String
+  phone          String?
+  email          String?
+  source         String?
+  note           String?
 
   // Beruf als Freitext, im Formular ueber Bausteine ("Student", "Azubi", ...)
   // mit einem Tipp gefuellt. Bewusst kein Aufzaehlungstyp: die haeufigen Faelle
@@ -249,6 +251,7 @@ model Contact {
   activities            Activity[]
   stageEvents           StageEvent[]
   einheitenErinnerungen EinheitenErinnerung[]
+  kandidaturen          Kandidatur[]
 
   @@index([ownerId, updatedAt])
   @@index([ownerId, nextStepAt])
@@ -270,13 +273,21 @@ model StageEvent {
   user                User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
   einheitenErinnerung EinheitenErinnerung?
 
+  // Gesetzt, wenn das Ereignis zu einer Kandidatur gehoert (Aufbau-Trichter,
+  // docs/recruiting-plan.md §6). Ab Tag 1 mitgeschrieben: die Historie laesst
+  // sich billig anlegen und nie nachtragen. Cascade wie beim Contact - loescht
+  // jemand die Kandidatur, nimmt sie ihre Historie mit.
+  kandidaturId String?
+  kandidatur   Kandidatur? @relation(fields: [kandidaturId], references: [id], onDelete: Cascade)
+
   @@index([contactId, at])
+  @@index([kandidaturId, at])
 }
 
 model User {
-  startProgress StartProgress?
-  nameCollections NameCollection[]
-  nameOperations NameOperation[]
+  startProgress                StartProgress?
+  nameCollections              NameCollection[]
+  nameOperations               NameOperation[]
   id                           String                @id @default(cuid())
   name                         String
   arbeitsfokus                 Arbeitsfokus          @default(AUTO)
@@ -427,17 +438,26 @@ model User {
   // zeigt den Namen sonst allen Mitgliedern. Wer Namen will, schaltet sie frei.
   feedNamen Boolean @default(false)
 
+  // Der Schluessel des teilbaren Struktur-Berichts (docs/adr/0002): dieselbe
+  // Bauart wie feedToken - undurchsichtiges Zufallswort, zurueckziehbar durch
+  // Erneuern. NULL = noch nie einen Berichts-Link erzeugt. Der Bericht zeigt
+  // ausschliesslich indexierte Verlaeufe und Zaehlwerte, nie Kundendaten und
+  // nie absolute Einheiten.
+  berichtToken String? @unique
+
   termine         Termin[]
   kalenderquellen Kalenderquelle[]
 
   fuehrungsAufgaben LeadershipTask[] @relation("Fuehrt")
   betrifftMich      LeadershipTask[] @relation("Betrifft")
 
-  nachrichtenGesendet  Nachricht[] @relation("NachrichtVon")
-  nachrichtenErhalten  Nachricht[] @relation("NachrichtAn")
-  invites              Invite[]    @relation("Einladender")
-  invite               Invite?     @relation("Eingeloest")
-  platzhalterEinladung Invite?     @relation("Platzhalter")
+  nachrichtenGesendet  Nachricht[]  @relation("NachrichtVon")
+  nachrichtenErhalten  Nachricht[]  @relation("NachrichtAn")
+  invites              Invite[]     @relation("Einladender")
+  invite               Invite?      @relation("Eingeloest")
+  platzhalterEinladung Invite?      @relation("Platzhalter")
+  kandidaturen         Kandidatur[]
+  geworbenAus          Kandidatur?  @relation("Geworben")
 
   @@index([leaderId])
   @@index([path])
@@ -542,9 +562,72 @@ model Invite {
 
   createdAt DateTime @default(now())
 
-  angekommene User[] @relation("Herkunft")
+  angekommene User[]      @relation("Herkunft")
+  kandidatur  Kandidatur?
 
   @@index([leaderId, createdAt])
+}
+
+// --- Aufbau: die Kandidatur (docs/recruiting-plan.md, §6) ---------------------
+// Der Mensch bleibt ein Contact - Name und Nummer stehen laengst in der
+// Namensliste, und eine zweite Tabelle mit demselben Menschen waere eine zweite
+// Wahrheit bei der Telefonnummer. Alles BEWERBERSPEZIFISCHE liegt hier: Motiv,
+// Situation, Verlauf, Ablehnungsgrund. Diese Tabelle taucht in KEINEM
+// Kundenexport auf (lib/export.ts laesst sie bewusst aus) und ersetzt das
+// geplante Modell "Recruit" aus docs/struktur-plan.md §6.
+
+enum KandidaturPhase {
+  KONTAKT
+  ANGESPROCHEN
+  INFO_VEREINBART
+  INFO_GEHALTEN
+  ENTSCHEIDUNG
+  ZUSAGE
+  GESTARTET
+}
+
+model Kandidatur {
+  id        String  @id @default(cuid())
+  contactId String // die Person steht weiter im Contact
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  ownerId   String // der Werbende
+  owner     User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  phase      KandidaturPhase @default(KONTAKT)
+  outcome    Outcome         @default(OFFEN)
+  lostReason LostReason?
+
+  // Was im Gespraech wirklich zaehlt - und was in KEINEN Kundenexport gehoert.
+  motiv     String? // "will raus aus dem Lager"
+  situation String? // Beruf, Zeitfenster, Familie
+
+  nextStepType NextStepType?
+  nextStepAt   DateTime?
+  nextStepNote String?
+
+  // Beim Zusage-Knopf erzeugt: die Kandidatur haelt ihre Einladung fest, damit
+  // "eingeloest" ohne Suche ablesbar ist. SetNull, nicht Cascade - eine
+  // zurueckgenommene Einladung loescht keinen Bewerbungs-Verlauf.
+  inviteId String? @unique
+  invite   Invite? @relation(fields: [inviteId], references: [id], onDelete: SetNull)
+
+  // Die Naht zur Mannschaft: aus diesem Bewerber wurde dieses Konto.
+  becameUserId String? @unique
+  becameUser   User?   @relation("Geworben", fields: [becameUserId], references: [id], onDelete: SetNull)
+
+  // Gegen doppelte Wettbewerbspunkte, dieselbe Bauart wie die drei Stempel am
+  // Contact: jeder Punkt faellt genau einmal je Kandidatur.
+  talkLoggedAt      DateTime?
+  activatedLoggedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stageEvents StageEvent[]
+
+  @@index([ownerId, nextStepAt])
+  @@index([ownerId, phase, outcome])
+  @@index([contactId])
 }
 
 // Was die Fuehrungskraft sich vorgenommen hat (docs/struktur-plan.md, 5).
@@ -826,6 +909,35 @@ model Suchbegriff {
 
   @@id([begriff, day])
   @@index([day])
+}
+
+// --- Einstellungen ----------------------------------------------------------
+// Was der BETRIEB festlegt und nicht der Code (docs/emil-feedback-plan.md, D4):
+// die Schwellen der Karrierestufen, spaeter der Fokus-Prozentsatz der
+// Einheitenaufteilung und die Ampel-Kriterien. Gepflegt in der Werkstatt, vom
+// Admin, ohne Deploy - genau das war Emils Satz: "soll dann selbst eintragbar
+// sein".
+//
+// Im Muster von Feature.key: ein sprechender Schluessel als @id, kein
+// kuenstlicher. "schwelle.1" ist die Schwelle, die auf Karrierestufe 1 bis zur
+// naechsten fehlt - der Schluessel sagt selbst, was er meint, und zwei Zeilen
+// fuer dieselbe Sache kann es nicht geben.
+//
+// DER WERT STEHT ALS TEXT DA, obwohl hier Zahlen liegen. Das ist die bewusste
+// Gegenrechnung: EINE Tabelle fuer alles Konfigurierbare statt einer neuen
+// Tabelle und einer neuen Migration je Wert. Ein typisiertes
+// StufenSchwelle(stufe, hundertstel) haette die Schwellen sauber gedeckt und
+// den Fokus-Prozentsatz aus AP-06 schon wieder nicht - und D4 nennt drei
+// solche Werte, nicht einen. Gelesen und geschrieben wird ausschliesslich
+// ueber lib/einstellungen.ts; dort steht die einzige Stelle, an der aus dem
+// Text wieder eine Zahl wird.
+model Einstellung {
+  schluessel String @id
+  wert       String
+
+  // Wer gedreht hat, steht bewusst nicht dabei: die Werkstatt ist der Admin,
+  // einen zweiten gibt es nicht. Wann, reicht.
+  geaendertAt DateTime @default(now()) @updatedAt
 }
 
 // Gemeinsamer Block: 25 Minuten, alle gleichzeitig. Gezaehlt wird ueber
@@ -1268,4 +1380,30 @@ model VereinbarungVersion {
   createdAt      DateTime            @default(now())
 
   @@unique([vereinbarungId, version])
+}
+
+// --- Anfrage von aussen -------------------------------------------------------
+// Was auf der oeffentlichen Seite /anfrage abgeschickt wird: ein Berater, der
+// das Cockpit gesehen hat und einen Zugang will. Kein Konto, keine Session -
+// deshalb steht hier Freitext statt einer Beziehung.
+//
+// BEWUSST OHNE Relation auf User oder Person: die Anfrage kommt von jemandem,
+// den die Instanz nicht kennt, und sie soll den spaeteren Mandanten-Umbau
+// nicht verteuern - eine Tabelle ohne Kanten laesst sich jedem Mandanten
+// zuschlagen oder global lassen, ohne dass eine Abfrage bricht.
+model Anfrage {
+  id String @id @default(cuid())
+
+  name      String
+  // Freitext statt getrennter Felder: Handynummer, E-Mail, Instagram - was der
+  // Absender eben dalassen will. Eine Pflicht-E-Mail waere die erste Huerde.
+  kontakt   String
+  // Woher er kommt / was er will. Ueberspringbar.
+  nachricht String?
+
+  gesehenAt  DateTime?
+  erledigtAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([createdAt])
 }

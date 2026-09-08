@@ -23,11 +23,11 @@ export default function SprintUhr({ ende }: { ende: string }) {
   const sek = sekunden % 60;
 
   if (ms <= 0) {
-    return <span className="tabular-nums text-slate-500">vorbei</span>;
+    return <span className="tabular-nums text-ink-muted">vorbei</span>;
   }
 
   return (
-    <span className="tabular-nums text-2xl font-semibold tracking-tight text-slate-900">
+    <span className="tabular-nums text-2xl font-semibold tracking-tight text-ink">
       {min}:{String(sek).padStart(2, "0")}
     </span>
   );
