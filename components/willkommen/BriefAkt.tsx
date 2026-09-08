@@ -9,16 +9,16 @@ import { briefFrage } from "@/lib/willkommen";
 // (/heute zeigt ihn nach 14 Tagen Dabeisein und einer Woche Stille).
 // Die Leute gehen nicht, weil die Software schlecht ist.
 
-export default function BriefAkt({ onDone }: { onDone: () => void }) {
-  const [text, setText] = useState("");
+export default function BriefAkt({ onDone, demo = false, initialText = "" }: { onDone: () => void; demo?: boolean; initialText?: string }) {
+  const [text, setText] = useState(initialText);
+  const [error,setError] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const weglegen = () => {
     const inhalt = text.trim();
     if (!inhalt) return;
     startTransition(async () => {
-      await briefSpeichern(inhalt);
-      onDone();
+      try { if (!demo) await briefSpeichern(inhalt); onDone(); } catch { setError(true); }
     });
   };
 
@@ -48,6 +48,7 @@ export default function BriefAkt({ onDone }: { onDone: () => void }) {
         className="w-full rounded-xl border border-white/25 bg-white/5 px-4 py-3 text-15 leading-relaxed text-white placeholder:text-slate-500 focus:border-gold-400 focus:outline-none"
       />
 
+      {error && <p role="alert" className="text-red-300">Der Brief wurde noch nicht gespeichert. Bitte erneut versuchen.</p>}
       <div className="space-y-3">
         <button
           type="button"
@@ -59,6 +60,7 @@ export default function BriefAkt({ onDone }: { onDone: () => void }) {
         </button>
         <button
           type="button"
+          disabled={pending}
           onClick={onDone}
           className="block w-full text-center text-sm text-slate-400 hover:text-white"
         >

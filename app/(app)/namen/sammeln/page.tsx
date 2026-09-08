@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { beginCollection, collectionView } from "@/lib/start/service";
+import { startOptions } from "@/lib/start/settings";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
@@ -7,7 +10,6 @@ import {
   andereListe,
   isListKind,
   listKindHints,
-  listKindLabels,
   listKindListLabels,
 } from "@/lib/namelist";
 import NamenSammeln from "@/components/NamenSammeln";
@@ -45,10 +47,10 @@ function Kopf({ unterzeile, zurueck }: { unterzeile: string; zurueck: string }) 
 export default async function SammelnPage({
   searchParams,
 }: {
-  searchParams: Promise<{ liste?: string }>;
+  searchParams: Promise<{ liste?: string; runde?: string }>;
 }) {
   const user = await requireUser();
-  const { liste } = await searchParams;
+  const { liste, runde } = await searchParams;
 
   // Hier bewusst NICHT listeAus: die anderen Namens-Seiten zeigen nur an und
   // duerfen deshalb eine Liste vorschlagen. Diese hier SCHREIBT zwanzig Namen
@@ -127,18 +129,22 @@ export default async function SammelnPage({
     );
   }
 
-  const vorhanden = await prisma.contact.count({
-    where: { ...eigene(user.id).kontakte, listKinds: { has: kind } },
-  });
+  if (!runde) {
+    const round = await beginCollection(prisma, user.id, kind);
+    redirect(`/namen/sammeln?liste=${kind}&runde=${round.id}`);
+  }
+  const belongs = await prisma.nameCollection.findFirst({ where: { id: runde, userId: user.id, kind }, select: { id: true } });
+  if (!belongs) notFound();
+  const [round, state, options] = await Promise.all([
+    collectionView(prisma, user.id, runde),
+    prisma.startProgress.findUnique({ where: { userId: user.id } }),
+    startOptions(),
+  ]);
 
   return (
     <div className={`${columnNarrow} space-y-5`}>
-      <Kopf
-        unterzeile={`${listKindLabels[kind]} · alles aufschreiben, nichts aussortieren`}
-        zurueck={`/namen?liste=${kind}`}
-      />
-
-      <NamenSammeln kind={kind} vorhanden={vorhanden} />
+      <h1 className={pageTitle}>Namen sammeln</h1>
+      <NamenSammeln key={round.id} initial={round} userId={user.id} guided={options.guidance && state !== null && state.phase !== "DONE" && state.collectionId === round.id} />
     </div>
   );
 }

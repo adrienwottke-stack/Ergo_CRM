@@ -22,6 +22,8 @@ import StageBadge from "@/components/StageBadge";
 import NextStepBadge from "@/components/NextStepBadge";
 import QuickRowActions from "@/components/QuickRowActions";
 import type { ContactLite } from "@/components/ContactActionDialog";
+import StartHinweis from "@/components/StartHinweis";
+import { startOptions } from "@/lib/start/settings";
 import ErsteWoche from "@/components/ErsteWoche";
 import Meldungen from "@/components/Meldungen";
 import Postfach from "@/components/Postfach";
@@ -201,7 +203,11 @@ export default async function HeutePage() {
   ).length;
   const sonstigeHeute = jetzt.length - anrufeHeute - termineHeute;
   const openCount = jetzt.length;
-  const nachfuellen = offeneNamen < NACHFUELL_SCHWELLE;
+  const startState = (await startOptions()).guidance && !gefuehrte && user.role !== "ADMIN"
+    ? await prisma.startProgress.findUnique({where:{userId:user.id}}) : null;
+  const activeStart = startState && startState.phase !== "DONE" ? startState : null;
+  const urgent = openCount > 0 || aufgaben.length > 0;
+  const nachfuellen = !activeStart && offeneNamen < NACHFUELL_SCHWELLE;
 
   // Liegenbleiber ueber beide Listen: die mit Schritt (ueberfaellig und nie
   // angefasst) und die ohne. Der Balken nennt den aeltesten und zaehlt den
@@ -219,6 +225,7 @@ export default async function HeutePage() {
   return (
     <div className="space-y-6">
       <SeitenKopf kicker="Beraterbereich" titel="Heute" />
+      {activeStart && !urgent && <StartHinweis phase={activeStart.phase} />}
 
       {/* Was jemand geschrieben hat, steht vor der Arbeit - es dauert zehn
           Sekunden und ist der Grund, warum sich das Werkzeug nach Mannschaft
@@ -283,7 +290,7 @@ export default async function HeutePage() {
       <div className={`${card} p-5 sm:p-6`}>
         {openCount === 0 ? (
           <p className="text-base font-semibold text-slate-900">
-            Nichts offen – alles abgearbeitet.
+            {activeStart ? "Heute sind noch keine Anrufe eingeplant." : "Nichts offen – alles abgearbeitet."}
           </p>
         ) : (
           <>
@@ -398,9 +405,9 @@ export default async function HeutePage() {
 
       {/* Startwoche, Brief, Versprechen, Wiedereinstieg - meldet sich nur,
           wenn einer dieser Momente wirklich ansteht. */}
-      <ErsteWoche user={user} />
+      {activeStart ? <details className="text-sm"><summary className="min-h-11 cursor-pointer text-slate-500">Deine erste Woche und dein Ziel</summary><ErsteWoche user={user} /></details> : <ErsteWoche user={user} />}
 
-      {rows.length === 0 && orphans.length === 0 && aufgaben.length === 0 ? (
+      {rows.length === 0 && orphans.length === 0 && aufgaben.length === 0 && !activeStart ? (
         <LeerZustand
           ton="erfolg"
           symbol={<CheckIcon className="h-6 w-6" />}
@@ -618,6 +625,7 @@ export default async function HeutePage() {
           )}
         </section>
       )}
+      {activeStart && urgent && <StartHinweis phase={activeStart.phase} />}
     </div>
   );
 }

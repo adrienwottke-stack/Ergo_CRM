@@ -3,6 +3,7 @@ import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { authCookieName, sessionCookieOptions } from "@/lib/session";
 import { normalisiereCode, statusVon } from "@/lib/einladung";
+import { entryRoute } from "@/lib/start/entry";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
 
   // Wer angemeldet ist, landet auf der Arbeitsliste: dort steht, was heute
   // dran ist.
-  if (user) return ziel("/heute");
+  if (user) return ziel(await entryRoute(user.id));
 
   // Auch eine verbrauchte oder abgelaufene Einladung geht zurueck auf die
   // Einladungsseite: die erklaert in einem Satz, was los ist, und verlinkt

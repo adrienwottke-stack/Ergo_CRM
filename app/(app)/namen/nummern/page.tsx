@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
@@ -7,7 +6,9 @@ import NummernNachtragen, {
   type NummerEintrag,
 } from "@/components/NummernNachtragen";
 import { pageTitle, columnNarrow } from "@/components/ui";
-import { XIcon } from "@/components/icons";
+import { startOptions } from "@/lib/start/settings";
+import { redirect } from "next/navigation";
+import { isListKind } from "@/lib/namelist";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,10 @@ export default async function NummernPage({
 }) {
   const user = await requireUser();
   const { liste } = await searchParams;
+  if (!isListKind(liste ?? "") && !user.startTrack) redirect("/namen/sammeln");
   const kind = listeAus(liste, user.startTrack);
+  const [state,options] = await Promise.all([prisma.startProgress.findUnique({where:{userId:user.id}}),startOptions()]);
+  const guided = options.guidance && state?.phase === "PHONES" && state.kind === kind;
 
   const [ohneNummer, mitNummer] = await Promise.all([
     prisma.contact.findMany({
@@ -57,7 +61,7 @@ export default async function NummernPage({
     }),
   ]);
 
-  const queue: NummerEintrag[] = ohneNummer.map((kontakt) => ({
+  const queue: NummerEintrag[] = ohneNummer.filter(k => !guided || !state.phoneSkipped.includes(k.id)).map((kontakt) => ({
     id: kontakt.id,
     name: kontakt.name,
     rating: kontakt.rating,
@@ -75,16 +79,9 @@ export default async function NummernPage({
             {listKindLabels[kind]} · ohne Nummer kein Anruf
           </p>
         </div>
-        <Link
-          href={`/namen?liste=${kind}`}
-          className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
-        >
-          <XIcon className="h-4 w-4" />
-          Beenden
-        </Link>
       </div>
 
-      <NummernNachtragen queue={queue} kind={kind} schonAnrufbar={mitNummer} />
+      <NummernNachtragen key={kind} queue={queue} kind={kind} schonAnrufbar={mitNummer} guided={guided} userId={user.id} />
     </div>
   );
 }

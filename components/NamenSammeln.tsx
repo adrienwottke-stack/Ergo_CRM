@@ -1,361 +1,141 @@
 "use client";
 
-// Die gefuehrte Namenssammlung: Szene fuer Szene statt leeres Feld.
-//
-// Der Ablauf ist bewusst eine Einbahnstrasse mit einem einzigen Bedienelement
-// (Feld + Enter). Alles, was hier nach Entscheidung aussieht - einstufen,
-// Nummer nachtragen, Liste waehlen - passiert danach auf /namen. Wer beim
-// Sammeln nachdenkt, kommt nicht auf zwanzig.
-//
-// Geschrieben wird ueber dieselbe Server-Action wie die Schnellerfassung
-// (addName). Kein zweiter Weg in die Datenbank, der eigene Fehler machen kann.
-
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addName, moveNames } from "@/app/(app)/namen/actions";
-import { STUETZEN, STUETZEN_ANZAHL } from "@/lib/gedaechtnisstuetzen";
-import {
-  NAME_TARGET,
-  andereListe,
-  listKindHints,
-  listKindLabels,
-  listKindListLabels,
-} from "@/lib/namelist";
-import type { ListKind } from "@/lib/generated/prisma/enums";
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  CheckIcon,
-  PhoneIcon,
-  PlusIcon,
-} from "@/components/icons";
-import { btnPrimary, card, input, kicker } from "@/components/ui";
+import { addName } from "@/app/(app)/namen/actions";
+import { sammlungVerschieben, sammlungSzene, sammlungStand, sammlungAbschliessen, sammlungBeginnen, startVertagen } from "@/app/startActions";
+import { STUETZEN } from "@/lib/gedaechtnisstuetzen";
+import { NAME_TARGET, andereListe, listKindListLabels } from "@/lib/namelist";
+import type { collectionView } from "@/lib/start/service";
+import { btnPrimary, btnSecondary, card, input } from "@/components/ui";
 
-export default function NamenSammeln({
-  kind,
-  vorhanden,
-}: {
-  kind: ListKind;
-  /** Namen, die schon auf dieser Liste stehen. */
-  vorhanden: number;
-}) {
-  const [stufe, setStufe] = useState(0);
-  // Je Szene die Namen, die gerade dazugekommen sind - als sichtbarer Ertrag.
-  const [gesammelt, setGesammelt] = useState<string[][]>(
-    STUETZEN.map(() => [])
-  );
-  const [hinweis, setHinweis] = useState<string | null>(null);
-  // Die Kontakte dieser Runde. Nur damit laesst sich am Ende "alle umhaengen"
-  // anbieten - ein Name allein ist kein Griff, an dem der Server etwas findet.
-  // Bewusst ohne die, die schon auf der Liste standen ("already"): die hat
-  // diese Runde nicht angelegt, also zieht sie sie auch nicht mit um.
-  const [ids, setIds] = useState<string[]>([]);
-  // Wohin die Namen dieser Runde am Ende gehoeren. null = unveraendert auf
-  // `kind`. Ein Zustand fuer beide Richtungen, damit der Knopf am Abschluss
-  // immer nur "in die andere Liste" heisst - und der Weg zurueck derselbe ist.
-  const [verschoben, setVerschoben] = useState<ListKind | null>(null);
+type Round = Awaited<ReturnType<typeof collectionView>>;
+
+export default function NamenSammeln({ initial, userId, guided }: { initial: Round; userId: string; guided: boolean }) {
+  const router = useRouter();
+  const [round, setRound] = useState(initial);
+  const [name, setName] = useState("");
+  const [hint, setHint] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const feldRef = useRef<HTMLInputElement>(null);
+  const busy = useRef(false);
+  const operation = useRef<{ name: string; key: string; scene: string } | null>(null);
+  const field = useRef<HTMLInputElement>(null);
+  const draftKey = `ergo.start.name.${userId}.${round.id}`;
+  const sceneIndex = Math.max(0, STUETZEN.findIndex((s) => s.key === round.scene));
+  const scene = STUETZEN[sceneIndex];
+  const saved = round.operations.filter((o) => o.result !== "already" && o.contact && o.contact.listKinds.includes(round.kind));
+  const inScene = saved.filter((o) => o.scene === round.scene);
 
-  // Eingefroren beim Betreten. addName laesst den Server neu rechnen, und der
-  // liefert `vorhanden` dann INKLUSIVE der gerade gesammelten Namen - waehrend
-  // `gesammelt` sie ebenfalls zaehlt. Ohne das Einfrieren stand nach drei
-  // Namen "6 von 20" da, und zwar schon im Fortschritt waehrend des Sammelns.
-  const [basis] = useState(vorhanden);
-
-  const fertig = stufe >= STUETZEN_ANZAHL;
-  const stuetze = fertig ? null : STUETZEN[stufe]!;
-  const neueNamen = gesammelt.flat();
-  const gesamt = basis + neueNamen.length;
-
-  const eintragen = () => {
-    const name = feldRef.current?.value.trim() ?? "";
-    if (!name || !stuetze) return;
-
-    if (feldRef.current) feldRef.current.value = "";
-    feldRef.current?.focus();
-    setHinweis(null);
-
-    // Sofort anzeigen, Server hinterher: zwanzig Namen hintereinander duerfen
-    // nicht auf die Datenbank warten.
-    setGesammelt((alt) =>
-      alt.map((namen, index) => (index === stufe ? [...namen, name] : namen))
-    );
-
-    const data = new FormData();
-    data.set("name", name);
-    data.set("listKind", kind);
-
-    startTransition(async () => {
-      const ergebnis = await addName(data);
-      if (ergebnis.status === "already") {
-        setHinweis(`${ergebnis.name} steht schon auf der Liste.`);
-        return;
+  useEffect(() => {
+    try {
+      const draft = JSON.parse(localStorage.getItem(draftKey) ?? "null");
+      if (draft && typeof draft.name === "string" && typeof draft.key === "string") {
+        setName(draft.name); operation.current = { ...draft, scene: draft.scene ?? round.scene };
       }
-      setIds((alt) => [...alt, ergebnis.id]);
-    });
-  };
+    } catch { /* Storage-disabled browsers still support normal entry. */ }
+  // Restore once per collection. Moving to another scene must not replace an active draft.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
 
-  // Auf welcher Liste die Namen dieser Runde liegen, und wohin ein Umhaengen
-  // ginge. Waehrend des Sammelns ist das immer `kind`; erst der Abschluss
-  // kann daran etwas aendern.
-  const liste = verschoben ?? kind;
-  const ziel = andereListe(liste);
-
-  // Der ganze Stapel auf einmal. Es gibt genau zwei Listen, also ist das Ziel
-  // eindeutig und braucht kein Menue (docs/audit-kernmodell.md, 1.5).
-  const umhaengen = () => {
-    if (ids.length === 0) return;
-
-    const data = new FormData();
-    data.set("ids", ids.join(","));
-    data.set("von", liste);
-    data.set("nach", ziel);
-
-    // Sofort umschalten, Server hinterher - dasselbe Muster wie beim Eintragen.
-    setVerschoben(ziel === kind ? null : ziel);
-    startTransition(async () => {
-      await moveNames(data);
-    });
-  };
-
-  if (fertig) {
-    return (
-      <div className={`${card} flex flex-col items-center px-6 py-12 text-center`}>
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-          <CheckIcon className="h-6 w-6" />
-        </span>
-        <h2 className="mt-4 text-lg font-semibold text-slate-900">
-          {neueNamen.length === 0
-            ? "Keine neuen Namen"
-            : `${neueNamen.length} ${neueNamen.length === 1 ? "Name" : "Namen"} dazu`}
-        </h2>
-        {/* Die Liste gehoert in den Satz, den er ohnehin liest. Vorher stand
-            hier "auf deiner Liste" - welche, sagte diese Seite nie.
-
-            Nach einem Umhaengen bleibt der Gesamtstand weg: `gesamt` zaehlt die
-            Liste, auf der gesammelt wurde. Wie viele auf der anderen schon
-            liegen, weiss diese Seite nicht - und eine geratene Zahl ist
-            schlimmer als keine. */}
-        <p className="mt-1 text-sm text-slate-500">
-          {verschoben
-            ? `Sie liegen jetzt auf deiner ${listKindListLabels[liste]}.`
-            : neueNamen.length === 0
-              ? `Auf deiner ${listKindListLabels[liste]} stehen ${gesamt} von ${NAME_TARGET}.`
-              : gesamt >= NAME_TARGET
-                ? `Sie stehen auf deiner ${listKindListLabels[liste]} — damit sind es ${gesamt}. Das reicht zum Loslegen.`
-                : `Sie stehen auf deiner ${listKindListLabels[liste]} — damit sind es ${gesamt} von ${NAME_TARGET}.`}
-        </p>
-
-        {/* Ohne Nummer kein Anruf: die frisch gesammelten Namen haben noch
-            keine. Hier endete die Kette frueher - der naechste Schritt stand
-            nirgends, und auf der Liste wartete ein toter Knopf. */}
-        {neueNamen.length > 0 ? (
-          <>
-            <Link
-              href={`/namen/nummern?liste=${liste}`}
-              className={`${btnPrimary} mt-6`}
-            >
-              <PhoneIcon className="h-4 w-4" />
-              Nummern nachtragen
-            </Link>
-            <p className="mt-2 max-w-xs text-xs text-slate-400">
-              Ohne Nummer kein Anruf. Geht am schnellsten am Stück — ein Name,
-              ein Feld.
-            </p>
-          </>
-        ) : (
-          <Link href={`/namen?liste=${liste}`} className={`${btnPrimary} mt-6`}>
-            Zur Namensliste
-          </Link>
-        )}
-
-        {/* Der Ausweg genau dort, wo der Fehler auffaellt. Auf der Liste selbst
-            gibt es das Umhaengen laengst - nur kommt dort nicht an, wer eben
-            zwanzig Namen in den falschen Reiter getippt hat. */}
-        {ids.length > 0 && (
-          <div className="mt-6 w-full rounded-lg bg-sunken px-4 py-3 text-left">
-            <p className="text-13 text-slate-600">
-              {verschoben
-                ? "Umgehängt. Hier ist der Weg zurück, falls es doch die andere war."
-                : `Falsche Liste? Die ${ids.length} Namen dieser Runde ziehen in einem Zug um.`}
-            </p>
-            <button
-              type="button"
-              onClick={umhaengen}
-              disabled={pending}
-              className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-navy-700 transition hover:text-navy-900 disabled:opacity-40"
-            >
-              <ArrowRightIcon className="h-4 w-4" />
-              {verschoben
-                ? `Doch zurück nach ${listKindLabels[ziel]}`
-                : `Alle ${ids.length} nach ${listKindLabels[ziel]}`}
-            </button>
-          </div>
-        )}
-
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4">
-          {verschoben && (
-            <Link
-              href={`/namen/sammeln?liste=${liste}`}
-              className="min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
-            >
-              Weiter sammeln
-            </Link>
-          )}
-          {gesamt < NAME_TARGET && !verschoben && (
-            <button
-              type="button"
-              onClick={() => {
-                setGesammelt(STUETZEN.map(() => []));
-                setIds([]);
-                setStufe(0);
-              }}
-              className="min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
-            >
-              Noch eine Runde
-            </button>
-          )}
-          {neueNamen.length > 0 && (
-            <Link
-              href={`/namen?liste=${liste}`}
-              className="min-h-11 text-sm font-medium text-slate-500 hover:text-navy-700 hover:underline"
-            >
-              Zur Namensliste
-            </Link>
-          )}
-        </div>
-      </div>
-    );
+  function changeName(value: string) {
+    setName(value);
+    const draft = { name: value, key: crypto.randomUUID(), scene:round.scene };
+    operation.current = draft;
+    try { localStorage.setItem(draftKey, JSON.stringify(draft)); } catch { /* optional draft */ }
   }
 
-  const dieseRunde = gesammelt[stufe] ?? [];
+  function run(work: () => Promise<void>) {
+    if (busy.current) return;
+    busy.current = true; setError(null);
+    startTransition(async () => {
+      try { await work(); } catch (e) { setError(e instanceof Error ? e.message : "Speichern hat nicht geklappt. Bitte erneut versuchen."); }
+      finally { busy.current = false; }
+    });
+  }
 
-  return (
-    <div className="space-y-5">
-      {/* Fortschritt: er soll sehen, dass das hier endlich ist. */}
-      <div>
-        <div className="flex items-baseline justify-between text-xs font-medium text-slate-500">
-          <span>
-            Szene {stufe + 1} von {STUETZEN_ANZAHL}
-          </span>
-          <span>
-            {gesamt} von {NAME_TARGET} Namen
-          </span>
-        </div>
-        <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-navy-700 transition-all duration-300"
-            style={{ width: `${Math.round(((stufe + 1) / STUETZEN_ANZAHL) * 100)}%` }}
-          />
-        </div>
+  async function saveDraft() {
+    const value = name.trim();
+    if (!value) return;
+    const op = operation.current?.name === name ? operation.current : { name, key: crypto.randomUUID(), scene:round.scene };
+    operation.current = op;
+    try { localStorage.setItem(draftKey, JSON.stringify(op)); } catch { /* optional draft */ }
+    const data = new FormData();
+    data.set("name", value); data.set("listKind", round.kind);
+    data.set("operationKey", op.key); data.set("collectionId", round.id); data.set("scene", op.scene);
+    const result = await addName(data);
+    // A lost reply is retried with the same key; only acknowledged input is cleared.
+    setName(""); operation.current = null;
+    try { localStorage.removeItem(draftKey); } catch { /* optional draft */ }
+    setRound(await sammlungStand(round.id));
+    setHint(result.status === "already" ? `${result.name} steht schon auf deiner Liste.` : "Gespeichert. Du kannst direkt den nächsten Namen eingeben.");
+    field.current?.focus();
+  }
+
+  async function finish() {
+    await saveDraft(); await sammlungAbschliessen(round.id);
+    setRound(await sammlungStand(round.id));
+  }
+
+  const errors = error && <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900">{error}<button type="button" onClick={() => window.location.reload()} className="ml-2 min-h-11 underline">Stand neu laden</button>{name && <button type="button" disabled={pending} onClick={() => {changeName("");setError(null);}} className="ml-2 min-h-11 underline">Eingabe verwerfen</button>}</div>;
+
+  if (round.completedAt) {
+    const next = round.callable > 0 ? `/namen/startklar?liste=${round.kind}` : `/namen/nummern?liste=${round.kind}${guided ? "&start=1" : ""}`;
+    return <div className={`${card} space-y-5 p-6`}>
+      <p className="text-sm text-slate-500">Sammlung abgeschlossen</p>
+      <h2 className="text-3xl font-semibold">{saved.length === 0 ? "Keine neuen Namen" : `${saved.length} ${saved.length === 1 ? "Name" : "Namen"} dazu`}</h2>
+      <p className="text-base text-slate-600">Jetzt stehen {round.names} {round.names === 1 ? "Name" : "Namen"} auf deiner {listKindListLabels[round.kind]}.</p>
+      {errors}
+      {round.names > 0 ? <Link href={next} className={`${btnPrimary} min-h-14 w-full`}>{round.callable > 0 ? "Erste Anrufe vorbereiten" : "Nummern ergänzen"}</Link>
+        : <button className={`${btnPrimary} min-h-14 w-full`} disabled={pending} onClick={() => run(async () => { router.replace(await sammlungBeginnen(round.kind, true)); })}>Namen sammeln</button>}
+      <div className="flex flex-wrap gap-4">
+        <button className="min-h-11 text-sm underline" disabled={pending} onClick={() => run(async () => { router.replace(await sammlungBeginnen(round.kind, true)); })}>Weitere Namen sammeln</button>
+        <button className="min-h-11 text-sm underline" disabled={pending} onClick={() => run(async () => { if (guided) await startVertagen(); router.push("/heute"); })}>Zu Heute</button>
+        <Link className="min-h-11 text-sm underline" href={`/namen?liste=${round.kind}`}>Zur Namensliste</Link>
       </div>
+      {saved.length > 0 && <details className="border-t border-line pt-4">
+        <summary className="cursor-pointer text-sm">Liste ändern</summary>
+        <p className="mt-3 text-sm text-slate-600">Die {saved.length} zusätzlichen Namen dieser Runde auf die andere Liste verschieben.</p>
+        <button disabled={pending} className={`${btnSecondary} mt-3`} onClick={() => run(async () => {
+          const next = await sammlungVerschieben(round.id, andereListe(round.kind));
+          setRound(next);
+          router.replace(`/namen/sammeln?liste=${next.kind}&runde=${next.id}`);
+        })}>Nach {listKindListLabels[andereListe(round.kind)]} verschieben</button>
+      </details>}
+    </div>;
+  }
 
-      <div className={`${card} space-y-4 p-5`}>
-        {/* Welche Liste hier gefuellt wird - an der Eingabe, nicht als graue
-            Fussnote am Seitenende. Die zehn Szenen sind fuer beide Listen
-            dieselben ("Familie", "Verein", "Nachbarn"); ohne diese Zeile liest
-            sich der ganze Ablauf wie "schreib alle auf, die du kennst". Genau
-            so landen Kundennamen in der Recruiting-Liste. */}
-        <div className="flex items-start justify-between gap-3 border-b border-line pb-3">
-          <div className="min-w-0">
-            <p className={kicker}>{listKindListLabels[kind]}</p>
-            <p className="mt-0.5 text-13 font-medium text-slate-700">
-              {listKindHints[kind]}
-            </p>
-          </div>
-          {/* Der Wechsel steht nur da, solange die Runde leer ist. Wer schon
-              getippt hat, soll nicht die Liste unter seinen Namen wegziehen -
-              fuer den ist das Umhaengen am Ende der richtige Weg. */}
-          {neueNamen.length === 0 && (
-            <Link
-              href={`/namen/sammeln?liste=${andereListe(kind)}`}
-              className="shrink-0 text-13 font-medium text-navy-700 transition hover:text-navy-900 hover:underline"
-            >
-              Wechseln
-            </Link>
-          )}
-        </div>
-
-        <div>
-          <h2 className="text-xl font-semibold tracking-[-0.01em] text-slate-900">
-            {stuetze!.titel}
-          </h2>
-          <ul className="mt-3 space-y-1.5">
-            {stuetze!.fragen.map((frage) => (
-              <li key={frage} className="flex gap-2 text-sm text-slate-600">
-                <span aria-hidden className="text-slate-300">
-                  —
-                </span>
-                {frage}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="flex gap-2">
-          <input
-            ref={feldRef}
-            type="text"
-            autoFocus
-            placeholder="Name"
-            enterKeyHint="done"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                eintragen();
-              }
-            }}
-            className={`${input} mt-0 flex-1`}
-          />
-          <button
-            type="button"
-            onClick={eintragen}
-            aria-label="Namen hinzufügen"
-            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-akzent px-4 text-white transition hover:bg-akzent-stark active:scale-[0.99]"
-          >
-            <PlusIcon className="h-4 w-4" />
-          </button>
-        </div>
-        {hinweis && <p className="text-xs font-medium text-amber-700">{hinweis}</p>}
-
-        {dieseRunde.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 border-t border-slate-100 pt-3">
-            {dieseRunde.map((name, index) => (
-              <span
-                key={`${name}-${index}`}
-                className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800"
-              >
-                {name}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-3">
-        {stufe > 0 && (
-          <button
-            type="button"
-            onClick={() => setStufe((wert) => wert - 1)}
-            aria-label="Eine Szene zurück"
-            className="inline-flex min-h-14 items-center justify-center rounded-xl px-3 text-slate-400 transition hover:text-slate-700"
-          >
-            <ArrowLeftIcon className="h-5 w-5" />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setStufe((wert) => wert + 1)}
-          className="flex min-h-14 flex-1 items-center justify-center rounded-xl bg-akzent text-base font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.99]"
-        >
-          {dieseRunde.length > 0 ? "Weiter" : "Fällt mir keiner ein"}
-        </button>
-      </div>
-
-      <p className="text-center text-xs text-slate-400">
-        Nummern und Einstufung kommen später auf der Liste
-      </p>
+  return <div className="space-y-5">
+    <div className="flex justify-between gap-3 text-sm text-slate-500"><span>Bereich {sceneIndex + 1} von {STUETZEN.length}</span><span>{round.names} Namen gespeichert</span></div>
+    <div className={`${card} space-y-5 p-5 sm:p-6`}>
+      <p className="text-sm font-medium text-slate-600">{listKindListLabels[round.kind]}</p>
+      {round.operations.length === 0 && <button disabled={pending} className="text-sm underline" onClick={() => run(async () => { router.replace(await sammlungBeginnen(andereListe(round.kind))); })}>Andere Liste wählen</button>}
+      <h2 className="text-3xl font-semibold tracking-tight">{scene.titel}</h2>
+      <p className="text-lg leading-relaxed text-slate-700">{scene.fragen[0]}</p>
+      <details className="text-sm text-slate-500"><summary className="min-h-11 cursor-pointer">Mehr Gedächtnisstützen</summary><ul className="space-y-2">{scene.fragen.slice(1).map(q => <li key={q}>{q}</li>)}</ul></details>
+      {round.operations.length === 0 && <p className="text-sm text-slate-500">Name eingeben und auf Hinzufügen tippen. Telefonnummern kommen danach.</p>}
+      <form onSubmit={e => { e.preventDefault(); run(saveDraft); }} className="flex flex-wrap gap-2">
+        <label className="min-w-0 flex-1"><span className="sr-only">Name</span><input ref={field} value={name} onChange={e => changeName(e.target.value)} disabled={pending} maxLength={120} autoFocus autoComplete="off" enterKeyHint="done" placeholder="Name" className={`${input} min-h-14 w-full text-base`} /></label>
+        <button type="submit" disabled={pending || !name.trim()} className={`${btnPrimary} min-h-14`}>{pending ? "Speichern …" : "Hinzufügen"}</button>
+      </form>
+      {hint && <p role="status" className="text-sm text-slate-600">{hint}</p>}
+      {errors}
+      {inScene.length > 0 && <ul aria-label="In diesem Bereich gespeichert" className="flex flex-wrap gap-2">{inScene.map(o => <li key={o.id} className="rounded-lg bg-sunken px-3 py-2 text-sm">{o.contact!.name}</li>)}</ul>}
     </div>
-  );
+    {round.names >= NAME_TARGET && <p className="text-sm text-slate-600">{round.names} Namen stehen. Du kannst weiter sammeln oder mit ihnen loslegen.</p>}
+    <div className="flex gap-3">
+      {sceneIndex > 0 && <button className={btnSecondary} disabled={pending} onClick={() => run(async () => { await saveDraft(); const result = await sammlungSzene(round.id, round.revision, STUETZEN[sceneIndex - 1].key); setRound(r => ({ ...r, ...result })); setHint(null); })}>Zurück</button>}
+      <button className={`${btnPrimary} min-h-14 flex-1`} disabled={pending} onClick={() => run(async () => {
+        if (sceneIndex === STUETZEN.length - 1) return finish();
+        await saveDraft();
+        const result = await sammlungSzene(round.id, round.revision, STUETZEN[sceneIndex + 1].key);
+        setRound(r => ({ ...r, ...result })); setHint(null);
+      })}>{sceneIndex === STUETZEN.length - 1 ? "Sammlung abschließen" : inScene.length > 0 || name.trim() ? "Nächster Bereich" : "Fällt mir niemand ein"}</button>
+    </div>
+    <div className="flex flex-wrap justify-between gap-3 text-sm">
+      <button disabled={pending} className="min-h-11 underline" onClick={() => run(finish)}>Für heute fertig</button>
+      <button disabled={pending} className="min-h-11 underline" onClick={() => run(async () => { await saveDraft(); if (guided) await startVertagen(); router.push(guided ? "/heute" : `/namen?liste=${round.kind}`); })}>Später fortsetzen</button>
+    </div>
+  </div>;
 }

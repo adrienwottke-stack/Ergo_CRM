@@ -10,6 +10,7 @@ import {
   newPasswordSalt,
 } from "@/lib/auth";
 import { pfadUnter } from "@/lib/struktur";
+import { entryRoute } from "@/lib/start/entry";
 
 const cookieOptions = {
   httpOnly: true,
@@ -93,7 +94,7 @@ export async function login(formData: FormData) {
 
   const cookieStore = await cookies();
   cookieStore.set(authCookieName, await createSession(user.id), cookieOptions);
-  redirect("/heute");
+  redirect(await entryRoute(user.id));
 }
 
 export async function logout() {

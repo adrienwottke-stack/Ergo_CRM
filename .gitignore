@@ -52,3 +52,6 @@ next-env.d.ts
 # Audit-Werkzeuge dieser Sitzung: schreiben in die echte Datenbank, gehoeren
 # nicht ins Repo.
 scripts/_audit/
+
+# Local browser regression output
+/test-results/

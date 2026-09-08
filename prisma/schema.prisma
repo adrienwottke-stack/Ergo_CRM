@@ -109,7 +109,62 @@ enum ListKind {
   VERKAUF
 }
 
+// Fortsetzungsstand: fachliche Checkpoints, getrennt von onboardingSteps (Messung).
+model StartProgress {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version Int @default(1)
+  revision Int @default(0)
+  phase String @default("INTRO")
+  paused Boolean @default(false)
+  kind ListKind?
+  collectionId String?
+  introAct String @default("chat")
+  answers Json @default("{}")
+  stornoChoices String[] @default([])
+  stornoSkipped Boolean @default(false)
+  sprintEndAt DateTime?
+  phoneSkipped String[] @default([])
+  plannedAt DateTime?
+  milestones Json @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NameCollection {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind ListKind
+  scene String @default("familie")
+  revision Int @default(0)
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  operations NameOperation[]
+  @@index([userId, kind, completedAt])
+}
+
+// Ein Vorgangsschlüssel schützt auch bei verlorener HTTP-Antwort vor doppelten Aktivitäten.
+model NameOperation {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key String
+  fingerprint String
+  contactId String?
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  collectionId String?
+  collection NameCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  scene String?
+  kind ListKind
+  result String
+  createdAt DateTime @default(now())
+  @@unique([userId, key])
+  @@index([collectionId])
+}
+
 model Contact {
+  nameOperations NameOperation[]
   id     String  @id @default(cuid())
   name   String
   phone  String?
@@ -210,6 +265,9 @@ model StageEvent {
 }
 
 model User {
+  startProgress StartProgress?
+  nameCollections NameCollection[]
+  nameOperations NameOperation[]
   id   String @id @default(cuid())
   name String
 

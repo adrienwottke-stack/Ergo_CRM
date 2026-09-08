@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireUser, requireUserPerson } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
-import { berlinToday, dayToUtcDate } from "@/lib/dates";
+
+import { saveName } from "@/lib/start/service";
 import {
   LIST_KINDS,
   gleicheListen,
@@ -50,69 +51,18 @@ export type AddNameResult =
 // Namensliste ist ihr eigener Arbeitsvorrat.
 export async function addName(formData: FormData): Promise<AddNameResult> {
   const user = await requireUser();
-  const person = await requireUserPerson(user.id);
-
-  const name = text(formData, "name");
-  if (!name) throw new Error("Name ist ein Pflichtfeld.");
-
-  const kindRaw = text(formData, "listKind");
-  if (!kindRaw || !isListKind(kindRaw)) throw new Error("Liste fehlt.");
-  const kind: ListKind = kindRaw;
-
-  const phone = text(formData, "phone");
-  const ratingRaw = text(formData, "rating");
-  const rating = ratingRaw && isContactRating(ratingRaw) ? ratingRaw : null;
-
-  // Gibt es den Menschen schon? Dann nicht doppelt anlegen, sondern den
-  // bestehenden Kontakt auf die Liste holen – sonst entstehen zwei Wahrheiten.
-  const existing = await prisma.contact.findFirst({
-    where: {
-      ...eigene(user.id).kontakte,
-      name: { equals: name, mode: "insensitive" },
-    },
-    select: { id: true, name: true, listKinds: true, phone: true, rating: true },
+  const kind = text(formData, "listKind");
+  if (!kind || !isListKind(kind)) throw new Error("Bitte wähle eine Liste.");
+  const rating = text(formData, "rating");
+  const result = await saveName(prisma, user.id, {
+    name: text(formData, "name") ?? "", kind,
+    phone: text(formData, "phone"),
+    rating: rating && isContactRating(rating) ? rating : null,
+    key: text(formData, "operationKey") ?? undefined,
+    collectionId: text(formData, "collectionId"), scene: text(formData, "scene"),
   });
-
-  if (existing) {
-    if (existing.listKinds.includes(kind)) {
-      return { status: "already", id: existing.id, name: existing.name };
-    }
-    await prisma.contact.update({
-      where: { id: existing.id },
-      data: {
-        listKinds: { set: [...existing.listKinds, kind] },
-        ...(phone && !existing.phone ? { phone } : {}),
-        ...(rating && !existing.rating ? { rating } : {}),
-      },
-    });
-    refreshNameViews();
-    return { status: "linked", id: existing.id, name: existing.name };
-  }
-
-  const today = dayToUtcDate(berlinToday());
-  const angelegt = await prisma.$transaction(async (tx) => {
-    const created = await tx.contact.create({
-      data: {
-        name,
-        phone,
-        rating,
-        listKinds: [kind],
-        source: "Namensliste",
-        stage: "NEU",
-        ownerId: user.id,
-      },
-    });
-    await tx.stageEvent.create({
-      data: { contactId: created.id, toStage: "NEU", userId: user.id },
-    });
-    await tx.dailyLog.create({
-      data: { personId: person.id, type: "NUMBERS_PULLED", count: 1, date: today },
-    });
-    return created;
-  });
-
   refreshNameViews();
-  return { status: "created", id: angelegt.id, name };
+  return result;
 }
 
 export async function setRating(formData: FormData) {
