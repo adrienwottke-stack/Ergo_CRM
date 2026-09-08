@@ -1,7 +1,7 @@
 # Onboarding: Umsetzung und Integration
 
 Ursprung: `codex/onboarding-storno-namensfuehrung`, Ausgangspunkt `07b9798`, Commit `422ef706445c66a2b1becedcdca5254be33d13aa`.
-Die dort separat geprüfte Umsetzung wurde am 08.09.2026 gezielt in den laufenden, noch nicht committeten Redesign-Workspace integriert.
+Die dort separat geprüfte Umsetzung wurde am 08.09.2026 gezielt in den damals noch nicht committeten Redesign-Workspace integriert. Anschließend wurde der Onboarding-Branch auf `codex/review-arbeitslagen-onboarding` regulär zusammengeführt; die geprüften Anwendungsinhalte blieben dabei unverändert. Siehe [Review-Stand](review-arbeitslagen-onboarding.md).
 
 ## Gemeinsamer Integrationsstand
 
