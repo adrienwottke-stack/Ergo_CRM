@@ -134,10 +134,10 @@ function Block({
 
   // Nur Kundentermine fuehren irgendwohin. Ein fremder Termin ist Belegung,
   // kein Vorgang - er hat keine Akte, in die man springen koennte.
-  if (eintrag.kontaktId) {
+  if (eintrag.kontaktId || eintrag.href) {
     return (
       <Link
-        href={`/contacts/${eintrag.kontaktId}`}
+        href={eintrag.href ?? `/contacts/${eintrag.kontaktId}`}
         className={cn(klassen, "transition hover:brightness-95")}
         style={lage}
       >

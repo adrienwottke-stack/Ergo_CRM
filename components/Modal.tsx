@@ -47,11 +47,11 @@ export default function Modal({
 
   if (!open || !mounted) return null;
 
-  // Direkt an <body>: so liegt die Milchglas-Flaeche garantiert ueber dem
+  // Direkt an <body>: so liegt der Dialog garantiert ueber dem
   // ganzen Bildschirm und nicht in irgendeinem Layout-Container fest.
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center overscroll-contain bg-slate-950/40 backdrop-blur-sm sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center overscroll-contain bg-black/60 sm:items-center sm:p-4"
       onClick={onClose}
       role="presentation"
     >
@@ -60,7 +60,7 @@ export default function Modal({
         aria-modal="true"
         aria-label={title}
         onClick={(event) => event.stopPropagation()}
-        className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl sm:max-w-lg sm:rounded-xl"
+        className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl sm:max-w-lg sm:rounded-xl"
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
           <div>
@@ -76,7 +76,7 @@ export default function Modal({
             <XIcon className="h-5 w-5" />
           </button>
         </div>
-        <div className="overflow-y-auto px-5 py-5">{children}</div>
+        <div className="overflow-y-auto px-5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">{children}</div>
       </div>
     </div>,
     document.body,

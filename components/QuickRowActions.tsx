@@ -64,12 +64,15 @@ export default function QuickRowActions({
   contact,
   istAnruf,
   istTermin = false,
+  zeigeWeitere = true,
 }: {
   contact: ContactLite;
   /** Anruf-Schritt? Dann die vier Ergebnisse statt "Erledigt". */
   istAnruf: boolean;
   /** Termin-Schritt? Dann gehalten/geplatzt statt "Erledigt". */
   istTermin?: boolean;
+  /** Im Kontaktdetail liegen diese Aktionen bereits im beschrifteten Aufklappbereich. */
+  zeigeWeitere?: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -193,14 +196,14 @@ export default function QuickRowActions({
           </>
         )}
 
-        <button
+        {zeigeWeitere && <button
           type="button"
           onClick={() => setMehr("stage")}
           aria-label="Weitere Aktionen"
           className={`${stil.neutral} px-3.5`}
         >
           …
-        </button>
+        </button>}
       </div>
 
       {fehler && (
@@ -232,15 +235,15 @@ export default function QuickRowActions({
           setFehler(null);
           void (async () => {
             try {
-              await recordAppointmentResult(data);
+              const ergebnis = await recordAppointmentResult(data);
               undoMoeglich();
               setDialog(null);
               // Der Abschluss steht jetzt in der Datenbank. Erst danach die
               // Frage nach der Zahl - sie darf das Speichern nie aufhalten.
               // Als Ereignis, weil diese Zeile gleich aus der Heute-Liste
               // faellt: das Fenster haengt in der Schale, nicht an ihr.
-              if (data.get("result") === "abschluss") {
-                frageNachEinheiten(contact.name);
+              if (ergebnis.einheiten?.anzeigen) {
+                frageNachEinheiten(contact.name, { erinnerungId: ergebnis.einheiten.id });
               }
             } catch (err) {
               setFehler(err instanceof Error ? err.message : "Das hat nicht geklappt.");
@@ -281,9 +284,6 @@ export default function QuickRowActions({
         mode={mehr ?? "stage"}
         contact={contact}
         onClose={() => setMehr(null)}
-        onSuccess={({ stage }) => {
-          if (stage === "ABSCHLUSS") frageNachEinheiten(contact.name);
-        }}
       />
     </>
   );

@@ -6,21 +6,22 @@
 // Namensliste aus zu finden. Sie sind aber nicht namenslisten-spezifisch: die
 // Heute-Liste braucht genau dieselben vier Knoepfe.
 //
-// Jedes Ergebnis laeuft ueber die bestehenden Server-Actions – gleiche
-// Pruefungen, gleiche Wettbewerbspunkte, gleiche Phasenhistorie. Es gibt
-// keinen zweiten Weg in die Datenbank, der eigene Fehler machen kann.
+// Phasen und Punkte teilen den internen Schreibweg mit der Pipeline. Ein
+// Terminergebnis bleibt samt Empfehlungen in einer gesperrten Transaktion.
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { offenerUndoEintrag, undoAusfuehren, withUndo } from "@/lib/undo";
-import { addDays, berlinToday, dayToUtcDate } from "@/lib/dates";
+import { addDays, berlinLocalToUtc, berlinToday, dayToUtcDate } from "@/lib/dates";
 import { isLostReason } from "@/lib/pipeline";
 import { empfehlungenAnlegen, empfehlungenAusFormular } from "@/lib/empfehlungen";
 import { meldeNebenbei } from "@/lib/push";
 import { fortschrittJetzt } from "@/lib/liegenbleiber";
 import { createActivity, quickLogCall } from "@/app/(app)/contacts/actions";
-import { markContactLost, setContactStage } from "@/app/(app)/pipeline/actions";
+import { markContactLost } from "@/app/(app)/pipeline/actions";
+import { schreibeKontaktPhase, sperreEigenenKontakt } from "@/lib/pipeline-schreiben";
+import { ladeHauptziel } from "@/lib/ziele";
 
 export type CallResult = "appointment" | "unreachable" | "later" | "lost";
 
@@ -44,8 +45,11 @@ function text(formData: FormData, field: string): string | null {
 }
 
 function refreshViews(contactId: string) {
+  revalidatePath("/fortschritt");
+  revalidatePath("/mannschaft/auswertung");
   revalidatePath("/heute");
   revalidatePath("/namen");
+  revalidatePath("/trichter");
   revalidatePath("/leaderboard");
   revalidatePath(`/contacts/${contactId}`);
 }
@@ -85,56 +89,66 @@ export async function recordAppointmentResult(formData: FormData) {
   if (!contactId || !resultRaw) throw new Error("Ergebnis fehlt.");
 
   const result = resultRaw as AppointmentResult;
-  if (!(result in APPOINTMENT_LABELS)) throw new Error("Unbekanntes Ergebnis.");
+  if (!Object.hasOwn(APPOINTMENT_LABELS, result)) throw new Error("Unbekanntes Ergebnis.");
 
   const contact = await loadOwnContact(user.id, contactId);
   const empfehlungen = empfehlungenAusFormular(formData);
-
-  await withUndo(
+  const ergebnis = await withUndo(
     {
       userId: user.id,
       personId: person.id,
       contactId,
       label: `${APPOINTMENT_LABELS[result]}: ${contact.name}`,
     },
-    async () => {
-      // Der Termin selbst laeuft ueber setContactStage: dort haengen der
-      // Punkt fuer den gehaltenen Termin, der fuer den Abschluss und die
-      // Phasenhistorie. Kein zweiter Weg in die Datenbank.
-      const meeting = new FormData();
-      meeting.set("contactId", contactId);
-      meeting.set("type", "MEETING");
-      meeting.set("text", APPOINTMENT_LABELS[result]);
-      await createActivity(meeting);
+    () => prisma.$transaction(async (tx) => {
+      const aktuell = await sperreEigenenKontakt(tx, user.id, contactId);
+      const bereitsGespeichert = result === "abschluss"
+        ? aktuell.stage === "ABSCHLUSS" && aktuell.outcome === "GEWONNEN"
+        : aktuell.stage === "TERMIN_GEHALTEN" && (result === "offen"
+          ? aktuell.outcome === "OFFEN"
+          : aktuell.outcome === "VERLOREN" && aktuell.lostReason === "KEIN_BEDARF");
+      // Ein Retry verändert weder Chronik, Punkte, Empfehlungen noch Reminder.
+      // Ein neu vereinbarter Termin verlässt diese Ergebnisphase und darf
+      // später wieder als gehalten erfasst werden.
+      if (bereitsGespeichert) return { einheiten: null, abschlussNeu: false };
 
-      const stage = new FormData();
-      stage.set("contactId", contactId);
-      stage.set("stage", result === "abschluss" ? "ABSCHLUSS" : "TERMIN_GEHALTEN");
-      await setContactStage(stage);
-
+      await tx.activity.create({ data: { contactId, type: "MEETING", text: APPOINTMENT_LABELS[result] } });
+      const gespeichert = await schreibeKontaktPhase(tx, {
+        userId: user.id,
+        personId: person.id,
+        aktuell,
+        stage: result === "abschluss" ? "ABSCHLUSS" : "TERMIN_GEHALTEN",
+      });
       if (result === "kein_abschluss") {
-        const lost = new FormData();
-        lost.set("contactId", contactId);
-        lost.set("lostReason", "KEIN_BEDARF");
-        await markContactLost(lost);
+        await tx.contact.update({ where: { id: contactId }, data: {
+          outcome: "VERLOREN", lostReason: "KEIN_BEDARF", lostAt: new Date(),
+          nextStepType: null, nextStepAt: null, nextStepNote: null,
+          ...fortschrittJetzt(),
+        } });
+        await tx.stageEvent.create({ data: {
+          contactId, fromStage: "TERMIN_GEHALTEN", toStage: "VERLOREN:KEIN_BEDARF", userId: user.id,
+        } });
+      } else if (result === "offen" && aktuell.outcome === "GEWONNEN") {
+        // Eine ausdrücklich wieder offene Beratung hat auch ein offenes
+        // Ergebnis; der historische Abschlusszähler wird nicht erneut gebucht.
+        await tx.contact.update({ where: { id: contactId }, data: { outcome: "OFFEN", lostReason: null, lostAt: null } });
       }
 
-      await prisma.$transaction(async (tx) => {
-        await empfehlungenAnlegen(tx, {
-          userId: user.id,
-          personId: person.id,
-          contactId,
-          contactName: contact.name,
-          entries: empfehlungen,
-        });
+      await empfehlungenAnlegen(tx, {
+        userId: user.id,
+        personId: person.id,
+        contactId,
+        contactName: aktuell.name,
+        entries: empfehlungen,
       });
-    }
+      return gespeichert;
+    })
   );
 
   // Ein Abschluss ist das seltenste Ereignis im Netzwerk - und das einzige,
   // fuer das es sich lohnt, alle anderen zu stoeren. Der Rest der Rangliste
   // erfaehrt es beim naechsten Aufruf von selbst.
-  if (result === "abschluss") {
+  if (ergebnis.abschlussNeu) {
     const andere = await prisma.user.findMany({
       where: { id: { not: user.id }, deactivatedAt: null },
       select: { id: true },
@@ -151,6 +165,7 @@ export async function recordAppointmentResult(formData: FormData) {
   }
 
   refreshViews(contactId);
+  return { einheiten: ergebnis.einheiten };
 }
 
 /**
@@ -232,20 +247,21 @@ export async function recordCallResult(formData: FormData) {
 
         case "appointment": {
           const appointment = text(formData, "appointmentAt");
-          if (!appointment) {
+          const appointmentAt = appointment ? berlinLocalToUtc(appointment) : null;
+          if (!appointmentAt) {
             throw new Error("Für den Termin werden Datum und Uhrzeit gebraucht.");
           }
-          const call = new FormData();
-          call.set("contactId", contactId);
-          call.set("type", "CALL");
-          call.set("text", note);
-          await createActivity(call);
-
-          const stage = new FormData();
-          stage.set("contactId", contactId);
-          stage.set("stage", "TERMIN_VEREINBART");
-          stage.set("appointmentAt", appointment);
-          await setContactStage(stage);
+          await prisma.$transaction(async (tx) => {
+            const aktuell = await sperreEigenenKontakt(tx, user.id, contactId);
+            const activity = await tx.activity.create({ data: { contactId, type: "CALL", text: note } });
+            await tx.dailyLog.create({ data: {
+              personId: person.id, activityId: activity.id, type: "CALL", count: 1, date: dayToUtcDate(berlinToday()),
+            } });
+            await schreibeKontaktPhase(tx, {
+              userId: user.id, personId: person.id, aktuell, stage: "TERMIN_VEREINBART", appointmentAt,
+            });
+            await tx.contact.update({ where: { id: contactId }, data: fortschrittJetzt() });
+          });
           break;
         }
 
@@ -352,7 +368,8 @@ export async function completeStepQuick(formData: FormData) {
 /** Der juengste noch zurueckenehmbare Eintrag, fuer die Anzeige unten. */
 export async function getOpenUndo() {
   const user = await requireUser();
-  return offenerUndoEintrag(user.id);
+  const [eintrag, ziel] = await Promise.all([offenerUndoEintrag(user.id), ladeHauptziel(user.id)]);
+  return eintrag ? { ...eintrag, zielstand: ziel ? `${ziel.standText} ${ziel.kennzahlText}${ziel.geschafft ? " · Ziel erreicht" : ""}` : null } : null;
 }
 
 export async function undoLast(formData: FormData) {
@@ -363,5 +380,7 @@ export async function undoLast(formData: FormData) {
   revalidatePath("/heute");
   revalidatePath("/namen");
   revalidatePath("/leaderboard");
+  revalidatePath("/fortschritt");
+  revalidatePath("/mannschaft/auswertung");
   return label;
 }

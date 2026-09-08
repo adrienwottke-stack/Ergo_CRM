@@ -17,17 +17,8 @@ export const FALLBACK_ABSENDER = "Paul Ehlert";
 // Theater), danach arbeitet jeder Akt etwas ab. Der Fortschrittsbalken oben
 // rechnet mit dieser Liste.
 
-export const AKTE = [
-  "boot",
-  "chat",
-  "rechnung",
-  "einwand",
-  "brief",
-  "sprint",
-  "einstufung",
-  "rangliste",
-  "ankunft",
-] as const;
+export { INTRO_ACTS as AKTE } from "@/lib/start/model";
+import { INTRO_ACTS as AKTE } from "@/lib/start/model";
 
 export type Akt = (typeof AKTE)[number];
 
@@ -95,7 +86,7 @@ export function introChat(vorname: string, greeting: string | null): ChatSchritt
         },
       ],
     },
-    { art: "blase", text: "Erstmal zeig ich dir, was das hier für dich rechnet. Los." },
+    { art: "blase", text: "Los geht’s. Ich zeig dir Schritt für Schritt, wie du anfängst." },
   ];
 }
 

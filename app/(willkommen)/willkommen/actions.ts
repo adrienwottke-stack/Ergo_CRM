@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
-import { berlinLocalToUtc, berlinToday, shiftDay, startOfWeek, utcToBerlinLocalInput } from "@/lib/dates";
+import { berlinToday, startOfWeek } from "@/lib/dates";
 import { isListKind } from "@/lib/namelist";
 import { quotaTypePoints } from "@/lib/labels";
 
@@ -70,12 +70,12 @@ export async function versprechenSetzen(termine: number) {
 // Der Sprint legt Namen ohne Naehe an. Diese Abfrage holt sie fuer die
 // Einstufung zurueck - bewusst alle offenen ohne Naehe, nicht nur die aus dem
 // Sprint: wer schon Namen hatte, stuft die gleich mit ein.
-export async function offeneNamenOhneNaehe(): Promise<{ id: string; name: string }[]> {
+export async function offeneNamenOhneNaehe(track?: string | null): Promise<{ id: string; name: string }[]> {
   const user = await requireUser();
   return prisma.contact.findMany({
     where: {
       ...eigene(user.id).kontakte,
-      listKinds: { isEmpty: false },
+      listKinds: track && isListKind(track) ? { has: track } : { isEmpty: false },
       rating: null,
       stage: { in: ["NEU", "KONTAKTIERT"] },
       outcome: { not: "VERLOREN" },
@@ -84,58 +84,6 @@ export async function offeneNamenOhneNaehe(): Promise<{ id: string; name: string
     orderBy: { createdAt: "desc" },
     take: 40,
   });
-}
-
-// --- Der erste Tag ist geplant --------------------------------------------------
-// Das Onboarding endet nicht mit "viel Erfolg", sondern mit drei Anrufen, die
-// heute Nachmittag in /heute stehen. Der Uebergang vom Start in die Arbeit ist
-// die Stelle, an der die meisten verloren gehen - hier gibt es ihn nicht.
-export async function ersterTagPlanen(): Promise<{ anzahl: number; label: string }> {
-  const user = await requireUser();
-
-  const kandidaten = await prisma.contact.findMany({
-    where: {
-      ...eigene(user.id).kontakte,
-      listKinds: { isEmpty: false },
-      stage: "NEU",
-      outcome: "OFFEN",
-      nextStepType: null,
-    },
-    select: { id: true },
-    // A-Kontakte zuerst, dann die frischesten: der Sprint liegt Sekunden zurueck.
-    orderBy: [{ rating: "asc" }, { createdAt: "desc" }],
-    take: 3,
-  });
-  if (kandidaten.length === 0) return { anzahl: 0, label: "" };
-
-  // Vor 15 Uhr Berliner Zeit: heute ab 16:00. Danach: morgen ab 10:00.
-  const heute = berlinToday();
-  const jetztLokal = utcToBerlinLocalInput(new Date());
-  const nachmittags = jetztLokal.slice(11, 16) < "15:00";
-  const tag = nachmittags ? heute : shiftDay(heute, 1);
-  const startStunde = nachmittags ? 16 : 10;
-
-  await prisma.$transaction(
-    kandidaten.map((kontakt, index) =>
-      prisma.contact.update({
-        where: { id: kontakt.id },
-        data: {
-          nextStepType: "ANRUF",
-          nextStepAt:
-            berlinLocalToUtc(
-              `${tag}T${String(startStunde).padStart(2, "0")}:${String(index * 15).padStart(2, "0")}`
-            ) ?? undefined,
-          nextStepNote: "Erster Anruf",
-        },
-      })
-    )
-  );
-
-  revalidatePath("/heute");
-  return {
-    anzahl: kandidaten.length,
-    label: nachmittags ? "heute ab 16:00" : "morgen ab 10:00",
-  };
 }
 
 // --- Der Rangliste-Moment -------------------------------------------------------

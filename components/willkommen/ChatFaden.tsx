@@ -15,14 +15,19 @@ const TIPP_MS = 900;
 export default function ChatFaden({
   schritte,
   absender,
+  initialAnswers = {},
   onAntwort,
   onDone,
 }: {
   schritte: ChatSchritt[];
   absender: string;
-  onAntwort?: (frageId: string, optionId: string) => void;
+  initialAnswers?: Record<string,string>;
+  onAntwort?: (frageId: string, optionId: string) => void | Promise<void>;
   onDone: () => void;
 }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const lock = useRef(false);
   const [nachrichten, setNachrichten] = useState<Nachricht[]>([]);
   const [tippt, setTippt] = useState(false);
   // Warteschlange der noch abzuspielenden Blasen; danach geht es bei
@@ -71,6 +76,11 @@ export default function ChatFaden({
       setQueue([schritt.text]);
       setSchrittIndex((index) => index + 1);
     } else {
+      const saved = schritt.optionen.find(o => o.id === initialAnswers[schritt.id]);
+      if (saved) {
+        setNachrichten(alt => [...alt, {von:"er",text:schritt.text},{von:"ich",text:saved.label}]);
+        setQueue(saved.antwort); setSchrittIndex(i => i+1); return;
+      }
       // Frage: erst den Fragetext als Blase zeigen, die Knoepfe rendern unten,
       // sobald die Blase steht (queue leer und wir stehen AUF der Frage).
       const schonGefragt = nachrichten.some(
@@ -95,13 +105,16 @@ export default function ChatFaden({
     endeRef.current?.scrollIntoView({ block: "end", behavior: sofort.current ? "auto" : "smooth" });
   }, [nachrichten, tippt]);
 
-  const antworten = (optionId: string) => {
+  const antworten = async (optionId: string) => {
+    if (lock.current) return;
     if (!schritt || schritt.art !== "frage") return;
     const option = schritt.optionen.find((kandidat) => kandidat.id === optionId);
     if (!option) return;
     if (navigator.vibrate) navigator.vibrate(12);
+    lock.current = true; setSaving(true); setError(null);
+    try { await onAntwort?.(schritt.id, option.id); } catch { setError("Deine Antwort wurde noch nicht gespeichert. Bitte erneut versuchen."); lock.current = false; setSaving(false); return; }
+    lock.current = false; setSaving(false);
     setNachrichten((alt) => [...alt, { von: "ich", text: option.label }]);
-    onAntwort?.(schritt.id, option.id);
     setSchrittIndex((index) => index + 1);
     setQueue(option.antwort);
   };
@@ -160,10 +173,12 @@ export default function ChatFaden({
 
       {/* Antwortknoepfe unten, in Daumenreichweite. */}
       <div className="min-h-19 pb-2">
+        {error && <p role="alert" className="pb-2 text-sm text-red-300">{error}</p>}
         {frageOffen && schritt.art === "frage" && (
           <div className="animate-rise flex flex-col gap-2 sm:flex-row">
             {schritt.optionen.map((option) => (
               <button
+                disabled={saving}
                 key={option.id}
                 type="button"
                 onClick={() => antworten(option.id)}

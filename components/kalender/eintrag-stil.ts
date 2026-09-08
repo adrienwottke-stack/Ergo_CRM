@@ -22,9 +22,9 @@ export type EintragStil = {
 
 const artTon: Record<TerminArt, EintragStil> = {
   BEGLEITUNG: {
-    block: "border-l-2 border-l-violet-500 bg-violet-50 text-violet-900",
-    streifen: "bg-violet-100 text-violet-900",
-    punkt: "bg-violet-500",
+    block: "border-l-2 border-l-navy-600 bg-navy-50 text-navy-900",
+    streifen: "bg-navy-100 text-navy-900",
+    punkt: "bg-navy-600",
   },
   SCHULUNG: {
     block: "border-l-2 border-l-sky-500 bg-sky-50 text-sky-900",

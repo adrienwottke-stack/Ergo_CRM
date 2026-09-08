@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
+import { currentUser } from "@/lib/auth";
+import { entryRoute } from "@/lib/start/entry";
 
-export default function Home() {
+export default async function Home() {
   // Startseite ist die Arbeitsliste, nicht die Auswertung.
-  redirect("/heute");
+  const user = await currentUser();
+  redirect(user ? await entryRoute(user.id) : "/login");
 }

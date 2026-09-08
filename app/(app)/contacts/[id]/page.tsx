@@ -13,6 +13,7 @@ import type { ActivityType } from "@/lib/generated/prisma/enums";
 import StageBadge from "@/components/StageBadge";
 import NextStepBadge, { formatDue } from "@/components/NextStepBadge";
 import ContactActions from "@/components/ContactActions";
+import QuickRowActions from "@/components/QuickRowActions";
 import DeleteContactButton from "@/components/DeleteContactButton";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import { contactStageHints, lostReasonLabels } from "@/lib/pipeline";
@@ -81,6 +82,14 @@ export default async function ContactDetailPage({
   }
 
   const today = berlinToday();
+  const istOffen = contact.outcome === "OFFEN";
+  // Ein geplatzter Termin bleibt in der Phase TERMIN_VEREINBART, verliert
+  // aber appointmentAt und erhält einen Anrufschritt. Dann führt die nächste
+  // Aktion wieder zur Terminvereinbarung statt erneut zu „Gehalten“.
+  const istTermin = istOffen && (contact.nextStepType === "TERMIN"
+    || (contact.stage === "TERMIN_VEREINBART" && contact.appointmentAt !== null));
+  const istAnruf = istOffen && !istTermin && (contact.nextStepType === "ANRUF"
+    || contact.stage === "NEU" || contact.stage === "KONTAKTIERT");
   const lite: ContactLite = {
     id: contact.id,
     name: contact.name,
@@ -172,7 +181,14 @@ export default async function ContactDetailPage({
           </div>
         </div>
         <div className="mt-4 border-t border-slate-100 pt-4">
-          <ContactActions contact={lite} />
+          {(istTermin || istAnruf) && <div className="space-y-3">
+            <p className="text-base font-semibold text-slate-900">{istTermin ? "Wie ist der Termin gelaufen?" : "Anrufergebnis festhalten"}</p>
+            <QuickRowActions contact={lite} istAnruf={istAnruf} istTermin={istTermin} zeigeWeitere={false} />
+          </div>}
+          <details className={istTermin || istAnruf ? "mt-4 border-t border-slate-100 pt-2" : ""}>
+            <summary className="flex min-h-12 cursor-pointer list-item items-center py-3 text-base font-medium text-slate-700">Weitere Kontaktaktionen</summary>
+            <div className="pb-2 pt-2"><ContactActions contact={lite} /></div>
+          </details>
         </div>
       </section>
 

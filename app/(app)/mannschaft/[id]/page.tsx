@@ -21,6 +21,7 @@ import NachrichtSenden from "@/components/NachrichtSenden";
 import KuemmereMich from "@/components/KuemmereMich";
 import { PhoneIcon } from "@/components/icons";
 import { card, kicker, pageTitle } from "@/components/ui";
+import PartnerVereinbarungen from "@/components/vereinbarungen/PartnerVereinbarungen";
 
 export const dynamic = "force-dynamic";
 
@@ -299,7 +300,7 @@ export default async function PersonPage({
                   ? // Einblick zu: das Datum steht ohnehin in den Zahlen, der
                     // Name nicht.
                     `Aktivität am ${tagKurz.format(person.werte.letzteAktivitaet)}`
-                  : "Seit dem Start nichts."
+                  : "Noch keine Aktivität eingetragen."
             }
           />
           <SchrittZeile
@@ -314,13 +315,17 @@ export default async function PersonPage({
             text={
               naechstes
                 ? `${naechsterText(naechstes)}${naechstes.ueberfaellig ? " — überfällig" : ""}`
+                : !person.pipelineSichtbar && !person.einblick.offen
+                  ? "Nächste Schritte sind nicht freigegeben."
                 : person.werte.naechsterSchritt
                   ? `Fällig ${tagKurz.format(person.werte.naechsterSchritt)}`
-                  : "Nichts geplant."
+                  : "Kein nächster Schritt eingetragen."
             }
           />
         </section>
       )}
+
+      {!person.istDu && !person.platzhalter && <PartnerVereinbarungen userId={user.id} partnerId={person.id} />}
 
       {/* --- Was zu tun ist --------------------------------------------------
           Steht vor allen Zahlen. Wer die Seite oeffnet, hat eine Frage, und
@@ -332,7 +337,7 @@ export default async function PersonPage({
           eingetragen hat statt er selbst. */}
       {!person.platzhalter && (
       <section className={`${card} p-4 sm:p-5`}>
-        <h2 className={kicker}>Dein Schritt</h2>
+        <h2 className={kicker}>Dein nächster Betreuungsschritt</h2>
         <p className="mt-1.5 text-sm text-slate-900">{fuehrungsSchritt(person)}</p>
         {person.betreuung && (
           <p className="mt-1 text-xs font-medium text-amber-700">
@@ -421,7 +426,9 @@ export default async function PersonPage({
               <Kennzahl wert={summe.vereinbartWoche} bezeichnung="Termine vereinbart" />
               <Kennzahl wert={summe.gehaltenWoche} bezeichnung="Termine gehalten" />
               <Kennzahl wert={summe.abschluesseMonat} bezeichnung="Abschlüsse (Monat)" betont />
-              <Kennzahl wert={summe.inAkquise} bezeichnung="in Akquise" />
+              {[person, ...ast].every((eintrag) => eintrag.platzhalter || eintrag.pipelineSichtbar)
+                ? <Kennzahl wert={summe.inAkquise} bezeichnung="in Akquise" />
+                : <p className="text-base text-slate-600">Pipeline gesamt: nicht vollständig freigegeben.</p>}
               <Kennzahl wert={summe.punkteWoche} bezeichnung="Punkte (Woche)" />
             </div>
           </div>

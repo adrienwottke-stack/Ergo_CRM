@@ -14,9 +14,8 @@
 //    Frage haengt hinten dran, sie steht nicht davor. Ein Dialog, der einen
 //    Abschluss blockiert, waere eine Verschlechterung - egal wie nuetzlich die
 //    Zahl ist.
-// 2. "SPAETER" IST GLEICHWERTIG und kostet nichts: keine Wiedervorlage, kein
-//    rotes Abzeichen, keine zweite Frage morgen. Wer seine Einheiten woanders
-//    pflegt, darf das.
+// 2. "SPAETER" legt genau eine Erinnerung für den nächsten Kalendertag an.
+//    Bezug ist der gespeicherte Abschluss, niemals nur der angezeigte Name.
 // 3. KEIN ZWEITER WEG IN DIE DATENBANK. Gebucht wird ueber dieselbe Aktion wie
 //    im Schnellfenster und auf /einheiten.
 // 4. DAS FENSTER HAENGT IN DER SCHALE, NICHT AN DER ZEILE. Genau wie der
@@ -30,15 +29,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { einheitSchnellBuchen } from "@/app/(team)/einheiten/actions";
+import { einheitenSpaeter } from "@/app/(app)/fortschritt/einheitenActions";
 import Modal from "@/components/Modal";
 import { btnGhost, cn, inputBlank } from "@/components/ui";
 
 const ABSCHLUSS_EVENT = "crm:abschluss";
 
 /** Nach einem GESPEICHERTEN Abschluss aufrufen, nie davor. */
-export function frageNachEinheiten(name: string) {
+export function frageNachEinheiten(
+  name: string,
+  bezug?: { erinnerungId: string },
+) {
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(ABSCHLUSS_EVENT, { detail: name }));
+    window.dispatchEvent(
+      new CustomEvent(ABSCHLUSS_EVENT, {
+        detail: { name, erinnerungId: bezug?.erinnerungId },
+      }),
+    );
   }
 }
 
@@ -46,16 +53,28 @@ export default function EinheitenNachAbschluss() {
   const router = useRouter();
   // Der Name ist zugleich der Schalter: steht einer da, ist das Fenster offen.
   const [name, setName] = useState<string | null>(null);
+  const [erinnerungId, setErinnerungId] = useState<string | undefined>();
   const [menge, setMenge] = useState("");
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
+  const [erfolg, setErfolg] = useState<{
+    monat: string;
+    zielstand: string | null;
+  } | null>(null);
 
   useEffect(() => {
     const onFrage = (event: Event) => {
-      const wer = (event as CustomEvent<string>).detail;
+      const detail = (
+        event as CustomEvent<string | { name: string; erinnerungId?: string }>
+      ).detail;
+      const wer = typeof detail === "string" ? detail : detail?.name;
+      setErinnerungId(
+        typeof detail === "object" ? detail?.erinnerungId : undefined,
+      );
       setMenge("");
       setFehler(null);
       setName(typeof wer === "string" && wer ? wer : "Der Abschluss");
+      setErfolg(null);
     };
     window.addEventListener(ABSCHLUSS_EVENT, onFrage);
     return () => window.removeEventListener(ABSCHLUSS_EVENT, onFrage);
@@ -63,6 +82,8 @@ export default function EinheitenNachAbschluss() {
 
   const schliessen = useCallback(() => {
     setName(null);
+    setErinnerungId(undefined);
+    setErfolg(null);
     setMenge("");
     setFehler(null);
   }, []);
@@ -75,12 +96,16 @@ export default function EinheitenNachAbschluss() {
       // Der Name geht als Notiz mit: auf /einheiten steht in der Liste der
       // letzten Buchungen sonst nur eine Zahl, und in vier Wochen weiss
       // niemand mehr, woher sie kam.
-      const antwort = await einheitSchnellBuchen(menge, `Abschluss: ${name}`);
+      const antwort = await einheitSchnellBuchen(
+        menge,
+        `Abschluss: ${name}`,
+        erinnerungId,
+      );
       if (!antwort.ok) {
         setFehler(antwort.fehler);
         return;
       }
-      schliessen();
+      setErfolg({ monat: antwort.monat, zielstand: antwort.zielstand });
       // Zeigt die Seite im Hintergrund Einheiten, steht dort sonst noch der
       // Stand von vorhin.
       router.refresh();
@@ -89,14 +114,72 @@ export default function EinheitenNachAbschluss() {
     } finally {
       setLaeuft(false);
     }
-  }, [menge, laeuft, name, schliessen, router]);
+  }, [menge, laeuft, name, router, erinnerungId]);
+
+  const spaeter = useCallback(async () => {
+    if (laeuft) return;
+    if (!erinnerungId) {
+      schliessen();
+      return;
+    }
+    setLaeuft(true);
+    setFehler(null);
+    try {
+      const antwort = await einheitenSpaeter(erinnerungId);
+      if (!antwort.ok) {
+        setFehler(
+          antwort.fehler ?? "Die Erinnerung konnte nicht gespeichert werden.",
+        );
+        return;
+      }
+      schliessen();
+      router.refresh();
+    } catch {
+      setFehler(
+        "Die Erinnerung konnte nicht gespeichert werden. Bitte versuche es erneut.",
+      );
+    } finally {
+      setLaeuft(false);
+    }
+  }, [erinnerungId, laeuft, router, schliessen]);
 
   if (name === null) return null;
+  if (erfolg)
+    return (
+      <Modal
+        open
+        onClose={schliessen}
+        title="Einheiten eingetragen"
+        subtitle={name}
+      >
+        <div className="space-y-5">
+          <div role="status" className="space-y-3">
+            <p className="text-2xl font-semibold">
+              {erfolg.monat} Einheiten im Monat
+            </p>
+            {erfolg.zielstand && (
+              <p className="text-base text-slate-600">
+                Dein Ziel: {erfolg.zielstand}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={schliessen}
+            className="min-h-12 w-full rounded-xl bg-akzent px-4 py-3 text-base font-semibold text-white"
+          >
+            Weiter
+          </button>
+        </div>
+      </Modal>
+    );
 
   return (
     <Modal
       open
-      onClose={schliessen}
+      onClose={() => {
+        void spaeter();
+      }}
       title="Abschluss steht"
       subtitle={name}
     >
@@ -140,9 +223,18 @@ export default function EinheitenNachAbschluss() {
 
         <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
           <p className="text-xs text-slate-500">
-            Geht auch später — unter Wettbewerb › Einheiten.
+            {erinnerungId
+              ? "Bei „Später“ erinnern wir dich morgen auf Heute."
+              : "Auch unter Fortschritt › Einheiten erreichbar."}
           </p>
-          <button type="button" onClick={schliessen} className={btnGhost}>
+          <button
+            type="button"
+            onClick={() => {
+              void spaeter();
+            }}
+            disabled={laeuft}
+            className={`${btnGhost} min-h-12 px-3`}
+          >
             Später
           </button>
         </div>

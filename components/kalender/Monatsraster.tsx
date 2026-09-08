@@ -113,10 +113,10 @@ export function Monatsraster({
                     "block truncate rounded px-1 py-0.5 text-[11px] leading-tight",
                     stil.streifen
                   );
-                  return eintrag.kontaktId ? (
+                  return eintrag.kontaktId || eintrag.href ? (
                     <Link
                       key={eintrag.id}
-                      href={`/contacts/${eintrag.kontaktId}`}
+                      href={eintrag.href ?? `/contacts/${eintrag.kontaktId}`}
                       className={cn(klassen, "transition hover:brightness-95")}
                     >
                       {text}

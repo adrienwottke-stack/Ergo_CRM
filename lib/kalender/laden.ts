@@ -14,11 +14,12 @@
 import { prisma } from "@/lib/prisma";
 import { eigene } from "@/lib/scope";
 import type { TerminArt } from "@/lib/generated/prisma/enums";
+import { ladeVereinbarungsTermine } from "@/lib/vereinbarungen";
 
 /** Wie lange ein Kundentermin dauert, wenn niemand etwas anderes sagt. */
 export const TERMIN_DAUER_MINUTEN = 60;
 
-export type Herkunft = "KONTAKT" | "EIGEN" | "FREMD";
+export type Herkunft = "KONTAKT" | "EIGEN" | "FREMD" | "BETREUUNG";
 
 export type KalenderEintrag = {
   id: string;
@@ -38,6 +39,7 @@ export type KalenderEintrag = {
   /** Nur bei FREMD: aus welchem Kalender das kommt. */
   quelleName?: string;
   farbe?: string;
+  href?: string;
 };
 
 /**
@@ -58,7 +60,7 @@ export async function eintraegeImZeitraum(
   // Termindauer nach hinten aufgemacht und danach genau gefiltert.
   const kontaktAb = new Date(von.getTime() - TERMIN_DAUER_MINUTEN * 60_000);
 
-  const [kontakte, eigeneTermine, fremde] = await Promise.all([
+  const [kontakte, eigeneTermine, fremde, betreuung] = await Promise.all([
     prisma.contact.findMany({
       where: {
         ...eigene(userId).kontakte,
@@ -87,9 +89,16 @@ export async function eintraegeImZeitraum(
       orderBy: { von: "asc" },
       include: { quelle: { select: { name: true, farbe: true } } },
     }),
+    ladeVereinbarungsTermine(userId),
   ]);
 
   const eintraege: KalenderEintrag[] = [];
+
+  for (const termin of betreuung) {
+    if (termin.von >= bis || termin.bis <= von) continue;
+    eintraege.push({ ...termin, id: `betreuung:${termin.id}`, herkunft: "BETREUUNG", ganztags: false,
+      titel: `Betreuung · ${termin.titel}`, zusatz: termin.partnerName, art: "BEGLEITUNG" });
+  }
 
   for (const kontakt of kontakte) {
     const start = kontakt.appointmentAt!;

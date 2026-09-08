@@ -7,26 +7,25 @@ import { eigene } from "@/lib/scope";
 import {
   addDays,
   addMonths,
-  berlinDayOf,
   berlinLocalToUtc,
   berlinToday,
   dayToUtcDate,
 } from "@/lib/dates";
 import {
-  CONTACT_PLAYBOOK,
+  contactStageLabels,
   isContactStage,
   isLostReason,
   isNextStepType,
-  playbookDueDate,
 } from "@/lib/pipeline";
 import type { ContactStage, NextStepType } from "@/lib/generated/prisma/enums";
 import {
   empfehlungenAnlegen,
   empfehlungenAusFormular,
-  rueckmeldungAnEmpfehlungsgeber,
 } from "@/lib/empfehlungen";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { fortschrittJetzt } from "@/lib/liegenbleiber";
+import { withUndo } from "@/lib/undo";
+import { phaseFolgeschritt as stepFromPlaybook, schreibeKontaktPhase, sperreEigenenKontakt } from "@/lib/pipeline-schreiben";
 
 // --- gemeinsame Bausteine ---------------------------------------------------
 
@@ -34,6 +33,8 @@ function refreshPipelineViews(contactId?: string) {
   revalidatePath("/heute");
   revalidatePath("/namen");
   revalidatePath("/trichter");
+  revalidatePath("/fortschritt");
+  revalidatePath("/mannschaft/auswertung");
   revalidatePath("/leaderboard");
   if (contactId) revalidatePath(`/contacts/${contactId}`);
 }
@@ -73,16 +74,6 @@ function readNextStep(formData: FormData): StepInput | null {
   return { type: typeRaw, at, note: text(formData, "nextStepNote") };
 }
 
-// Vorbelegung aus dem Playbook, wenn das Formular nichts mitgibt.
-function stepFromPlaybook(stage: ContactStage, appointmentAt?: Date | null): StepInput {
-  const entry = CONTACT_PLAYBOOK[stage];
-  if (!entry) return EMPTY_STEP;
-  const raw = playbookDueDate(entry, new Date(), appointmentAt);
-  // Reine Fristen liegen auf dem Tag, Termin-Schritte behalten die Uhrzeit.
-  const at = entry.useAppointment && appointmentAt ? raw : dayToUtcDate(berlinDayOf(raw));
-  return { type: entry.type, at, note: entry.note };
-}
-
 function stepData(step: StepInput) {
   return {
     nextStepType: step.type,
@@ -96,24 +87,13 @@ async function recordStageEvent(
   params: { contactId: string; from: string | null; to: string; userId: string }
 ) {
   if (params.from === params.to) return;
-  await tx.stageEvent.create({
+  return tx.stageEvent.create({
     data: {
       contactId: params.contactId,
       fromStage: params.from,
       toStage: params.to,
       userId: params.userId,
     },
-  });
-}
-
-async function award(
-  tx: Tx,
-  personId: string,
-  type: "APPOINTMENT_SET" | "APPOINTMENT_HELD" | "DEAL_WON",
-  count: number
-) {
-  await tx.dailyLog.create({
-    data: { personId, type, count, date: dayToUtcDate(berlinToday()) },
   });
 }
 
@@ -139,80 +119,21 @@ export async function setContactStage(formData: FormData) {
   const contact = await loadOwnContact(user.id, contactId);
 
   const appointmentLocal = text(formData, "appointmentAt");
-  const appointmentAt = appointmentLocal
-    ? berlinLocalToUtc(appointmentLocal)
-    : contact.appointmentAt;
-
-  const needsAppointment = stage === "TERMIN_VEREINBART";
-  if (needsAppointment && !appointmentAt) {
-    throw new Error("Fuer diese Phase wird ein Termin mit Datum und Uhrzeit gebraucht.");
-  }
-
-  const step = readNextStep(formData) ?? stepFromPlaybook(stage, appointmentAt);
-
-  const setsAppointmentPoint =
-    stage === "TERMIN_VEREINBART" && !contact.appointmentLoggedAt;
-  // Der gehaltene Termin wird einmal je Kontakt gezaehlt, nicht bei jedem
-  // Rueckwechsel in die Beratung.
-  const heldAppointmentPoint =
-    stage === "TERMIN_GEHALTEN" && !contact.appointmentHeldLoggedAt;
-  // Der Abschluss ebenso: ein Kontakt schliesst einmal ab, nicht bei jedem
-  // Speichern der Phase aufs Neue.
-  const wonPoint = stage === "ABSCHLUSS" && !contact.wonLoggedAt;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.contact.update({
-      where: { id: contactId },
-      data: {
-        stage,
-        // Ein Phasenwechsel holt einen verlorenen Kontakt zurueck; als Kunde
-        // gilt er als gewonnen.
-        ...(stage === "ABSCHLUSS"
-          ? { outcome: "GEWONNEN" as const, lostReason: null, lostAt: null }
-          : contact.outcome === "VERLOREN"
-            ? { outcome: "OFFEN" as const, lostReason: null, lostAt: null }
-            : {}),
-        ...(appointmentAt && needsAppointment ? { appointmentAt } : {}),
-        ...(setsAppointmentPoint ? { appointmentLoggedAt: new Date() } : {}),
-        ...(heldAppointmentPoint ? { appointmentHeldLoggedAt: new Date() } : {}),
-        ...(wonPoint ? { wonLoggedAt: new Date() } : {}),
-        ...stepData(step),
-        // Ein Phasenwechsel ist der deutlichste Fortschritt, den es gibt.
-        ...fortschrittJetzt(),
-      },
-    });
-
-    await recordStageEvent(tx, {
-      contactId,
-      from: contact.stage,
-      to: stage,
-      userId: user.id,
-    });
-
-    if (setsAppointmentPoint) await award(tx, person.id, "APPOINTMENT_SET", 1);
-    if (heldAppointmentPoint) await award(tx, person.id, "APPOINTMENT_HELD", 1);
-    // Zaehler bleibt 1 = ein Abschluss; die Gewichtung macht die Rangliste
-    // ueber quotaTypePoints.
-    if (wonPoint) await award(tx, person.id, "DEAL_WON", 1);
-
-    // Der Kreis schliesst sich: wer einen Namen gegeben hat, erfaehrt, was
-    // daraus geworden ist. Genau daran haengt die ZWEITE Empfehlung - ohne
-    // Rueckmeldung hoert der Geber nie wieder etwas von seinem Namen.
-    //
-    // Ausgeloest beim ersten gehaltenen Termin oder Abschluss, nicht schon
-    // beim vereinbarten: ein Termin, der noch platzen kann, ist keine
-    // Nachricht wert.
-    if (contact.referredById && (heldAppointmentPoint || wonPoint)) {
-      await rueckmeldungAnEmpfehlungsgeber(tx, {
-        empfohlenerId: contactId,
-        empfohlenerName: contact.name,
-        referredById: contact.referredById,
-        ereignis: wonPoint ? "ein Abschluss" : "ein gehaltener Termin",
+  const appointmentAt = appointmentLocal ? berlinLocalToUtc(appointmentLocal) : undefined;
+  if (appointmentLocal && !appointmentAt) throw new Error("Bitte ein gültiges Termindatum angeben.");
+  const ergebnis = await withUndo(
+    { userId: user.id, personId: person.id, contactId, label: `${contactStageLabels[stage]}: ${contact.name}` },
+    () => prisma.$transaction(async (tx) => {
+      const aktuell = await sperreEigenenKontakt(tx, user.id, contactId);
+      return schreibeKontaktPhase(tx, {
+        userId: user.id, personId: person.id, aktuell, stage, appointmentAt,
+        step: readNextStep(formData),
       });
-    }
-  });
+    })
+  );
 
   refreshPipelineViews(contactId);
+  return { einheiten: ergebnis.einheiten };
 }
 
 // --- Kontakt: Schritt erledigen --------------------------------------------

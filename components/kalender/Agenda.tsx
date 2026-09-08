@@ -100,9 +100,9 @@ export function Agenda({
                   </span>
 
                   <div className="min-w-0 flex-1">
-                    {eintrag.kontaktId ? (
+                    {eintrag.kontaktId || eintrag.href ? (
                       <Link
-                        href={`/contacts/${eintrag.kontaktId}`}
+                        href={eintrag.href ?? `/contacts/${eintrag.kontaktId}`}
                         className="block truncate text-sm font-semibold text-slate-900 hover:text-navy-700"
                       >
                         {eintrag.titel}

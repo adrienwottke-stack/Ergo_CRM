@@ -11,6 +11,10 @@ import {
   tageLiegt,
 } from "@/lib/liegenbleiber";
 import { ABGESCHLOSSENE_STAENDE, AUDIO_AUFBEWAHRUNG_TAGE } from "@/lib/rueckmeldung";
+import { ladeVereinbarungsErinnerungen } from "@/lib/vereinbarungen";
+import { tagesmeldungenBuendeln, type Tagesmeldung } from "@/lib/vereinbarungen-meldungen";
+import { pipelineFreigegeben } from "@/lib/einblick-regeln";
+import { ladeFaelligeEinheitenMeldungen } from "@/lib/einheiten-meldungen";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +25,8 @@ export const dynamic = "force-dynamic";
 // aufgerufen werden. Genau die Leute, die ein Signal ausloesen, rufen nichts
 // auf.
 //
-// Zwei Meldungen, mehr nicht:
-//   1. An den Berater: was heute auf ihn wartet.
-//   2. An die Fuehrungskraft: wer heute still ist oder leer laeuft.
+// Eigene Aufgaben, Führung, Absprachen und offene Einheiten werden gesammelt
+// und anschließend in einem einzigen Tagesüberblick je Nutzer verschickt.
 //
 // HOECHSTENS EINE Meldung je Kopf und Lauf. Wer morgens drei Benachrichtigungen
 // bekommt, schaltet sie ab - und dann ist auch die wichtige weg.
@@ -95,6 +98,7 @@ export async function GET(request: NextRequest) {
         path: true,
         startedAt: true,
         onboardingDoneAt: true,
+        visibility: true,
       },
     }),
     // Offen und faellig: ueberfaellig plus heute.
@@ -208,6 +212,12 @@ export async function GET(request: NextRequest) {
   });
 
   // --- 1. An den Berater: was heute wartet ---------------------------------
+  const meldungenJe = new Map<string, Tagesmeldung[]>();
+  const vormerken = (userId: string, meldung: Tagesmeldung) => {
+    const liste = meldungenJe.get(userId) ?? [];
+    liste.push(meldung);
+    meldungenJe.set(userId, liste);
+  };
   const anBerater: string[] = [];
   let anLiegen = 0;
   for (const konto of konten) {
@@ -278,7 +288,7 @@ export async function GET(request: NextRequest) {
         kennung: "tagespensum",
       };
     }
-    await sendeMeldung([konto.id], meldung);
+    vormerken(konto.id, meldung);
   }
 
   // --- 2. An die Fuehrungskraft: wer sie heute braucht ----------------------
@@ -305,8 +315,8 @@ export async function GET(request: NextRequest) {
         : null;
     }
     const zuletzt = letzteJe.get(konto.id);
-    if (!zuletzt || zuletzt < stilleGrenze) return "ist still";
-    if ((namenJe.get(konto.id) ?? 0) < NACHFUELL_SCHWELLE) return "hat keine Namen mehr";
+    if (!zuletzt || zuletzt < stilleGrenze) return "hat zuletzt keine Aktivität eingetragen";
+    if (pipelineFreigegeben(konto.visibility) && (namenJe.get(konto.id) ?? 0) < NACHFUELL_SCHWELLE) return "hat wenige offene Namen";
     return null;
   };
 
@@ -361,7 +371,7 @@ export async function GET(request: NextRequest) {
             nameVon.get(zuerst.konto.leaderId ?? "")?.split(" ")[0] ?? "ihm"
           } besprechen, nicht daran vorbei.`;
 
-    await sendeMeldung([leaderId], {
+    vormerken(leaderId, {
       titel,
       text,
       url: "/mannschaft",
@@ -370,10 +380,38 @@ export async function GET(request: NextRequest) {
     anFuehrung += 1;
   }
 
+  const [absprachen, offeneEinheiten] = await Promise.all([
+    ladeVereinbarungsErinnerungen(),
+    ladeFaelligeEinheitenMeldungen(heute),
+  ]);
+  for (const [userId, anzahl] of absprachen) {
+    if (!kontoVon.has(userId)) continue;
+    const teile = [
+      anzahl.bestaetigen > 0 ? `${anzahl.bestaetigen} ${anzahl.bestaetigen === 1 ? "Vorschlag wartet" : "Vorschläge warten"} auf deine Antwort` : "",
+      anzahl.faellig > 0 ? `${anzahl.faellig} bestätigte ${anzahl.faellig === 1 ? "Absprache ist fällig" : "Absprachen sind fällig"}` : "",
+    ].filter(Boolean);
+    vormerken(userId, { titel: "Eure Absprachen", text: `${teile.join(". ")}.`, url: "/mannschaft/vereinbarungen", kennung: "absprachen" });
+  }
+  for (const [userId, anzahl] of offeneEinheiten) {
+    if (!kontoVon.has(userId)) continue;
+    vormerken(userId, {
+      titel: "Einheiten ergänzen",
+      text: anzahl === 1 ? "Bei einem Abschluss sind die Einheiten noch offen." : `Bei ${anzahl} Abschlüssen sind die Einheiten noch offen.`,
+      url: "/heute",
+      kennung: "einheiten",
+    });
+  }
+  for (const [userId, meldungen] of meldungenJe) {
+    const gebuendelt = tagesmeldungenBuendeln(meldungen);
+    if (gebuendelt) await sendeMeldung([userId], gebuendelt);
+  }
+
   return NextResponse.json({
     berater: anBerater.length,
     liegenbleiber: anLiegen,
     fuehrung: anFuehrung,
+    einheiten: offeneEinheiten.size,
+    empfaenger: meldungenJe.size,
     aufnahmenGeloescht,
   });
 }

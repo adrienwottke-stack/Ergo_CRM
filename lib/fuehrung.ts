@@ -24,6 +24,7 @@ import {
 } from "@/lib/signale";
 import { starterpassStand } from "@/lib/starterpass";
 import { einblickFuer, type Einblick } from "@/lib/einblick";
+import { pipelineFreigegeben } from "@/lib/einblick-regeln";
 import { statusVon } from "@/lib/einladung";
 import type { Bewegung } from "@/lib/fuehrungsaufgaben";
 import type { LeadershipTaskType, UserRole } from "@/lib/generated/prisma/enums";
@@ -220,6 +221,9 @@ export async function mannschaftsLage(betrachter: {
   role: UserRole;
 }): Promise<Mannschaftslage> {
   let sicht = await sichtbarkeit(betrachter, "STRUKTUR");
+  // Private Betreuungsaufgaben gehören weiterhin zur eigenen Führungskette,
+  // auch wenn ein Admin unten die gesamte Instanz betrachten darf.
+  const eigeneMitgliederIds = sicht.beraterIds.filter((id) => id !== betrachter.id);
   // Ein Admin ohne eigene Leute soll trotzdem die Struktur sehen koennen -
   // sonst zeigt die Seite nur die Einladen-Karte, obwohl das ganze Netzwerk
   // laengst steht. `beraterIds` enthaelt immer mindestens den Betrachter
@@ -372,7 +376,12 @@ export async function mannschaftsLage(betrachter: {
     // eigenen: eine Aufgabe ist ein Merkzettel, kein Vorgang, den andere
     // Fuehrungskraefte sehen oder gar abhaken duerfen.
     prisma.leadershipTask.findMany({
-      where: { leaderId: betrachter.id, doneAt: null },
+      where: {
+        leaderId: betrachter.id,
+        memberId: { in: eigeneMitgliederIds },
+        member: { is: { deactivatedAt: null, passwordHash: { not: null } } },
+        doneAt: null,
+      },
       orderBy: { dueAt: "asc" },
       select: { id: true, memberId: true, dueAt: true, note: true, signal: true },
     }),
@@ -534,7 +543,7 @@ export async function mannschaftsLage(betrachter: {
 
   const alle: Mannschaftsperson[] = berater.map((person) => {
     const w = werte.get(person.id) ?? leereWerte();
-    const pipelineSichtbar = person.visibility === "PIPELINE";
+    const pipelineSichtbar = person.id === betrachter.id || pipelineFreigegeben(person.visibility);
     const platzhalter = person.passwordHash === null;
     const angekommen = person.onboardingDoneAt !== null;
     const tageDabei = person.startedAt ? tageSeit(person.startedAt) : null;
@@ -731,11 +740,25 @@ export type FaelligeAufgabe = {
 };
 
 export async function faelligeAufgaben(leaderId: string): Promise<FaelligeAufgabe[]> {
+  // Ein alter privater Merkzettel ist keine dauerhafte Freigabe. Nach einem
+  // Strukturwechsel dürfen darüber weder neue Aktivitäten noch die Nummer
+  // einer neuen Führungskraft aus einem fremden Ast gelesen werden.
+  const sicht = await sichtbarkeit({ id: leaderId, role: "MEMBER" }, "STRUKTUR");
+  const strukturIds = new Set(sicht.beraterIds);
+  const memberIds = sicht.beraterIds.filter((id) => id !== leaderId);
+  if (memberIds.length === 0) return [];
   // Alles bis Ende heute. Was erst morgen faellig ist, gehoert nicht auf die
   // Liste von heute - sonst waere die Frist eine Zierde.
   const bisEnde = new Date(dayToUtcDate(berlinToday()).getTime() + TAG_MS);
   const aufgaben = await prisma.leadershipTask.findMany({
-    where: { leaderId, doneAt: null, dueAt: { lt: bisEnde } },
+    where: {
+      leaderId,
+      memberId: { in: memberIds },
+      leader: { is: { deactivatedAt: null, passwordHash: { not: null } } },
+      member: { is: { deactivatedAt: null, passwordHash: { not: null } } },
+      doneAt: null,
+      dueAt: { lt: bisEnde },
+    },
     orderBy: { dueAt: "asc" },
     select: {
       id: true,
@@ -810,7 +833,7 @@ export async function faelligeAufgaben(leaderId: string): Promise<FaelligeAufgab
       bewegung,
       anrufen: (() => {
         const dazwischen =
-          aufgabe.member.leaderId && aufgabe.member.leaderId !== leaderId
+          aufgabe.member.leaderId && aufgabe.member.leaderId !== leaderId && strukturIds.has(aufgabe.member.leaderId)
             ? aufgabe.member.leader
             : null;
         const ziel = dazwischen

@@ -17,7 +17,6 @@ import {
   nextRating,
   ratingHints,
   ratingLabels,
-  ratingPalette,
   targetPercent,
 } from "@/lib/namelist";
 import { UNDO_WINDOW_SECONDS } from "@/lib/undo-window";
@@ -31,7 +30,7 @@ import {
   UndoIcon,
   XIcon,
 } from "@/components/icons";
-import { card, chip, input } from "@/components/ui";
+import { card, input } from "@/components/ui";
 import { liegtLabel } from "@/lib/liegenbleiber";
 
 export type NameEntry = {
@@ -114,12 +113,17 @@ export default function NameList({
   const [hint, setHint] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
   const [showLost, setShowLost] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   // Auswahlmodus: null = aus. Eine (auch leere) Menge = an.
   const [auswahl, setAuswahl] = useState<Set<string> | null>(null);
   const [rueckgaengig, setRueckgaengig] = useState<Rueckgaengig | null>(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (showAdd) nameRef.current?.focus();
+  }, [showAdd]);
 
   // Es gibt genau zwei Listen, also ist das Ziel eindeutig. Kein Menue.
   const ziel = andereListe(kind);
@@ -256,217 +260,107 @@ export default function NameList({
   const nachfuellen = total > 0 && open.length < NACHFUELL_SCHWELLE;
 
   return (
-    <div className={`space-y-5 ${auswaehlend ? "pb-24" : ""}`}>
-      {nachfuellen && !auswaehlend && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-900">
-            {open.length === 0
-              ? "Deine Liste ist leer gearbeitet."
-              : `Nur noch ${open.length} ${open.length === 1 ? "offener Name" : "offene Namen"}.`}
-          </p>
-          <p className="mt-1 text-sm text-amber-800">
-            Ohne Nachschub steht die Schleife still. Zehn Fragen, und du hast
-            wieder welche.
-          </p>
-          <Link
-            href={`/namen/sammeln?liste=${kind}`}
-            className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-fest-warnung px-4 text-sm font-semibold text-white transition hover:bg-fest-warnung-stark"
-          >
-            <SparkIcon className="h-4 w-4" />
-            Namen sammeln
-          </Link>
-        </div>
+    <div className={`space-y-6 ${auswaehlend ? "pb-32" : ""}`}>
+      {!auswaehlend && (
+        <section aria-label="Nächster Schritt" className="space-y-4">
+          {open.length === 0 ? (
+            <>
+              <div>
+                <h2 className="text-xl font-semibold text-ink">
+                  {total === 0 ? "Mit Namen beginnt dein Geschäft." : "Bereit für neue Kontakte."}
+                </h2>
+                <p className="mt-2 text-base text-ink-muted">
+                  {total === 0
+                    ? "Sammle zuerst die Menschen, die du kennst. Nummern und nächste Schritte ergänzen wir danach."
+                    : "Die offenen Namen sind bearbeitet. Sammle die nächsten Menschen, die du ansprechen möchtest."}
+                </p>
+              </div>
+              <Link href={`/namen/sammeln?liste=${kind}`} className="crm-primary-action">
+                <SparkIcon className="h-5 w-5" />
+                Namen sammeln
+              </Link>
+            </>
+          ) : callable > 0 ? (
+            <Link href={`/namen/anrufen?liste=${kind}`} className="crm-primary-action">
+              <PhoneIcon className="h-5 w-5" />
+              <span>Anrufe starten <span className="ml-1 font-normal">· {callable}</span></span>
+            </Link>
+          ) : (
+            <>
+              <p className="text-base text-ink-muted">Ergänze eine Nummer, dann kannst du mit dem ersten Anruf starten.</p>
+              <Link href={`/namen/nummern?liste=${kind}`} className="crm-primary-action">
+                <PhoneIcon className="h-5 w-5" />
+                Nummern ergänzen · {ohneNummer}
+              </Link>
+            </>
+          )}
+
+          <div className={`grid gap-2 ${callable > 0 && ohneNummer > 0 ? "sm:grid-cols-2" : ""}`}>
+            <button
+              type="button"
+              onClick={() => setShowAdd((value) => !value)}
+              aria-expanded={showAdd}
+              aria-controls="namen-schnellerfassung"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-3 text-base font-medium text-ink"
+            >
+              {showAdd ? <XIcon className="h-5 w-5" /> : <PlusIcon className="h-5 w-5" />}
+              {showAdd ? "Eingabe schließen" : "Name hinzufügen"}
+            </button>
+            {callable > 0 && ohneNummer > 0 && (
+              <Link href={`/namen/nummern?liste=${kind}`} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-3 text-base font-medium text-ink">
+                Nummern ergänzen · {ohneNummer}
+              </Link>
+            )}
+          </div>
+
+          {showAdd && (
+            <form id="namen-schnellerfassung" className="space-y-4 rounded-2xl border border-line bg-surface p-4 sm:p-5" onSubmit={(event) => { event.preventDefault(); submitName(); }}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-sm font-medium text-ink">
+                  Name
+                  <input ref={nameRef} type="text" name="name" autoComplete="off" required placeholder="Vor- und Nachname" enterKeyHint="next" className={input} />
+                </label>
+                <label className="text-sm font-medium text-ink">
+                  Telefonnummer <span className="font-normal text-ink-muted">(optional)</span>
+                  <input ref={phoneRef} type="tel" name="phone" autoComplete="off" placeholder="Zum Beispiel 0176 …" enterKeyHint="done" className={input} />
+                </label>
+              </div>
+              <button type="submit" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-akzent px-4 py-3 text-base font-semibold text-white sm:w-auto">
+                <PlusIcon className="h-5 w-5" /> Name speichern
+              </button>
+              <Link href={`/namen/sammeln?liste=${kind}`} className="flex min-h-11 items-center gap-2 text-sm font-medium text-navy-700">
+                <SparkIcon className="h-4 w-4" /> Mehrere Namen sammeln →
+              </Link>
+            </form>
+          )}
+          {hint && <p role="status" className="text-sm text-ink-muted">{hint}</p>}
+          {nachfuellen && open.length > 0 && (
+            <p className="text-sm leading-relaxed text-ink-muted">
+              Noch {open.length} {open.length === 1 ? "offener Name" : "offene Namen"}.{" "}
+              <Link href={`/namen/sammeln?liste=${kind}`} className="inline-flex min-h-11 items-center font-medium text-navy-700">Namen sammeln →</Link>
+            </p>
+          )}
+        </section>
       )}
 
-      {/* Fortschritt zum Ziel. 20 ist ein Ziel, keine Grenze – der Balken
-          bleibt bei 100 %, weitere Namen sind willkommen. */}
-      <div className={`${card} space-y-2 p-4`}>
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm font-semibold text-slate-900">
-            {total} von {NAME_TARGET} Namen
-          </span>
-          <span className="text-xs font-medium text-slate-500">
-            {total >= NAME_TARGET ? "Ziel erreicht" : `${percent} %`}
-          </span>
-        </div>
-        <div className="h-[3px] w-full overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-navy-700 transition-all duration-300"
-            style={{ width: `${percent}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Was gerade umgezogen ist, und der Weg zurueck. Bewusst im Fluss der
-          Seite statt als schwebender Streifen: der Rueckgaengig-Balken der
-          Gespraechsergebnisse sitzt schon unten am Rand, und zwei davon
-          uebereinander liest niemand. */}
       {rueckgaengig && (
-        <div className="flex items-center gap-3 rounded-xl border border-navy-200 bg-navy-50 py-2 pl-4 pr-2">
-          <p className="min-w-0 flex-1 text-sm font-medium text-navy-900">
-            {rueckgaengig.text}
-          </p>
-          <button
-            type="button"
-            onClick={zurueck}
-            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-navy-700 transition hover:bg-navy-100"
-          >
-            <UndoIcon className="h-4 w-4" />
-            Rückgängig
+        <div role="status" className="flex items-center gap-3 rounded-xl border border-line-strong bg-sunken py-2 pl-4 pr-2">
+          <p className="min-w-0 flex-1 text-sm font-medium text-ink">{rueckgaengig.text}</p>
+          <button type="button" onClick={zurueck} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-navy-700">
+            <UndoIcon className="h-4 w-4" /> Rückgängig
           </button>
         </div>
       )}
 
-      {/* Schnell-Erfassung: Name breit, Nummer schmal, Enter legt an. */}
-      {!auswaehlend && (
-        <div className={`${card} space-y-3 p-4`}>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              ref={nameRef}
-              type="text"
-              autoFocus={entries.length === 0}
-              placeholder="Name"
-              enterKeyHint="done"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  submitName();
-                }
-              }}
-              className={`${input} mt-0 flex-1`}
-            />
-            <input
-              ref={phoneRef}
-              type="tel"
-              placeholder="Nummer (optional)"
-              enterKeyHint="done"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  submitName();
-                }
-              }}
-              className={`${input} mt-0 sm:w-48`}
-            />
-            <button
-              type="button"
-              onClick={submitName}
-              aria-label="Namen hinzufügen"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-akzent px-4 text-sm font-medium text-white transition hover:bg-akzent-stark active:scale-[0.99]"
-            >
-              <PlusIcon className="h-4 w-4" />
-              <span className="sm:hidden">Hinzufügen</span>
-            </button>
-          </div>
-          {hint && <p className="text-xs font-medium text-amber-700">{hint}</p>}
-          {/* Der gefuehrte Weg fuer alle, denen nach sechs Namen nichts mehr
-              einfaellt - und das sind fast alle. */}
-          <Link
-            href={`/namen/sammeln?liste=${kind}`}
-            className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
-          >
-            <SparkIcon className="h-4 w-4" />
-            Fällt dir keiner mehr ein? Sammeln starten
-          </Link>
-        </div>
-      )}
-
       {open.length > 0 && (
-        <>
-          {/* Hier stand eine Filterleiste nach A/B/C. Sie war ein
-              Entscheidungspunkt, den der Nutzer nicht treffen soll
-              (docs/audit-kernmodell.md, 1.5 und 10.9): der Durchlauf sortiert
-              ohnehin nach Naehe, enger Kreis zuerst. Wer filtern konnte, konnte
-              vor allem eines - die unangenehmen Namen wegblenden. */}
-
-          {!auswaehlend && (
-            <>
-              {/* Ohne Nummer kein Anruf. Frueher stand hier ein toter Knopf
-                  ("Erst Nummern eintragen") und der Partner musste sich selbst
-                  ausdenken, wie er zwanzig Nummern in die Liste bekommt. Jetzt
-                  ist der Satz der Weg. */}
-              {callable > 0 ? (
-                <Link
-                  href={`/namen/anrufen?liste=${kind}`}
-                  className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-fest-erfolg text-base font-semibold text-white transition hover:bg-fest-erfolg-stark active:scale-[0.99]"
-                >
-                  <PhoneIcon className="h-5 w-5" />
-                  Durchlauf starten · {callable}{" "}
-                  {callable === 1 ? "Name" : "Namen"}
-                </Link>
-              ) : (
-                <Link
-                  href={`/namen/nummern?liste=${kind}`}
-                  className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-akzent text-base font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.99]"
-                >
-                  <PhoneIcon className="h-5 w-5" />
-                  Nummern nachtragen · {ohneNummer}{" "}
-                  {ohneNummer === 1 ? "Name" : "Namen"}
-                </Link>
-              )}
-
-              {callable > 0 && ohneNummer > 0 && (
-                <Link
-                  href={`/namen/nummern?liste=${kind}`}
-                  className="-mt-2 inline-flex min-h-11 items-center justify-center gap-1.5 text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
-                >
-                  {ohneNummer} {ohneNummer === 1 ? "Name hat" : "Namen haben"}{" "}
-                  noch keine Nummer — nachtragen
-                </Link>
-              )}
-
-              {/* Zaehlt, was die Plaketten unten einzeln zeigen. Ohne diese
-                  Zeile muesste man zwanzig Namen absuchen, um zu merken, dass
-                  sechs davon liegen. */}
-              {liegen > 0 && (
-                <p className="text-sm font-semibold text-red-700">
-                  {liegen === 1
-                    ? "Ein Name liegt seit Tagen."
-                    : `${liegen} Namen liegen seit Tagen.`}{" "}
-                  <span className="font-normal text-slate-500">
-                    Anrufen oder von der Liste nehmen.
-                  </span>
-                </p>
-              )}
-            </>
-          )}
-
-          {/* Der Einstieg ins Umhaengen von vielen. Steht bewusst klein ueber
-              der Liste: der Normalfall ist Anrufen, nicht Sortieren. */}
+        <section aria-label="Offene Kontakte" className="space-y-3">
           <div className="flex min-h-11 items-center justify-between gap-3">
-            <p className="text-13 font-semibold text-slate-500">
-              {auswaehlend
-                ? `${gewaehlt} von ${auswaehlbar.length} ausgewählt`
-                : `${open.length} offen`}
-            </p>
-            {auswaehlend ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setAuswahl(
-                    alleGewaehlt
-                      ? new Set()
-                      : new Set(auswaehlbar.map((entry) => entry.id))
-                  )
-                }
-                className="shrink-0 text-13 font-semibold text-navy-600 transition hover:text-navy-800 hover:underline"
-              >
-                {alleGewaehlt ? "Keinen" : `Alle ${auswaehlbar.length}`}
-              </button>
-            ) : (
-              auswaehlbar.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setAuswahl(new Set())}
-                  className="shrink-0 text-13 font-semibold text-navy-600 transition hover:text-navy-800 hover:underline"
-                >
-                  Mehrere verschieben
-                </button>
-              )
-            )}
+            <h2 className="text-lg font-semibold text-ink">{auswaehlend ? `${gewaehlt} ausgewählt` : `Offene Kontakte · ${open.length}`}</h2>
+            {auswaehlend && <button type="button" onClick={() => setAuswahl(alleGewaehlt ? new Set() : new Set(auswaehlbar.map((entry) => entry.id)))} className="min-h-11 shrink-0 px-2 text-sm font-semibold text-navy-700">
+              {alleGewaehlt ? "Keine auswählen" : "Alle auswählen"}
+            </button>}
           </div>
-
-          <ul className="space-y-2">
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
             {open.map((entry) => (
               <NameRow
                 key={entry.id}
@@ -476,161 +370,74 @@ export default function NameList({
                 gewaehlt={auswahl?.has(entry.id) ?? false}
                 onToggle={() => umschalten(entry.id)}
                 onCycleRating={() => cycleRating(entry)}
-                onMove={() =>
-                  schieben(
-                    [entry.id],
-                    kind,
-                    ziel,
-                    `${entry.name} steht jetzt auf ${listKindLabels[ziel]}.`
-                  )
-                }
-                onDrop={() =>
-                  schieben(
-                    [entry.id],
-                    kind,
-                    null,
-                    `${entry.name} ist von der Liste.`
-                  )
-                }
+                onMove={() => schieben([entry.id], kind, ziel, `${entry.name} steht jetzt auf ${listKindLabels[ziel]}.`)}
+                onDrop={() => schieben([entry.id], kind, null, `${entry.name} ist von der Liste.`)}
               />
             ))}
           </ul>
-        </>
-      )}
-
-      {open.length === 0 && total === 0 && (
-        <div className={`${card} px-6 py-12 text-center`}>
-          <p className="text-sm font-medium text-slate-900">
-            Noch keine Namen auf der Liste
-          </p>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
-            Schreib erst alle Namen auf, die dir einfallen – einstufen und
-            anrufen kommt danach. Wer beim Sammeln über Details nachdenkt,
-            kommt nicht auf {NAME_TARGET}.
-          </p>
-          <Link
-            href={`/namen/sammeln?liste=${kind}`}
-            className="mt-5 inline-flex min-h-14 items-center gap-2 rounded-xl bg-akzent px-6 text-base font-semibold text-white transition hover:bg-akzent-stark"
-          >
-            <SparkIcon className="h-5 w-5" />
-            Geführt sammeln
-          </Link>
-        </div>
+        </section>
       )}
 
       {done.length > 0 && !auswaehlend && (
-        <div className={`${card} overflow-hidden`}>
-          <button
-            type="button"
-            onClick={() => setShowDone((value) => !value)}
-            className="flex min-h-14 w-full items-center justify-between px-4 text-left"
-          >
-            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-800">
-              <CheckIcon className="h-4 w-4" />
-              Geschafft · {done.length}
-            </span>
-            <span className="text-xs text-slate-400">
-              {showDone ? "Zuklappen" : "Anzeigen"}
-            </span>
+        <section className={`${card} overflow-hidden`}>
+          <button type="button" onClick={() => setShowDone((value) => !value)} aria-expanded={showDone} aria-controls="namen-geschafft" className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left">
+            <span className="inline-flex items-center gap-2 text-base font-semibold text-ink"><CheckIcon className="h-5 w-5 text-navy-700" /> Geschafft · {done.length}</span>
+            <span className="text-sm text-ink-muted">{showDone ? "Schließen" : "Anzeigen"}</span>
           </button>
-          {showDone && (
-            <ul className="divide-y divide-slate-100 border-t border-slate-100">
-              {done.map((entry) => (
-                <li key={entry.id}>
-                  <Link
-                    href={`/contacts/${entry.id}`}
-                    className="flex min-h-14 items-center justify-between gap-3 px-4 hover:bg-emerald-50/40"
-                  >
-                    <span className="text-sm font-medium text-slate-900">
-                      {entry.name}
-                    </span>
-                    <span className="shrink-0 text-xs text-slate-500">
-                      {entry.appointmentLabel ?? "im CRM"}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+          {showDone && <ul id="namen-geschafft" className="divide-y divide-line border-t border-line">
+            {done.map((entry) => <li key={entry.id}>
+              <Link href={`/contacts/${entry.id}`} className="flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 hover:bg-sunken">
+                <span className="text-base font-medium text-ink">{entry.name}</span>
+                <span className="text-sm text-ink-muted">{entry.appointmentLabel ?? "Kontakt öffnen"}</span>
+              </Link>
+            </li>)}
+          </ul>}
+        </section>
       )}
 
       {lost.length > 0 && !auswaehlend && (
-        <div className={`${card} overflow-hidden`}>
-          <button
-            type="button"
-            onClick={() => setShowLost((value) => !value)}
-            className="flex min-h-14 w-full items-center justify-between px-4 text-left"
-          >
-            <span className="text-sm font-semibold text-slate-600">
-              Raus · {lost.length}
-            </span>
-            <span className="text-xs text-slate-400">
-              {showLost ? "Zuklappen" : "Anzeigen"}
-            </span>
+        <section className={`${card} overflow-hidden`}>
+          <button type="button" onClick={() => setShowLost((value) => !value)} aria-expanded={showLost} aria-controls="namen-raus" className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left">
+            <span className="text-base font-medium text-ink-muted">Nicht weiterverfolgt · {lost.length}</span>
+            <span className="text-sm text-ink-muted">{showLost ? "Schließen" : "Anzeigen"}</span>
           </button>
-          {showLost && (
-            <ul className="divide-y divide-slate-100 border-t border-slate-100">
-              {lost.map((entry) => (
-                <li
-                  key={entry.id}
-                  className="flex min-h-14 items-center justify-between gap-3 px-4"
-                >
-                  <span className="text-sm text-slate-500">{entry.name}</span>
-                  <span className="shrink-0 text-xs text-slate-400">
-                    {entry.lostLabel ?? "–"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+          {showLost && <ul id="namen-raus" className="divide-y divide-line border-t border-line">
+            {lost.map((entry) => <li key={entry.id} className="flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3">
+              <span className="text-base text-ink-muted">{entry.name}</span><span className="text-sm text-ink-muted">{entry.lostLabel ?? "–"}</span>
+            </li>)}
+          </ul>}
+        </section>
       )}
 
-      {/* Die Leiste des Auswahlmodus. Liegt am Daumen, nicht am Kopf der
-          Seite - bei siebzehn Namen scrollt man beim Auswaehlen nach unten. */}
+      {!auswaehlend && total > 0 && (
+        <details className="border-t border-line pt-2">
+          <summary className="min-h-12 cursor-pointer py-3 text-base font-medium text-ink">Liste organisieren & Fortschritt</summary>
+          <div className="space-y-5 pb-3 pt-2">
+            <div>
+              <div className="flex items-baseline justify-between gap-3 text-sm"><span className="font-medium text-ink">{total} von {NAME_TARGET} Namen gesammelt</span><span className="text-ink-muted">{total >= NAME_TARGET ? "Ziel erreicht" : `${percent} %`}</span></div>
+              <div role="progressbar" aria-label="Gesammelte Namen" aria-valuenow={Math.min(total, NAME_TARGET)} aria-valuemin={0} aria-valuemax={NAME_TARGET} aria-valuetext={`${total} von ${NAME_TARGET} Namen gesammelt`} className="mt-3 h-1.5 overflow-hidden rounded-full bg-sunken"><div className="h-full rounded-full bg-akzent transition-all" style={{ width: `${percent}%` }} /></div>
+            </div>
+            <div className="text-sm leading-relaxed text-ink-muted">
+              <p className="font-medium text-ink">Nähe hilft bei der Anrufreihenfolge.</p>
+              <p className="mt-1">A: {ratingLabels.A} · B: {ratingLabels.B} · C: {ratingLabels.C}. Unter „Mehr“ beim Kontakt lässt sich die Nähe ändern. Die Anrufliste beginnt mit deinem engen Kreis.</p>
+              {liegen > 0 && <p className="mt-3">{liegen} {liegen === 1 ? "Kontakt wartet" : "Kontakte warten"} seit mehreren Tagen auf einen nächsten Schritt. Die betroffenen Namen sind in der Liste gekennzeichnet.</p>}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {auswaehlbar.length > 1 && <button type="button" onClick={() => setAuswahl(new Set())} className="min-h-12 rounded-xl border border-line-strong px-4 py-3 text-sm font-medium text-ink">Mehrere Kontakte verschieben</button>}
+              <Link href={`/namen/sammeln?liste=${kind}`} className="inline-flex min-h-12 items-center gap-2 px-2 py-3 text-sm font-medium text-navy-700"><SparkIcon className="h-4 w-4" /> Namen sammeln</Link>
+            </div>
+          </div>
+        </details>
+      )}
+
       {auswaehlend && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4">
-          <div className="buehne pointer-events-auto flex w-full max-w-md items-center gap-2 rounded-xl bg-navy-950 py-2 pl-3 pr-2 text-white shadow-lg">
-            <button
-              type="button"
-              disabled={gewaehlt === 0}
-              onClick={() =>
-                schieben(
-                  [...(auswahl ?? [])],
-                  kind,
-                  ziel,
-                  `${gewaehlt} ${gewaehlt === 1 ? "Name steht" : "Namen stehen"} jetzt auf ${listKindLabels[ziel]}.`
-                )
-              }
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gold-400 px-3 text-sm font-semibold text-navy-950 transition hover:bg-gold-100 disabled:opacity-40"
-            >
-              <ArrowRightIcon className="h-4 w-4" />
-              {listKindLabels[ziel]}
-            </button>
-            <button
-              type="button"
-              disabled={gewaehlt === 0}
-              onClick={() =>
-                schieben(
-                  [...(auswahl ?? [])],
-                  kind,
-                  null,
-                  `${gewaehlt} ${gewaehlt === 1 ? "Name ist" : "Namen sind"} von der Liste.`
-                )
-              }
-              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-3 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
-            >
-              Von der Liste
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuswahl(null)}
-              aria-label="Auswahl beenden"
-              className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white"
-            >
-              <XIcon className="h-4.5 w-4.5" />
-            </button>
+        <div className="crm-undo pointer-events-none fixed inset-x-0 z-40 flex justify-center px-4">
+          <div className="pointer-events-auto w-full max-w-lg space-y-2 rounded-2xl border border-line-strong bg-surface p-3 text-ink shadow-lg">
+            <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">{gewaehlt} ausgewählt</p><button type="button" onClick={() => setAuswahl(null)} className="min-h-11 px-2 text-sm font-medium text-ink-muted">Auswahl beenden</button></div>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" disabled={gewaehlt === 0} onClick={() => schieben([...(auswahl ?? [])], kind, ziel, `${gewaehlt} ${gewaehlt === 1 ? "Name steht" : "Namen stehen"} jetzt auf ${listKindLabels[ziel]}.`)} className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl bg-akzent px-3 py-3 text-sm font-semibold text-white disabled:opacity-40"><ArrowRightIcon className="h-4 w-4" /> Zu {listKindLabels[ziel]}</button>
+              <button type="button" disabled={gewaehlt === 0} onClick={() => schieben([...(auswahl ?? [])], kind, null, `${gewaehlt} ${gewaehlt === 1 ? "Name ist" : "Namen sind"} von der Liste.`)} className="min-h-12 rounded-xl border border-line-strong px-3 py-3 text-sm font-medium text-ink disabled:opacity-40">Von der Liste</button>
+            </div>
           </div>
         </div>
       )}
@@ -638,20 +445,8 @@ export default function NameList({
   );
 }
 
-// --- Eine Zeile -------------------------------------------------------------
-
-function NameRow({
-  entry,
-  ziel,
-  auswaehlend,
-  gewaehlt,
-  onCycleRating,
-  onToggle,
-  onMove,
-  onDrop,
-}: {
+function NameRow({ entry, ziel, auswaehlend, gewaehlt, onCycleRating, onToggle, onMove, onDrop }: {
   entry: NameEntry;
-  /** Die andere Liste - Beschriftung des Schiebe-Knopfes. */
   ziel: ListKind;
   auswaehlend: boolean;
   gewaehlt: boolean;
@@ -662,144 +457,58 @@ function NameRow({
 }) {
   const [, startTransition] = useTransition();
   const [editingPhone, setEditingPhone] = useState(false);
-  const palette = entry.rating ? ratingPalette[entry.rating] : null;
+  const [showMore, setShowMore] = useState(false);
 
   const savePhone = (value: string) => {
     setEditingPhone(false);
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed || !istEcht(entry.id)) return;
     const data = new FormData();
     data.set("contactId", entry.id);
     data.set("phone", trimmed);
-    startTransition(() => {
-      void setPhone(data);
-    });
+    startTransition(() => { void setPhone(data); });
   };
 
-  // Im Auswahlmodus ist die ganze Zeile der Knopf: bei siebzehn Namen trifft
-  // niemand siebzehnmal ein Kaestchen von zwanzig Pixeln.
-  if (auswaehlend) {
-    return (
-      <li>
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-pressed={gewaehlt}
-          className={`${card} flex min-h-16 w-full items-center gap-3 p-3 text-left transition ${
-            gewaehlt ? "ring-2 ring-akzent" : ""
-          }`}
-        >
-          <span
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-semibold ${
-              gewaehlt
-                ? "bg-akzent text-white"
-                : "border border-dashed border-slate-300 text-slate-400"
-            }`}
-          >
-            {gewaehlt ? <CheckIcon className="h-5 w-5" /> : (entry.rating ?? "–")}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-slate-900">
-              {entry.name}
-            </span>
-            {entry.phone && (
-              <span className="block truncate text-sm text-slate-500">
-                {entry.phone}
-              </span>
-            )}
-          </span>
-        </button>
-      </li>
-    );
-  }
+  if (auswaehlend) return (
+    <li>
+      <button type="button" onClick={onToggle} disabled={!istEcht(entry.id)} aria-pressed={gewaehlt} className={`flex min-h-20 w-full items-center gap-3 px-4 py-3 text-left disabled:opacity-50 ${gewaehlt ? "bg-sunken" : ""}`}>
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${gewaehlt ? "bg-akzent text-white" : "border border-line-strong text-ink-muted"}`}>{gewaehlt ? <CheckIcon className="h-5 w-5" /> : <span aria-hidden="true">○</span>}</span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-base font-semibold text-ink">{entry.name}</span>{entry.phone && <span className="block truncate text-sm text-ink-muted">{entry.phone}</span>}</span>
+      </button>
+    </li>
+  );
 
   return (
-    <li className={`${card} flex min-h-16 items-center gap-2 p-3`}>
-      {/* Ein Tipp zykelt – → A → B → C → –. Kein Menü, kein Dialog. */}
-      <button
-        type="button"
-        onClick={onCycleRating}
-        aria-label={
-          entry.rating
-            ? `Einstufung ${entry.rating} (${ratingLabels[entry.rating]}) ändern`
-            : "Einstufen"
-        }
-        title={entry.rating ? ratingHints[entry.rating] : "Einstufen"}
-        className={`mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-semibold transition active:scale-95 ${
-          palette
-            ? palette.chip
-            : "border border-dashed border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600"
-        }`}
-      >
-        {entry.rating ?? "–"}
-      </button>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-semibold text-slate-900">
-            {entry.name}
-          </p>
-          {/* Die Plakette statt einer Umsortierung: die Liste bleibt in
-              Eingabe-Reihenfolge, damit beim Einstufen keine Zeile unter dem
-              Finger wegspringt. */}
-          {entry.liegtTage !== null && (
-            <span className={`${chip("gefahr")} shrink-0`}>
-              {liegtLabel(entry.liegtTage)}
-            </span>
-          )}
-        </div>
-        {editingPhone ? (
-          <input
-            type="tel"
-            autoFocus
-            defaultValue={entry.phone ?? ""}
-            placeholder="Nummer"
-            enterKeyHint="done"
-            onBlur={(event) => savePhone(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                savePhone(event.currentTarget.value);
-              }
+    <li>
+      <div className="flex min-h-20 items-start gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          {istEcht(entry.id) ? <Link href={`/contacts/${entry.id}`} className="inline-flex min-h-11 max-w-full items-center text-base font-semibold text-ink"><span className="truncate">{entry.name}</span></Link> : <p className="flex min-h-11 items-center text-base font-semibold text-ink">{entry.name}</p>}
+          {editingPhone ? (
+            <input type="tel" aria-label={`Telefonnummer für ${entry.name}`} autoFocus defaultValue={entry.phone ?? ""} placeholder="Telefonnummer" enterKeyHint="done" onBlur={(event) => savePhone(event.currentTarget.value)} onKeyDown={(event) => {
+              if (event.key === "Enter") { event.preventDefault(); savePhone(event.currentTarget.value); }
               if (event.key === "Escape") setEditingPhone(false);
-            }}
-            className="mt-1 w-full max-w-48 rounded-md border border-slate-300 px-2 py-1 text-sm"
-          />
-        ) : entry.phone ? (
-          <p className="truncate text-sm text-slate-500">{entry.phone}</p>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setEditingPhone(true)}
-            className="text-sm font-medium text-navy-600 hover:underline"
-          >
-            + Nummer
-          </button>
-        )}
+            }} className={`${input} max-w-sm`} />
+          ) : entry.phone ? <p className="truncate text-sm text-ink-muted">{entry.phone}</p> : (
+            <button type="button" disabled={!istEcht(entry.id)} onClick={() => setEditingPhone(true)} className="inline-flex min-h-11 items-center text-sm font-medium text-navy-700 disabled:opacity-50">Nummer ergänzen</button>
+          )}
+          {entry.liegtTage !== null && <p className="mt-1 text-xs text-ink-muted">{liegtLabel(entry.liegtTage)} · Nächsten Schritt festlegen</p>}
+        </div>
+        <button type="button" disabled={!istEcht(entry.id)} onClick={() => setShowMore((value) => !value)} aria-label={`Mehr zu ${entry.name}`} aria-expanded={showMore} aria-controls={`name-mehr-${entry.id}`} className="min-h-11 shrink-0 rounded-lg px-2 text-sm font-medium text-ink-muted disabled:opacity-50">{showMore ? "Schließen" : "Mehr"}</button>
       </div>
-
-      {/* Ein Tipp haengt den Namen um. Das Ziel steht dran, weil ein blosser
-          Pfeil nicht sagt, wohin. */}
-      <button
-        type="button"
-        onClick={onMove}
-        aria-label={`${entry.name} auf die Liste ${listKindLabels[ziel]} schieben`}
-        title={`Auf ${listKindLabels[ziel]} schieben`}
-        className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-500 transition hover:bg-navy-50 hover:text-navy-700"
-      >
-        <ArrowRightIcon className="h-3.5 w-3.5" />
-        {listKindLabels[ziel]}
-      </button>
-
-      <button
-        type="button"
-        onClick={onDrop}
-        aria-label={`${entry.name} von der Liste nehmen`}
-        title="Von der Liste nehmen (Kontakt bleibt erhalten)"
-        className="flex h-11 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-50 hover:text-slate-500"
-      >
-        <XIcon className="h-4.5 w-4.5" />
-      </button>
+      {showMore && <div id={`name-mehr-${entry.id}`} className="space-y-3 border-t border-line bg-sunken px-4 py-4">
+        <div>
+          <button type="button" onClick={onCycleRating} title={entry.rating ? ratingHints[entry.rating] : "Nähe zum Kontakt festlegen"} className="min-h-11 text-left text-sm font-medium text-ink">
+            Nähe: {entry.rating ? `${entry.rating} · ${ratingLabels[entry.rating]}` : "Noch nicht eingestuft"} <span className="ml-1 text-navy-700">Ändern</span>
+          </button>
+          <p className="text-xs text-ink-muted">Tippen wechselt zwischen A, B, C und keiner Einstufung.</p>
+        </div>
+        <div className="flex flex-col items-start gap-1">
+          {entry.phone && <button type="button" onClick={() => { setEditingPhone(true); setShowMore(false); }} className="min-h-11 text-sm font-medium text-ink">Nummer bearbeiten</button>}
+          <button type="button" onClick={onMove} className="inline-flex min-h-11 items-center gap-2 text-left text-sm font-medium text-ink"><ArrowRightIcon className="h-4 w-4" /> Zu {listKindLabels[ziel]} verschieben</button>
+          <button type="button" onClick={onDrop} className="min-h-11 text-left text-sm text-ink-muted">Von dieser Liste nehmen</button>
+          <p className="text-xs text-ink-muted">Der Kontakt bleibt dabei erhalten.</p>
+        </div>
+      </div>}
     </li>
   );
 }

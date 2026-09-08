@@ -1,26 +1,15 @@
 // Gemeinsame Klassen-Bausteine, damit alle Seiten dieselbe Sprache sprechen.
 //
-// Designlinie "Werkzeug": ruhige Flaechen, klare Kanten, ein Radius-System
-// (12 px Container, 8 px Bedienelemente, rund nur fuer Badges) und Zahlen
-// immer mit Tabellenziffern.
-//
-// Frueher hiess die Linie zusaetzlich "flache weisse Flaechen, 1-px-Haarlinien
-// statt Schatten". Das war konsequent, aber die Oberflaeche wurde dadurch flach
-// und grau: nichts lag vor etwas anderem, alles hatte dasselbe Gewicht. Jetzt
-// tragen die Haarlinien einen sehr weichen, navy-getoenten Schatten. Einzeln
-// sieht man ihn kaum - aber die Karte loest sich vom Grund, und genau das hat
-// gefehlt.
-//
-// Farben kommen ueber die semantischen Tokens aus globals.css (surface, line,
-// ink, akzent), nicht mehr ueber die Rampe. Nur so kippt der Dunkelmodus
-// sauber mit.
-
+// Navy als Grund, deckende Flächen und gut lesbare Beschriftungen.
+// Karten trennen sich durch Fläche und Kontur; Hauptaktionen verwenden Blau.
+// Farben folgen den semantischen Tokens aus globals.css. Feste Markenflächen
+// behalten ihre eigene Farbgebung in der Klasse buehne.
 /** Klassen zusammensetzen, ohne eine Abhaengigkeit dafuer zu holen. */
 export function cn(...teile: Array<string | false | null | undefined>) {
   return teile.filter(Boolean).join(" ");
 }
 
-export const card = "rounded-xl border border-line bg-surface schatten-karte";
+export const card = "rounded-2xl border border-line bg-surface";
 
 /** Karte, die auf einen Klick wartet: hebt sich unter dem Zeiger leicht an. */
 export const cardInteractive = `${card} transition duration-200 hover:-translate-y-px hover:border-line-strong hover:schatten-hoch`;
@@ -58,7 +47,7 @@ export const shell = "mx-auto w-full max-w-6xl 2xl:max-w-7xl";
 export const gutter = "px-4 sm:px-6 lg:px-8";
 
 export const btnPrimary =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-akzent px-5 py-2 text-sm font-medium text-white schatten-karte transition hover:bg-akzent-stark hover:schatten-hoch active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600";
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-akzent px-5 py-3 text-base font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600 disabled:opacity-60";
 
 export const btnSecondary =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600";
@@ -67,7 +56,7 @@ export const btnGhost =
   "text-sm font-medium text-slate-500 transition hover:text-slate-900";
 
 const inputBasis =
-  "min-h-11 w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/15";
+  "min-h-12 w-full rounded-xl border border-line-strong bg-surface px-3.5 py-3 text-base text-ink transition placeholder:text-ink-soft focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/25";
 
 /** Eingabefeld unter einem <label> - der Abstand nach oben steckt schon drin. */
 export const input = `mt-1.5 ${inputBasis}`;
@@ -84,7 +73,7 @@ export const inputBlank = inputBasis;
 export const label = "block text-[13px] font-medium text-slate-600";
 
 export const pageTitle =
-  "text-[1.75rem] font-semibold tracking-[-0.02em] text-slate-900";
+  "text-3xl font-semibold tracking-[-0.035em] text-ink sm:text-4xl";
 
 export const sectionTitle = "text-base font-semibold tracking-tight text-slate-900";
 

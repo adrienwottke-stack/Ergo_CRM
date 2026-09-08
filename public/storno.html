@@ -5,6 +5,9 @@
   auf /spiel nicht in eine fremde Anwendung zeigen soll - siehe
   lib/freischaltung.ts.
 
+  Der eingebettete Einstiegsmodus und ./storno-tutorial.js gehören ebenfalls
+  zu dieser CRM-Fassung. Bei einer Aktualisierung beide erhalten.
+
   Beim Nachziehen einer neuen Fassung gehen zwei Dinge verloren, die es nur in
   dieser Kopie gibt. Beide wieder einsetzen:
     1. <a class="heimweg"> gleich hinter <body> - der Weg zurueck nach /spiel.
@@ -82,6 +85,7 @@
     padding: max(42px, calc(env(safe-area-inset-top) + 34px)) 14px max(12px, env(safe-area-inset-bottom));
   }
   .screen.on { display: flex; }
+  .tutorial .screen { padding: 12px 14px; }
 
   /* ---------- Stamp ---------- */
   .stamp {
@@ -701,9 +705,15 @@
 
   </div>
 </div>
-<script>
+<script type="module">
+import { replayTutorial } from "./storno-tutorial.js";
 (function () {
   "use strict";
+  var tutorialMode = new URLSearchParams(location.search).get("mode") === "onboarding";
+  var tutorialInstance = new URLSearchParams(location.search).get("instance");
+  function tutorialSend(type, data) {
+    if (tutorialMode && window.parent !== window) window.parent.postMessage(Object.assign({ type: "storno:" + type, instance: tutorialInstance }, data || {}), location.origin);
+  }
 
   /* ---------- Werte (stilisierte Linien-Icons, kein Emoji) ---------- */
   var IC = {
@@ -1110,7 +1120,7 @@
 
   /* ---------- Storage ---------- */
   function lsGet(k) { try { return localStorage.getItem("storno." + k); } catch (e) { return null; } }
-  function lsSet(k, v) { try { localStorage.setItem("storno." + k, v); } catch (e) {} }
+  function lsSet(k, v) { if (tutorialMode) return; try { localStorage.setItem("storno." + k, v); } catch (e) {} }
 
   /* ---------- Audio (synthetisch, keine Assets) ---------- */
   var AC = null;
@@ -1497,6 +1507,7 @@
   /* ---------- Choice commit ---------- */
   function commit(side) {
     if (busy || !cardEl) return;
+    if (tutorialMode) { busy = true; tutorialSend("choice", { index: idx, side: side }); return; }
     busy = true;
     var card = deck[idx];
     var choice = card[side];
@@ -1870,6 +1881,48 @@
     if (e.key === "ArrowLeft") commit("L");
     if (e.key === "ArrowRight") commit("R");
   });
+  if (tutorialMode) {
+    document.documentElement.classList.add("tutorial");
+    document.querySelector(".heimweg").style.display = "none";
+    document.querySelector(".kal").style.display = "none";
+    document.querySelector(".intro-rules").textContent = "Deine Einstiegsrunde wird geladen …";
+    document.querySelector(".sig").hidden = true;
+    $("startBtn").hidden = true;
+    document.querySelector(".intro-foot").hidden = true;
+    var tutorialInitialized = false;
+    var tutorialTimer;
+    function restoreTutorial(choices, feedback) {
+      clearTimeout(tutorialTimer);
+      var run = replayTutorial(CARDS, choices);
+      deck = run.deck; bars = run.bars; idx = run.index;
+      days = [1, 2, 3, 4, 5]; day = days[Math.min(idx, 4)];
+      deadKey = null; vermerkt = {}; rallyShown = true;
+      if (cardEl) { cardEl.remove(); cardEl = null; }
+      renderBars(); show("game"); busy = true;
+      function next() {
+        if (run.done) { tutorialSend("complete"); return; }
+        busy = false; dealCard();
+      }
+      if (feedback && choices.length) {
+        queueToast(deck[choices.length - 1][choices[choices.length - 1]].out, "");
+        tutorialTimer = setTimeout(next, 1800);
+      } else next();
+    }
+    window.addEventListener("message", function (event) {
+      if (event.origin !== location.origin || event.source !== window.parent || !event.data || event.data.instance !== tutorialInstance) return;
+      var msg = event.data;
+      try {
+        if (msg.type === "storno:init" && !tutorialInitialized) {
+          tutorialInitialized = true;
+          nameInput.value = typeof msg.name === "string" ? msg.name : "";
+          restoreTutorial(msg.choices, false);
+        }
+        if (msg.type === "storno:saved" && tutorialInitialized) restoreTutorial(msg.choices, true);
+        if (msg.type === "storno:retry" && tutorialInitialized) busy = false;
+      } catch (e) { tutorialSend("error"); }
+    });
+    tutorialSend("ready");
+  }
 })();
 </script>
 </body>

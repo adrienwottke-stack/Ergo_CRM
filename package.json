@@ -7,7 +7,14 @@
     "build": "prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "build:check": "next build",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node --import ./scripts/alias-hook.mjs --test scripts/arbeitslagen.test.mjs scripts/vereinbarungen-test.mjs scripts/vereinbarungen-service-test.mjs scripts/team-auswertung-probe.mjs scripts/team-auswertung-db.test.mjs scripts/contact-result-review.test.mjs lib/ziele-modell.test.mjs lib/ziele-service.test.mjs scripts/einheiten-meldungen.test.mjs scripts/fuehrung-scope-db.test.mjs scripts/start-state.test.mjs scripts/start-service.test.mjs scripts/storno-tutorial.test.mjs",
+    "test:browser": "node --import ./scripts/alias-hook.mjs scripts/arbeitslagen-browser.mjs",
+    "test:start": "node --import ./scripts/alias-hook.mjs --test scripts/start-state.test.mjs scripts/start-service.test.mjs scripts/storno-tutorial.test.mjs",
+    "test:start:browser": "node --import ./scripts/alias-hook.mjs scripts/start-browser.test.mjs",
+    "build:start:check": "node --import ./scripts/alias-hook.mjs scripts/start-build-check.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
@@ -22,6 +29,8 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.4.3",
+    "@electric-sql/pglite-socket": "^0.1.3",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -30,6 +39,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "15.5.23",
+    "playwright": "^1.62.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

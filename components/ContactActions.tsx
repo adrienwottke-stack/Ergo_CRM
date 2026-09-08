@@ -5,7 +5,6 @@ import ContactActionDialog, {
   type ActionMode,
   type ContactLite,
 } from "@/components/ContactActionDialog";
-import { frageNachEinheiten } from "@/components/EinheitenNachAbschluss";
 import { reopenContact, snoozeContactStep } from "@/app/(app)/pipeline/actions";
 import { CheckIcon, PhoneIcon } from "@/components/icons";
 
@@ -102,9 +101,6 @@ export default function ContactActions({
         onClose={() => setOpen(false)}
         // Der Abschluss ist gespeichert, bevor gefragt wird
         // (docs/findbarkeit-plan.md, Abschnitt 4).
-        onSuccess={({ stage }) => {
-          if (stage === "ABSCHLUSS") frageNachEinheiten(contact.name);
-        }}
       />
     </>
   );

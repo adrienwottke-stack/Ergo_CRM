@@ -1,3 +1,7 @@
+import { redirect } from "next/navigation";
+import { ensureStart, skipStorno } from "@/lib/start/service";
+import { startOptions } from "@/lib/start/settings";
+import { startRoute } from "@/lib/start/model";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { FALLBACK_ABSENDER } from "@/lib/willkommen";
@@ -82,8 +86,19 @@ export default async function WillkommenPage() {
   // verstehen, was sie sehen, und die ersten Einladungen verschicken.
   const leaderFlow = gefuehrte > 0 || user.role === "ADMIN";
 
+  const options = await startOptions();
+  let progress = !leaderFlow && (options.guidance || options.game) ? await ensureStart(prisma, user.id) : null;
+  if (progress?.phase === "INTRO" && progress.introAct === "storno" && !options.game) progress = await skipStorno(prisma, user.id);
+  if (options.guidance && progress && progress.phase !== "INTRO" && progress.phase !== "DONE" && !progress.paused) redirect(startRoute(progress));
+
   return (
     <Willkommen
+      userId={user.id}
+      progress={progress?.phase === "INTRO" ? progress : null}
+      gameEnabled={options.game}
+      guidanceEnabled={options.guidance}
+      initialLetter={user.whyLetter ?? ""}
+      initialGoal={user.pledgeTarget}
       vorname={user.name.split(" ")[0] ?? user.name}
       einlader={einlader}
       greeting={herkunft?.greeting ?? null}

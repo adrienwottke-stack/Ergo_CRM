@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { addName } from "@/app/(app)/namen/actions";
-import { SPRINT_SEKUNDEN, SPRINT_VERGLEICH, sprintIntro } from "@/lib/willkommen";
+import { SPRINT_SEKUNDEN, sprintIntro } from "@/lib/willkommen";
+import { sprintBeginnen, startZahlen } from "@/app/startActions";
 import type { ListKind } from "@/lib/generated/prisma/enums";
 
 // Der 60-Sekunden-Sprint: aus der laestigsten Pflicht ("trag mal Namen ein")
@@ -36,258 +37,133 @@ function erkennungAnlegen(): Erkennung | null {
   return Klasse ? new Klasse() : null;
 }
 
-export default function NamenSprint({
-  track,
-  onDone,
-}: {
-  track: ListKind;
-  /** Bekommt die Anzahl der im Sprint angelegten Namen. */
-  onDone: (anzahl: number) => void;
+type PendingName = { key: string; name: string };
+
+export default function NamenSprint({ track, userId, demo, persistent, initialEndAt, onPendingChange, onDone }: {
+  track: ListKind; userId: string; demo: boolean; persistent: boolean; initialEndAt: string | null; onPendingChange:(pending:boolean)=>void; onDone: (count:number) => void;
 }) {
-  const [phase, setPhase] = useState<SprintPhase>("intro");
-  const [rest, setRest] = useState(SPRINT_SEKUNDEN);
-  const [anzahl, setAnzahl] = useState(0);
-  const [zuletzt, setZuletzt] = useState<string[]>([]);
-  const [hoert, setHoert] = useState(false);
-  const [, startTransition] = useTransition();
-  const eingabeRef = useRef<HTMLInputElement>(null);
-  const erkennungRef = useRef<Erkennung | null>(null);
-  const [mikrofonDa, setMikrofonDa] = useState(false);
+  const [phase,setPhase] = useState<SprintPhase>(initialEndAt ? "lauf" : "intro");
+  const [endAt,setEndAt] = useState(initialEndAt ? Date.parse(initialEndAt) : null);
+  const [rest,setRest] = useState(SPRINT_SEKUNDEN);
+  const [count,setCount] = useState(0);
+  const [waiting,setWaiting] = useState(0);
+  const [error,setError] = useState<string | null>(null);
+  const [saving,setSaving] = useState(false);
+  const [draft,setDraft] = useState("");
+  const [recent,setRecent] = useState<string[]>([]);
+  const [listening,setListening] = useState(false);
+  const [microphone,setMicrophone] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const queue = useRef<PendingName[]>([]);
+  const text = useRef("");
+  const lock = useRef(false);
+  const recognition = useRef<Erkennung | null>(null);
+  const demoNames = useRef(new Set<string>());
+  const storageKey = `ergo.start.sprint.${userId}.${track}${demo ? ".demo" : ""}`;
+  useEffect(() => { onPendingChange(saving || waiting > 0 || !!draft.trim()); },[saving,waiting,draft,onPendingChange]);
+  useEffect(() => () => onPendingChange(false),[onPendingChange]);
 
-  useEffect(() => {
-    setMikrofonDa(erkennungAnlegen() !== null);
-  }, []);
+  function persist() {
+    setWaiting(queue.current.length);
+    if (!demo) try { localStorage.setItem(storageKey, JSON.stringify({ queue:queue.current, draft:text.current })); } catch { /* optional drafts */ }
+  }
+  function change(value:string) { text.current=value; setDraft(value); persist(); }
 
-  // Der Countdown.
-  useEffect(() => {
-    if (phase !== "lauf") return;
-    const timer = setInterval(() => {
-      setRest((wert) => {
-        if (wert <= 1) {
-          clearInterval(timer);
-          setPhase("ergebnis");
-          erkennungRef.current?.stop();
-          return 0;
-        }
-        return wert - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [phase]);
-
-  const anlegen = (roh: string) => {
-    const name = roh.trim().slice(0, 60);
-    if (name.length < 2) return;
-    if (navigator.vibrate) navigator.vibrate(12);
-    setAnzahl((wert) => wert + 1);
-    setZuletzt((liste) => [name, ...liste].slice(0, 3));
-    const data = new FormData();
-    data.set("name", name);
-    data.set("listKind", track);
-    // Fire-and-forget: der Sprint wartet auf niemanden. Dubletten faengt die
-    // Action selbst ("already" zaehlt dann eben nicht doppelt in der Liste).
-    startTransition(async () => {
-      try {
-        await addName(data);
-      } catch {
-        // Ein verlorener Name ist aergerlich, ein eingefrorener Sprint schlimmer.
-      }
-    });
-  };
-
-  const eintragen = () => {
-    const wert = eingabeRef.current?.value ?? "";
-    if (eingabeRef.current) eingabeRef.current.value = "";
-    // Auch getippte Kommas trennen - "Max, Lisa und Jonas" sind drei Namen.
-    for (const teil of wert.split(/[\n,;]+| und /i)) anlegen(teil);
-    eingabeRef.current?.focus();
-  };
-
-  const einfuegen = (event: React.ClipboardEvent<HTMLInputElement>) => {
-    const text = event.clipboardData.getData("text");
-    if (!/[\n,;]/.test(text)) return; // einzelner Name: normal einfuegen lassen
-    event.preventDefault();
-    for (const teil of text.split(/[\n,;]+/)) anlegen(teil);
-  };
-
-  const mikrofon = () => {
-    if (hoert) {
-      erkennungRef.current?.stop();
-      return;
-    }
-    const erkennung = erkennungAnlegen();
-    if (!erkennung) return;
-    erkennungRef.current = erkennung;
-    erkennung.lang = "de-DE";
-    erkennung.continuous = true;
-    erkennung.interimResults = false;
-    erkennung.onresult = (event) => {
-      const letzte = event.results[event.results.length - 1];
-      const transcript = letzte?.[0]?.transcript ?? "";
-      for (const teil of transcript.split(/[\n,;]+| und /i)) anlegen(teil);
-    };
-    erkennung.onend = () => setHoert(false);
+  async function flush() {
+    if (lock.current) return;
+    lock.current=true; setSaving(true); setError(null);
     try {
-      erkennung.start();
-      setHoert(true);
-    } catch {
-      setHoert(false);
+      while (queue.current.length) {
+        const item=queue.current[0];
+        if (demo) { demoNames.current.add(item.name.toLocaleLowerCase("de")); setCount(demoNames.current.size); }
+        else {
+          const data=new FormData();
+          data.set("name",item.name); data.set("listKind",track); data.set("operationKey",item.key); data.set("scene","sprint");
+          await addName(data);
+          // Read confirmed totals before removing the retry key. Lost replies remain retryable.
+          setCount((await startZahlen(track)).sprint);
+        }
+        queue.current.shift(); persist(); setRecent(list => [item.name,...list].slice(0,3));
+      }
+    } catch(e) { setError(e instanceof Error ? e.message : "Speichern hat nicht geklappt. Deine Eingaben warten hier auf einen neuen Versuch."); }
+    finally { lock.current=false; setSaving(false); }
+  }
+  function enqueue(value:string) {
+    for (const part of value.split(/[\n,;]+| und /i)) {
+      const name=part.trim();
+      if (name) queue.current.push({key:crypto.randomUUID(),name});
     }
-  };
-
-  if (phase === "intro") {
-    return (
-      <div className="flex h-full flex-col justify-center gap-6">
-        <div className="space-y-2">
-          {sprintIntro.map((zeile, index) => (
-            <p
-              key={index}
-              className={
-                index === 0
-                  ? "text-3xl font-bold text-white"
-                  : "text-base leading-relaxed text-slate-300"
-              }
-            >
-              {zeile}
-            </p>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setPhase("lauf");
-            setTimeout(() => eingabeRef.current?.focus(), 50);
-          }}
-          className="min-h-14 w-full rounded-xl bg-gold-400 text-lg font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
-        >
-          Start
-        </button>
-        <button
-          type="button"
-          onClick={() => onDone(0)}
-          className="block w-full text-center text-sm text-slate-400 hover:text-white"
-        >
-          Mach ich später
-        </button>
-      </div>
-    );
+    persist(); void flush();
   }
+  function submit() { const value=text.current; change(""); enqueue(value); input.current?.focus(); }
+  function finish() { recognition.current?.stop(); submit(); setPhase("ergebnis"); }
 
-  if (phase === "ergebnis") {
-    const stark = anzahl > SPRINT_VERGLEICH;
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
-        <p className="text-6xl font-bold tabular-nums text-gold-400">{anzahl}</p>
-        <div>
-          <p className="text-xl font-semibold text-white">
-            {anzahl === 1 ? "Name" : "Namen"} in {SPRINT_SEKUNDEN} Sekunden.
-          </p>
-          <p className="mt-1 text-sm text-slate-300">
-            {anzahl === 0
-              ? "Kein Problem — die Liste wartet in der App auf dich."
-              : stark
-                ? `Die meisten schaffen ${SPRINT_VERGLEICH}. Du nicht.`
-                : `Die meisten schaffen ${SPRINT_VERGLEICH} — und jeder einzelne zählt schon für den Wettbewerb.`}
-          </p>
-        </div>
-        {anzahl > 0 && (
-          <p className="text-sm text-slate-300">
-            Die stehen ab jetzt in deiner Liste — mit deinen Punkten.
-          </p>
-        )}
-        <button
-          type="button"
-          onClick={() => onDone(anzahl)}
-          className="min-h-12 w-full rounded-xl bg-gold-400 text-15 font-bold text-navy-950 transition hover:bg-gold-100 active:scale-[0.98]"
-        >
-          Weiter
-        </button>
-      </div>
-    );
+  useEffect(() => {
+    setMicrophone(erkennungAnlegen() !== null);
+    if (!demo) {
+      try {
+        const saved=JSON.parse(localStorage.getItem(storageKey) ?? "null");
+        if (saved) {
+          queue.current=Array.isArray(saved.queue) ? saved.queue.filter((v:PendingName) => typeof v?.name === "string" && typeof v?.key === "string") : [];
+          text.current=typeof saved.draft === "string" ? saved.draft : ""; setDraft(text.current); setWaiting(queue.current.length);
+        }
+      } catch { /* optional drafts */ }
+      void startZahlen(track).then(result => setCount(result.sprint)).catch(() => setError("Der gespeicherte Stand konnte nicht geladen werden. Bitte erneut versuchen."));
+      if (queue.current.length) void flush();
+    }
+    return () => { recognition.current?.stop(); };
+    // The mounted sprint owns its queue for one user/list; server refreshes must not reset it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (phase !== "lauf" || !endAt) return;
+    function tick() {
+      const remaining=Math.max(0,Math.ceil((endAt!-Date.now())/1000)); setRest(remaining);
+      if (!remaining) finish();
+    }
+    tick(); const timer=setInterval(tick,250); return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[phase,endAt]);
+
+  async function begin() {
+    setSaving(true); setError(null);
+    try {
+      const end=!demo && persistent ? (await sprintBeginnen()).sprintEndAt?.getTime() : Date.now()+60_000;
+      if (!end) throw new Error("Bitte lade deinen Start neu.");
+      setEndAt(end); setPhase("lauf"); requestAnimationFrame(() => input.current?.focus());
+    } catch(e) { setError(e instanceof Error ? e.message : "Der Sprint konnte nicht gestartet werden."); }
+    finally { setSaving(false); }
   }
-
-  return (
-    <div className="flex h-full flex-col justify-center gap-6">
-      <div className="flex items-center justify-between">
-        <p
-          className={`text-5xl font-bold tabular-nums ${rest <= 10 ? "text-red-400" : "text-white"}`}
-        >
-          {rest}
-        </p>
-        <div className="text-right">
-          <p className="text-3xl font-bold tabular-nums text-gold-400">{anzahl}</p>
-          <p className="text-xs text-slate-400">{anzahl === 1 ? "Name" : "Namen"}</p>
-        </div>
-      </div>
-
-      <div className="flex gap-2">
-        <input
-          ref={eingabeRef}
-          type="text"
-          inputMode="text"
-          autoComplete="off"
-          autoCapitalize="words"
-          enterKeyHint="next"
-          placeholder="Name, Enter, nächster"
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              eintragen();
-            }
-          }}
-          onPaste={einfuegen}
-          className="min-h-14 w-full flex-1 rounded-xl border border-white/25 bg-white/5 px-4 text-lg text-white placeholder:text-slate-500 focus:border-gold-400 focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={eintragen}
-          aria-label="Name eintragen"
-          className="min-h-14 w-14 shrink-0 rounded-xl bg-gold-400 text-2xl font-bold text-navy-950 active:scale-[0.95]"
-        >
-          +
-        </button>
-        {mikrofonDa && (
-          <button
-            type="button"
-            onClick={mikrofon}
-            aria-label={hoert ? "Aufnahme stoppen" : "Namen einsprechen"}
-            className={`min-h-14 w-14 shrink-0 rounded-xl text-xl transition active:scale-[0.95] ${
-              hoert ? "animate-pulse bg-red-500 text-white" : "bg-white/10 text-white"
-            }`}
-          >
-            🎤
-          </button>
-        )}
-      </div>
-
-      <div className="min-h-18">
-        {anzahl >= 3 && rest > 15 && (
-          <p className="text-center text-sm font-medium text-slate-300">
-            Weiter. Nicht nachdenken.
-          </p>
-        )}
-        <ul className="mt-2 space-y-1 text-center">
-          {zuletzt.map((name, index) => (
-            <li
-              key={`${name}-${index}`}
-              className={`animate-tick text-sm ${index === 0 ? "text-white" : "text-slate-500"}`}
-            >
-              {name}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          erkennungRef.current?.stop();
-          setPhase("ergebnis");
-        }}
-        className="block w-full text-center text-sm text-slate-400 hover:text-white"
-      >
-        Mir fällt keiner mehr ein
-      </button>
-    </div>
-  );
+  function toggleMicrophone() {
+    if (listening) { recognition.current?.stop(); return; }
+    const rec=erkennungAnlegen(); if (!rec) return;
+    recognition.current=rec; rec.lang="de-DE"; rec.continuous=true; rec.interimResults=false;
+    rec.onresult=event => enqueue(event.results[event.results.length-1]?.[0]?.transcript ?? "");
+    rec.onend=() => setListening(false);
+    try { rec.start(); setListening(true); } catch { setError("Das Mikrofon ist nicht verfügbar. Du kannst Namen eintippen."); }
+  }
+  const primary="min-h-14 w-full rounded-xl bg-gold-400 px-4 text-lg font-semibold text-navy-950 disabled:opacity-40";
+  return <div className="flex h-full flex-col justify-center gap-5 overflow-y-auto py-4 text-white">
+    {phase === "intro" ? <>
+      {sprintIntro.map((line,i) => <p key={line} className={i ? "text-slate-300" : "text-3xl font-bold"}>{line}</p>)}
+      <button disabled={saving} onClick={begin} className={primary}>Start</button>
+      <button disabled={saving || waiting > 0} onClick={() => onDone(count)} className="min-h-11 text-sm text-slate-300">Mach ich später</button>
+    </> : phase === "lauf" ? <>
+      <div className="flex items-end justify-between"><p className={`text-5xl font-bold ${rest <= 10 ? "text-red-300" : ""}`}>{rest}</p><p>{count} Namen gespeichert</p></div>
+      <form className="flex gap-2" onSubmit={e => { e.preventDefault(); submit(); }}>
+        <label className="min-w-0 flex-1"><span className="sr-only">Name</span><input ref={input} value={draft} onChange={e => change(e.target.value)} onPaste={e => { const v=e.clipboardData.getData("text"); if (/[\n,;]/.test(v)) { e.preventDefault(); enqueue(v); } }} autoComplete="off" autoCapitalize="words" enterKeyHint="next" placeholder="Name, Enter, nächster" className="min-h-14 w-full rounded-xl border border-white/25 bg-white/5 px-3 text-lg" /></label>
+        <button type="submit" aria-label="Name eintragen" className="min-h-14 min-w-14 rounded-xl bg-gold-400 text-2xl text-navy-950">+</button>
+        {microphone && <button type="button" onClick={toggleMicrophone} aria-label={listening ? "Aufnahme stoppen" : "Namen einsprechen"} className={`min-h-14 min-w-11 rounded-xl ${listening ? "bg-red-600" : "bg-white/10"}`}>🎤</button>}
+      </form>
+      <ul className="space-y-2 text-center text-slate-300">{recent.map((name,i) => <li key={i}>{name}</li>)}</ul>
+      <button onClick={finish} className="min-h-11 text-sm text-slate-300">Mir fällt keiner mehr ein</button>
+    </> : <>
+      <p className="text-6xl font-bold text-gold-400">{count}</p>
+      <h2 className="text-2xl font-semibold">{count === 1 ? "Name gespeichert." : "Namen gespeichert."}</h2>
+      <p className="text-slate-300">{demo ? "Das war eine Übungsrunde." : count ? "Diese Namen stehen auf deiner Liste. Gleich sammeln wir mit Gedächtnisstützen weiter." : "Kein Druck. Gleich helfen dir Gedächtnisstützen beim Sammeln."}</p>
+      <button disabled={saving || waiting > 0} onClick={() => onDone(count)} className={primary}>Weiter</button>
+    </>}
+    {waiting > 0 && <p role="status" className="text-sm text-slate-300">{waiting} {waiting === 1 ? "Eingabe wartet" : "Eingaben warten"} noch auf Bestätigung.</p>}
+    {error && <div role="alert" className="text-sm text-red-300">{error}<button disabled={saving} onClick={() => void flush()} className="ml-2 min-h-11 underline">Speichern erneut versuchen</button>{waiting > 0 && <button disabled={saving} onClick={() => { queue.current=[];persist();setError(null); }} className="min-h-11 underline">Ausstehende Eingaben verwerfen</button>}</div>}
+  </div>;
 }

@@ -80,7 +80,7 @@ export default async function NamenPage({
   return (
     <div className={`${column} space-y-6`}>
       <div>
-        <h1 className={pageTitle}>Namensliste</h1>
+        <h1 className={pageTitle}>Kontakte</h1>
         <p className="mt-1 text-sm text-slate-500">{listKindHints[kind]}</p>
       </div>
 

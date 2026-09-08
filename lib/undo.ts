@@ -11,6 +11,7 @@
 import { prisma } from "@/lib/prisma";
 import { berlinToday, dayToUtcDate } from "@/lib/dates";
 import { UNDO_WINDOW_SECONDS } from "@/lib/undo-window";
+import { Prisma } from "@/lib/generated/prisma/client";
 
 export { UNDO_WINDOW_SECONDS };
 
@@ -185,6 +186,36 @@ export async function undoAusfuehren(userId: string, entryId?: string) {
   const patch = entry.patch as unknown as UndoPatch;
 
   await prisma.$transaction(async (tx) => {
+    // Das Abschlussfenster kann nach der Kontaktaktion bereits Einheiten
+    // zugeordnet haben. Diese Verbindung muss vor dem Löschen der StageEvents
+    // gelesen werden: deren Cascade entfernt die Erinnerung, aber nicht die
+    // eigentliche Buchung. Nur explizit an DIESE neuen Abschlüsse gebundene
+    // Buchungen gehören zum Undo; freie Einträge und andere Abschlüsse bleiben.
+    if (patch.newStageEventIds?.length) {
+      // Auch noch ungebuchte Erinnerungen sperren. Sonst könnte zwischen dem
+      // Lesen und der Cascade eine gleichzeitig abgeschickte Einheit ankommen
+      // und ohne ihre Zuordnung übrig bleiben.
+      await tx.$queryRaw(Prisma.sql`
+        SELECT "id" FROM "EinheitenErinnerung"
+        WHERE "userId" = ${userId} AND "contactId" = ${patch.contactId}
+          AND "abschlussId" IN (${Prisma.join(patch.newStageEventIds)})
+        FOR UPDATE
+      `);
+      const zugeordnet = await tx.einheitenErinnerung.findMany({
+        where: {
+          userId,
+          contactId: patch.contactId,
+          abschlussId: { in: patch.newStageEventIds },
+          buchungId: { not: null },
+          abschluss: { toStage: "ABSCHLUSS", userId },
+        },
+        select: { buchungId: true },
+      });
+      const buchungIds = zugeordnet.flatMap((erinnerung) => erinnerung.buchungId ? [erinnerung.buchungId] : []);
+      if (buchungIds.length > 0) {
+        await tx.einheitenbuchung.deleteMany({ where: { userId, id: { in: buchungIds } } });
+      }
+    }
     if (patch.newActivityIds?.length) {
       await tx.activity.deleteMany({ where: { id: { in: patch.newActivityIds } } });
     }

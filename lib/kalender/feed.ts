@@ -5,6 +5,7 @@
 // als der, der funktioniert.
 
 import { prisma } from "@/lib/prisma";
+import { ladeVereinbarungsTermine } from "@/lib/vereinbarungen";
 import { addDays } from "@/lib/dates";
 import type { FeedEintrag } from "@/lib/ics";
 
@@ -61,7 +62,7 @@ export async function feedEintraege(
   const von = addDays(jetzt, -RUECKBLICK_TAGE);
   const bis = addDays(jetzt, VORLAUF_TAGE);
 
-  const [kontakte, eigene] = await Promise.all([
+  const [kontakte, eigene, betreuung] = await Promise.all([
     prisma.contact.findMany({
       where: {
         ownerId: userId,
@@ -75,6 +76,7 @@ export async function feedEintraege(
       where: { ownerId: userId, von: { lt: bis }, bis: { gt: von } },
       orderBy: { von: "asc" },
     }),
+    ladeVereinbarungsTermine(userId),
   ]);
 
   const eintraege: FeedEintrag[] = kontakte.map((kontakt) => ({
@@ -104,5 +106,9 @@ export async function feedEintraege(
     });
   }
 
+  for (const termin of betreuung) {
+    if (termin.von >= bis || termin.bis <= von) continue;
+    eintraege.push({ id: `betreuung-${termin.id}`, titel: "Betreuungsgespräch", ersatzTitel: "Betreuungsgespräch", von: termin.von, bis: termin.bis });
+  }
   return eintraege.sort((a, b) => a.von.getTime() - b.von.getTime());
 }

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { setRating } from "@/app/(app)/namen/actions";
 import { offeneNamenOhneNaehe } from "@/app/(willkommen)/willkommen/actions";
 import { ratingHints, ratingLabels } from "@/lib/namelist";
-import type { ContactRating } from "@/lib/generated/prisma/enums";
+import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
 
 // Blitz-Einstufung: die Namen aus dem Sprint fliegen einzeln durch, drei
 // grosse Knoepfe - A, B, C. Die Einstufung, die sonst nie passiert, ist in
@@ -17,14 +17,16 @@ const KNOEPFE: { rating: ContactRating; farbe: string }[] = [
   { rating: "C", farbe: "bg-slate-400 text-navy-950" },
 ];
 
-export default function Einstufung({ onDone }: { onDone: () => void }) {
+export default function Einstufung({ onDone, demo = false, track }: { onDone: () => void; demo?: boolean; track: ListKind | null }) {
   const [namen, setNamen] = useState<{ id: string; name: string }[] | null>(null);
   const [index, setIndex] = useState(0);
-  const [, startTransition] = useTransition();
+  const busy = useRef(false);
+  const [error,setError] = useState(false);
+  const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     let aktiv = true;
-    offeneNamenOhneNaehe()
+    (demo ? Promise.resolve([{id:"demo",name:"Beispiel: Lisa"}]) : offeneNamenOhneNaehe(track))
       .then((ergebnis) => {
         if (!aktiv) return;
         if (ergebnis.length === 0) onDone();
@@ -47,31 +49,25 @@ export default function Einstufung({ onDone }: { onDone: () => void }) {
 
   const aktuell = namen[index];
   if (!aktuell) {
-    onDone();
-    return null;
+    return <button onClick={onDone} className="min-h-12 text-white">Weiter</button>;
   }
 
   const einstufen = (rating: ContactRating | null) => {
-    if (navigator.vibrate) navigator.vibrate(10);
-    if (rating) {
-      const kontaktId = aktuell.id;
-      const data = new FormData();
-      data.set("contactId", kontaktId);
-      data.set("rating", rating);
-      startTransition(async () => {
-        try {
-          await setRating(data);
-        } catch {
-          // Nicht eingestuft ist kein Beinbruch - die Liste kann es spaeter.
+    if (busy.current) return;
+    busy.current = true; setError(false);
+    startTransition(async () => {
+      try {
+        if (rating && !demo) {
+          const data = new FormData(); data.set("contactId",aktuell.id); data.set("rating",rating); await setRating(data);
         }
-      });
-    }
-    if (index + 1 >= namen.length) onDone();
-    else setIndex(index + 1);
+        if (index+1 >= namen.length) onDone(); else setIndex(index+1);
+      } catch { setError(true); } finally { busy.current=false; }
+    });
   };
 
   return (
     <div className="flex h-full flex-col justify-center gap-8">
+      {error && <p role="alert" className="text-red-300">Noch nicht gespeichert. Bitte erneut versuchen.</p>}
       <div className="text-center">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
           Wie nah dran? · {index + 1} von {namen.length}
@@ -85,7 +81,8 @@ export default function Einstufung({ onDone }: { onDone: () => void }) {
         {KNOEPFE.map(({ rating, farbe }) => (
           <button
             key={rating}
-            type="button"
+            disabled={pending}
+          type="button"
             onClick={() => einstufen(rating)}
             className={`min-h-20 rounded-2xl ${farbe} px-2 transition active:scale-[0.95]`}
           >
@@ -102,6 +99,7 @@ export default function Einstufung({ onDone }: { onDone: () => void }) {
 
       <div className="space-y-2 text-center">
         <button
+          disabled={pending}
           type="button"
           onClick={() => einstufen(null)}
           className="text-sm text-slate-400 hover:text-white"
@@ -109,6 +107,7 @@ export default function Einstufung({ onDone }: { onDone: () => void }) {
           Weiß nicht — überspringen
         </button>
         <button
+          disabled={pending}
           type="button"
           onClick={onDone}
           className="block w-full text-sm text-slate-500 hover:text-white"

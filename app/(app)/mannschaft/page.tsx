@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import TeamNavigation from "./TeamNavigation";
+import VereinbarungenHeute from "@/components/vereinbarungen/VereinbarungenHeute";
 import {
   RUECKBLICK_TAGE,
   astSummen,
@@ -175,9 +178,10 @@ function kopfzeile(person: Mannschaftsperson): string {
 export default async function MannschaftPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ansicht?: string }>;
+  searchParams: Promise<{ ansicht?: string; bereich?: string }>;
 }) {
-  const { ansicht } = await searchParams;
+  const { ansicht, bereich } = await searchParams;
+  const begleiten = bereich !== "ueberblick" && ansicht !== "liste";
   // Das Bild ist die Vorgabe. Die Liste bleibt einen Tipp entfernt - sie
   // traegt die Signale und die Knoepfe, fuer die im Kasten kein Platz ist.
   const alsListe = ansicht === "liste";
@@ -191,6 +195,11 @@ export default async function MannschaftPage({
   // braucht genau diese Koepfe. Danach laufen die beiden uebrigen Abfragen
   // nebeneinander statt hintereinander.
   const lage = await mannschaftsLage(user);
+  const eigenePartner = lage.leute.filter((person) => person.istDirekt && !person.platzhalter && !person.ausgetreten);
+  const eigeneFuehrung = eigenePartner.length === 0 && user.leaderId ? await prisma.user.findFirst({
+    where: { id: user.leaderId, deactivatedAt: null, passwordHash: { not: null } },
+    select: { id: true, name: true, phone: true },
+  }) : null;
   const alle = [lage.ich, ...lage.baum];
   const [aeste, einheitenAn, einheiten] = await Promise.all([
     astVergleich(user.id),
@@ -205,8 +214,11 @@ export default async function MannschaftPage({
   // einer Stelle abschalten und an der anderen nicht.
   const zeigeEinheiten = einheitenAn.einheiten && traegtZahlen(einheiten);
 
-  const rot = lage.dringend.filter((person) => person.ampel === "rot");
-  const gelb = lage.dringend.filter((person) => person.ampel === "gelb");
+  // Direkte stehen einmal in der Partnerliste. Zusätzliche Hinweise betreffen
+  // ausschließlich weitere Ebenen, damit dieselbe Person nicht doppelt erscheint.
+  const rot = lage.dringend.filter((person) => person.ampel === "rot" && !person.istDirekt);
+  const gelb = lage.dringend.filter((person) => person.ampel === "gelb" && !person.istDirekt);
+  const ruhendTiefer = lage.ruhend.filter((person) => !person.istDirekt);
 
   const summen = astSummen(alle);
   const knoten: OrgaKnoten[] = alle.map((person) => {
@@ -284,20 +296,31 @@ export default async function MannschaftPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className={pageTitle}>Mannschaft</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {lage.fuehrtNiemanden
-            ? "Sobald jemand unter dir hängt, steht hier, wer dich braucht."
-            : rot.length > 0
-              ? `${rot.length === 1 ? "Einer braucht" : `${rot.length} brauchen`} dich heute${gelb.length > 0 ? `, bei ${gelb.length} hakt es` : ""}.`
-              : gelb.length > 0
-                ? `Nichts Dringendes. Bei ${gelb.length} ${gelb.length === 1 ? "Person" : "Personen"} hakt es.`
-                : "Alles läuft. Nichts, wo du heute hin müsstest."}{" "}
-          <strong className="font-medium text-slate-600">Tipp auf einen Namen</strong> — bei
-          frisch Gestarteten liest du die ersten {NAMENSFENSTER_TAGE} Tage mit: Vornamen
-          der Kontakte und was passiert ist. Bei allen anderen stehen dort Zahlen.
-        </p>
+        <h1 className={pageTitle}>Team</h1>
+        <p className="mt-2 text-base text-slate-600">{begleiten ? "Deine Partner, eure Absprachen und der nächste gemeinsame Schritt." : "Wer zu deinem Team gehört und wie die einzelnen Bereiche zusammenarbeiten."}</p>
       </div>
+
+      <TeamNavigation aktiv={begleiten ? "begleiten" : "ueberblick"} />
+
+      {begleiten && <VereinbarungenHeute userId={user.id} />}
+
+      {eigenePartner.length === 0 && (
+        <section className="space-y-4 rounded-2xl border border-slate-200 bg-surface p-5">
+          <h2 className="text-2xl font-semibold text-slate-900">{eigeneFuehrung ? "Dein Führungskontakt" : "Gemeinsam starten"}</h2>
+          {eigeneFuehrung ? <>
+            <p className="text-xl font-medium text-slate-900">{eigeneFuehrung.name}</p>
+            <p className="text-base text-slate-600">Besprecht deinen nächsten Schritt oder vereinbart eine gemeinsame Vorbereitung.</p>
+            <div className="flex flex-wrap gap-3"><Link href={`/mannschaft/vereinbarungen?partner=${eigeneFuehrung.id}`} className="min-h-12 rounded-xl bg-akzent px-4 py-3 text-base font-semibold text-white">Unsere Absprachen</Link>{eigeneFuehrung.phone && <a href={`tel:${eigeneFuehrung.phone.replace(/[^+\d]/g, "")}`} className="min-h-12 rounded-xl border border-slate-300 px-4 py-3 text-base font-semibold text-slate-700">Anrufen</a>}<NachrichtSenden anId={eigeneFuehrung.id} name={eigeneFuehrung.name} variante="knopf" /></div>
+          </> : <p className="text-base text-slate-600">Sobald dein Führungskontakt hinterlegt ist, könnt ihr hier gemeinsame Schritte vereinbaren.</p>}
+          <Link href="/einladen" className="inline-flex min-h-12 items-center text-base font-semibold text-navy-800">Geschäftspartner einladen →</Link>
+        </section>
+      )}
+
+      {begleiten && eigenePartner.length > 0 && (
+        <section className="space-y-3"><div className="flex items-baseline justify-between gap-3"><h2 className="text-2xl font-semibold text-slate-900">Deine Partner</h2><Link href="/einladen" className="min-h-11 py-2 text-base font-medium text-navy-800">Einladen</Link></div>
+          <ul className="divide-y divide-slate-200">{eigenePartner.map((person) => <li key={person.id}><Link href={`/mannschaft/${person.id}`} className="flex min-h-24 items-center justify-between gap-4 py-5"><div className="min-w-0"><p className="text-xl font-semibold text-slate-900">{person.name}</p><p className="mt-1 text-base text-slate-600">{person.betreuung ? `Nachfassen am ${datumKurz.format(person.betreuung.faelligAm)}` : person.signale[0]?.titel ?? "Keine offenen Unterstützungshinweise"}</p><p className="mt-1 text-sm text-slate-600">{person.werte.letzteAktivitaet ? `Zuletzt eingetragen: ${datumKurz.format(person.werte.letzteAktivitaet)}` : "Noch keine Aktivität eingetragen"}</p></div><span aria-hidden className="text-2xl text-slate-500">›</span></Link></li>)}</ul>
+        </section>
+      )}
 
       {!lage.fuehrtNiemanden && lage.gesamtstruktur && (
         <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
@@ -306,7 +329,7 @@ export default async function MannschaftPage({
         </p>
       )}
 
-      {lage.fuehrtNiemanden && (
+      {!begleiten && lage.fuehrtNiemanden && (
         <div className={`${card} p-6`}>
           <p className="text-sm font-medium text-slate-900">Noch niemand in deiner Struktur</p>
           <p className="mt-1 text-sm text-slate-600">
@@ -332,7 +355,7 @@ export default async function MannschaftPage({
           schlechter aus als ein fleissiger Einzelkaempfer. Hier steht, was die
           Mannschaft zusammen geschafft hat - und wie sie gegen die Aeste
           daneben steht. */}
-      {!lage.fuehrtNiemanden && aeste?.meiner && (
+      {!begleiten && !lage.fuehrtNiemanden && aeste?.meiner && (
         <section className={`${card} p-5 sm:p-6`}>
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className={kicker}>Deine Struktur diese Woche</h2>
@@ -388,9 +411,9 @@ export default async function MannschaftPage({
           Ganz oben steht nicht die Struktur, sondern die Antwort: wen rufe ich
           heute an, und was sage ich ihm. Die Liste bleibt kurz, weil nur rot
           und gelb hier landen. */}
-      {rot.length > 0 && (
+      {begleiten && rot.length > 0 && (
         <section className="space-y-3">
-          <h2 className={kicker}>Heute dran</h2>
+          <h2 className={kicker}>Unterstützung in weiteren Ebenen</h2>
           <ul className="space-y-3">
             {rot.map((person) => {
               const oben = person.signale[0]!;
@@ -468,8 +491,8 @@ export default async function MannschaftPage({
                   <p className="mt-2.5 text-xs text-slate-500">
                     {[
                       `${person.werte.anrufeWoche} Anrufe diese Woche`,
-                      `${person.werte.inAkquise} offene Namen`,
-                      person.werte.ueberfaellig > 0 &&
+                      person.pipelineSichtbar && `${person.werte.inAkquise} offene Namen`,
+                      person.pipelineSichtbar && person.werte.ueberfaellig > 0 &&
                         `${person.werte.ueberfaellig} überfällig`,
                     ]
                       .filter(Boolean)
@@ -486,11 +509,11 @@ export default async function MannschaftPage({
           Nicht weg, nur leise. Wer sich gekuemmert hat, will sehen, dass es
           steht - aber nicht jeden Morgen daran erinnert werden, als haette er
           nichts getan. */}
-      {lage.ruhend.length > 0 && (
+      {begleiten && ruhendTiefer.length > 0 && (
         <section className={`${card} p-4 sm:p-5`}>
           <h2 className={kicker}>Du kümmerst dich</h2>
           <ul className="mt-2.5 divide-y divide-slate-100">
-            {lage.ruhend.map((person) => (
+            {ruhendTiefer.map((person) => (
               <li key={person.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-2">
                 <Ampel ampel={person.ampel} variante="punkt" groesse="klein" />
                 <NameLink person={person} klasse="text-sm font-medium text-slate-900" />
@@ -515,9 +538,9 @@ export default async function MannschaftPage({
       {/* Gelb ist kein Notfall, sondern ein Gespraechsthema. Stuende es oben
           zwischen den roten Karten, waere die Liste nach zwei Wochen wieder
           so lang, dass niemand mehr hinsieht - eine Zeile je Person reicht. */}
-      {gelb.length > 0 && (
+      {begleiten && gelb.length > 0 && (
         <section className={`${card} p-4 sm:p-5`}>
-          <h2 className={kicker}>Hakt, brennt aber nicht</h2>
+          <h2 className={kicker}>Beim nächsten Gespräch</h2>
           <ul className="mt-2.5 divide-y divide-slate-100">
             {gelb.map((person) => (
               <li
@@ -540,7 +563,7 @@ export default async function MannschaftPage({
           Baumreihenfolge, Direkte prominent, Tiefe eingerueckt und mit dem
           Namen der Fuehrungskraft davor. Wer hier steht, ist bereits oben
           abgehandelt - das hier ist zum Nachsehen, nicht zum Entscheiden. */}
-      {!lage.fuehrtNiemanden && (
+      {!begleiten && !lage.fuehrtNiemanden && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h2 className={kicker}>
@@ -550,11 +573,11 @@ export default async function MannschaftPage({
               {/* Zwei Sichten auf dieselbe Struktur. Das Bild beantwortet
                   "wer haengt unter wem", die Liste "was ist mit wem los" -
                   und traegt die Knoepfe, fuer die im Kasten kein Platz ist. */}
-              <Link href="/mannschaft" scroll={false} className={filterPill(!alsListe)}>
+              <Link href="/mannschaft?bereich=ueberblick" scroll={false} className={filterPill(!alsListe)}>
                 Organigramm
               </Link>
               <Link
-                href="/mannschaft?ansicht=liste"
+                href="/mannschaft?bereich=ueberblick&ansicht=liste"
                 scroll={false}
                 className={filterPill(alsListe)}
               >
@@ -602,9 +625,9 @@ export default async function MannschaftPage({
                         : !person.angekommen
                           ? "noch nicht gestartet"
                           : person.tageDabei !== null && person.tageDabei <= RUECKBLICK_TAGE
-                            ? "seit dem Start nichts"
-                            : `seit über ${RUECKBLICK_TAGE} Tagen nichts`}
-                      {!person.platzhalter && (
+                            ? "noch keine Aktivität eingetragen"
+                            : `seit über ${RUECKBLICK_TAGE} Tagen keine Aktivität eingetragen`}
+                      {!person.platzhalter && (person.pipelineSichtbar || person.einblick.offen) && (
                         <>
                           {" · "}
                           {w.naechsterSchritt
@@ -710,7 +733,7 @@ export default async function MannschaftPage({
           "Eigen" ist, was jemand selbst gemeldet hat, "Team" alles unter ihm.
           Bewusst getrennt von den Taetigkeits-Kennzahlen oben: das sind zwei
           Waehrungen, und Einheiten zaehlen in keiner Rangliste mit. */}
-      {zeigeEinheiten && (
+      {!begleiten && zeigeEinheiten && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className={kicker}>Einheiten in deiner Struktur</h2>
@@ -786,7 +809,7 @@ export default async function MannschaftPage({
           Stand vorher als erste Karte zwischen den Leuten. Eine Fuehrungskraft
           fuehrt sich nicht selbst: die eigene Zeile gehoert getrennt, sonst
           vermischen sich zwei Arten von Arbeit auf einem Bildschirm. */}
-      <section className={`${card} p-4 sm:p-5`}>
+      {!begleiten && <section className={`${card} p-4 sm:p-5`}>
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h2 className={kicker}>Dein eigenes Geschäft</h2>
           <Link
@@ -811,7 +834,7 @@ export default async function MannschaftPage({
             ))}
           </ul>
         )}
-      </section>
+      </section>}
 
       <p className={kicker}>
         Woche ab Montag, Monat ab dem Ersten, beides nach Berliner Kalender. Signale

@@ -10,7 +10,9 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { ladeHauptziel } from "@/lib/ziele";
 import { berlinToday, dayToUtcDate, isValidDay, shiftDay } from "@/lib/dates";
+import { bucheZugeordneteEinheiten, EinheitenBereitsErfasst } from "@/lib/einheiten-erinnerung";
 import {
   eigenerMonatsstand,
   formatEinheiten,
@@ -34,6 +36,9 @@ function feld(formData: FormData, name: string): string {
 
 function neuRechnen() {
   revalidatePath("/einheiten");
+  revalidatePath("/fortschritt");
+  revalidatePath("/fortschritt/einheiten-offen");
+  revalidatePath("/heute");
 }
 
 /**
@@ -48,7 +53,8 @@ async function buchen(
   userId: string,
   mengeRoh: string,
   tagRoh: string,
-  notizRoh: string
+  notizRoh: string,
+  erinnerungId?: string,
 ): Promise<boolean> {
   const hundertstel = parseEinheiten(mengeRoh);
   // 0 ist keine Buchung, sondern ein Fehlgriff im Formular.
@@ -62,14 +68,14 @@ async function buchen(
       ? heute
       : gewuenscht;
 
-  await prisma.einheitenbuchung.create({
-    data: {
-      userId,
-      hundertstel,
-      tag: dayToUtcDate(tag),
-      notiz: notizRoh.slice(0, 120) || null,
-    },
-  });
+  const daten = { userId, hundertstel, tag: dayToUtcDate(tag), notiz: notizRoh.slice(0, 120) || null };
+  if (erinnerungId) {
+    try {
+      await prisma.$transaction((tx) => bucheZugeordneteEinheiten(tx, { ...daten, erinnerungId }));
+    } catch (fehler) {
+      if (!(fehler instanceof EinheitenBereitsErfasst)) return false;
+    }
+  } else await prisma.einheitenbuchung.create({ data: daten });
 
   neuRechnen();
   return true;
@@ -82,7 +88,8 @@ export async function einheitenBuchen(formData: FormData) {
     user.id,
     feld(formData, "menge"),
     feld(formData, "tag"),
-    feld(formData, "notiz")
+    feld(formData, "notiz"),
+    feld(formData, "erinnerungId") || undefined,
   );
 }
 
@@ -101,16 +108,18 @@ export async function einheitenBuchen(formData: FormData) {
  */
 export async function einheitSchnellBuchen(
   mengeRoh: string,
-  notizRoh = ""
-): Promise<{ ok: true; monat: string } | { ok: false; fehler: string }> {
+  notizRoh = "",
+  erinnerungId?: string,
+): Promise<{ ok: true; monat: string; zielstand: string | null } | { ok: false; fehler: string }> {
   const user = await requireUser();
 
-  const gebucht = await buchen(user.id, mengeRoh, "", notizRoh);
+  const gebucht = await buchen(user.id, mengeRoh, "", notizRoh, erinnerungId);
   if (!gebucht) {
-    return { ok: false, fehler: "Das war keine Zahl. Zum Beispiel: 12,5" };
+    return { ok: false, fehler: erinnerungId ? "Bitte prüfe die Zahl und ob der Abschluss noch offen ist. Zum Beispiel: 12,5" : "Das war keine Zahl. Zum Beispiel: 12,5" };
   }
 
-  return { ok: true, monat: formatEinheiten(await eigenerMonatsstand(user.id)) };
+  const [monat, ziel] = await Promise.all([eigenerMonatsstand(user.id), ladeHauptziel(user.id)]);
+  return { ok: true, monat: formatEinheiten(monat), zielstand: ziel ? `${ziel.standText} ${ziel.kennzahlText}${ziel.geschafft ? " · Ziel erreicht" : ""}` : null };
 }
 
 /**

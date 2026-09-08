@@ -39,7 +39,7 @@ export default function ThemaSchalter() {
   // Beim Serverdurchlauf gibt es kein localStorage. Wir starten deshalb auf
   // "system" und holen die echte Einstellung im ersten Effekt nach - sonst
   // wuerde React ueber unterschiedliches Markup meckern.
-  const [thema, setThema] = useState<Thema>("system");
+  const [thema, setThema] = useState<Thema>("dunkel");
   const [bereit, setBereit] = useState(false);
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function ThemaSchalter() {
   function weiter() {
     const naechstes = THEMEN[(THEMEN.indexOf(thema) + 1) % THEMEN.length]!;
     setThema(naechstes);
-    localStorage.setItem(THEMA_SCHLUESSEL, naechstes);
+    try { localStorage.setItem(THEMA_SCHLUESSEL, naechstes); } catch { /* nur für diese Sitzung */ }
   }
 
   const Symbol =

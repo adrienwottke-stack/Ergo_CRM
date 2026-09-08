@@ -60,6 +60,13 @@ enum UserRole {
   MEMBER
 }
 
+enum Arbeitsfokus {
+  AUTO
+  EIGEN
+  AUFBAU
+  FUEHRUNG
+}
+
 // Was eine Fuehrungskraft sich vornimmt. Aus einem Signal entstanden, aber
 // NIE automatisch: dazwischen liegt immer ein Tipp (docs/struktur-plan.md,
 // Abschnitt 5, und audit-kernmodell.md, Abschnitt 9 - "automatisch erzeugte
@@ -109,7 +116,62 @@ enum ListKind {
   VERKAUF
 }
 
+// Fortsetzungsstand: fachliche Checkpoints, getrennt von onboardingSteps (Messung).
+model StartProgress {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version Int @default(1)
+  revision Int @default(0)
+  phase String @default("INTRO")
+  paused Boolean @default(false)
+  kind ListKind?
+  collectionId String?
+  introAct String @default("chat")
+  answers Json @default("{}")
+  stornoChoices String[] @default([])
+  stornoSkipped Boolean @default(false)
+  sprintEndAt DateTime?
+  phoneSkipped String[] @default([])
+  plannedAt DateTime?
+  milestones Json @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NameCollection {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind ListKind
+  scene String @default("familie")
+  revision Int @default(0)
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  operations NameOperation[]
+  @@index([userId, kind, completedAt])
+}
+
+// Ein Vorgangsschlüssel schützt auch bei verlorener HTTP-Antwort vor doppelten Aktivitäten.
+model NameOperation {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key String
+  fingerprint String
+  contactId String?
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  collectionId String?
+  collection NameCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  scene String?
+  kind ListKind
+  result String
+  createdAt DateTime @default(now())
+  @@unique([userId, key])
+  @@index([collectionId])
+}
+
 model Contact {
+  nameOperations NameOperation[]
   id     String  @id @default(cuid())
   name   String
   phone  String?
@@ -184,8 +246,9 @@ model Contact {
   referredBy   Contact?  @relation("Empfehlung", fields: [referredById], references: [id], onDelete: SetNull)
   referrals    Contact[] @relation("Empfehlung")
 
-  activities  Activity[]
-  stageEvents StageEvent[]
+  activities            Activity[]
+  stageEvents           StageEvent[]
+  einheitenErinnerungen EinheitenErinnerung[]
 
   @@index([ownerId, updatedAt])
   @@index([ownerId, nextStepAt])
@@ -197,21 +260,35 @@ model Contact {
 
 // Phasenhistorie: Grundlage fuer die Kennzahlen der Schleife.
 model StageEvent {
-  id        String   @id @default(cuid())
-  contactId String?
-  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  fromStage String?
-  toStage   String
-  at        DateTime @default(now())
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id                  String               @id @default(cuid())
+  contactId           String?
+  contact             Contact?             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  fromStage           String?
+  toStage             String
+  at                  DateTime             @default(now())
+  userId              String?
+  user                User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  einheitenErinnerung EinheitenErinnerung?
 
   @@index([contactId, at])
 }
 
 model User {
-  id   String @id @default(cuid())
-  name String
+  startProgress StartProgress?
+  nameCollections NameCollection[]
+  nameOperations NameOperation[]
+  id                           String                @id @default(cuid())
+  name                         String
+  arbeitsfokus                 Arbeitsfokus          @default(AUTO)
+  eigeneZiele                  Ziel[]                @relation("ZielInhaber")
+  erstellteZiele               Ziel[]                @relation("ZielErsteller")
+  zielBeteiligungen            ZielBeteiligung[]
+  hauptzielId                  String?
+  hauptziel                    Ziel?                 @relation("Hauptziel", fields: [hauptzielId], references: [id], onDelete: SetNull)
+  einheitenErinnerungen        EinheitenErinnerung[]
+  vereinbarungenInitiiert      PartnerVereinbarung[] @relation("VereinbarungInitiiert")
+  vereinbarungenEmpfangen      PartnerVereinbarung[] @relation("VereinbarungEmpfangen")
+  vereinbarungenVerantwortlich PartnerVereinbarung[] @relation("VereinbarungVerantwortlich")
 
   // --- Platzhalter (docs/struktur-plan.md, Abschnitt 2) ----------------------
   // Ein Konto OHNE Zugangsdaten ist ein Platzhalter: jemand, der in der
@@ -356,11 +433,11 @@ model User {
   fuehrungsAufgaben LeadershipTask[] @relation("Fuehrt")
   betrifftMich      LeadershipTask[] @relation("Betrifft")
 
-  nachrichtenGesendet  Nachricht[]    @relation("NachrichtVon")
-  nachrichtenErhalten  Nachricht[]    @relation("NachrichtAn")
-  invites              Invite[]       @relation("Einladender")
-  invite               Invite?        @relation("Eingeloest")
-  platzhalterEinladung Invite?        @relation("Platzhalter")
+  nachrichtenGesendet  Nachricht[] @relation("NachrichtVon")
+  nachrichtenErhalten  Nachricht[] @relation("NachrichtAn")
+  invites              Invite[]    @relation("Einladender")
+  invite               Invite?     @relation("Eingeloest")
+  platzhalterEinladung Invite?     @relation("Platzhalter")
 
   @@index([leaderId])
   @@index([path])
@@ -384,9 +461,10 @@ model User {
 // der DailyLog haengt - dort etwas anzubauen waere der kurze Weg, Einheiten
 // doch noch in die Punktewertung zu ziehen. Und die Karrierestufe sitzt am Konto.
 model Einheitenbuchung {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  erinnerung EinheitenErinnerung?
+  id         String               @id @default(cuid())
+  userId     String
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Negativ ist erlaubt und kein Fehler: ein Storno ist in diesem Beruf der
   // Normalfall, nicht die Ausnahme.
@@ -1068,4 +1146,126 @@ model RueckmeldungAudio {
   typ   String
   ms    Int
   bytes Int
+}
+
+enum ZielKennzahl {
+  CALL
+  APPOINTMENT_SET
+  APPOINTMENT_HELD
+  UNITS
+}
+
+enum ZielZeitraum {
+  WOCHE
+  MONAT
+  ALT_30_TAGE
+}
+
+enum ZielZusage {
+  OFFEN
+  BESTAETIGT
+  ABGELEHNT
+}
+
+model Ziel {
+  id                String            @id @default(cuid())
+  inhaberId         String
+  inhaber           User              @relation("ZielInhaber", fields: [inhaberId], references: [id], onDelete: Cascade)
+  erstelltVonId     String
+  erstelltVon       User              @relation("ZielErsteller", fields: [erstelltVonId], references: [id], onDelete: Cascade)
+  titel             String
+  wunsch            String?
+  kennzahl          ZielKennzahl
+  zeitraum          ZielZeitraum
+  start             DateTime
+  ende              DateTime
+  zielwert          Int
+  archiviertAt      DateTime?
+  altVersprechenKey String?           @unique
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  beteiligte        ZielBeteiligung[]
+  hauptzielFuer     User[]            @relation("Hauptziel")
+
+  @@index([inhaberId, start, ende])
+  @@index([erstelltVonId])
+}
+
+model ZielBeteiligung {
+  zielId       String
+  ziel         Ziel       @relation(fields: [zielId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zusage       ZielZusage @default(OFFEN)
+  bestaetigtAt DateTime?
+
+  @@id([zielId, userId])
+  @@index([userId, zusage])
+}
+
+model EinheitenErinnerung {
+  id          String            @id @default(cuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId   String
+  contact     Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  abschlussId String            @unique
+  abschluss   StageEvent        @relation(fields: [abschlussId], references: [id], onDelete: Cascade)
+  faelligAm   DateTime?
+  buchungId   String?           @unique
+  buchung     Einheitenbuchung? @relation(fields: [buchungId], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now())
+
+  @@index([userId, faelligAm])
+}
+
+enum VereinbarungArt {
+  AUFGABE
+  TERMIN
+}
+
+enum VereinbarungStatus {
+  VORGESCHLAGEN
+  BESTAETIGT
+  ERLEDIGT
+  ABGELEHNT
+  ABGESAGT
+}
+
+model PartnerVereinbarung {
+  id                 String                @id @default(cuid())
+  initiatorId        String
+  initiator          User                  @relation("VereinbarungInitiiert", fields: [initiatorId], references: [id], onDelete: Cascade)
+  empfaengerId       String
+  empfaenger         User                  @relation("VereinbarungEmpfangen", fields: [empfaengerId], references: [id], onDelete: Cascade)
+  verantwortlicherId String
+  verantwortlicher   User                  @relation("VereinbarungVerantwortlich", fields: [verantwortlicherId], references: [id], onDelete: Cascade)
+  titel              String
+  art                VereinbarungArt       @default(AUFGABE)
+  faelligAm          DateTime
+  endetAm            DateTime?
+  status             VereinbarungStatus    @default(VORGESCHLAGEN)
+  version            Int                   @default(1)
+  vorgeschlagenVonId String
+  bestaetigtVonId    String?
+  bestaetigtAm       DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  verlauf            VereinbarungVersion[]
+
+  @@index([initiatorId, status, faelligAm])
+  @@index([empfaengerId, status, faelligAm])
+}
+
+model VereinbarungVersion {
+  id             String              @id @default(cuid())
+  vereinbarungId String
+  vereinbarung   PartnerVereinbarung @relation(fields: [vereinbarungId], references: [id], onDelete: Cascade)
+  version        Int
+  akteurId       String
+  aktion         String
+  stand          Json
+  createdAt      DateTime            @default(now())
+
+  @@unique([vereinbarungId, version])
 }

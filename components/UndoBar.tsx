@@ -22,7 +22,7 @@ export function undoMoeglich() {
   }
 }
 
-type Eintrag = { id: string; label: string; createdAt: Date | string };
+type Eintrag = { id: string; label: string; createdAt: Date | string; zielstand?: string | null };
 
 function verbleibend(createdAt: Date | string): number {
   const start = new Date(createdAt).getTime();
@@ -79,9 +79,9 @@ export default function UndoBar() {
   };
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4">
+    <div className="crm-undo pointer-events-none fixed inset-x-0 z-40 flex justify-center px-4 pb-4">
       <div className="buehne pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl bg-navy-950 py-2 pl-4 pr-2 text-white shadow-lg">
-        <p className="min-w-0 flex-1 truncate text-sm">{eintrag.label}</p>
+        <div role="status" className="min-w-0 flex-1 text-sm"><p className="truncate">{eintrag.label}</p>{eintrag.zielstand && <p className="mt-1 text-xs text-navy-200">{eintrag.zielstand}</p>}</div>
         <span className="shrink-0 text-xs tabular-nums text-slate-400">{rest}s</span>
         <button
           type="button"

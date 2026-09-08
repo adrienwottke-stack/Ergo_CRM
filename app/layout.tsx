@@ -16,7 +16,7 @@ const INSTALL_MITSCHNITT = `window.addEventListener('beforeinstallprompt',functi
 // faellt auf die Geraetevorgabe zurueck und setzt die Klasse sofort.
 // Der try/catch ist noetig, weil localStorage in manchen Browsern (privater
 // Modus, gesperrte Cookies) beim blossen Zugriff wirft.
-const THEMA_VORLAUF = `(function(){try{var t=localStorage.getItem('ergo-thema')||'system';var d=t==='dunkel'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}})();`;
+const THEMA_VORLAUF = `(function(){try{var t=localStorage.getItem('ergo-thema')||'dunkel';var d=t==='dunkel'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}})();`;
 
 const inter = Inter({
   variable: "--font-inter",
@@ -62,7 +62,7 @@ export default function RootLayout({
   return (
     // suppressHydrationWarning: das Skript unten setzt die Klasse "dark" schon
     // vor React. Ohne den Hinweis meldet React genau diesen Unterschied.
-    <html lang="de" suppressHydrationWarning>
+    <html lang="de" className="dark" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEMA_VORLAUF }} />
         <script dangerouslySetInnerHTML={{ __html: INSTALL_MITSCHNITT }} />

@@ -9,87 +9,171 @@ import {
   berlinToday,
   dayToUtcDate,
   dueState,
-  hasTimeOfDay,
   utcToBerlinLocalInput,
-  type DueState,
+  startOfWeek,
 } from "@/lib/dates";
-import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
-import { liegtLabel, liegtSeit } from "@/lib/liegenbleiber";
-import { herkunftAusQuelle } from "@/lib/empfehlungen";
-import { faelligeAufgaben, fuehrungsSchritt, mannschaftsLage } from "@/lib/fuehrung";
+import { arbeitslageFuer } from "@/lib/arbeitslage";
+import {
+  faelligeAufgaben,
+  fuehrungsSchritt,
+  mannschaftsLage,
+} from "@/lib/fuehrung";
+import { ladeHeuteVereinbarungen } from "@/lib/vereinbarungen";
+import { ladeTeamauswertung } from "@/lib/team-auswertung";
+import { ladeRangliste } from "@/lib/arena";
+import { formatEinheiten } from "@/lib/einheiten";
+import { schalter } from "@/lib/features";
+import { startOptions } from "@/lib/start/settings";
+import ArbeitsfokusWahl from "@/components/ArbeitsfokusWahl";
 import FuehrungsAufgabe from "@/components/FuehrungsAufgabe";
-import StageBadge from "@/components/StageBadge";
-import NextStepBadge from "@/components/NextStepBadge";
+import VereinbarungenHeute from "@/components/vereinbarungen/VereinbarungenHeute";
+import ZielHeute from "@/components/ziele/ZielHeute";
+import EinheitenErinnerungen from "@/components/ziele/EinheitenErinnerungen";
 import QuickRowActions from "@/components/QuickRowActions";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import ErsteWoche from "@/components/ErsteWoche";
-import Meldungen from "@/components/Meldungen";
+import StartHinweis from "@/components/StartHinweis";
 import Postfach from "@/components/Postfach";
-import NummerHinterlegen from "@/components/NummerHinterlegen";
-import { card, chip, flaeche } from "@/components/ui";
-import SeitenKopf from "@/components/SeitenKopf";
-import LeerZustand from "@/components/LeerZustand";
-import ZahlHoch from "@/components/ZahlHoch";
-import { KennzahlKachel } from "@/components/Kennzahl";
-import { CheckIcon, ChevronRightIcon, PhoneIcon, SparkIcon } from "@/components/icons";
+import { card, column, pageTitle } from "@/components/ui";
+import {
+  ArrowRightIcon,
+  PhoneIcon,
+  CalendarCheckIcon,
+  SparkIcon,
+  TrophyIcon,
+} from "@/components/icons";
 
 export const dynamic = "force-dynamic";
-
-const kurzDatum = new Intl.DateTimeFormat("de-DE", {
+const datum = new Intl.DateTimeFormat("de-DE", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  timeZone: "Europe/Berlin",
+});
+const zeit = new Intl.DateTimeFormat("de-DE", {
   day: "2-digit",
   month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
   timeZone: "Europe/Berlin",
 });
 
-// Dringlichkeit als Kante links an der Karte. Vorher hatte jede Zeile
-// denselben grauen Rahmen - ob sie seit einer Woche liegt oder erst naechsten
-// Freitag ansteht, sah gleich aus. Die Kante beantwortet das, bevor man liest.
-const kanteJeFaelligkeit: Record<DueState, string> = {
-  overdue: "border-l-4 border-l-red-400",
-  today: "border-l-4 border-l-navy-400",
-  week: "border-l-4 border-l-slate-200",
-  later: "border-l-4 border-l-slate-200",
+type Kontakt = ContactLite & {
+  nextStepType: string | null;
+  nextStepAt: Date | null;
+  note: string | null;
+  letzteNotiz: string | null;
 };
+
+function Arbeitsliste({ kontakte }: { kontakte: Kontakt[] }) {
+  return (
+    <ul className="crm-list">
+      {kontakte.map((k) => (
+        <li key={k.id} className="p-5">
+          <div className="flex items-start justify-between gap-3">
+            <Link
+              href={`/contacts/${k.id}`}
+              className="min-h-11 text-lg font-semibold text-ink"
+            >
+              {k.name}
+            </Link>
+            {k.nextStepAt && (
+              <span className="shrink-0 text-right text-sm text-ink-muted">
+                {zeit.format(k.nextStepAt)}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-ink-muted">
+            {k.nextStepType === "TERMIN"
+              ? "Termin"
+              : k.nextStepType === "ANRUF"
+                ? "Anruf"
+                : k.nextStepType
+                  ? "Nächster Schritt"
+                  : "Nächsten Schritt festlegen"}
+          </p>
+          {k.letzteNotiz && (
+            <p className="mt-2 line-clamp-2 text-sm text-ink-muted">
+              Zuletzt: {k.letzteNotiz}
+            </p>
+          )}
+          <div className="mt-4">
+            <QuickRowActions
+              contact={k}
+              istAnruf={
+                k.nextStepType === "ANRUF" ||
+                (!k.nextStepType && ["NEU", "KONTAKTIERT"].includes(k.stage))
+              }
+              istTermin={k.nextStepType === "TERMIN"}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+async function WettbewerbHeute({ userId }: { userId: string }) {
+  const person = await prisma.person.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  const rangliste = person
+    ? await ladeRangliste(startOfWeek(berlinToday()))
+    : [];
+  const index = rangliste.findIndex((e) => e.personId === person?.id);
+  const ich = rangliste[index];
+  return (
+    <Link
+      href="/arena"
+      className="flex min-h-20 items-center gap-4 rounded-2xl border border-line p-5"
+    >
+      <TrophyIcon className="h-7 w-7 text-navy-700" />
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">Dein Wettbewerb</span>
+        <span className="mt-1 block text-sm text-ink-muted">
+          {ich
+            ? `${ich.punkte} Punkte diese Woche · Platz ${index + 1}`
+            : "Deine erste Aktivität bringt dich ins Rennen."}
+        </span>
+      </span>
+      <ArrowRightIcon className="h-5 w-5 text-ink-muted" />
+    </Link>
+  );
+}
 
 export default async function HeutePage() {
   const user = await requireUser();
-
-  // Die App war heute offen - das ist einen Punkt wert (lib/anwesenheit.ts).
-  //
-  // Hier und nicht in login(): das Sitzungs-Cookie lebt 30 Tage, eine echte
-  // Anmeldung passiert ein paar Mal im Jahr. "Einloggen" heisst in Wahrheit
-  // "die App aufmachen", und dort landen alle Wege - nach der Anmeldung, vom
-  // Startbildschirm und jeden Morgen.
-  //
-  // In after(): der Rueckruf laeuft NACH der ausgelieferten Antwort. Kostet
-  // den Nutzer keine Millisekunde und kann die Seite nicht mehr kippen.
   after(() => merkeAnwesenheit(user.id));
-
+  const heute = berlinToday();
   const sicht = eigene(user.id);
-  const today = berlinToday();
-  const horizon = addDays(dayToUtcDate(today), 8);
-
-  const [contacts, orphans, offeneNamen, meineFuehrung, gefuehrte, nachrichten] =
-    await Promise.all([
+  const [
+    kontakte,
+    ohneSchritt,
+    namen,
+    ohneNummer,
+    aktiveDirekte,
+    nachrichten,
+    absprachen,
+    flags,
+    startKonfiguration,
+    startState,
+  ] = await Promise.all([
     prisma.contact.findMany({
       where: {
         ...sicht.kontakte,
         nextStepType: { not: null },
-        nextStepAt: { lt: horizon },
+        nextStepAt: { lt: addDays(dayToUtcDate(heute), 8) },
       },
       orderBy: { nextStepAt: "asc" },
-      // Die letzte Aktivitaet gleich mitnehmen: vor einem Anruf will man
-      // wissen, was beim letzten Mal war – ohne dafuer ins Profil zu springen.
       include: {
         activities: {
           orderBy: { date: "desc" },
           take: 1,
-          select: { text: true, date: true },
+          select: { text: true },
         },
       },
     }),
-    // Ohne naechsten Schritt: faellt sonst durchs Raster. Wer die Schleife
-    // durch hat, ist kein Versaeumnis.
     prisma.contact.findMany({
       where: {
         ...sicht.kontakte,
@@ -97,12 +181,16 @@ export default async function HeutePage() {
         outcome: { not: "VERLOREN" },
         stage: { not: "ABSCHLUSS" },
       },
-      // Die aeltesten zuerst - und ab jetzt nach echtem Fortschritt sortiert,
-      // nicht nach updatedAt. Eine nachgetragene Nummer hat einen Namen
-      // bisher an das Ende der Liste geschoben, als waere etwas passiert.
       orderBy: { lastProgressAt: "asc" },
+      take: 25,
+      include: {
+        activities: {
+          orderBy: { date: "desc" },
+          take: 1,
+          select: { text: true },
+        },
+      },
     }),
-    // Nachschub-Stand: was noch zu arbeiten ist, nicht was je gesammelt wurde.
     prisma.contact.count({
       where: {
         ...sicht.kontakte,
@@ -111,512 +199,356 @@ export default async function HeutePage() {
         stage: { in: ["NEU", "KONTAKTIERT"] },
       },
     }),
-    // Wer ueber mir haengt - fuer die Frage nach der eigenen Nummer. Ohne
-    // Fuehrungskraft gibt es niemanden, der anrufen wuerde, also wird auch
-    // nicht gefragt.
-    user.phone === null && user.leaderId
-      ? prisma.user.findUnique({
-          where: { id: user.leaderId },
-          select: { name: true },
-        })
-      : Promise.resolve(null),
-    // Fuehrungskraft ist eine Position, keine Rolle: wer Direkte hat, fuehrt.
-    // Billige Zaehlung vorweg, damit die teure Mannschafts-Rechnung nur bei
-    // denen laeuft, fuer die sie ueberhaupt etwas anzeigt.
-    prisma.user.count({ where: { leaderId: user.id, deactivatedAt: null } }),
-    // Was Kollegen und die eigene Fuehrungskraft geschrieben haben.
-    //
-    // Bis hierhin lagen Nachrichten ausschliesslich in der Arena. Wer aus der
-    // Mannschaft heraus schrieb ("Ich komme zu deinem naechsten Termin mit"),
-    // schickte sie damit an eine Stelle, die der Empfaenger vielleicht am
-    // Freitag oeffnet. Eine Nachricht, die niemand liest, ist keine Handlung.
-    //
-    // Bewusst nach Zeitfenster und NICHT nach "ungelesen": das Ansehen setzt
-    // den Haken, und eine Abfrage auf ungelesen haette den Stapel im selben
-    // Wimpernschlag wieder ausgeblendet - gelesen hatte ihn dann niemand.
+    prisma.contact.count({
+      where: {
+        ...sicht.kontakte,
+        listKinds: { isEmpty: false },
+        phone: null,
+        outcome: "OFFEN",
+        stage: { in: ["NEU", "KONTAKTIERT"] },
+      },
+    }),
+    prisma.user.count({
+      where: {
+        leaderId: user.id,
+        deactivatedAt: null,
+        passwordHash: { not: null },
+      },
+    }),
     prisma.nachricht.findMany({
-      where: { anId: user.id, createdAt: { gte: new Date(Date.now() - 3 * 86_400_000) } },
+      where: {
+        anId: user.id,
+        createdAt: { gte: new Date(Date.now() - 3 * 86400000) },
+      },
       orderBy: { createdAt: "desc" },
       take: 5,
-      select: { id: true, text: true, gelesenAt: true, von: { select: { name: true } } },
+      select: {
+        id: true,
+        text: true,
+        gelesenAt: true,
+        von: { select: { name: true } },
+      },
     }),
+    ladeHeuteVereinbarungen(user.id),
+    schalter("einheiten"),
+    startOptions(),
+    prisma.startProgress.findUnique({ where: { userId: user.id } }),
   ]);
-
-  // Emil oeffnet die App morgens im Auto und landet hier - nicht auf
-  // /mannschaft. Bis hierhin erfuhr er von einem stillen Partner erst, wenn er
-  // von sich aus nachsah. Eine Zeile, nicht mehr: wer, und der naechste Schritt.
-  const [lage, aufgaben] =
-    gefuehrte > 0
-      ? await Promise.all([mannschaftsLage(user), faelligeAufgaben(user.id)])
-      : [null, []];
-  const brauchenDich = lage?.dringend.filter((person) => person.ampel === "rot") ?? [];
-
-  // Faellige Fuehrungsaufgaben gehoeren in dieselben Gruppen wie die
-  // Kundenschritte - eine Fuehrungskraft hat EINE Liste. Was ueberfaellig ist,
-  // steht oben; was heute faellig ist, bei heute.
-  const aufgabenJe: Record<DueState, typeof aufgaben> = {
-    overdue: aufgaben.filter((aufgabe) => aufgabe.ueberfaellig),
-    today: aufgaben.filter((aufgabe) => !aufgabe.ueberfaellig),
-    week: [],
-    later: [],
-  };
-
-  type Row = { at: Date; due: DueState; data: (typeof contacts)[number] };
-
-  const rows: Row[] = contacts.map((data) => ({
-    at: data.nextStepAt!,
-    due: dueState(data.nextStepAt!, today),
-    data,
-  }));
-
-  const groups: { key: DueState; title: string; hint: string; rows: Row[] }[] = [
-    {
-      key: "overdue",
-      title: "Überfällig",
-      hint: "Zuerst abarbeiten",
-      rows: rows.filter((row) => row.due === "overdue"),
-    },
-    {
-      key: "today",
-      title: "Heute",
-      hint: "Dein Tagespensum",
-      rows: rows.filter((row) => row.due === "today"),
-    },
-    {
-      key: "week",
-      title: "Diese Woche",
-      hint: "Kommt auf dich zu",
-      rows: rows.filter((row) => row.due === "week"),
-    },
-  ];
-
-  // Das Tagespensum: was JETZT dran ist, nach Art getrennt. Ueberfaellig und
-  // heute zaehlen zusammen - ein Anruf von gestern ist heute ein Anruf.
-  const jetzt = [...groups[0]!.rows, ...groups[1]!.rows];
-  const anrufeHeute = jetzt.filter(
-    (row) => row.data.nextStepType === "ANRUF"
-  ).length;
-  const termineHeute = jetzt.filter(
-    (row) => row.data.nextStepType === "TERMIN"
-  ).length;
-  const sonstigeHeute = jetzt.length - anrufeHeute - termineHeute;
-  const openCount = jetzt.length;
-  const nachfuellen = offeneNamen < NACHFUELL_SCHWELLE;
-
-  // Liegenbleiber ueber beide Listen: die mit Schritt (ueberfaellig und nie
-  // angefasst) und die ohne. Der Balken nennt den aeltesten und zaehlt den
-  // Rest - er wiederholt die Liste NICHT, die Plaketten unten tun das schon.
-  const liegen = [
-    ...rows.map((row) => ({ kontakt: row.data, tage: liegtSeit(row.data) })),
-    ...orphans.map((kontakt) => ({ kontakt, tage: liegtSeit(kontakt) })),
-  ]
-    .filter((eintrag): eintrag is { kontakt: typeof eintrag.kontakt; tage: number } =>
-      eintrag.tage !== null
-    )
-    .sort((a, b) => b.tage - a.tage);
-  const aeltester = liegen[0];
-
-  return (
-    <div className="space-y-6">
-      <SeitenKopf kicker="Beraterbereich" titel="Heute" />
-
-      {/* Was jemand geschrieben hat, steht vor der Arbeit - es dauert zehn
-          Sekunden und ist der Grund, warum sich das Werkzeug nach Mannschaft
-          anfuehlt und nicht nach Verwaltung. */}
-      {nachrichten.length > 0 && (
-        <Postfach
-          nachrichten={nachrichten.map((nachricht) => ({
-            id: nachricht.id,
-            von: nachricht.von.name,
-            text: nachricht.text,
-            neu: nachricht.gelesenAt === null,
-          }))}
-          ungelesen={nachrichten.filter((n) => n.gelesenAt === null).length}
-        />
-      )}
-
-      {/* Fragt genau einmal und verschwindet danach fuer immer. Es gibt
-          bewusst keine Kontoseite dafuer - ein Bildschirm mit einem Feld
-          darauf ist ein Bildschirm zu viel. */}
-      {meineFuehrung && (
-        <NummerHinterlegen fuehrungskraft={meineFuehrung.name.split(" ")[0] ?? meineFuehrung.name} />
-      )}
-
-      {/* Fuehrung zuerst, eigenes Geschaeft darunter: ein stiller Partner
-          kostet mehr als ein liegengebliebener Anruf. Steht nur da, wenn
-          wirklich jemand rot ist - sonst waere es Tapete. */}
-      {brauchenDich.length > 0 && (
-        <Link
-          href="/mannschaft"
-          className={`${flaeche("gefahr")} flex items-start gap-3 p-4 transition hover:schatten-hoch sm:p-5`}
-        >
-          {/* Der einzige Punkt der Anwendung, der pulst. Wer wartet, wartet
-              nicht still. */}
-          <span
-            aria-hidden
-            className="mt-1.5 h-2.5 w-2.5 shrink-0 animate-halo rounded-full bg-red-500"
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-slate-900">
-              {brauchenDich.length === 1
-                ? `${brauchenDich[0]!.name} braucht dich`
-                : brauchenDich.length === 2
-                  ? `${brauchenDich[0]!.vorname} und ${brauchenDich[1]!.vorname} brauchen dich`
-                  : `${brauchenDich[0]!.vorname}, ${brauchenDich[1]!.vorname} und ${
-                      brauchenDich.length - 2
-                    } weitere brauchen dich`}
-            </span>
-            <span className="mt-0.5 block text-sm text-slate-600">
-              {brauchenDich.length === 1
-                ? fuehrungsSchritt(brauchenDich[0]!)
-                : "Aus deiner Mannschaft. In der Übersicht steht, was jeweils ansteht."}
-            </span>
-          </span>
-          <span aria-hidden className="mt-0.5 shrink-0 text-slate-400">
-            <ChevronRightIcon className="h-5 w-5" />
-          </span>
-        </Link>
-      )}
-
-      {/* Beim Oeffnen steht da, was heute zu tun ist - als Zahl, nicht als
-          Liste, aus der man erst auswaehlen muss. */}
-      <div className={`${card} p-5 sm:p-6`}>
-        {openCount === 0 ? (
-          <p className="text-base font-semibold text-slate-900">
-            Nichts offen – alles abgearbeitet.
-          </p>
-        ) : (
-          <>
-            {/* Die Tagesleistung ist der Grund, warum jemand die Seite
-                oeffnet. Sie darf gross sein und beim Ankommen kurz
-                hochzaehlen - danach steht sie still. */}
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <ZahlHoch
-                wert={anrufeHeute > 0 ? anrufeHeute : openCount}
-                className="text-4xl font-bold tracking-[-0.02em] tabular-nums text-navy-700"
-              />
-              <span className="text-base font-semibold text-slate-900">
-                {anrufeHeute > 0
-                  ? `${anrufeHeute === 1 ? "Anruf" : "Anrufe"} heute`
-                  : `${openCount === 1 ? "Schritt" : "Schritte"} heute`}
-              </span>
-            </div>
-
-            {/* Vorher eine Zeile mit Mittelpunkten ("3 Termine · 2 weitere ·
-                4 ueberfaellig"). Als Kacheln sieht man die Verteilung, statt
-                sie zu lesen. */}
-            {termineHeute + sonstigeHeute + groups[0]!.rows.length > 0 ? (
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                <KennzahlKachel
-                  wert={termineHeute}
-                  bezeichnung={termineHeute === 1 ? "Termin" : "Termine"}
-                  ton={termineHeute > 0 ? "info" : "neutral"}
-                />
-                <KennzahlKachel
-                  wert={sonstigeHeute}
-                  bezeichnung="weitere Schritte"
-                />
-                <KennzahlKachel
-                  wert={groups[0]!.rows.length}
-                  bezeichnung="überfällig"
-                  ton={groups[0]!.rows.length > 0 ? "gefahr" : "neutral"}
-                />
-              </div>
-            ) : (
-              <p className="mt-1 text-sm text-slate-500">
-                Der Reihe nach von oben.
-              </p>
-            )}
-          </>
-        )}
-
-        {/* Liegenbleiber: der Name, der zu lange nichts gehoert hat. Steht
-            ueber dem Nachfuell-Alarm, weil ein liegender Name der teurere
-            Fehler ist - Nachschub holen kann man morgen, einen kalt
-            gewordenen Namen nicht zurueckholen. */}
-        {aeltester && (
-          <div
-            className={`${flaeche("gefahr")} mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
-          >
-            <p className="text-sm text-red-900">
-              <span className="font-semibold">
-                {aeltester.kontakt.name} {liegtLabel(aeltester.tage)}.
-              </span>{" "}
-              {liegen.length === 1
-                ? "Anrufen oder von der Liste nehmen."
-                : `Und ${liegen.length - 1} ${
-                    liegen.length === 2 ? "weiterer" : "weitere"
-                  }. Der älteste zuerst.`}
-            </p>
-            <Link
-              href={`/contacts/${aeltester.kontakt.id}`}
-              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-fest-gefahr px-4 text-sm font-semibold text-white transition hover:bg-fest-gefahr-stark"
-            >
-              <PhoneIcon className="h-4 w-4" />
-              {aeltester.kontakt.name.split(" ")[0]} anrufen
-            </Link>
-          </div>
-        )}
-
-        {/* Nachfuell-Alarm: ohne Namen kein Anruf, egal wie voll der Tag ist. */}
-        {nachfuellen && (
-          <div
-            className={`${flaeche("warnung")} mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
-          >
-            <p className="text-sm text-amber-900">
-              <span className="font-semibold">
-                {offeneNamen === 0
-                  ? "Keine offenen Namen mehr."
-                  : `Nur noch ${offeneNamen} offene Namen.`}
-              </span>{" "}
-              Ohne Nachschub steht die Schleife still.
-            </p>
-            <Link
-              href="/namen/sammeln"
-              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-fest-warnung px-4 text-sm font-semibold text-white transition hover:bg-fest-warnung-stark"
-            >
-              <SparkIcon className="h-4 w-4" />
-              Namen sammeln
-            </Link>
-          </div>
-        )}
-
-        {openCount > 0 && !nachfuellen && (
-          <Link
-            href="/namen"
-            className="mt-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-navy-600 transition hover:text-navy-800 hover:underline"
-          >
-            <PhoneIcon className="h-4 w-4" />
-            Lieber am Stück telefonieren? Durchlauf über die Namensliste
-          </Link>
-        )}
-      </div>
-
-      {/* Fragt nur, wenn noch nicht zugestimmt wurde - und erklaert wofuer,
-          bevor der Browser fragt. */}
-      <Meldungen vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""} />
-
-      {/* Startwoche, Brief, Versprechen, Wiedereinstieg - meldet sich nur,
-          wenn einer dieser Momente wirklich ansteht. */}
-      <ErsteWoche user={user} />
-
-      {rows.length === 0 && orphans.length === 0 && aufgaben.length === 0 ? (
-        <LeerZustand
-          ton="erfolg"
-          symbol={<CheckIcon className="h-6 w-6" />}
-          titel="Keine offenen Schritte"
-          text={
-            <>
-              Neue Namen sammelst du in der{" "}
-              <Link
-                href="/namen"
-                className="font-medium text-navy-600 hover:underline"
-              >
-                Namensliste
-              </Link>
-              .
-            </>
+  const arbeitslage = arbeitslageFuer(user.arbeitsfokus, aktiveDirekte);
+  const [lage, aufgaben, bericht] = await Promise.all([
+    aktiveDirekte > 0 ? mannschaftsLage(user) : null,
+    aktiveDirekte > 0 ? faelligeAufgaben(user.id) : [],
+    arbeitslage === "FUEHRUNG"
+      ? ladeTeamauswertung(user, { zeit: "monat", umfang: "struktur" })
+      : null,
+  ]);
+  const jetzt = kontakte.filter((k) =>
+    ["overdue", "today"].includes(dueState(k.nextStepAt!, heute)),
+  );
+  const spaeter = kontakte.filter((k) => !jetzt.includes(k));
+  const ueberfaellig = jetzt.filter(
+    (k) => dueState(k.nextStepAt!, heute) === "overdue",
+  );
+  const brauchenDich = lage?.dringend.filter((p) => p.ampel === "rot") ?? [];
+  const activeStart =
+    startKonfiguration.guidance &&
+    user.role !== "ADMIN" &&
+    startState?.phase !== "DONE"
+      ? startState
+      : null;
+  const dringendeArbeit =
+    jetzt.length > 0 ||
+    aufgaben.length > 0 ||
+    absprachen.length > 0 ||
+    brauchenDich.length > 0;
+  const startVorne =
+    activeStart && !dringendeArbeit && arbeitslage !== "FUEHRUNG";
+  const naechster = jetzt.find((k) => k.nextStepType === "TERMIN") ?? jetzt[0];
+  const liste = user.startTrack ? `?liste=${user.startTrack}` : "";
+  const lite = (k: (typeof kontakte)[number]): Kontakt => ({
+    id: k.id,
+    name: k.name,
+    phone: k.phone,
+    stage: k.stage,
+    outcome: k.outcome,
+    appointmentLocal: k.appointmentAt
+      ? utcToBerlinLocalInput(k.appointmentAt)
+      : null,
+    hasStep: k.nextStepType !== null,
+    referralsAsked: k.referralsAskedAt !== null,
+    nextStepType: k.nextStepType,
+    nextStepAt: k.nextStepAt,
+    note: k.note,
+    letzteNotiz: k.activities[0]?.text ?? null,
+  });
+  const eigeneAktion = naechster
+    ? {
+        titel:
+          naechster.nextStepType === "TERMIN"
+            ? "Dein nächster Termin"
+            : "Dein nächster Schritt",
+        text: naechster.name,
+        label:
+          naechster.nextStepType === "TERMIN"
+            ? "Termin bearbeiten"
+            : "Kontakt öffnen",
+        href: `/contacts/${naechster.id}`,
+      }
+    : namen === 0
+      ? {
+          titel: "Alles beginnt mit einem Namen",
+          text: "Wen kennst du?",
+          label: "Namen sammeln",
+          href: `/namen/sammeln${liste}`,
+        }
+      : ohneNummer === namen
+        ? {
+            titel: "Mach deine Namen erreichbar",
+            text: `${ohneNummer} Nummern ergänzen`,
+            label: "Nummern ergänzen",
+            href: `/namen/nummern${liste}`,
           }
-        >
-          {/* Der Willkommens-Ablauf bleibt aufrufbar - zum Vorfuehren am
-              Launch-Tag und fuer alle, die ihn weggeklickt haben. */}
-          <Link
-            href="/willkommen"
-            className="text-xs font-medium text-slate-400 hover:text-navy-700 hover:underline"
-          >
-            Wie das hier gedacht ist — der Start, nochmal
-          </Link>
-        </LeerZustand>
-      ) : (
-        groups
-          .filter((group) => group.rows.length + aufgabenJe[group.key].length > 0)
-          .map((group) => (
-            <section key={group.key} className="space-y-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-base font-semibold text-slate-900">
-                  {group.title}
-                  <span className="ml-2 text-sm font-normal text-slate-400">
-                    {group.rows.length + aufgabenJe[group.key].length}
-                  </span>
-                </h2>
-                <span className="text-xs text-slate-500">{group.hint}</span>
-              </div>
-
-              <ul className="space-y-3">
-                {/* Menschen vor Kunden: wenn heute beides ansteht, ist der
-                    stille Partner das Teurere. */}
-                {aufgabenJe[group.key].map((aufgabe) => (
-                  <FuehrungsAufgabe key={aufgabe.id} aufgabe={aufgabe} />
-                ))}
-                {group.rows.map((row, i) => {
-                  const contact = row.data;
-                  const liegtSeitTagen = liegtSeit(contact);
-                  const lite: ContactLite = {
-                    id: contact.id,
-                    name: contact.name,
-                    phone: contact.phone,
-                    stage: contact.stage,
-                    outcome: contact.outcome,
-                    appointmentLocal: contact.appointmentAt
-                      ? utcToBerlinLocalInput(contact.appointmentAt)
-                      : null,
-                    hasStep: true,
-                    referralsAsked: contact.referralsAskedAt !== null,
-                  };
-                  return (
-                    <li
-                      key={contact.id}
-                      className={`${card} ${kanteJeFaelligkeit[row.due]} animate-rise p-4 transition duration-200 hover:schatten-hoch`}
-                      // Die Zeilen laufen leicht versetzt ein. Nur die ersten
-                      // acht - danach wuerde man auf die Liste warten.
-                      style={
-                        i < 8
-                          ? ({ "--rise-delay": `${i * 40}ms` } as React.CSSProperties)
-                          : undefined
-                      }
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <Link
-                          href={`/contacts/${contact.id}`}
-                          className="text-sm font-semibold text-slate-900 hover:text-navy-700"
-                        >
-                          {contact.name}
-                        </Link>
-                        <div className="flex items-center gap-2">
-                          {/* Die Faelligkeit sagt "ueberfaellig", aber nicht
-                              seit wann. Genau darin liegt der Unterschied
-                              zwischen gestern vergessen und vor drei Wochen
-                              aufgegeben. */}
-                          {liegtSeitTagen !== null && (
-                            <span className={chip("gefahr")}>
-                              {liegtLabel(liegtSeitTagen)}
-                            </span>
-                          )}
-                          <StageBadge stage={contact.stage} outcome={contact.outcome} />
-                        </div>
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <NextStepBadge
-                          type={contact.nextStepType!}
-                          at={contact.nextStepAt!}
-                          state={row.due}
-                          withTime={hasTimeOfDay(contact.nextStepAt!)}
-                        />
-                        {contact.nextStepNote && (
-                          <span className="text-xs text-slate-500">
-                            {contact.nextStepNote}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Vorgeschichte in der Zeile statt im Profil. */}
-                      {(contact.activities[0] ||
-                        contact.note ||
-                        herkunftAusQuelle(contact.source)) && (
-                        <div className="mt-2 space-y-0.5 border-l-2 border-slate-100 pl-2.5">
-                          {/* Zuerst die Herkunft: der Unterschied zwischen
-                              einem kalten und einem warmen Anruf steht in
-                              diesem einen Satz. */}
-                          {herkunftAusQuelle(contact.source) && (
-                            <p className="text-xs font-semibold text-amber-800">
-                              Empfehlung von {herkunftAusQuelle(contact.source)}
-                            </p>
-                          )}
-                          {contact.activities[0] && (
-                            <p className="line-clamp-2 text-xs text-slate-500">
-                              <span className="text-slate-400">
-                                Zuletzt {kurzDatum.format(contact.activities[0].date)}:
-                              </span>{" "}
-                              {contact.activities[0].text}
-                            </p>
-                          )}
-                          {contact.note && (
-                            <p className="line-clamp-2 text-xs text-amber-800">
-                              {contact.note}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="mt-3 border-t border-slate-100 pt-3">
-                        <QuickRowActions
-                          contact={lite}
-                          istAnruf={contact.nextStepType === "ANRUF"}
-                          istTermin={contact.nextStepType === "TERMIN"}
-                        />
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))
-      )}
-
-      {orphans.length > 0 && (
+        : {
+            titel: "Der nächste Anruf zählt",
+            text: "Zeit für ein Gespräch",
+            label: "Anrufe starten",
+            href: `/namen/anrufen${liste}`,
+          };
+  const hauptaktion =
+    arbeitslage === "FUEHRUNG"
+      ? {
+          titel: absprachen.length
+            ? "Gemeinsam dran"
+            : "Deine Partner im Blick",
+          text:
+            absprachen[0]?.titel ??
+            (brauchenDich.length
+              ? `${brauchenDich.length} Partner näher ansehen`
+              : "Zeit für dein Team"),
+          label: absprachen.length ? "Absprachen ansehen" : "Partner begleiten",
+          href: absprachen.length
+            ? "/mannschaft/vereinbarungen"
+            : "/mannschaft",
+        }
+      : eigeneAktion;
+  const betreuung = (
+    <div className="space-y-6">
+      <VereinbarungenHeute userId={user.id} />
+      {aufgaben.length > 0 && (
         <section className="space-y-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-900">
-              Ohne nächsten Schritt
-              <span className="ml-2 text-sm font-normal text-slate-400">
-                {orphans.length}
-              </span>
-            </h2>
-            <span className="text-xs text-slate-500">Fällt sonst durchs Raster</span>
-          </div>
+          <h2 className="text-xl font-semibold">Deine Betreuungsaufgaben</h2>
           <ul className="space-y-3">
-            {orphans.slice(0, 25).map((contact) => (
-              <li
-                key={contact.id}
-                className={`${card} border-l-4 border-l-amber-400 p-4 transition duration-200 hover:schatten-hoch`}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <Link
-                    href={`/contacts/${contact.id}`}
-                    className="text-sm font-semibold text-slate-900 hover:text-navy-700"
-                  >
-                    {contact.name}
-                  </Link>
-                  <div className="flex items-center gap-2">
-                    {liegtSeit(contact) !== null && (
-                      <span className={chip("gefahr")}>
-                        {liegtLabel(liegtSeit(contact)!)}
-                      </span>
-                    )}
-                    <StageBadge stage={contact.stage} outcome={contact.outcome} />
-                  </div>
-                </div>
-                <div className="mt-3 border-t border-slate-100 pt-3">
-                  <QuickRowActions
-                    contact={{
-                      id: contact.id,
-                      name: contact.name,
-                      phone: contact.phone,
-                      stage: contact.stage,
-                      outcome: contact.outcome,
-                      appointmentLocal: contact.appointmentAt
-                        ? utcToBerlinLocalInput(contact.appointmentAt)
-                        : null,
-                      hasStep: false,
-                      referralsAsked: contact.referralsAskedAt !== null,
-                    }}
-                    // Ohne Schritt, aber noch in der Akquise: dann ist der
-                    // naechste Griff ohnehin das Telefon.
-                    istAnruf={
-                      contact.stage === "NEU" || contact.stage === "KONTAKTIERT"
-                    }
-                  />
-                </div>
-              </li>
+            {aufgaben.map((a) => (
+              <FuehrungsAufgabe key={a.id} aufgabe={a} />
             ))}
           </ul>
-          {orphans.length > 25 && (
-            <p className="text-xs text-slate-500">
-              … und {orphans.length - 25} weitere. Die Liste rückt nach, sobald
-              die ersten einen Schritt haben.
+        </section>
+      )}
+      {brauchenDich.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-xl font-semibold">Hier lohnt ein Gespräch</h2>
+          <div className="crm-list">
+            {brauchenDich.slice(0, 3).map((p) => (
+              <Link
+                key={p.id}
+                href={`/mannschaft/${p.istDirekt ? p.id : (p.ueberId ?? p.id)}`}
+                className="crm-list-row"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold">{p.name}</span>
+                  <span className="mt-1 block text-sm text-ink-muted">
+                    {fuehrungsSchritt(p)}
+                    {!p.istDirekt && p.ueber
+                      ? ` · Mit ${p.ueber} besprechen`
+                      : ""}
+                  </span>
+                </span>
+                <ArrowRightIcon className="h-5 w-5 shrink-0" />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+  return (
+    <div className={`${column} space-y-7`}>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="mb-2 text-sm text-ink-muted">
+            {datum.format(new Date())}
+          </p>
+          <h1 className={pageTitle}>Heute</h1>
+        </div>
+        <ArbeitsfokusWahl
+          wert={user.arbeitsfokus}
+          aktiveDirekte={aktiveDirekte}
+        />
+      </div>
+      {startVorne ? (
+        <StartHinweis phase={activeStart.phase} />
+      ) : (
+        <section className="space-y-5 py-2" aria-labelledby="naechste-handlung">
+          <div>
+            <p className="text-sm font-medium text-ink-muted">
+              {hauptaktion.titel}
+            </p>
+            <h2
+              id="naechste-handlung"
+              className="mt-2 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl"
+            >
+              {hauptaktion.text}
+            </h2>
+          </div>
+          <Link href={hauptaktion.href} className="crm-primary-action">
+            {hauptaktion.label}
+            <ArrowRightIcon className="h-5 w-5" />
+          </Link>
+          {arbeitslage !== "FUEHRUNG" && jetzt.length > 0 && (
+            <p className="text-sm text-ink-muted">
+              {jetzt.length} offene Schritte
+              {ueberfaellig.length > 0
+                ? ` · ${ueberfaellig.length} überfällig`
+                : ""}
             </p>
           )}
         </section>
+      )}
+      {(arbeitslage !== "START" || absprachen.length > 0) && betreuung}
+      {arbeitslage === "FUEHRUNG" && bericht && (
+        <Link href="/mannschaft/auswertung" className={`${card} block p-5`}>
+          <span className="text-sm text-ink-muted">
+            Dein Team · dieser Monat
+          </span>
+          <span className="mt-2 block text-3xl font-semibold tabular-nums">
+            {formatEinheiten(bericht.team.einheitenZeitraum)}{" "}
+            <span className="text-base font-normal">Einheiten</span>
+          </span>
+          <span className="mt-3 block text-sm text-navy-700">
+            Entwicklung ansehen →
+          </span>
+        </Link>
+      )}
+      <section className="space-y-3" id="eigene-arbeit">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-xl font-semibold">
+            {arbeitslage === "FUEHRUNG"
+              ? "Dein eigenes Geschäft"
+              : "Anrufe und Termine"}
+          </h2>
+          <Link
+            href="/kalender"
+            className="inline-flex min-h-11 items-center text-sm text-navy-700"
+          >
+            Kalender →
+          </Link>
+        </div>
+        {jetzt.length > 0 ? (
+          <Arbeitsliste kontakte={jetzt.map(lite)} />
+        ) : (
+          <p className={`${card} p-5 text-ink-muted`}>
+            Für heute sind keine Kontaktschritte offen.
+          </p>
+        )}
+        {spaeter.length > 0 && (
+          <details className={`${card} p-5`}>
+            <summary className="cursor-pointer py-1 font-medium">
+              Diese Woche · {spaeter.length} weitere Schritte
+            </summary>
+            <div className="mt-4">
+              <Arbeitsliste kontakte={spaeter.map(lite)} />
+            </div>
+          </details>
+        )}
+        {ohneSchritt.length > 0 && (
+          <details className={`${card} p-5`}>
+            <summary className="cursor-pointer py-1 font-medium">
+              Nächsten Schritt festlegen · {ohneSchritt.length}
+              {ohneSchritt.length === 25 ? "+" : ""}
+            </summary>
+            <div className="mt-4">
+              <Arbeitsliste kontakte={ohneSchritt.map(lite)} />
+            </div>
+          </details>
+        )}
+      </section>
+      {activeStart && !startVorne && arbeitslage !== "FUEHRUNG" && (
+        <StartHinweis phase={activeStart.phase} />
+      )}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">Dein Fortschritt</h2>
+        <ZielHeute userId={user.id} />
+        {flags.einheiten && (
+          <>
+            <EinheitenErinnerungen userId={user.id} />
+            <Link
+              href="/einheiten"
+              className="inline-flex min-h-11 items-center font-medium text-navy-700"
+            >
+              Einheiten eintragen →
+            </Link>
+          </>
+        )}
+        <WettbewerbHeute userId={user.id} />
+      </section>
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          {
+            href: `/namen/sammeln${liste}`,
+            label: "Namen sammeln",
+            icon: SparkIcon,
+          },
+          { href: `/namen/anrufen${liste}`, label: "Anrufen", icon: PhoneIcon },
+          { href: "/kalender", label: "Termine", icon: CalendarCheckIcon },
+        ].map((a) => (
+          <Link
+            key={a.label}
+            href={a.href}
+            className="flex min-h-24 flex-col items-center justify-center gap-3 rounded-2xl border border-line bg-surface p-3 text-center text-sm font-medium"
+          >
+            <a.icon className="h-6 w-6 text-navy-700" />
+            {a.label}
+          </Link>
+        ))}
+      </div>
+      {arbeitslage === "FUEHRUNG" ? (
+        activeStart && (
+          <details className={`${card} p-5`}>
+            <summary className="min-h-11 cursor-pointer py-2 font-medium text-ink-muted">
+              Deinen Einstieg fortsetzen
+            </summary>
+            <div className="mt-3">
+              <StartHinweis phase={activeStart.phase} />
+            </div>
+          </details>
+        )
+      ) : (
+        <details className={`${card} p-5`}>
+          <summary className="min-h-11 cursor-pointer py-2 font-medium text-ink-muted">
+            Deine erste Woche und dein Einstieg
+          </summary>
+          <div className="mt-3">
+            <ErsteWoche
+              user={{
+                ...user,
+                pledgeTarget: null,
+                pledgeSetAt: null,
+                pledgeShownAt: null,
+              }}
+            />
+          </div>
+        </details>
+      )}
+      {nachrichten.length > 0 && (
+        <Postfach
+          nachrichten={nachrichten.map((n) => ({
+            id: n.id,
+            von: n.von.name,
+            text: n.text,
+            neu: n.gelesenAt === null,
+          }))}
+          ungelesen={nachrichten.filter((n) => n.gelesenAt === null).length}
+        />
       )}
     </div>
   );

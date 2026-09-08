@@ -4,6 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import Modal from "@/components/Modal";
 import EmpfehlungsBlock from "@/components/EmpfehlungsBlock";
 import type { ContactStage, Outcome } from "@/lib/generated/prisma/enums";
+import { frageNachEinheiten } from "@/components/EinheitenNachAbschluss";
+import { undoMoeglich } from "@/components/UndoBar";
 import {
   ALL_LOST_REASONS,
   CONTACT_STAGES,
@@ -71,14 +73,19 @@ export default function ContactActionDialog({
 
   if (!contact) return null;
 
-  const submit = (action: (data: FormData) => Promise<void>) =>
+  const submit = (action: (data: FormData) => Promise<unknown>) =>
     (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
       setError(null);
       startTransition(async () => {
         try {
-          await action(formData);
+          const result = await action(formData);
+          if (result && typeof result === "object" && "einheiten" in result) {
+            const erinnerung = result.einheiten as { id: string; anzeigen: boolean } | null;
+            if (erinnerung?.anzeigen) frageNachEinheiten(contact.name, { erinnerungId: erinnerung.id });
+          }
+          if (mode === "stage") undoMoeglich();
           // Nur der Phasenwechsel meldet eine Phase - bei "Erledigt",
           // "Verloren" und "Empfehlungen" hat sich keine geaendert.
           onSuccess?.({ stage: mode === "stage" ? stage : null });

@@ -81,7 +81,7 @@ export type Bewegung = {
 
 export function bewegungSatz(bewegung: Bewegung, vorname: string): string {
   if (!bewegung.etwas) {
-    return `Seitdem hat sich bei ${vorname} nichts bewegt — kein Anruf, kein Termin.`;
+    return `Seitdem sind bei ${vorname} keine Anrufe, Termine oder Abschlüsse eingetragen.`;
   }
   const teile: string[] = [];
   if (bewegung.anrufe > 0) {
