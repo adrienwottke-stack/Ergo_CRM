@@ -293,6 +293,47 @@ async function runEngine(engine, name, port, scenarios) {
             assert.equal(saved.appointmentAt?.toISOString(), berlinLocalToUtc(appointmentLocal)?.toISOString(), 'Appointment saves the chosen Berlin date/time');
             assert.deepEqual(saved.nextStepAt, saved.appointmentAt, 'Next step and appointment stay synchronized');
           }
+          if (scenario.allTasks) {
+            const own = page.locator('#eigene-arbeit');
+            assert.equal(await own.locator('a[href^="/contacts/"]').count(), 3, 'The default Today group remains capped at three contact rows');
+            const primaryHref = await page.locator('main .crm-primary-action').first().getAttribute('href');
+            const promoted = scenario.allTasks.due.find(item => primaryHref?.startsWith(`/contacts/${item.id}?`));
+            const expectedRemaining = scenario.allTasks.due.filter(item => item.id !== promoted?.id);
+            if (promoted) assert.equal(await own.locator(`a[href^="/contacts/${promoted.id}?"]`).count(), 0, 'The primary contact is not duplicated in the task group');
+            const allLink = own.getByRole('link', { name: new RegExp(`^Alle ${expectedRemaining.length} Aufgaben ansehen`) });
+            assert.equal(await allLink.getAttribute('href'), '/heute?alle=1#eigene-arbeit', 'All call reminders are reached through Today rather than Calendar');
+            await allLink.click();
+            await page.waitForURL(url => url.pathname === '/heute' && url.search === '?alle=1' && url.hash === '#eigene-arbeit');
+            assert.equal(await page.locator('#eigene-arbeit a[href^="/contacts/"]').count(), expectedRemaining.length, 'The full Today view exposes every remaining due task');
+            for (const item of expectedRemaining) {
+              const link = page.locator(`#eigene-arbeit a[href^="/contacts/${item.id}?"]`);
+              assert.equal(await link.count(), 1, `Due task ${item.name} remains reachable exactly once`);
+              assert.equal(new URL(await link.getAttribute('href'), origin).searchParams.get('zurueck'), '/heute?alle=1');
+            }
+            const last = expectedRemaining.at(-1);
+            await page.locator(`#eigene-arbeit a[href^="/contacts/${last.id}?"]`).click();
+            await page.getByRole('heading', { name: last.name, exact: true }).waitFor();
+            const back = page.locator('main .crm-page-head a').first();
+            assert.equal(await back.getAttribute('href'), '/heute?alle=1', 'A contact opened from all tasks returns to the full view');
+            await back.click();
+            await page.waitForURL(url => url.pathname === '/heute' && url.search === '?alle=1');
+            assert.equal(await page.locator('#eigene-arbeit a[href^="/contacts/"]').count(), expectedRemaining.length);
+            await page.getByRole('link', { name: /Zur Tagesübersicht/ }).click();
+            await page.waitForURL(url => url.pathname === '/heute' && url.search === '');
+            await page.locator('#weitere-schritte > summary').click();
+            assert.equal(await page.locator('#weitere-schritte a[href^="/contacts/"]:visible').count(), 6, 'Default week and unscheduled groups each show at most three contacts');
+            const allWeek = page.locator('#weitere-schritte').getByRole('link', { name: /^Alle 4 Schritte ansehen/ });
+            assert.equal(await allWeek.getAttribute('href'), '/heute?alle=1#weitere-schritte');
+            await allWeek.click();
+            await page.waitForURL(url => url.search === '?alle=1' && url.hash === '#weitere-schritte');
+            assert.equal(await page.locator('#weitere-schritte').evaluate(el => el.open), true, 'The full extended view opens the week and unscheduled groups');
+            for (const item of [...scenario.allTasks.week, ...scenario.allTasks.unscheduled]) {
+              const link = page.locator(`#weitere-schritte a[href^="/contacts/${item.id}?"]:visible`);
+              assert.equal(await link.count(), 1, `Extended task ${item.name} remains reachable exactly once`);
+              assert.equal(new URL(await link.getAttribute('href'), origin).searchParams.get('zurueck'), '/heute?alle=1');
+            }
+            await page.screenshot({ path: fileURLToPath(new URL(screenshot.replace('.png', '-all-tasks.png'), output)), fullPage: true });
+          }
           if (scenario.expectedBack) {
             const back = page.locator('main .crm-page-head a').first();
             assert.equal(await back.getAttribute('href'), scenario.expectedBack, 'The profile back action preserves context or safely falls back');
@@ -341,11 +382,17 @@ try {
       const id = `qa-${label}-${density}`;
       await user(id, focus);
       if (focus !== 'EIGEN') await user(`${id}-partner`, 'EIGEN', id);
+      const allTasks = { due: [], week: [], unscheduled: [] };
       if (density === 'many') {
-        for (let i = 0; i < 12; i++) await contact(id, `Aufgabe ${i + 1} Beispiel`, `03012345${String(i).padStart(2, '0')}`, true);
+        for (let i = 0; i < 12; i++) allTasks.due.push(await contact(id, `Aufgabe ${i + 1} Beispiel`, `03012345${String(i).padStart(2, '0')}`, true));
+        for (let i = 0; i < 4; i++) {
+          const planned = await contact(id, `Wochenschritt ${i + 1} Beispiel`, `03065432${i}`);
+          allTasks.week.push(await db.contact.update({ where: { id: planned.id }, data: { nextStepType: 'ANRUF', nextStepAt: dayToUtcDate(shiftDay(berlinToday(), 1)) } }));
+          allTasks.unscheduled.push(await contact(id, `Ohne Schritt ${i + 1} Beispiel`, `03077777${i}`));
+        }
         if (focus !== 'EIGEN') for (let i = 0; i < 5; i++) await db.partnerVereinbarung.create({ data: { initiatorId: id, empfaengerId: `${id}-partner`, verantwortlicherId: id, vorgeschlagenVonId: id, titel: `Gemeinsam Gespräch ${i + 1} vorbereiten`, art: 'AUFGABE', faelligAm: today, status: 'BESTAETIGT', bestaetigtVonId: `${id}-partner`, bestaetigtAm: now } });
       }
-      scenarios.push({ name: `today-${label}-${density}`, user: id, route: '/heute', wideSmoke: label === 'start' && density === 'many' });
+      scenarios.push({ name: `today-${label}-${density}`, user: id, route: '/heute', wideSmoke: label === 'start' && density === 'many', ...(density === 'many' ? { allTasks } : {}) });
     }
   }
   await user('qa-calendar');
