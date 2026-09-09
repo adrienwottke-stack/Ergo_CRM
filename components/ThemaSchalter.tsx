@@ -38,7 +38,7 @@ function istDunkel(thema: Thema) {
 // Farbe gesetzt werden - sonst bliebe z. B. die Adressleiste des Browsers
 // hell, waehrend die Seite laengst dunkel ist.
 function themeFarbeSynchronisieren(dunkel: boolean) {
-  const farbe = dunkel ? "#071426" : "#eef2f8";
+  const farbe = dunkel ? "#0c131e" : "#eef2f8";
   document
     .querySelectorAll('meta[name="theme-color"]')
     .forEach((meta) => meta.setAttribute("content", farbe));
@@ -58,8 +58,10 @@ export default function ThemaSchalter() {
   const [bereit, setBereit] = useState(false);
 
   useEffect(() => {
-    const gemerkt = localStorage.getItem(THEMA_SCHLUESSEL) as Thema | null;
-    if (gemerkt && THEMEN.includes(gemerkt)) setThema(gemerkt);
+    try {
+      const gemerkt = localStorage.getItem(THEMA_SCHLUESSEL) as Thema | null;
+      if (gemerkt && THEMEN.includes(gemerkt)) setThema(gemerkt);
+    } catch { /* Der dunkle Standard funktioniert auch ohne lokalen Speicher. */ }
     setBereit(true);
   }, []);
 

@@ -3,6 +3,7 @@ import { cn, card } from "@/components/ui";
 import { berlinDayOf, berlinMinutesOfDay, dayToUtcDate } from "@/lib/dates";
 import type { KalenderEintrag } from "@/lib/kalender/laden";
 import { beschriftung, stilFuer } from "./eintrag-stil";
+import { kalenderEintragHref } from "./kontakt-link";
 
 // Die Zeitachse. Woche und Tag benutzen dieselbe - der Tag ist die Woche mit
 // einer Spalte. Zwei getrennte Bauteile waeren zwei Orte, an denen die
@@ -91,10 +92,12 @@ function Block({
   eintrag,
   ab,
   kompakt,
+  rueckweg,
 }: {
   eintrag: Platziert;
   ab: number;
   kompakt: boolean;
+  rueckweg: string;
 }) {
   const stil = stilFuer(eintrag);
   const beginn = berlinMinutesOfDay(eintrag.von);
@@ -134,10 +137,11 @@ function Block({
 
   // Nur Kundentermine fuehren irgendwohin. Ein fremder Termin ist Belegung,
   // kein Vorgang - er hat keine Akte, in die man springen koennte.
-  if (eintrag.kontaktId || eintrag.href) {
+  const ziel = kalenderEintragHref(eintrag, rueckweg);
+  if (ziel) {
     return (
       <Link
-        href={eintrag.href ?? `/contacts/${eintrag.kontaktId}`}
+        href={ziel}
         className={cn(klassen, "transition hover:brightness-95")}
         style={lage}
       >
@@ -156,11 +160,13 @@ export function Zeitraster({
   tage,
   eintraege,
   heute,
+  rueckweg,
 }: {
   /** Tag-Strings ("2026-08-25"). Einer = Tagesansicht, sieben = Woche. */
   tage: string[];
   eintraege: KalenderEintrag[];
   heute: string;
+  rueckweg: string;
 }) {
   const { ab, bis } = achse(eintraege);
   const stunden = Array.from({ length: bis - ab }, (_, i) => ab + i);
@@ -279,7 +285,13 @@ export function Zeitraster({
               {platziere(
                 (jeTag.get(tag) ?? []).filter((eintrag) => !eintrag.ganztags)
               ).map((eintrag) => (
-                <Block key={eintrag.id} eintrag={eintrag} ab={ab} kompakt={kompakt} />
+                <Block
+                  key={eintrag.id}
+                  eintrag={eintrag}
+                  ab={ab}
+                  kompakt={kompakt}
+                  rueckweg={rueckweg}
+                />
               ))}
             </div>
           ))}

@@ -5,6 +5,7 @@ import { berlinToday } from "@/lib/dates";
 import { ladeTeamauswertung, type Berichtsfilter } from "@/lib/team-auswertung";
 import Berichtsgruppe from "@/components/auswertung/Berichtsgruppe";
 import TeamNavigation from "@/app/(app)/mannschaft/TeamNavigation";
+import SeitenKopf from "@/components/SeitenKopf";
 
 export const dynamic = "force-dynamic";
 
@@ -58,23 +59,12 @@ export default async function AuswertungPage({
     <div
       className={`mx-auto w-full space-y-6 pb-8 ${meeting ? "max-w-6xl" : "max-w-4xl"}`}
     >
-      <header>
-        <Link
-          href="/mannschaft"
-          className="inline-flex min-h-11 items-center text-sm font-medium text-ink-muted hover:text-ink"
-        >
-          ← Team
-        </Link>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-          {meeting ? "Unser Teamstand" : "Auswertung"}
-        </h1>
-        <p className="mt-2 text-base text-ink-muted">
-          {bericht.zeit.label} · {umfangLabel}
-        </p>
-        <p className="mt-1 text-sm text-ink-muted">
-          Stand {datum(bericht.stand)}
-        </p>
-      </header>
+      <SeitenKopf
+        titel={meeting ? "Unser Teamstand" : "Auswertung"}
+        werkzeuge={!meeting}
+        zurueck={{ href: "/mannschaft", label: "Team" }}
+        unterzeile={`${bericht.zeit.label} · ${umfangLabel} · Stand ${datum(bericht.stand)}`}
+      />
 
       {!meeting && <TeamNavigation aktiv="auswertung" />}
 
@@ -185,6 +175,23 @@ export default async function AuswertungPage({
         gruppe={bericht.eigen}
         meeting={meeting}
       />
+
+      {!meeting && (
+        <nav aria-label="Weitere Teamansichten" className="grid gap-2 sm:grid-cols-2">
+          <Link
+            href="/teamabend"
+            className="flex min-h-14 items-center justify-between rounded-xl border border-line-strong bg-surface px-4 py-3 font-semibold text-ink transition hover:bg-sunken"
+          >
+            Teamabend öffnen <span aria-hidden>›</span>
+          </Link>
+          <Link
+            href="/mannschaft/bericht"
+            className="flex min-h-14 items-center justify-between rounded-xl border border-line-strong bg-surface px-4 py-3 font-semibold text-ink transition hover:bg-sunken"
+          >
+            Berichts-Link erstellen <span aria-hidden>›</span>
+          </Link>
+        </nav>
+      )}
 
       <aside className="rounded-2xl bg-sunken p-5 text-sm leading-relaxed text-ink-muted">
         <h2 className="font-semibold text-ink">Aktuelle Teamzuordnung</h2>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cn, segmentGruppe, segmentKnopf } from "@/components/ui";
 
 export default function TeamNavigation({
   aktiv,
@@ -8,26 +9,26 @@ export default function TeamNavigation({
   return (
     <nav
       aria-label="Teamansichten"
-      className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1"
+      className={cn(segmentGruppe, "w-full")}
     >
       {[
         { key: "begleiten", titel: "Begleiten", href: "/mannschaft" },
         {
-          key: "ueberblick",
-          titel: "Überblick",
-          href: "/mannschaft?bereich=ueberblick",
-        },
-        {
           key: "auswertung",
           titel: "Auswertung",
           href: "/mannschaft/auswertung",
+        },
+        {
+          key: "ueberblick",
+          titel: "Struktur",
+          href: "/mannschaft?bereich=ueberblick",
         },
       ].map((eintrag) => (
         <Link
           key={eintrag.key}
           href={eintrag.href}
           aria-current={aktiv === eintrag.key ? "page" : undefined}
-          className={`flex min-h-12 items-center justify-center rounded-xl px-2 py-3 text-sm font-semibold sm:text-base ${aktiv === eintrag.key ? "bg-surface text-ink" : "text-slate-700"}`}
+          className={cn(segmentKnopf(aktiv === eintrag.key), "min-w-0 flex-1 !px-2")}
         >
           {eintrag.titel}
         </Link>

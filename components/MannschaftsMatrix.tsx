@@ -25,12 +25,14 @@ const AMPEL_RANG: Record<AmpelWert, number> = { rot: 0, gelb: 1, gruen: 2, grau:
 
 export default function MannschaftsMatrix({
   personen,
+  rueckweg = "/mannschaft",
   einheiten,
   zeigeEinheiten,
   kurz,
 }: {
   /** Die Mannschaft ohne den Betrachter selbst - eine Fuehrungskraft fuehrt
    *  sich nicht selbst, siehe "Dein eigenes Geschaeft" weiter unten. */
+  rueckweg?: string;
   personen: Mannschaftsperson[];
   einheiten: Map<string, EinheitenAufteilung>;
   zeigeEinheiten: boolean;
@@ -177,7 +179,7 @@ export default function MannschaftsMatrix({
                     <span className="flex items-center gap-2">
                       <Ampel ampel={person.ampel} variante="punkt" />
                       <Link
-                        href={`/mannschaft/${person.id}`}
+                        href={`/mannschaft/${person.id}?zurueck=${encodeURIComponent(rueckweg)}`}
                         className="-my-2.5 flex min-h-11 items-center rounded py-2.5 transition hover:text-navy-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600"
                       >
                         {/* GpName statt blossem Text: laeuft der Vorfuehr-

@@ -161,7 +161,7 @@ function abstand(a: Punkt, b: Punkt): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
+export default function Organigramm({ knoten, rueckweg = "/mannschaft" }: { knoten: OrgaKnoten[]; rueckweg?: string }) {
   const { pos, linien, breite, hoehe } = useMemo(() => baulayout(knoten), [knoten]);
   const rahmen = useRef<HTMLDivElement>(null);
   const [sicht, setSicht] = useState<Sicht>({ x: RAND, y: RAND, s: 1 });
@@ -413,7 +413,7 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
           return (
             <Link
               key={k.id}
-              href={`/mannschaft/${k.id}`}
+              href={`/mannschaft/${k.id}?zurueck=${encodeURIComponent(rueckweg)}`}
               onClick={(e) => {
                 // Das Loslassen nach einem Zug ist kein Klick.
                 //

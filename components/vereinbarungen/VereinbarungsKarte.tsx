@@ -25,7 +25,7 @@ export default function VereinbarungsKarte({
   const offen =
     stand.status === "VORGESCHLAGEN" || stand.status === "BESTAETIGT";
   return (
-    <article className="space-y-4 rounded-2xl border border-slate-200 bg-surface p-4 sm:p-5">
+    <article id={`absprache-${stand.id}`} className="scroll-mt-6 space-y-4 rounded-2xl border border-slate-200 bg-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-base font-semibold text-slate-700">
           Mit {stand.partner.name}

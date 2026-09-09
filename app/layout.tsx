@@ -16,7 +16,7 @@ const INSTALL_MITSCHNITT = `window.addEventListener('beforeinstallprompt',functi
 // faellt auf die Geraetevorgabe zurueck und setzt die Klasse sofort.
 // Der try/catch ist noetig, weil localStorage in manchen Browsern (privater
 // Modus, gesperrte Cookies) beim blossen Zugriff wirft.
-const THEMA_VORLAUF = `(function(){try{var t=localStorage.getItem('ergo-thema')||'dunkel';var d=t==='dunkel'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}})();`;
+const THEMA_VORLAUF = `(function(){var m=window.matchMedia('(prefers-color-scheme: dark)');function a(){var t='dunkel';try{t=localStorage.getItem('ergo-thema')||'dunkel'}catch(e){}var d=t!=='hell'&&(t!=='system'||m.matches);document.documentElement.classList.toggle('dark',d);document.querySelectorAll('meta[name="theme-color"]').forEach(function(n){n.setAttribute('content',d?'#0c131e':'#eef2f8')})}a();document.addEventListener('DOMContentLoaded',a,{once:true});m.addEventListener('change',a);window.addEventListener('storage',function(e){if(e.key==='ergo-thema')a()})})();`;
 
 const inter = Inter({
   variable: "--font-inter",
@@ -46,7 +46,7 @@ export const viewport: Viewport = {
   // Die Browser-Umrandung setzt die jeweilige Canvas-Farbe fort.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#eef2f8" },
-    { media: "(prefers-color-scheme: dark)", color: "#071426" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c131e" },
   ],
   // Die Kopfzeile ist klebrig und die Ergebnis-Knoepfe sitzen unten – ohne
   // viewportFit verschwinden sie am iPhone hinter der Home-Leiste.

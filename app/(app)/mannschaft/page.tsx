@@ -50,13 +50,13 @@ import VorfuehrSchalter from "@/components/VorfuehrSchalter";
 import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
 import { VorfuehrHinweis } from "@/components/GriffKarte";
 import GpName from "@/components/GpName";
+import SeitenKopf from "@/components/SeitenKopf";
 import {
   card,
   chip,
   filterPill,
   flaeche,
   kicker,
-  pageTitle,
   sectionTitle,
   td,
   th,
@@ -102,14 +102,16 @@ function NameLink({
   person,
   klasse,
   kurz,
+  zurueck,
 }: {
   person: Mannschaftsperson;
   klasse: string;
   kurz?: string;
+  zurueck: string;
 }) {
   return (
     <Link
-      href={`/mannschaft/${person.id}`}
+      href={`/mannschaft/${person.id}?zurueck=${encodeURIComponent(zurueck)}`}
       className={`${klasse} rounded transition hover:text-navy-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600`}
     >
       <GpName name={person.name} kurz={kurz} />
@@ -250,6 +252,9 @@ export default async function MannschaftPage({
 }) {
   const { ansicht, bereich } = await searchParams;
   const begleiten = bereich !== "ueberblick" && ansicht !== "liste";
+  const profilRueckweg = begleiten
+    ? "/mannschaft"
+    : `/mannschaft?bereich=ueberblick${ansicht === "liste" ? "&ansicht=liste" : ""}`;
   // Das Bild ist die Vorgabe. Die Liste bleibt einen Tipp entfernt - sie
   // traegt die Signale und die Knoepfe, fuer die im Kasten kein Platz ist.
   const alsListe = ansicht === "liste";
@@ -493,37 +498,48 @@ export default async function MannschaftPage({
 
   return (
     <VorfuehrProvider>
-      <div className="space-y-6">
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <h1 className={pageTitle}>Team</h1>
-            <VorfuehrSchalter />
-          </div>
+      <div className="flex flex-col gap-6">
+        <div className="order-[-20]">
+          <SeitenKopf
+            titel="Team"
+            werkzeuge
+            aktion={<VorfuehrSchalter />}
+            unterzeile={
+              begleiten
+                ? "Deine Partner, eure Absprachen und der nächste gemeinsame Schritt."
+                : "Wer zu deinem Team gehört und wie die einzelnen Bereiche zusammenarbeiten."
+            }
+          />
           <VorfuehrHinweis />
-          <p className="mt-2 text-base text-ink-muted">
-            {begleiten
-              ? "Deine Partner, eure Absprachen und der nächste gemeinsame Schritt."
-              : "Wer zu deinem Team gehört und wie die einzelnen Bereiche zusammenarbeiten."}
-          </p>
         </div>
 
-        <TeamNavigation aktiv={begleiten ? "begleiten" : "ueberblick"} />
+        <div className="order-[-10]">
+          <TeamNavigation aktiv={begleiten ? "begleiten" : "ueberblick"} />
+        </div>
 
         {!begleiten && (
-          <MannschaftsMatrix
-            personen={lage.leute}
-            einheiten={einheiten}
-            zeigeEinheiten={zeigeEinheiten}
-            kurz={kurzMap}
-          />
+          <details className={`${card} order-10 p-5`}>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between font-semibold text-ink">
+              Teamlage als Matrix
+              <span aria-hidden className="text-ink-muted">›</span>
+            </summary>
+            <div className="mt-4 border-t border-line pt-4">
+              <MannschaftsMatrix rueckweg={profilRueckweg}
+                personen={lage.leute}
+                einheiten={einheiten}
+                zeigeEinheiten={zeigeEinheiten}
+                kurz={kurzMap}
+              />
+            </div>
+          </details>
         )}
         {!begleiten && einheitenAn.einheiten && direktenZeilen.length > 0 && (
-          <details className={card + " p-5"}>
+          <details className={card + " order-10 p-5"}>
             <summary className="min-h-11 cursor-pointer py-2 font-semibold">
               Direkte Partner im Monatsvergleich
             </summary>
             <div className="mt-3">
-              <DirektenListe
+              <DirektenListe rueckweg={profilRueckweg}
                 personen={direktenZeilen}
                 einheitenAn={einheitenAn.einheiten}
                 monatLabel={produktionsmonat(berlinToday()).label}
@@ -532,23 +548,9 @@ export default async function MannschaftPage({
             </div>
           </details>
         )}
-        <div className="flex flex-wrap gap-x-5 gap-y-2">
-          <Link
-            className="inline-flex min-h-11 items-center font-medium text-navy-700"
-            href="/teamabend"
-          >
-            Teamabend öffnen →
-          </Link>
-          <Link
-            className="inline-flex min-h-11 items-center font-medium text-navy-700"
-            href="/mannschaft/bericht"
-          >
-            Berichts-Link erstellen →
-          </Link>
-        </div>
         {begleiten && (
           <VorfuehrVerdeckt hinweis="Gemeinsame Absprachen werden beim Vorführen ausgeblendet.">
-            <VereinbarungenHeute userId={user.id} />
+            <VereinbarungenHeute userId={user.id} kompakt />
           </VorfuehrVerdeckt>
         )}
 
@@ -607,7 +609,7 @@ export default async function MannschaftPage({
         )}
 
         {begleiten && eigenePartner.length > 0 && (
-          <section className="space-y-3">
+          <section className="order-10 space-y-3">
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="text-2xl font-semibold text-ink">Deine Partner</h2>
               <Link
@@ -621,7 +623,7 @@ export default async function MannschaftPage({
               {eigenePartner.map((person) => (
                 <li key={person.id}>
                   <Link
-                    href={`/mannschaft/${person.id}`}
+                    href={`/mannschaft/${person.id}?zurueck=${encodeURIComponent(profilRueckweg)}`}
                     className="flex min-h-24 items-center justify-between gap-4 py-5"
                   >
                     <div className="min-w-0">
@@ -780,6 +782,7 @@ export default async function MannschaftPage({
                         person={person}
                         klasse="text-base font-semibold text-ink"
                         kurz={kurzMap.get(person.name)}
+                        zurueck={profilRueckweg}
                       />
                       <Ampel ampel={person.ampel} variante="text" />
                       <UeberChip
@@ -899,6 +902,7 @@ export default async function MannschaftPage({
                     person={person}
                     klasse="text-sm font-medium text-ink"
                     kurz={kurzMap.get(person.name)}
+                    zurueck={profilRueckweg}
                   />
                   <UeberChip
                     person={person}
@@ -943,6 +947,7 @@ export default async function MannschaftPage({
                     person={person}
                     klasse="font-medium text-ink"
                     kurz={kurzMap.get(person.name)}
+                    zurueck={profilRueckweg}
                   />
                   {person.ueber && (
                     <span className="text-xs text-ink-soft">
@@ -967,6 +972,7 @@ export default async function MannschaftPage({
           Namen der Fuehrungskraft davor. Wer hier steht, ist bereits oben
           abgehandelt - das hier ist zum Nachsehen, nicht zum Entscheiden. */}
         {!begleiten && lage.baum.length > 0 && (
+          <div className="order-[-5]">
           <VorfuehrVerdeckt hinweis="Beim Vorführen ausgeblendet — der Strukturbaum zeigt Klarnamen.">
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -999,7 +1005,7 @@ export default async function MannschaftPage({
                 </div>
               </div>
 
-              {!alsListe && <Organigramm knoten={knoten} />}
+              {!alsListe && <Organigramm knoten={knoten} rueckweg={profilRueckweg} />}
 
               {alsListe && (
                 <ul className="mt-3 space-y-3">
@@ -1025,6 +1031,7 @@ export default async function MannschaftPage({
                             <NameLink
                               person={person}
                               klasse="text-sm font-semibold text-ink"
+                              zurueck={profilRueckweg}
                             />
                             {/* Der Zustand steht jetzt als Wort daneben, nicht mehr
                           nur im sr-only-Text: "braucht dich" muss man sehen. */}
@@ -1175,6 +1182,7 @@ export default async function MannschaftPage({
               )}
             </section>
           </VorfuehrVerdeckt>
+          </div>
         )}
 
         {/* --- Verlauf deiner Struktur ------------------------------------------
@@ -1403,7 +1411,7 @@ export default async function MannschaftPage({
           </section>
         )}
 
-        <p className={kicker}>
+        <p className={`${kicker} order-20`}>
           Woche ab Montag, Monat ab dem Ersten, beides nach Berliner Kalender.
           Signale werden bei jedem Aufruf neu berechnet und nirgends
           gespeichert. Von den Kontakten siehst du die ersten{" "}

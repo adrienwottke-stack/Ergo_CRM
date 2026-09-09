@@ -3,6 +3,7 @@ import { cn, card } from "@/components/ui";
 import { berlinDayOf, dayToUtcDate, startOfMonth, tageImRaster } from "@/lib/dates";
 import type { KalenderEintrag } from "@/lib/kalender/laden";
 import { beschriftung, stilFuer } from "./eintrag-stil";
+import { kalenderEintragHref } from "./kontakt-link";
 
 // Das Monatsgitter - die Uebersicht, in der man nichts liest, sondern sieht,
 // wo Betrieb ist und wo nicht.
@@ -26,10 +27,12 @@ export function Monatsraster({
   tag,
   eintraege,
   heute,
+  rueckweg,
 }: {
   tag: string;
   eintraege: KalenderEintrag[];
   heute: string;
+  rueckweg: string;
 }) {
   const tage = tageImRaster(tag);
   const monat = startOfMonth(tag).getUTCMonth();
@@ -99,6 +102,7 @@ export function Monatsraster({
               <div className="space-y-0.5">
                 {sichtbar.map((eintrag) => {
                   const stil = stilFuer(eintrag);
+                  const ziel = kalenderEintragHref(eintrag, rueckweg);
                   const text = (
                     <>
                       {!eintrag.ganztags && (
@@ -113,10 +117,10 @@ export function Monatsraster({
                     "block truncate rounded px-1 py-0.5 text-11 leading-tight",
                     stil.streifen
                   );
-                  return eintrag.kontaktId || eintrag.href ? (
+                  return ziel ? (
                     <Link
                       key={eintrag.id}
-                      href={eintrag.href ?? `/contacts/${eintrag.kontaktId}`}
+                      href={ziel}
                       className={cn(klassen, "transition hover:brightness-95")}
                     >
                       {text}

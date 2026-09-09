@@ -16,8 +16,6 @@ import {
 import { eintraegeImZeitraum } from "@/lib/kalender/laden";
 import { faelligeQuellenAbgleichen } from "@/lib/kalender/abgleich";
 import {
-  kicker,
-  pageTitle,
   shell,
   btnPrimary,
   btnSecondary,
@@ -25,6 +23,7 @@ import {
   punkt,
 } from "@/components/ui";
 import { ArrowRightIcon, CalendarCheckIcon, PlusIcon } from "@/components/icons";
+import SeitenKopf from "@/components/SeitenKopf";
 import { Umschalter, type Ansicht } from "@/components/kalender/Umschalter";
 import { Zeitraster } from "@/components/kalender/Zeitraster";
 import { Monatsraster } from "@/components/kalender/Monatsraster";
@@ -64,7 +63,7 @@ const kurzFormat = new Intl.DateTimeFormat("de-DE", {
   timeZone: "UTC",
 });
 
-// Fuer die Sync-Status-Zeile unten - dieselben Feldoptionen wie das
+// Fuer die Sync-Status-Zeile - dieselben Feldoptionen wie das
 // "zuletzt"-Datum auf /kalender/quellen, nur in dieser Datei noch einmal
 // angelegt: page.tsx-Module exportieren ihre internen Konstanten nicht.
 const zuletztFormat = new Intl.DateTimeFormat("de-DE", {
@@ -82,7 +81,7 @@ function istAnsicht(wert: string | undefined): wert is Ansicht {
 type QuellenZeile = { name: string; letzterLauf: Date | null; letzterFehler: string | null };
 
 /**
- * Der Sync-Zustand als ein Satz - fuer die Zeile oben auf der Seite.
+ * Der Sync-Zustand als ein Satz fuer die kompakte Statuszeile.
  *
  * "Gestoert" heisst hier: der letzte Lauf dieser Quelle ist fehlgeschlagen
  * (letzterFehler gesetzt). Das trifft sowohl die Quelle, die nach drei
@@ -213,7 +212,8 @@ export default async function KalenderPage({
 
   const wochentage = Array.from({ length: 7 }, (_, i) => shiftDay(mondayOf(tag), i));
 
-  // Sync-Zustand der angebundenen Quellen - fuer die Status-Zeile oben.
+  // Sync-Zustand der angebundenen Quellen. Fehler stehen vor dem Kalender;
+  // der unauffaellige Erfolgszustand folgt erst unter seinem Inhalt.
   // Eine kleine, gezielte Abfrage extra zu den Kalendereintraegen oben: nur
   // die drei Felder, die der Satz braucht, keine Fremdtermine mitgeladen.
   const quellenZeilen = await prisma.kalenderquelle.findMany({
@@ -221,14 +221,15 @@ export default async function KalenderPage({
     select: { name: true, letzterLauf: true, letzterFehler: true },
   });
   const syncZustand = kalenderSyncZustand(quellenZeilen);
+  const kalenderRueckweg = `/kalender?ansicht=${ansicht}&tag=${tag}`;
 
   // Angebundene Kalender nachfassen - NACH der Antwort, nicht davor.
   //
   // Vor dem Rendern haette der Aufruf jeden Seitenaufruf um die Anmeldung bei
   // TimeTree verlaengert, also um Sekunden, die niemand fuer fremde Termine
   // ausgeben will. So ist das Ergebnis erst beim naechsten Aufruf da - dafuer
-  // ist die Seite sofort da. Wer nicht warten will, tippt oben "Jetzt
-  // nachsehen" (haelt sich weiter an die 15-Minuten-Drossel) oder geht auf
+  // ist die Seite sofort da. Wer nicht warten will, tippt unter dem Kalender
+  // "Jetzt nachsehen" (haelt sich weiter an die 15-Minuten-Drossel) oder geht auf
   // die Quellen-Seite und drueckt dort "Jetzt holen" (bricht die Drossel
   // bewusst, siehe dort).
   //
@@ -244,109 +245,144 @@ export default async function KalenderPage({
   });
 
   return (
-    <div className={`${shell} space-y-5`}>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className={pageTitle}>Kalender</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            {imFenster.length === 0
-              ? "Nichts in diesem Zeitraum."
-              : `${imFenster.length} ${imFenster.length === 1 ? "Eintrag" : "Einträge"}.`}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href="/kalender/abo" className={btnSecondary}>
-            <CalendarCheckIcon className="h-4 w-4" />
-            Auf dem Handy
-          </Link>
+    <div className={`${shell} space-y-6`}>
+      <SeitenKopf
+        titel="Kalender"
+        werkzeuge
+        aktion={
           <Link href={`/kalender/neu?tag=${tag}`} className={btnPrimary}>
             <PlusIcon className="h-4 w-4" />
-            Eintrag
+            Termin anlegen
           </Link>
-        </div>
-      </div>
-
-      {syncZustand && (
-        <div
-          className={
-            syncZustand.gestoerte.length > 0
-              ? `${flaeche("gefahr")} flex flex-wrap items-center justify-between gap-3 px-4 py-3`
-              : "flex flex-wrap items-center justify-between gap-3"
-          }
-        >
-          <p
-            className={`flex items-center gap-2 text-sm ${
-              syncZustand.gestoerte.length > 0 ? "text-red-900" : "text-ink-muted"
-            }`}
-          >
-            <span
-              aria-hidden
-              className={`h-2 w-2 shrink-0 rounded-full ${
-                syncZustand.gestoerte.length > 0 ? punkt.gefahr : punkt.erfolg
-              }`}
-            />
-            {syncZustand.zeitText}
-            {syncZustand.gestoerte.length > 0 &&
-              ` · ${
-                syncZustand.gestoerte.length === 1
-                  ? `${syncZustand.gestoerte[0]!.name} gestört`
-                  : `${syncZustand.gestoerte.length} Quellen gestört`
-              }`}
-          </p>
-
-          {/* Beide Knoepfe tragen ihre 44 Pixel selbst: "Jetzt nachsehen" stand
-              vorher auf btnGhost, und das ist reiner Text ohne Mindesthoehe -
-              rund 20 Pixel Trefferflaeche an genau der Stelle, an der am Handy
-              getippt wird. */}
-          {syncZustand.gestoerte.length > 0 ? (
-            <Link
-              href="/kalender/quellen"
-              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-fest-gefahr px-4 text-sm font-semibold text-white transition hover:bg-fest-gefahr-stark"
-            >
-              Reparieren
-              <ArrowRightIcon className="h-4 w-4" />
-            </Link>
-          ) : (
-            <form action={jetztAbgleichen}>
-              <button type="submit" className={`${btnSecondary} shrink-0`}>
-                Jetzt nachsehen
-              </button>
-            </form>
-          )}
-        </div>
-      )}
-
-      <Umschalter
-        ansicht={ansicht}
-        tag={tag}
-        heute={heute}
-        zurueck={zurueck}
-        vor={vor}
-        titel={titel}
+        }
       />
 
-      {ansicht === "monat" && (
-        <Monatsraster tag={tag} eintraege={imFenster} heute={heute} />
-      )}
-      {ansicht === "woche" && (
-        <Zeitraster tage={wochentage} eintraege={imFenster} heute={heute} />
-      )}
-      {ansicht === "tag" && (
-        <Zeitraster tage={[tag]} eintraege={imFenster} heute={heute} />
-      )}
-      {ansicht === "liste" && <Agenda eintraege={imFenster} heute={heute} />}
-
-      <p className={kicker}>
-        „Auf dem Handy“ legt den Kalender in dein Telefon — dann weckt dich dein
-        Telefon, auch wenn die App zu ist. Umgekehrt holt{" "}
-        <Link
-          href="/kalender/quellen"
-          className="font-medium text-navy-600 hover:underline"
+      {syncZustand && syncZustand.gestoerte.length > 0 && (
+        <div
+          className={`${flaeche("gefahr")} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
         >
-          TimeTree hereinholen
-        </Link>{" "}
-        deine dortigen Termine hierher, damit niemand in belegte Zeit plant.
-      </p>
+          <p className="flex items-center gap-2 text-sm text-red-900">
+            <span
+              aria-hidden
+              className={`h-2 w-2 shrink-0 rounded-full ${punkt.gefahr}`}
+            />
+            {syncZustand.zeitText}
+            {` · ${
+              syncZustand.gestoerte.length === 1
+                ? `${syncZustand.gestoerte[0]!.name} gestört`
+                : `${syncZustand.gestoerte.length} Quellen gestört`
+            }`}
+          </p>
+          <Link
+            href="/kalender/quellen"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-fest-gefahr px-4 text-sm font-semibold text-white transition hover:bg-fest-gefahr-stark"
+          >
+            Reparieren
+            <ArrowRightIcon className="h-4 w-4" />
+          </Link>
+        </div>
+      )}
+
+      <section aria-label="Kalenderansicht" className="space-y-4">
+        <Umschalter
+          ansicht={ansicht}
+          tag={tag}
+          heute={heute}
+          zurueck={zurueck}
+          vor={vor}
+          titel={titel}
+        />
+
+        {ansicht === "monat" && (
+          <Monatsraster
+            tag={tag}
+            eintraege={imFenster}
+            heute={heute}
+            rueckweg={kalenderRueckweg}
+          />
+        )}
+        {ansicht === "woche" && (
+          <Zeitraster
+            tage={wochentage}
+            eintraege={imFenster}
+            heute={heute}
+            rueckweg={kalenderRueckweg}
+          />
+        )}
+        {ansicht === "tag" && (
+          <Zeitraster
+            tage={[tag]}
+            eintraege={imFenster}
+            heute={heute}
+            rueckweg={kalenderRueckweg}
+          />
+        )}
+        {ansicht === "liste" && (
+          <Agenda
+            eintraege={imFenster}
+            heute={heute}
+            rueckweg={kalenderRueckweg}
+          />
+        )}
+      </section>
+
+      {syncZustand && syncZustand.gestoerte.length === 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+          <p className="flex items-center gap-2 text-sm text-ink-muted">
+            <span
+              aria-hidden
+              className={`h-2 w-2 shrink-0 rounded-full ${punkt.erfolg}`}
+            />
+            {syncZustand.zeitText}
+          </p>
+          <form action={jetztAbgleichen}>
+            <button type="submit" className={btnSecondary}>
+              Jetzt nachsehen
+            </button>
+          </form>
+        </div>
+      )}
+
+      <details className="group border-t border-line pt-1">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-ink">
+          Kalender verwalten
+          <span
+            aria-hidden
+            className="text-xl font-normal text-ink-muted transition-transform group-open:rotate-45 motion-reduce:transition-none"
+          >
+            +
+          </span>
+        </summary>
+        <div className="divide-y divide-line rounded-xl border border-line bg-surface">
+          <Link
+            href="/kalender/abo"
+            className="flex min-h-14 items-center justify-between gap-4 px-4 py-3 transition hover:bg-sunken"
+          >
+            <span className="flex items-center gap-3">
+              <CalendarCheckIcon className="h-5 w-5 text-link" />
+              <span>
+                <span className="block text-base font-medium text-ink">
+                  Auf dem Handy
+                </span>
+                <span className="block text-sm text-ink-muted">
+                  Termine im Telefon abonnieren
+                </span>
+              </span>
+            </span>
+            <ArrowRightIcon className="h-4 w-4 shrink-0 text-ink-muted" />
+          </Link>
+          <Link
+            href="/kalender/quellen"
+            className="flex min-h-14 items-center justify-between gap-4 px-4 py-3 transition hover:bg-sunken"
+          >
+            <span>
+              <span className="block text-base font-medium text-ink">Kalenderquellen</span>
+              <span className="block text-sm text-ink-muted">TimeTree und Abgleich verwalten</span>
+            </span>
+            <ArrowRightIcon className="h-4 w-4 shrink-0 text-ink-muted" />
+          </Link>
+        </div>
+      </details>
     </div>
   );
 }

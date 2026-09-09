@@ -69,10 +69,12 @@ function StufeZeile({ stufe }: { stufe: DirektenStufe }) {
 
 export default function DirektenListe({
   personen,
+  rueckweg = "/mannschaft",
   einheitenAn,
   monatLabel,
   vormonatLabel,
 }: {
+  rueckweg?: string;
   personen: DirektenZeile[];
   einheitenAn: boolean;
   /** "August" - fuer die Fussnote. */
@@ -91,7 +93,7 @@ export default function DirektenListe({
           {personen.map((person) => (
             <li key={person.id}>
               <Link
-                href={`/mannschaft/${person.id}`}
+                href={`/mannschaft/${person.id}?zurueck=${encodeURIComponent(rueckweg)}`}
                 className="flex min-h-11 flex-col gap-1 rounded-xl px-2 py-2 transition hover:bg-sunken/60 sm:px-3"
               >
                 <div className="flex items-center justify-between gap-3">

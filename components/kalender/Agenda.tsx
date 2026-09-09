@@ -4,6 +4,7 @@ import { berlinDayOf, dayToUtcDate, shiftDay } from "@/lib/dates";
 import type { KalenderEintrag } from "@/lib/kalender/laden";
 import { CalendarCheckIcon, PhoneIcon } from "@/components/icons";
 import { beschriftung, stilFuer } from "./eintrag-stil";
+import { kalenderEintragHref } from "./kontakt-link";
 
 // Die Liste - was hier vorher die ganze Seite war.
 //
@@ -28,9 +29,11 @@ const zeitFormat = new Intl.DateTimeFormat("de-DE", {
 export function Agenda({
   eintraege,
   heute,
+  rueckweg,
 }: {
   eintraege: KalenderEintrag[];
   heute: string;
+  rueckweg: string;
 }) {
   const tage = new Map<string, KalenderEintrag[]>();
   for (const eintrag of eintraege) {
@@ -78,51 +81,67 @@ export function Agenda({
             {tagName(tag)}
             <span className="ml-2 text-sm font-normal text-ink-soft">{liste.length}</span>
           </h2>
-          <ul className="space-y-2">
+          <ul className={`${card} divide-y divide-line overflow-hidden`}>
             {liste.map((eintrag) => {
               const stil = stilFuer(eintrag);
-              return (
-                <li
-                  key={eintrag.id}
-                  className={cn(
-                    `${card} flex items-center gap-3 p-4`,
-                    // Vergangenes bleibt sichtbar, tritt aber zurueck. Dass es
-                    // ueberhaupt sichtbar ist, ist neu: vorher verschwand ein
-                    // gehaltener Termin am naechsten Tag spurlos.
-                    tag < heute && "opacity-60"
-                  )}
-                >
+              const ziel = kalenderEintragHref(eintrag, rueckweg);
+              const vergangen = tag < heute;
+              const zeile = (
+                <>
                   <span className="flex w-14 shrink-0 items-center gap-1.5">
-                    <span className={cn("h-2 w-2 shrink-0 rounded-full", stil.punkt)} />
-                    <span className="text-sm font-semibold tabular-nums text-navy-800">
+                    <span
+                      className={cn("h-2 w-2 shrink-0 rounded-full", stil.punkt)}
+                    />
+                    <span
+                      className={cn(
+                        "text-sm font-semibold tabular-nums",
+                        vergangen ? "text-ink-muted" : "text-navy-800",
+                      )}
+                    >
                       {eintrag.ganztags ? "—" : zeitFormat.format(eintrag.von)}
                     </span>
                   </span>
 
-                  <div className="min-w-0 flex-1">
-                    {eintrag.kontaktId || eintrag.href ? (
-                      <Link
-                        href={eintrag.href ?? `/contacts/${eintrag.kontaktId}`}
-                        className="block truncate text-sm font-semibold text-ink hover:text-link"
-                      >
-                        {eintrag.titel}
-                      </Link>
-                    ) : (
-                      <p className="truncate text-sm font-semibold text-ink">
-                        {beschriftung(eintrag)}
-                      </p>
-                    )}
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={cn(
+                        "block truncate text-base font-semibold",
+                        vergangen ? "text-ink-muted" : "text-ink",
+                        ziel && "group-hover:text-link",
+                      )}
+                    >
+                      {ziel ? eintrag.titel : beschriftung(eintrag)}
+                    </span>
                     {(eintrag.zusatz || eintrag.quelleName) && (
-                      <p className="truncate text-xs text-ink-muted">
+                      <span className="block truncate text-xs text-ink-muted">
                         {[eintrag.quelleName && `aus ${eintrag.quelleName}`, eintrag.zusatz]
                           .filter(Boolean)
                           .join(" · ")}
-                      </p>
+                      </span>
                     )}
-                  </div>
+                  </span>
+                </>
+              );
+              return (
+                <li
+                  key={eintrag.id}
+                  className="flex min-h-16 items-center gap-3 px-4 py-3"
+                >
+                  {ziel ? (
+                    <Link
+                      href={ziel}
+                      className="group flex min-h-11 min-w-0 flex-1 items-center gap-3"
+                    >
+                      {zeile}
+                    </Link>
+                  ) : (
+                    <div className="flex min-h-11 min-w-0 flex-1 items-center gap-3">
+                      {zeile}
+                    </div>
+                  )}
 
                   <div className="flex shrink-0 items-center gap-1">
-                    {eintrag.telefon && (
+                    {eintrag.telefon && !eintrag.kontaktId && (
                       <a
                         href={`tel:${eintrag.telefon.replace(/\s/g, "")}`}
                         aria-label={`${eintrag.titel} anrufen`}

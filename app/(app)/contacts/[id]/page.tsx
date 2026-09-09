@@ -19,18 +19,15 @@ import NextStepBadge, { formatDue } from "@/components/NextStepBadge";
 import ContactActions from "@/components/ContactActions";
 import QuickRowActions from "@/components/QuickRowActions";
 import DeleteContactButton from "@/components/DeleteContactButton";
+import KontaktProfilAktionen from "@/components/KontaktProfilAktionen";
 import KandidaturKarte from "@/components/KandidaturKarte";
 import QrCode from "@/components/schleuse/QrCode";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import { contactStageHints, lostReasonLabels } from "@/lib/pipeline";
 import { activityTypeLabels } from "@/lib/labels";
-import {
-  ArrowLeftIcon,
-  CalendarCheckIcon,
-  ClipboardIcon,
-  PhoneIcon,
-} from "@/components/icons";
-import { btnSecondary, card, kicker, pageTitle, sectionTitle } from "@/components/ui";
+import { CalendarCheckIcon, ClipboardIcon, PhoneIcon } from "@/components/icons";
+import { btnSecondary, card, kicker, sectionTitle } from "@/components/ui";
+import { internerRueckweg } from "@/lib/rueckweg";
 
 const dateTimeFormat = new Intl.DateTimeFormat("de-DE", {
   dateStyle: "medium",
@@ -66,10 +63,14 @@ const activityDotStyles: Record<ActivityType, string> = {
 
 export default async function ContactDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ zurueck?: string }>;
 }) {
   const { id } = await params;
+  const parameter = await searchParams;
+  const rueckweg = internerRueckweg(parameter.zurueck, "/namen");
   const user = await requireUser();
   const contact = await prisma.contact.findFirst({
     where: { id, ...eigene(user.id).kontakte },
@@ -141,49 +142,42 @@ export default async function ContactDetailPage({
     referralsAsked: contact.referralsAskedAt !== null,
   };
 
+  const letzteAktivitaet = contact.activities[0] ?? null;
+
   return (
-    <div className="space-y-8">
-      <div>
-        <Link
-          href="/heute"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
-          Zurück zu Heute
+    <div className="space-y-6">
+      <header className="crm-page-head crm-page-head-with-tools flex min-h-11 items-center justify-between gap-3">
+        <Link href={rueckweg} className="inline-flex min-h-11 items-center gap-2 text-base font-medium text-link">
+          <span aria-hidden>‹</span> Zurück
         </Link>
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-navy-100 text-lg font-semibold text-navy-700">
-              {initials(contact.name)}
-            </span>
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className={pageTitle}>{contact.name}</h1>
-                <StageBadge stage={contact.stage} outcome={contact.outcome} />
-              </div>
-              <p className="mt-0.5 text-sm text-ink-muted">
-                {contact.source ? `${contact.source} · ` : ""}
-                Kontakt seit {dateFormat.format(contact.createdAt)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href={`/contacts/${contact.id}/edit`} className={btnSecondary}>
-              Bearbeiten
-            </Link>
-            <DeleteContactButton
-              contactId={contact.id}
-              contactName={contact.name}
-              activityCount={contact.activities.length}
-              referralCount={contact.referrals.length}
-            />
+        <Link href={`/contacts/${contact.id}/edit`} className={`${btnSecondary} shrink-0`}>
+          Bearbeiten
+        </Link>
+      </header>
+
+      <section className="flex flex-col items-center text-center">
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-akzent text-xl font-semibold text-white">
+          {initials(contact.name)}
+        </span>
+        <div className="mt-3 min-w-0">
+          <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] text-ink">
+            {contact.name}
+          </h1>
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+            <StageBadge stage={contact.stage} outcome={contact.outcome} />
+            <p className="text-sm text-ink-muted">
+              {contact.source ? `${contact.source} · ` : ""}
+              seit {dateFormat.format(contact.createdAt)}
+            </p>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Was als Nächstes zu tun ist, steht ganz oben. */}
+      <KontaktProfilAktionen contact={lite} />
+
+      {/* Nächster Schritt und letzter Kontakt gehören in denselben Lageblock. */}
       <section className={`${card} p-5 sm:p-6`}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <p className={kicker}>Nächster Schritt</p>
             {contact.nextStepType && contact.nextStepAt ? (
@@ -217,17 +211,42 @@ export default async function ContactDetailPage({
               {contactStageHints[contact.stage]}
             </p>
           </div>
+          <div className="border-t border-line pt-5 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+            <p className={kicker}>Letzter Kontakt</p>
+            {letzteAktivitaet ? (
+              <>
+                <p className="mt-2 text-base font-medium text-ink">
+                  {activityTypeLabels[letzteAktivitaet.type]}
+                  <span className="font-normal text-ink-muted">
+                    {` · ${dateTimeFormat.format(letzteAktivitaet.date)}`}
+                  </span>
+                </p>
+                <p className="mt-1 line-clamp-2 text-sm text-ink-muted">
+                  {letzteAktivitaet.text}
+                </p>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-ink-muted">Noch kein Kontakt festgehalten.</p>
+            )}
+          </div>
         </div>
-        <div className="mt-4 border-t border-line pt-4">
-          {(istTermin || istAnruf) && <div className="space-y-3">
-            <p className="text-base font-semibold text-ink">{istTermin ? "Wie ist der Termin gelaufen?" : "Anrufergebnis festhalten"}</p>
-            <QuickRowActions contact={lite} istAnruf={istAnruf} istTermin={istTermin} zeigeWeitere={false} />
-          </div>}
-          <details className={istTermin || istAnruf ? "mt-4 border-t border-line pt-2" : ""}>
-            <summary className="flex min-h-12 cursor-pointer list-item items-center py-3 text-base font-medium text-ink-muted">Weitere Kontaktaktionen</summary>
-            <div className="pb-2 pt-2"><ContactActions contact={lite} /></div>
+        {istTermin && (
+          <div className="mt-4 space-y-3 border-t border-line pt-4">
+            <p className="text-base font-semibold text-ink">Wie ist der Termin gelaufen?</p>
+            <QuickRowActions contact={lite} istAnruf={false} istTermin zeigeWeitere={false} zeigeAnrufen={false} />
+          </div>
+        )}
+        {istAnruf && (
+          <details id="anrufergebnis" className="group mt-4 border-t border-line pt-2">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-base font-semibold text-ink">
+              Anrufergebnis festhalten
+              <span aria-hidden className="text-ink-muted transition group-open:rotate-90">›</span>
+            </summary>
+            <div className="pb-1 pt-3">
+              <QuickRowActions contact={lite} istAnruf zeigeWeitere={false} zeigeAnrufen={false} />
+            </div>
           </details>
-        </div>
+        )}
       </section>
 
       {/* Aufbau-Trichter: nur fuer Kontakte auf der Recruiting-Liste, gut
@@ -244,60 +263,6 @@ export default async function ContactDetailPage({
           />
         </section>
       )}
-
-      {/* Was vor einem Anruf zaehlt - mehr nicht. Alles Weitere stand hier
-          frueher, weil es das Feld gab, nicht weil es jemand braucht. */}
-      <div className={`${card} grid gap-x-8 gap-y-5 p-6 sm:grid-cols-2 sm:p-8`}>
-        <div>
-          <p className={kicker}>Telefon</p>
-          <p className="mt-1 text-sm text-ink">
-            {contact.phone ? (
-              <a
-                href={`tel:${contact.phone}`}
-                className="font-medium text-navy-600 hover:underline"
-              >
-                {contact.phone}
-              </a>
-            ) : (
-              "–"
-            )}
-          </p>
-        </div>
-        <div>
-          <p className={kicker}>Beruf</p>
-          <p className="mt-1 text-sm text-ink">{contact.job ?? "–"}</p>
-        </div>
-        {contact.appointmentAt && (
-          <div>
-            <p className={kicker}>Termin</p>
-            <p className="mt-1 text-sm text-ink">
-              {formatDue(contact.appointmentAt, hasTimeOfDay(contact.appointmentAt))}
-            </p>
-          </div>
-        )}
-        {/* Nur noch Bestand: neu erfasst wird keine E-Mail mehr. */}
-        {contact.email && (
-          <div>
-            <p className={kicker}>E-Mail</p>
-            <p className="mt-1 text-sm text-ink">
-              <a
-                href={`mailto:${contact.email}`}
-                className="font-medium text-navy-600 hover:underline"
-              >
-                {contact.email}
-              </a>
-            </p>
-          </div>
-        )}
-        {contact.note && (
-          <div className="sm:col-span-2">
-            <p className={kicker}>Notiz</p>
-            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">
-              {contact.note}
-            </p>
-          </div>
-        )}
-      </div>
 
       {/* Die Empfehlungsfrage ist der Motor - fehlt sie nach einem gehaltenen
           Termin, steht das hier und nicht in einer Auswertung. */}
@@ -318,7 +283,7 @@ export default async function ContactDetailPage({
               Empfohlen von{" "}
               <Link
                 href={`/contacts/${contact.referredBy.id}`}
-                className="font-medium text-navy-600 hover:underline"
+                className="inline-flex min-h-11 items-center font-medium text-link hover:underline"
               >
                 {contact.referredBy.name}
               </Link>
@@ -349,23 +314,17 @@ export default async function ContactDetailPage({
 
       {/* Vorgeschichte: entsteht aus den Ergebnis-Knoepfen, nicht aus einem
           Formular. Hier wird nur gelesen. */}
-      <div className="space-y-5">
-        <h2 className={sectionTitle}>
-          Vorgeschichte{" "}
-          <span className="font-normal text-ink-soft">
-            ({contact.activities.length})
-          </span>
-        </h2>
-
-        {contact.activities.length === 0 ? (
-          <div className={`${card} px-6 py-12 text-center`}>
-            <p className="text-sm font-medium text-ink">Noch nichts passiert</p>
-            <p className="mt-1 text-sm text-ink-muted">
-              Jeder Anruf und jeder Termin landet hier automatisch.
-            </p>
-          </div>
-        ) : (
-          <ol className="relative space-y-0 pl-2">
+      {contact.activities.length === 0 ? (
+        <p className="text-sm text-ink-muted">
+          Noch kein Verlauf. Anrufe und Termine erscheinen hier automatisch.
+        </p>
+      ) : (
+        <details className={`${card} group p-5 sm:p-6`}>
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-base font-semibold text-ink">
+            Verlauf ansehen · {contact.activities.length}
+            <span aria-hidden className="text-ink-muted transition group-open:rotate-90">›</span>
+          </summary>
+          <ol className="relative mt-4 space-y-0 border-t border-line pt-4 pl-2">
             {contact.activities.map((activity, index) => (
               <li key={activity.id} className="relative flex gap-4 pb-6">
                 {index < contact.activities.length - 1 && (
@@ -395,8 +354,40 @@ export default async function ContactDetailPage({
               </li>
             ))}
           </ol>
-        )}
-      </div>
+        </details>
+      )}
+
+      <details className={`${card} group p-5 sm:p-6`}>
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-lg font-semibold text-ink">
+          Kontaktdetails
+          <span className="text-ink-muted transition group-open:rotate-90" aria-hidden>›</span>
+        </summary>
+        <div className="mt-5 grid gap-x-8 gap-y-5 border-t border-line pt-5 sm:grid-cols-2">
+          <div>
+            <p className={kicker}>Telefon</p>
+            <p className="mt-1 text-sm text-ink">
+              {contact.phone ? <a href={`tel:${contact.phone}`} className="inline-flex min-h-11 items-center font-medium text-link hover:underline">{contact.phone}</a> : "–"}
+            </p>
+          </div>
+          <div><p className={kicker}>Beruf</p><p className="mt-1 text-sm text-ink">{contact.job ?? "–"}</p></div>
+          {contact.appointmentAt && <div><p className={kicker}>Termin</p><p className="mt-1 text-sm text-ink">{formatDue(contact.appointmentAt, hasTimeOfDay(contact.appointmentAt))}</p></div>}
+          {contact.email && <div><p className={kicker}>E-Mail</p><p className="mt-1 text-sm text-ink"><a href={`mailto:${contact.email}`} className="inline-flex min-h-11 items-center font-medium text-link hover:underline">{contact.email}</a></p></div>}
+          {contact.note && <div className="sm:col-span-2"><p className={kicker}>Notiz</p><p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">{contact.note}</p></div>}
+        </div>
+      </details>
+
+      <details className={`${card} group p-5 sm:p-6`}>
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-base font-semibold text-ink">
+          Weitere Aktionen
+          <span className="text-ink-muted transition group-open:rotate-90" aria-hidden>›</span>
+        </summary>
+        <div className="mt-4 space-y-4 border-t border-line pt-4">
+          <ContactActions contact={lite} />
+          <div className="border-t border-line pt-4">
+            <DeleteContactButton contactId={contact.id} contactName={contact.name} activityCount={contact.activities.length} referralCount={contact.referrals.length} />
+          </div>
+        </div>
+      </details>
     </div>
   );
 }

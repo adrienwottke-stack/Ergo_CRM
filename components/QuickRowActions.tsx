@@ -64,6 +64,7 @@ export default function QuickRowActions({
   istAnruf,
   istTermin = false,
   zeigeWeitere = true,
+  zeigeAnrufen = true,
 }: {
   contact: ContactLite;
   /** Anruf-Schritt? Dann die vier Ergebnisse statt "Erledigt". */
@@ -72,6 +73,8 @@ export default function QuickRowActions({
   istTermin?: boolean;
   /** Im Kontaktdetail liegen diese Aktionen bereits im beschrifteten Aufklappbereich. */
   zeigeWeitere?: boolean;
+  /** Das Profil hat bereits einen großen Anruf-Knopf über dem Ergebnisbereich. */
+  zeigeAnrufen?: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -105,7 +108,7 @@ export default function QuickRowActions({
   return (
     <>
       <div className="flex flex-wrap items-center gap-1.5">
-        {contact.phone && (
+        {zeigeAnrufen && contact.phone && (
           <a href={`tel:${contact.phone.replace(/\s/g, "")}`} className={stil.call}>
             <PhoneIcon className="h-4 w-4" />
             Anrufen

@@ -40,35 +40,34 @@ export function Umschalter({
     "flex h-11 w-11 items-center justify-center rounded-lg border border-line-strong bg-surface text-ink-muted transition hover:border-line-strong hover:text-ink";
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <Link href={href(ansicht, zurueck)} aria-label="Zurück" className={springKnopf}>
-          <ArrowLeftIcon className="h-4 w-4" />
-        </Link>
-        <Link href={href(ansicht, vor)} aria-label="Vor" className={springKnopf}>
-          <ArrowRightIcon className="h-4 w-4" />
-        </Link>
-        <h2 className="ml-1 text-base font-semibold tracking-tight text-ink">
+    <div className="space-y-3">
+      <div className="flex min-h-11 items-center gap-2">
+        <h2 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-ink">
           {titel}
         </h2>
         {tag !== heute && (
           <Link
             href={href(ansicht, heute)}
-            className="ml-1 text-sm font-medium text-navy-600 hover:underline"
+            className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-link hover:text-link-stark"
           >
             Heute
           </Link>
         )}
+        <Link href={href(ansicht, zurueck)} aria-label="Vorheriger Zeitraum" className={springKnopf}>
+          <ArrowLeftIcon className="h-4 w-4" />
+        </Link>
+        <Link href={href(ansicht, vor)} aria-label="Nächster Zeitraum" className={springKnopf}>
+          <ArrowRightIcon className="h-4 w-4" />
+        </Link>
       </div>
 
-      {/* Segmentgruppe. Am Handy scrollt sie lieber, als umzubrechen. */}
-      <div className={segmentGruppe}>
+      <div className={`${segmentGruppe} w-full`}>
         {ANSICHTEN.map(({ wert, label }) => (
           <Link
             key={wert}
             href={href(wert, tag)}
             aria-current={wert === ansicht ? "page" : undefined}
-            className={segmentKnopf(wert === ansicht)}
+            className={`${segmentKnopf(wert === ansicht)} min-w-0 flex-1 px-2 sm:px-3.5`}
           >
             {label}
           </Link>

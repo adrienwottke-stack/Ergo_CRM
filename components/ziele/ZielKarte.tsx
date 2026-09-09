@@ -32,12 +32,12 @@ export default function ZielKarte({
   return (
     <article className={`${card} space-y-4 p-5`}>
       <div>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-muted">
           {eigen ? "Dein Ziel" : `Für ${ziel.inhaber.name}`}
           {ziel.id === hauptzielId ? " · Auf Heute" : ""}
         </p>
-        <h2 className="mt-1 text-xl font-semibold">{ziel.titel}</h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <h2 className="mt-1 text-xl font-semibold text-ink">{ziel.titel}</h2>
+        <p className="mt-1 text-sm text-ink-muted">
           {datum.format(ziel.start)} – {datum.format(ende)}
         </p>
       </div>
@@ -66,7 +66,7 @@ export default function ZielKarte({
           {ziel.kennzahlText}
         </p>
       )}
-      {ziel.wunsch && <p className="text-base text-slate-600">{ziel.wunsch}</p>}
+      {ziel.wunsch && <p className="text-base text-ink-muted">{ziel.wunsch}</p>}
       {ziel.zusage === "ABGELEHNT" && (
         <p className="text-sm">Vorschlag abgelehnt.</p>
       )}
@@ -112,7 +112,7 @@ export default function ZielKarte({
             <input type="hidden" name="zielId" value={ziel.id} />
             <button className={btnSecondary}>Erfolg ans Netzwerk melden</button>
           </form>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-ink-muted">
             Du teilst nur den erreichten Stand. Dein persönlicher Wunsch bleibt
             hier.
           </p>

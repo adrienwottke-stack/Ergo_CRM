@@ -24,8 +24,10 @@ import { SCHNELLTEXTE_FUEHRUNG } from "@/lib/nachrichten";
 import NachrichtSenden from "@/components/NachrichtSenden";
 import KuemmereMich from "@/components/KuemmereMich";
 import { PhoneIcon } from "@/components/icons";
-import { card, kicker, pageTitle } from "@/components/ui";
+import { card, kicker } from "@/components/ui";
 import PartnerVereinbarungen from "@/components/vereinbarungen/PartnerVereinbarungen";
+import SeitenKopf from "@/components/SeitenKopf";
+import { internerRueckweg } from "@/lib/rueckweg";
 
 export const dynamic = "force-dynamic";
 
@@ -178,12 +180,12 @@ function VerlaufsTag({
   );
 }
 
-function AstZeile({ person }: { person: Mannschaftsperson }) {
+function AstZeile({ person, zurueck }: { person: Mannschaftsperson; zurueck: string }) {
   const w = person.werte;
   return (
     <li>
       <Link
-        href={`/mannschaft/${person.id}`}
+        href={`/mannschaft/${person.id}?zurueck=${encodeURIComponent(zurueck)}`}
         className="-mx-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg px-2 py-2 transition hover:bg-sunken"
       >
         <Ampel
@@ -212,10 +214,15 @@ function AstZeile({ person }: { person: Mannschaftsperson }) {
 
 export default async function PersonPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ zurueck?: string }>;
 }) {
   const { id } = await params;
+  const parameter = await searchParams;
+  const rueckweg = internerRueckweg(parameter.zurueck, "/mannschaft");
+  const dieserRueckweg = `/mannschaft/${id}?zurueck=${encodeURIComponent(rueckweg)}`;
   const user = await requireUser();
   const kopfzeilen = await headers();
   const herkunft = `${kopfzeilen.get("x-forwarded-proto") ?? "http"}://${kopfzeilen.get("host") ?? ""}`;
@@ -259,29 +266,19 @@ export default async function PersonPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link
-          href="/mannschaft"
-          className="text-13 font-medium text-navy-700 hover:underline"
-        >
-          ← Mannschaft
-        </Link>
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <Ampel ampel={person.ampel} variante="punkt" groesse="gross" />
-          <h1 className={pageTitle}>{person.name}</h1>
-          {/* Der Zustand als Wort direkt hinter dem Namen - das ist die
-              Antwort auf die Frage, mit der man diese Seite oeffnet. */}
-          <Ampel ampel={person.ampel} variante="text" />
-          {person.ueber && (
-            <span className="rounded-full bg-sunken px-2.5 py-0.5 text-xs font-medium text-ink-muted">
-              über {person.ueber}
-            </span>
-          )}
-          {person.ausgetreten && (
-            <span className="text-xs text-ink-soft">ausgetreten</span>
-          )}
+      <SeitenKopf
+        titel={person.name}
+        werkzeuge
+        zurueck={{ href: rueckweg, label: "Team" }}
+      />
+
+      <section className="rounded-2xl border border-line bg-surface p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Ampel ampel={person.ampel} groesse="gross" />
+          {person.ueber && <span className="rounded-full bg-sunken px-2.5 py-1 text-xs font-medium text-ink-muted">über {person.ueber}</span>}
+          {person.ausgetreten && <span className="rounded-full bg-sunken px-2.5 py-1 text-xs text-ink-soft">ausgetreten</span>}
         </div>
-        <p className="mt-1 text-sm text-ink-muted">
+        <p className="mt-3 text-sm text-ink-muted">
           {person.tageDabei !== null
             ? `${person.tageDabei} Tage dabei`
             : "Eintritt unbekannt"}
@@ -290,11 +287,13 @@ export default async function PersonPage({
           {" · "}
           {person.einblick.hinweis}
         </p>
-      </div>
+      </section>
 
-      {/* --- Zuletzt und als Naechstes ---------------------------------------
-          Ganz oben, noch vor dem eigenen Schritt: das ist die Auskunft, wegen
-          der man den Namen ueberhaupt angetippt hat. */}
+      {!person.istDu && !person.platzhalter && (
+        <PartnerVereinbarungen userId={user.id} partnerId={person.id} />
+      )}
+
+      {/* Status und nächster Schritt stehen direkt bei den Vereinbarungen. */}
       {person.platzhalter ? (
         <section className={`${card} p-4 sm:p-5`}>
           <h2 className={kicker}>Noch nicht dabei</h2>
@@ -321,9 +320,7 @@ export default async function PersonPage({
               zuletzt
                 ? `${zuletzt.was} · ${namensListe(zuletzt)}${zuletzt.zusatz ? ` · ${zuletzt.zusatz}` : ""} · ${tagKurz.format(zuletzt.wann)}`
                 : person.werte.letzteAktivitaet
-                  ? // Einblick zu: das Datum steht ohnehin in den Zahlen, der
-                    // Name nicht.
-                    `Aktivität am ${tagKurz.format(person.werte.letzteAktivitaet)}`
+                  ? `Aktivität am ${tagKurz.format(person.werte.letzteAktivitaet)}`
                   : "Noch keine Aktivität eingetragen."
             }
           />
@@ -347,10 +344,6 @@ export default async function PersonPage({
             }
           />
         </section>
-      )}
-
-      {!person.istDu && !person.platzhalter && (
-        <PartnerVereinbarungen userId={user.id} partnerId={person.id} />
       )}
 
       {/* --- Was zu tun ist --------------------------------------------------
@@ -656,7 +649,7 @@ export default async function PersonPage({
           </h2>
           <ul className="mt-1.5 divide-y divide-line">
             {direkte.map((eintrag) => (
-              <AstZeile key={eintrag.id} person={eintrag} />
+              <AstZeile key={eintrag.id} person={eintrag} zurueck={dieserRueckweg} />
             ))}
           </ul>
 
@@ -677,7 +670,7 @@ export default async function PersonPage({
                 {ast
                   .filter((eintrag) => !direkte.includes(eintrag))
                   .map((eintrag) => (
-                    <AstZeile key={eintrag.id} person={eintrag} />
+                    <AstZeile key={eintrag.id} person={eintrag} zurueck={dieserRueckweg} />
                   ))}
               </ul>
             </details>

@@ -1,11 +1,7 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
 import {
-  LIST_KINDS,
-  listKindHints,
-  listKindLabels,
   listeAus,
   sectionOf,
 } from "@/lib/namelist";
@@ -14,7 +10,8 @@ import { liegtSeit } from "@/lib/liegenbleiber";
 import { lostReasonLabels } from "@/lib/pipeline";
 import NameList, { type NameEntry } from "@/components/NameList";
 import GuidePanel from "@/components/GuidePanel";
-import { cn, pageTitle, column, segmentGruppe, segmentKnopf } from "@/components/ui";
+import { column } from "@/components/ui";
+import SeitenKopf from "@/components/SeitenKopf";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +51,7 @@ export default async function NamenPage({
       // seit Wochen nichts gehoert hat.
       lastProgressAt: true,
       nextStepAt: true,
+      nextStepType: true,
     },
     orderBy: { createdAt: "asc" },
   });
@@ -70,6 +68,9 @@ export default async function NamenPage({
     section: sectionOf(contact),
     lostLabel: contact.lostReason ? lostReasonLabels[contact.lostReason] : null,
     liegtTage: liegtSeit(contact),
+    nextStepLabel: contact.nextStepType && contact.nextStepAt
+      ? `${contact.nextStepType === "ANRUF" ? "Anruf" : contact.nextStepType === "TERMIN" ? "Termin" : "Nächster Schritt"} · ${appointmentFormat.format(contact.nextStepAt)}`
+      : null,
     appointmentLabel: contact.appointmentAt
       ? appointmentFormat.format(contact.appointmentAt)
       : null,
@@ -78,31 +79,9 @@ export default async function NamenPage({
   const guide = DEFAULT_GUIDES[guideKey];
 
   return (
-    <div className={`${column} space-y-6`}>
-      <div>
-        <h1 className={pageTitle}>Kontakte</h1>
-        <p className="mt-1 text-sm text-ink-muted">{listKindHints[kind]}</p>
-      </div>
-
-      {/* Reiter: serverseitig gefiltert, damit der Zustand in der Adresse steht
-          und ein Neuladen nichts verliert. Dieselbe Segmented-Control wie im
-          Rest der App (components/ui.ts), statt einer eigenen Pillengruppe. */}
-      <div className={cn(segmentGruppe, "w-full")}>
-        {LIST_KINDS.map((value) => {
-          const active = value === kind;
-          return (
-            <Link
-              key={value}
-              href={`/namen?liste=${value}`}
-              className={cn(segmentKnopf(active), "flex-1")}
-            >
-              {listKindLabels[value]}
-            </Link>
-          );
-        })}
-      </div>
-
-      <NameList entries={entries} kind={kind} />
+    <div className={`${column} space-y-4`}>
+      <SeitenKopf titel="Kontakte" werkzeuge />
+      <NameList key={kind} entries={entries} kind={kind} />
 
       <GuidePanel title={guide.title} body={guide.body} kind={kind} />
     </div>
