@@ -11,6 +11,7 @@ import {
   dueState,
   utcToBerlinLocalInput,
   startOfWeek,
+  hasTimeOfDay,
 } from "@/lib/dates";
 import { arbeitslageFuer } from "@/lib/arbeitslage";
 import {
@@ -51,6 +52,7 @@ const zeit = new Intl.DateTimeFormat("de-DE", {
   minute: "2-digit",
   timeZone: "Europe/Berlin",
 });
+const kurzerTag = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" });
 
 type Kontakt = ContactLite & {
   nextStepType: string | null;
@@ -66,7 +68,7 @@ function Arbeitsliste({ kontakte }: { kontakte: Kontakt[] }) {
         <span aria-hidden className="crm-initials">{k.name.trim().split(/\s+/).slice(0, 2).map(teil => teil[0]).join("")}</span>
         <span className="min-w-0 flex-1">
           <span className="crm-contact-name">{k.name}</span>
-          <span className="crm-contact-state">{k.nextStepType === "TERMIN" ? "Termin" : k.nextStepType === "ANRUF" ? "Anruf" : "Nächsten Schritt festlegen"}{k.nextStepAt ? ` · ${zeit.format(k.nextStepAt)}` : ""}</span>
+          <span className="crm-contact-state">{k.nextStepType === "TERMIN" ? "Termin" : k.nextStepType === "ANRUF" ? "Anruf" : "Nächsten Schritt festlegen"}{k.nextStepAt ? ` · ${(hasTimeOfDay(k.nextStepAt) ? zeit : kurzerTag).format(k.nextStepAt)}` : ""}</span>
         </span>
         <span aria-hidden className="text-xl text-ink-muted">›</span>
       </Link>

@@ -268,7 +268,7 @@ export default async function PersonPage({
     <div className="space-y-6">
       <SeitenKopf
         titel={person.name}
-        werkzeuge
+        className="crm-page-head-with-tools"
         zurueck={{ href: rueckweg, label: "Team" }}
       />
 
@@ -290,7 +290,7 @@ export default async function PersonPage({
       </section>
 
       {!person.istDu && !person.platzhalter && (
-        <PartnerVereinbarungen userId={user.id} partnerId={person.id} />
+        <PartnerVereinbarungen userId={user.id} partnerId={person.id} kompakt />
       )}
 
       {/* Status und nächster Schritt stehen direkt bei den Vereinbarungen. */}

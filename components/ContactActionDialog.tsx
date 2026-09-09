@@ -41,6 +41,7 @@ export default function ContactActionDialog({
   mode,
   contact,
   targetStage,
+  nurTermin = false,
   onClose,
   onSuccess,
 }: {
@@ -48,6 +49,8 @@ export default function ContactActionDialog({
   mode: ActionMode;
   contact: ContactLite | null;
   targetStage?: ContactStage;
+  /** Direkter Termineinstieg im Profil mit automatisch passendem nächsten Schritt. */
+  nurTermin?: boolean;
   onClose: () => void;
   /**
    * Nach dem Speichern, vor dem Schliessen.
@@ -61,15 +64,15 @@ export default function ContactActionDialog({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [stage, setStage] = useState<ContactStage>(targetStage ?? "NEU");
+  const [stage, setStage] = useState<ContactStage>(nurTermin ? "TERMIN_VEREINBART" : targetStage ?? "NEU");
   const [appointment, setAppointment] = useState("");
 
   useEffect(() => {
     if (!open || !contact) return;
-    setStage(targetStage ?? contact.stage);
+    setStage(nurTermin ? "TERMIN_VEREINBART" : targetStage ?? contact.stage);
     setAppointment(contact.appointmentLocal ?? "");
     setError(null);
-  }, [open, contact, targetStage]);
+  }, [open, contact, targetStage, nurTermin]);
 
   if (!contact) return null;
 
@@ -116,10 +119,10 @@ export default function ContactActionDialog({
   if (mode === "stage") {
     const needsAppointment = stage === "TERMIN_VEREINBART";
     return (
-      <Modal open={open} onClose={onClose} title="Phase ändern" subtitle={contact.name}>
+      <Modal open={open} onClose={onClose} title={nurTermin ? "Termin vereinbaren" : "Phase ändern"} subtitle={contact.name}>
         <form onSubmit={submit(setContactStage)}>
           <input type="hidden" name="contactId" value={contact.id} />
-          <div>
+          {nurTermin ? <input type="hidden" name="stage" value="TERMIN_VEREINBART" /> : <div>
             <label htmlFor="stage" className={label}>
               Phase
             </label>
@@ -137,7 +140,7 @@ export default function ContactActionDialog({
               ))}
             </select>
             <p className="mt-1.5 text-xs text-ink-muted">{contactStageHints[stage]}</p>
-          </div>
+          </div>}
 
           {needsAppointment && (
             <div className="mt-4">
@@ -156,13 +159,13 @@ export default function ContactActionDialog({
             </div>
           )}
 
-          <div className="mt-4">
+          {!nurTermin && <div className="mt-4">
             <NextStepFields
               defaults={contactStepDefaults(stage, needsAppointment ? appointment : null)}
             />
-          </div>
+          </div>}
           {errorBox}
-          {footer("Phase speichern")}
+          {footer(nurTermin ? "Termin speichern" : "Phase speichern")}
         </form>
       </Modal>
     );

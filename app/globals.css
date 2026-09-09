@@ -23,8 +23,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --font-sans: -apple-system, BlinkMacSystemFont, var(--font-inter), "Segoe UI", Roboto,
-    sans-serif;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", var(--font-geist-mono), monospace;
 }
 
@@ -67,12 +66,12 @@
 
   /* Linien */
   --color-line: rgba(16, 32, 56, 0.1);
-  --color-line-strong: rgba(16, 32, 56, 0.16);
+  --color-line-strong: #77859a;
 
   /* Schrift */
   --color-ink: #0b1220;
   --color-ink-muted: #46536a;
-  --color-ink-soft: #78849a;
+  --color-ink-soft: #5c6b82;
 
   /* Akzent: Hauptknopf und alles, was fuehrt - iOS-Blau, der einzige Akzent
      der Oberflaeche. */
@@ -666,7 +665,7 @@ html:not(.dark) .crm-nav-active { color: #174dab; }
 .crm-icon-action { display: inline-flex; width: 2.75rem; min-height: 2.75rem; align-items: center; justify-content: center; border-radius: 50%; color: var(--color-ink); }
 .crm-profile-action { display: inline-flex; width: 2.75rem; min-height: 2.75rem; align-items: center; justify-content: center; border-radius: 50%; background: var(--color-surface); border: 1px solid var(--color-line); font-size: .875rem; font-weight: 600; color: var(--color-ink); }
 .crm-icon-action:hover, .crm-profile-action:hover { background: var(--color-sunken); }
-.crm-page-head h1 { font-size: 2rem; line-height: 1.15; letter-spacing: -.035em; }
+.crm-page-head h1 { font-size: 2rem; line-height: 1.15; letter-spacing: -.035em; overflow-wrap: anywhere; }
 .crm-contact-row { display: flex; min-height: 5rem; align-items: center; gap: .875rem; padding: .875rem 0; }
 .crm-initials { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 2.75rem; height: 2.75rem; border-radius: 50%; background: var(--color-highlight); color: var(--color-ink); font-size: 1rem; font-weight: 500; }
 .crm-shell { --schatten-karte: none; --schatten-hoch: none; }

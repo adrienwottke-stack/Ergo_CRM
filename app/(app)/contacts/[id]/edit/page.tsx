@@ -8,13 +8,19 @@ import ContactForm from "@/components/ContactForm";
 import DeleteContactButton from "@/components/DeleteContactButton";
 import { card, kicker, pageTitle, columnNarrow } from "@/components/ui";
 import { updateContact } from "../../actions";
+import { internerRueckweg } from "@/lib/rueckweg";
 
 export default async function EditContactPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ zurueck?: string }>;
 }) {
   const { id } = await params;
+  const parameter = await searchParams;
+  const rueckweg = internerRueckweg(parameter.zurueck, "/namen");
+  const kontaktRueckweg = `/contacts/${id}?zurueck=${encodeURIComponent(rueckweg)}`;
   const user = await requireUser();
   const contact = await prisma.contact.findFirst({
     where: { id, ...eigene(user.id).kontakte },
@@ -31,8 +37,8 @@ export default async function EditContactPage({
     <div className={`${columnNarrow} space-y-6`}>
       <div>
         <Link
-          href={`/contacts/${contact.id}`}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
+          href={kontaktRueckweg}
+          className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Zurück zu {contact.name}
@@ -43,6 +49,7 @@ export default async function EditContactPage({
         action={updateContact}
         contact={contact}
         submitLabel="Änderungen speichern"
+        zurueck={rueckweg}
       />
 
       <section className={`${card} border-red-200/70 p-6`}>

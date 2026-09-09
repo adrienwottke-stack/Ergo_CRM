@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegistrierung from "@/components/ServiceWorkerRegistrierung";
+import ThemaSynchronisierung from "@/components/ThemaSynchronisierung";
 
 // Chrome meldet die Installierbarkeit ueber "beforeinstallprompt" - und zwar
 // frueh, oft bevor React ueberhaupt haengt. Wer erst in einer Komponente
@@ -17,11 +18,6 @@ const INSTALL_MITSCHNITT = `window.addEventListener('beforeinstallprompt',functi
 // Der try/catch ist noetig, weil localStorage in manchen Browsern (privater
 // Modus, gesperrte Cookies) beim blossen Zugriff wirft.
 const THEMA_VORLAUF = `(function(){var m=window.matchMedia('(prefers-color-scheme: dark)');function a(){var t='dunkel';try{t=localStorage.getItem('ergo-thema')||'dunkel'}catch(e){}var d=t!=='hell'&&(t!=='system'||m.matches);document.documentElement.classList.toggle('dark',d);document.querySelectorAll('meta[name="theme-color"]').forEach(function(n){n.setAttribute('content',d?'#0c131e':'#eef2f8')})}a();document.addEventListener('DOMContentLoaded',a,{once:true});m.addEventListener('change',a);window.addEventListener('storage',function(e){if(e.key==='ergo-thema')a()})})();`;
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -67,9 +63,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: INSTALL_MITSCHNITT }} />
       </head>
       <body
-        className={`${inter.variable} ${geistMono.variable} font-sans antialiased`}
+        className={`${geistMono.variable} font-sans antialiased`}
       >
         {children}
+        <ThemaSynchronisierung />
         <ServiceWorkerRegistrierung />
       </body>
     </html>

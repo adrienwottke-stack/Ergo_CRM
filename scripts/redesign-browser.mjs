@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
 import { testDatabase } from './test-db.mjs';
 import { createSession, authCookieName } from '../lib/session.ts';
-import { berlinToday, dayToUtcDate } from '../lib/dates.ts';
+import { berlinToday, dayToUtcDate, shiftDay, berlinLocalToUtc } from '../lib/dates.ts';
 
 assert.equal(process.env.CRM_REDESIGN_EXCLUSIVE, '1', 'Obtain the exclusive .next slot before setting CRM_REDESIGN_EXCLUSIVE=1');
 const output = new URL('../test-results/redesign/', import.meta.url);
@@ -97,6 +97,15 @@ async function commonChecks(page, result) {
   const h1 = await page.getByRole('heading', { level: 1 }).boundingBox();
   if (viewport.width < 768 && !result.detail) assert.ok(h1.y < 80, 'The mobile title has no extra logo row above it');
   if (viewport.width < 768 && result.detail) assert.ok(h1.y < 230, 'The detail heading follows one compact return/edit row and avatar');
+  if (viewport.width < 768 && !result.detail) {
+    result.headerTools = [];
+    for (const label of ['Suchen', 'Profil und Einstellungen']) {
+      const tool = page.locator('main .crm-page-head').getByRole('link', { name: label, exact: true });
+      const bounds = await tool.boundingBox();
+      result.headerTools.push({ label, bounds });
+      assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= viewport.width + 1 && bounds.y >= 0 && bounds.y + bounds.height < box.y, `${label} remains visible inside the mobile page header`);
+    }
+  }
   result.rendered = await renderedAudit(page);
   assert.ok(result.rendered.overflow <= 1, 'No horizontal document overflow');
   assert.equal(result.rendered.canvas, result.light ? '#eef2f8' : '#0c131e', 'Rendered opaque canvas matches the saved appearance');
@@ -162,6 +171,8 @@ async function runEngine(engine, name, port, scenarios) {
         page.setDefaultTimeout(20000);
         const screenshot = `${name}-${scenario.name}-${viewport.width}.png`;
         try {
+          if (scenario.editProfile) await db.contact.update({ where: { id: scenario.editProfile.id }, data: { phone: null, note: null } });
+          if (scenario.makeAppointment) await db.contact.update({ where: { id: scenario.makeAppointment }, data: { stage: 'NEU', appointmentAt: null, nextStepType: 'ANRUF', nextStepAt: today } });
           await context.addCookies([{ name: authCookieName, value: await createSession(scenario.user), url: origin }]);
           await page.goto(`${origin}${scenario.openFrom || scenario.route}`, { waitUntil: 'networkidle' });
           if (scenario.openFrom) {
@@ -176,7 +187,8 @@ async function runEngine(engine, name, port, scenarios) {
             assert.equal(await page.evaluate(() => document.documentElement.classList.contains('dark')), !scenario.light, 'Appearance survives reload');
             assert.equal(await page.evaluate(() => localStorage.getItem('ergo-thema')), scenario.theme, 'Reload preserves the saved appearance');
             const expectedChrome = scenario.light ? '#eef2f8' : '#0c131e';
-            assert.ok((await page.locator('meta[name="theme-color"]').evaluateAll(elements => elements.map(el => el.getAttribute('content')))).every(color => color === expectedChrome), 'Browser chrome color agrees with the saved appearance after reload');
+            result.themeColors = await page.locator('meta[name="theme-color"]').evaluateAll(elements => elements.map(el => ({ content: el.getAttribute('content'), media: el.getAttribute('media') })));
+            assert.ok(result.themeColors.length > 0 && result.themeColors.every(meta => meta.content === expectedChrome), `Browser chrome color agrees with saved appearance after reload: expected ${expectedChrome}, got ${JSON.stringify(result.themeColors)}`);
           }
           if (scenario.search) {
             await page.getByLabel('Kontakte suchen', { exact: true }).fill('ZZZ-kein-Kontakt-9182');
@@ -243,11 +255,53 @@ async function runEngine(engine, name, port, scenarios) {
             await page.locator(`[data-contact-id="${added.id}"]:visible`).waitFor();
             await page.screenshot({ path: fileURLToPath(new URL(screenshot.replace('.png', '-saved.png'), output)), fullPage: false });
           }
+          if (scenario.editProfile) {
+            const actions = page.locator('[aria-label="Kontaktaktionen"]');
+            const entry = scenario.editProfile.entry;
+            const editLink = entry === 'phone' ? actions.getByRole('link', { name: /Anrufen.*Nummer ergänzen/ }) : entry === 'note' ? actions.getByRole('link', { name: 'Notiz', exact: true }) : page.getByRole('link', { name: 'Bearbeiten', exact: true });
+            await editLink.click();
+            await page.getByRole('heading', { name: 'Kontakt bearbeiten', exact: true }).waitFor();
+            assert.equal(new URL(page.url()).searchParams.get('zurueck'), scenario.expectedBack, 'All edit entry points carry the originating list and filter');
+            if (entry !== 'edit') assert.equal(new URL(page.url()).hash, entry === 'phone' ? '#phone' : '#note', 'The requested edit field is anchored');
+            const newPhone = `030909${viewport.width}`;
+            const newNote = `Persönliche Notiz ${name} ${viewport.width}`;
+            await page.getByLabel('Telefon', { exact: true }).fill(newPhone);
+            if (entry === 'note') await page.getByLabel('Notiz', { exact: true }).fill(newNote);
+            await page.getByRole('button', { name: 'Änderungen speichern', exact: true }).click();
+            await page.waitForURL(url => url.pathname === `/contacts/${scenario.editProfile.id}`);
+            await page.getByRole('heading', { name: scenario.heading, exact: true }).waitFor();
+            assert.equal(new URL(page.url()).searchParams.get('zurueck'), scenario.expectedBack, 'Saving contact details keeps the original return context');
+            const saved = await db.contact.findUniqueOrThrow({ where: { id: scenario.editProfile.id } });
+            assert.equal(saved.phone, newPhone, 'Edited phone persists');
+            if (entry === 'note') assert.equal(saved.note, newNote, 'Edited note persists');
+            await page.screenshot({ path: fileURLToPath(new URL(screenshot.replace('.png', '-edited.png'), output)), fullPage: false });
+          }
+          if (scenario.makeAppointment) {
+            await page.locator('[aria-label="Kontaktaktionen"]').getByRole('button', { name: 'Termin', exact: true }).click();
+            const dialog = page.getByRole('dialog');
+            await dialog.getByRole('heading', { name: 'Termin vereinbaren', exact: true }).waitFor();
+            assert.equal(await dialog.locator('select:visible').count(), 0, 'Simple appointment entry exposes no phase or step selector');
+            assert.equal(await dialog.locator('input:not([type="hidden"]):visible').count(), 1, 'Simple appointment entry asks only for date and time');
+            const appointmentLocal = `${shiftDay(berlinToday(), 2)}T15:30`;
+            await dialog.locator('input[type="datetime-local"]').fill(appointmentLocal);
+            await page.screenshot({ path: fileURLToPath(new URL(screenshot.replace('.png', '-appointment-dialog.png'), output)), fullPage: false });
+            await dialog.getByRole('button', { name: 'Termin speichern', exact: true }).click();
+            await dialog.waitFor({ state: 'hidden' });
+            const saved = await db.contact.findUniqueOrThrow({ where: { id: scenario.makeAppointment } });
+            assert.equal(saved.stage, 'TERMIN_VEREINBART');
+            assert.equal(saved.nextStepType, 'TERMIN');
+            assert.equal(saved.appointmentAt?.toISOString(), berlinLocalToUtc(appointmentLocal)?.toISOString(), 'Appointment saves the chosen Berlin date/time');
+            assert.deepEqual(saved.nextStepAt, saved.appointmentAt, 'Next step and appointment stay synchronized');
+          }
           if (scenario.expectedBack) {
             const back = page.locator('main .crm-page-head a').first();
             assert.equal(await back.getAttribute('href'), scenario.expectedBack, 'The profile back action preserves context or safely falls back');
             await back.click();
             await page.waitForURL(url => `${url.pathname}${url.search}${url.hash}` === scenario.expectedBack);
+            if (scenario.expectedSearch) {
+              assert.equal(await page.getByLabel('Kontakte suchen', { exact: true }).inputValue(), scenario.expectedSearch, 'Profile Back restores the list search');
+              assert.equal(await page.locator('[data-contact-id]:visible').count(), 1, 'Restored search preserves the filtered result');
+            }
           }
           assert.deepEqual(errors, [], 'No client render errors');
           result.passed = true;
@@ -297,6 +351,10 @@ try {
   await user('qa-calendar');
   await user('qa-phone'); await user('qa-add');
   const phoneContact = await contact('qa-phone', 'Paul Telefon', '+49 170 5550789', true);
+  await user('qa-edit'); await user('qa-appointment');
+  const editable = await contact('qa-edit', 'Emilia Bearbeitung');
+  await db.contact.update({ where: { id: editable.id }, data: { listKinds: ['RECRUITING', 'VERKAUF'] } });
+  const appointmentEntry = await contact('qa-appointment', 'Timo Termin', '+49 170 5550369', true);
   const appointment = await contact('qa-calendar', 'Clara Kalender', '+49 170 5550123');
   await db.contact.update({ where: { id: appointment.id }, data: { stage: 'TERMIN_VEREINBART', nextStepType: 'TERMIN', nextStepAt: now, appointmentAt: now } });
   const calendarRoute = `/kalender?ansicht=liste&tag=${berlinToday()}`;
@@ -311,7 +369,13 @@ try {
     { name: 'partner-profile-unsafe-back', user: 'qa-lead-many', route: '/mannschaft/qa-lead-many-partner?zurueck=' + encodeURIComponent('/\\example.test/escape'), expectedBack: '/mannschaft', heading: 'QA qa-lead-many-partner', detail: true },
     { name: 'contact-phone-return', user: 'qa-phone', route: `/contacts/${phoneContact.id}`, heading: phoneContact.name, detail: true, phoneReturn: phoneContact.id },
     { name: 'contacts-add-search-switch', user: 'qa-add', route: '/namen?liste=RECRUITING', addSearchSwitch: true },
+    { name: 'contact-profile-filtered-back', user: 'qa-two', route: `/contacts/${two[0].id}`, profilePath: `/contacts/${two[0].id}`, openFrom: '/namen?liste=RECRUITING&q=Anna', expectedBack: '/namen?liste=RECRUITING&q=Anna', expectedSearch: 'Anna', heading: two[0].name, detail: true },
+    { name: 'contact-simple-appointment', user: 'qa-appointment', route: `/contacts/${appointmentEntry.id}`, heading: appointmentEntry.name, detail: true, makeAppointment: appointmentEntry.id },
   );
+  for (const [entry, list] of [['phone', 'RECRUITING'], ['edit', 'VERKAUF'], ['note', 'RECRUITING']]) {
+    const returnPath = `/namen?liste=${list}${entry === 'note' ? '&q=Emilia' : ''}`;
+    scenarios.push({ name: `contact-edit-${entry}-${list.toLowerCase()}`, user: 'qa-edit', route: `/contacts/${editable.id}?zurueck=${encodeURIComponent(returnPath)}`, heading: editable.name, detail: true, expectedBack: returnPath, ...(entry === 'note' ? { expectedSearch: 'Emilia' } : {}), editProfile: { id: editable.id, entry } });
+  }
   for (const [theme, colorScheme, light] of [['dunkel', 'light', false], ['hell', 'dark', true], ['system', 'light', true], ['system', 'dark', false]]) {
     scenarios.push({ name: `theme-${theme}-${colorScheme}`, user: 'qa-two', route: '/namen?liste=RECRUITING', theme, colorScheme, light, viewports: [{ width: 390, height: 844 }] });
   }
@@ -332,3 +396,5 @@ try {
 } finally {
   await fixture.close();
 }
+// The WASM database shutdown can alter process.exitCode; publish the result last.
+if (!report.passed) process.exitCode = 1;

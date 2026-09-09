@@ -7,6 +7,7 @@ import {
 } from "@/lib/namelist";
 import { DEFAULT_GUIDES, guideKeyForList } from "@/lib/guides";
 import { liegtSeit } from "@/lib/liegenbleiber";
+import { hasTimeOfDay } from "@/lib/dates";
 import { lostReasonLabels } from "@/lib/pipeline";
 import NameList, { type NameEntry } from "@/components/NameList";
 import GuidePanel from "@/components/GuidePanel";
@@ -23,14 +24,16 @@ const appointmentFormat = new Intl.DateTimeFormat("de-DE", {
   minute: "2-digit",
   timeZone: "Europe/Berlin",
 });
+const tagFormat = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" });
 
 export default async function NamenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ liste?: string; stufe?: string }>;
+  searchParams: Promise<{ liste?: string; stufe?: string; q?: string }>;
 }) {
   const user = await requireUser();
-  const { liste } = await searchParams;
+  const { liste, q } = await searchParams;
+  const suche = typeof q === "string" ? q : "";
   const kind = listeAus(liste, user.startTrack);
 
   const guideKey = guideKeyForList[kind];
@@ -69,7 +72,7 @@ export default async function NamenPage({
     lostLabel: contact.lostReason ? lostReasonLabels[contact.lostReason] : null,
     liegtTage: liegtSeit(contact),
     nextStepLabel: contact.nextStepType && contact.nextStepAt
-      ? `${contact.nextStepType === "ANRUF" ? "Anruf" : contact.nextStepType === "TERMIN" ? "Termin" : "Nächster Schritt"} · ${appointmentFormat.format(contact.nextStepAt)}`
+      ? `${contact.nextStepType === "ANRUF" ? "Anruf" : contact.nextStepType === "TERMIN" ? "Termin" : "Nächster Schritt"} · ${(hasTimeOfDay(contact.nextStepAt) ? appointmentFormat : tagFormat).format(contact.nextStepAt)}`
       : null,
     appointmentLabel: contact.appointmentAt
       ? appointmentFormat.format(contact.appointmentAt)
@@ -81,7 +84,7 @@ export default async function NamenPage({
   return (
     <div className={`${column} space-y-4`}>
       <SeitenKopf titel="Kontakte" werkzeuge />
-      <NameList key={kind} entries={entries} kind={kind} />
+      <NameList key={`${kind}:${suche}`} entries={entries} kind={kind} initialSuche={suche} />
 
       <GuidePanel title={guide.title} body={guide.body} kind={kind} />
     </div>

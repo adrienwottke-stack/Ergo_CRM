@@ -14,12 +14,14 @@ const hauptaktion = `${basis} bg-akzent text-white hover:bg-akzent-stark`;
 
 export default function KontaktProfilAktionen({
   contact,
+  zurueck,
 }: {
   contact: ContactLite;
+  zurueck: string;
 }) {
   const [terminOffen, setTerminOffen] = useState(false);
   const anrufGestartet = useRef(false);
-  const bearbeiten = `/contacts/${contact.id}/edit`;
+  const bearbeiten = `/contacts/${contact.id}/edit?zurueck=${encodeURIComponent(zurueck)}`;
 
   useEffect(() => {
     const ergebnisOeffnen = () => {
@@ -81,6 +83,7 @@ export default function KontaktProfilAktionen({
         open={terminOffen}
         mode="stage"
         targetStage="TERMIN_VEREINBART"
+        nurTermin
         contact={contact}
         onClose={() => setTerminOffen(false)}
       />

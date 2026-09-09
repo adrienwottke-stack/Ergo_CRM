@@ -71,6 +71,7 @@ export default async function ContactDetailPage({
   const { id } = await params;
   const parameter = await searchParams;
   const rueckweg = internerRueckweg(parameter.zurueck, "/namen");
+  const bearbeiten = `/contacts/${id}/edit?zurueck=${encodeURIComponent(rueckweg)}`;
   const user = await requireUser();
   const contact = await prisma.contact.findFirst({
     where: { id, ...eigene(user.id).kontakte },
@@ -150,7 +151,7 @@ export default async function ContactDetailPage({
         <Link href={rueckweg} className="inline-flex min-h-11 items-center gap-2 text-base font-medium text-link">
           <span aria-hidden>‹</span> Zurück
         </Link>
-        <Link href={`/contacts/${contact.id}/edit`} className={`${btnSecondary} shrink-0`}>
+        <Link href={bearbeiten} className={`${btnSecondary} shrink-0`}>
           Bearbeiten
         </Link>
       </header>
@@ -160,7 +161,7 @@ export default async function ContactDetailPage({
           {initials(contact.name)}
         </span>
         <div className="mt-3 min-w-0">
-          <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] text-ink">
+          <h1 className="[overflow-wrap:anywhere] text-[32px] font-semibold leading-tight tracking-[-0.035em] text-ink">
             {contact.name}
           </h1>
           <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
@@ -173,7 +174,7 @@ export default async function ContactDetailPage({
         </div>
       </section>
 
-      <KontaktProfilAktionen contact={lite} />
+      <KontaktProfilAktionen contact={lite} zurueck={rueckweg} />
 
       {/* Nächster Schritt und letzter Kontakt gehören in denselben Lageblock. */}
       <section className={`${card} p-5 sm:p-6`}>

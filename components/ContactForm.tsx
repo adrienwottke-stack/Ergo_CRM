@@ -14,10 +14,12 @@ export default async function ContactForm({
   action,
   contact,
   submitLabel,
+  zurueck,
 }: {
   action: (formData: FormData) => Promise<void>;
   contact?: Contact;
   submitLabel: string;
+  zurueck?: string;
 }) {
   // Schluessel gegen doppelt angelegte Kontakte: ein Wert je gerendertem
   // Formular, egal wie oft abgeschickt wird. connection() haelt die Seite
@@ -33,6 +35,7 @@ export default async function ContactForm({
     <form action={action} className={`${card} space-y-5 p-6 sm:p-8`}>
       {contact && <input type="hidden" name="contactId" value={contact.id} />}
       {formToken && <input type="hidden" name="formToken" value={formToken} />}
+      {zurueck && <input type="hidden" name="zurueck" value={zurueck} />}
 
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="sm:col-span-2">

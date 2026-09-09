@@ -105,9 +105,11 @@ type Rueckgaengig = {
 export default function NameList({
   entries,
   kind,
+  initialSuche = "",
 }: {
   entries: NameEntry[];
   kind: ListKind;
+  initialSuche?: string;
 }) {
   const [optimistic, applyOptimistic] = useOptimistic(entries, applyPatch);
   const [, startTransition] = useTransition();
@@ -115,7 +117,7 @@ export default function NameList({
   const [showDone, setShowDone] = useState(false);
   const [showLost, setShowLost] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [suche, setSuche] = useState("");
+  const [suche, setSuche] = useState(initialSuche);
   // Auswahlmodus: null = aus. Eine (auch leere) Menge = an.
   const [auswahl, setAuswahl] = useState<Set<string> | null>(null);
   const [rueckgaengig, setRueckgaengig] = useState<Rueckgaengig | null>(null);
@@ -139,7 +141,7 @@ export default function NameList({
   const sichtbareOffene = open.filter(passt);
   const sichtbareErledigte = done.filter(passt);
   const sichtbareAusgeschiedene = lost.filter(passt);
-  const profilHref = (id: string) => `/contacts/${id}?zurueck=${encodeURIComponent(`/namen?liste=${kind}`)}`;
+  const profilHref = (id: string) => `/contacts/${id}?zurueck=${encodeURIComponent(`/namen?liste=${kind}${suchbegriff ? `&q=${encodeURIComponent(suche.trim())}` : ""}`)}`;
 
   const total = optimistic.length;
   const percent = targetPercent(total);

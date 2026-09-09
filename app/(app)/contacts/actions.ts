@@ -16,6 +16,7 @@ import {
 } from "@/lib/dates";
 import { fortschritt } from "@/lib/liegenbleiber";
 import type { ContactStage, NextStepType } from "@/lib/generated/prisma/enums";
+import { internerRueckweg } from "@/lib/rueckweg";
 
 function optional(formData: FormData, field: string) {
   const value = (formData.get(field) as string | null)?.trim();
@@ -135,6 +136,10 @@ export async function updateContact(formData: FormData) {
   const user = await requireUser();
   const contactId = (formData.get("contactId") as string | null)?.trim();
   if (!contactId) throw new Error("Kontakt-ID fehlt.");
+  const zurueck = internerRueckweg(
+    (formData.get("zurueck") as string | null)?.trim() || undefined,
+    "/namen",
+  );
   const data = contactDataFromForm(formData);
 
   // Nur die vier Stammfelder. Phase, Ausgang, Termin und naechster Schritt
@@ -146,7 +151,7 @@ export async function updateContact(formData: FormData) {
   if (count === 0) throw new Error("Kontakt nicht gefunden.");
 
   refreshContactViews(contactId);
-  redirect(`/contacts/${contactId}`);
+  redirect(`/contacts/${contactId}?zurueck=${encodeURIComponent(zurueck)}`);
 }
 
 /**

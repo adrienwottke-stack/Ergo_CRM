@@ -25,7 +25,7 @@ export default function AppShell({
     .split(/\s+/)
     .slice(0, 2)
     .map((teil) => teil[0])
-    .join("");
+    .join("").toLocaleUpperCase("de-DE");
   return (
     <ProfilProvider initialen={initialen}>
     <div className="crm-shell flex min-h-dvh flex-col">
