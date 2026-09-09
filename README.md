@@ -1,39 +1,53 @@
 # Cockpit
 
-Führungssystem für eine Schleife: Namen sammeln → anrufen → Termin machen →
-Termin halten → Ergebnis und neue Namen → von vorn. Jedes Teammitglied hat ein
-eigenes Konto und sieht ausschließlich die eigenen Kontakte. Die Rangliste ist
-teamweit, enthält aber nur Namen und aggregierte Aktivitätszahlen.
+Cockpit begleitet drei Geschäftssituationen: das eigene Geschäft, den Aufbau
+mit dem ersten eigenen Partner und die Führung direkter Partner mit ihren Teams.
+Der gemeinsame Geschäftsablauf führt von Namen und Telefonnummer über den Anruf
+zum Termin, zum Ergebnis und gegebenenfalls zu Einheiten. Neue Empfehlungen
+starten die nächste Runde. Ein gehaltener Termin zählt auch ohne Abschluss.
 
-Maßgeblich für alle Entscheidungen: `docs/audit-kernmodell.md`.
+Die fünf Hauptbereiche bleiben fest: **Heute, Kontakte, Kalender, Fortschritt,
+Team**. Die Startseite beginnt mit einer konkreten Handlung und einem kurzen
+Zielstand. Ziele, Wettbewerb, Zuspruch und Einstieg gehören zum Kern der
+Begleitung. Für Führungskräfte gehören Teamauswertung und Partnerentwicklung
+zum Kerngeschäft.
 
-## Die Schleife
-
-Fünf Stufen, mehr gibt es nicht:
-
-    Name → kontaktiert → Termin vereinbart → Termin gehalten → Abschluss
-
-Nach **jedem** gehaltenen Termin wird nach Empfehlungen gefragt — daraus
-entstehen die nächsten Namen. Das ist der Motor; alles andere bedient ihn.
+Der aktuelle Produktmaßstab und die Umsetzung stehen in
+[Geschäftssituationen](docs/geschaeftssituationen-umsetzung.md) und
+[Arbeitslagen](docs/arbeitslagen-umsetzung.md). Das ältere
+[Audit des Kernmodells](docs/audit-kernmodell.md) bleibt eine historische
+Bestandsaufnahme.
 
 ## Funktionen
 
-- **Namen sammeln:** geführt über zehn Szenen-Fragen (`/namen/sammeln`), dazu
-  Schnellerfassung, A/B/C-Nähe und Nachfüll-Alarm bei leerlaufender Liste
-- **Durchlauf:** ein Name je Karte, `tel:`-Link, Ergebnis in zwei Tipps,
-  Gesprächsleitfaden und Einwandbehandlung direkt daneben
-- **Heute:** führt mit dem Tagespensum („7 Anrufe heute“), darunter überfällig,
-  heute und diese Woche
-- **Kalender:** kommende Termine als Tage, Übernahme in den Handy-Kalender per
-  ICS samt Erinnerung
-- **Trichter:** vier Zahlen (Anrufe → Termine → gehalten → Abschlüsse) und der
-  schwächste Übergang als benannter Engpass
-- **Mannschaft:** je Berater letzter und nächster Schritt, Starterpass des
-  Neuen, Frühwarn-Signale mit Ampel
-- **Wettbewerb:** Rangliste, Puls, Zweikampf, gemeinsamer Sprint,
-  Kurznachrichten zwischen Partnern
-- **Meldungen:** Web-Push für Tagespensum, Frühwarnung, Abschlüsse und
-  Nachrichten (optional, siehe unten)
+- **Kontakte:** Namen aufnehmen, Nummern ergänzen, Gesprächshilfe beim ersten
+  Anruf; Termin, nicht erreicht, später und kein Interesse direkt im Durchlauf.
+- **Heute:** nächste Handlung, persönlicher oder gemeinsamer Zielstand und
+  höchstens drei Aufgaben beziehungsweise Partner pro Vorschau. Der Schwerpunkt
+  wird im Profil gespeichert. Automatisch entscheidet der erste aktive direkte
+  Partner zwischen eigenem Geschäft und Aufbau; Teamführung wird bewusst gewählt.
+- **Kalender:** eigene und bestätigte gemeinsame Termine, Terminergebnisse und
+  Übergabe in den Handy-Kalender.
+- **Fortschritt:** persönliche Ziele und Wünsche, Einheiten, Entwicklung,
+  Wettbewerb und Mein Warum. Jede Einheitenbuchung bestätigt gespeicherten Betrag,
+  Monats- und Gesamtstand sowie den persönlichen Zielbalken.
+- **Begleitung:** die erste Geschäftsablaufrunde bleibt ohne Ablauf nach sieben
+  Tagen sichtbar und freiwillig einklappbar. Erste Einheiten und erreichte Ziele
+  können bewusst geteilt werden; persönliche Nachrichten werden nie automatisch gesendet.
+- **Team:** Begleiten, Auswertung, Struktur. Je Partner letzter Stand, eigene
+  gemeinsame Absprache, nächster Schritt, erlaubter Zielstand und Unterstützung.
+  Eigenleistung und Teilteamleistung bleiben getrennt.
+- **Teamziele:** Wochen- oder Monatsziele für Anrufe, vereinbarte und gehaltene
+  Termine sowie Einheiten. Sie zählen aktive Nachfahren ohne die Eigenleistung
+  der Teamleitung. Mitglieder sehen den gemeinsamen Gesamtstand.
+- **Auswertung:** gemeinsamer Zeitraum und Teamumfang für Aktivitäten,
+  Einheitenkurve, Trichter und Teammeeting. Periodensummen sind keine
+  nachgewiesenen Abschlusswahrscheinlichkeiten.
+- **Netzwerkabend:** gemeinsamer Wettbewerb und geteilte Erfolge der gesamten
+  Instanz, zusätzlich zur Auswertung des eigenen Teams.
+- **Erinnerungen:** fällige eigene Arbeit, gemeinsame Absprachen, offene Einheiten
+  und belegte Führungsfälle. Im Führungsfokus löst eine leere eigene Kontaktliste
+  keinen allgemeinen Inaktivitäts- oder Nachfüllhinweis aus.
 
 ## Stack
 

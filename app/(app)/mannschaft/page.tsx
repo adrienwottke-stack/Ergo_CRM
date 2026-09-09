@@ -3,6 +3,9 @@ import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import TeamNavigation from "./TeamNavigation";
+import Teamziele from "@/components/ziele/Teamziele";
+import PartnerBegleitung from "@/components/PartnerBegleitung";
+import ErfolgeHeute from "@/components/ErfolgeHeute";
 import VereinbarungenHeute from "@/components/vereinbarungen/VereinbarungenHeute";
 import {
   RUECKBLICK_TAGE,
@@ -498,8 +501,8 @@ export default async function MannschaftPage({
 
   return (
     <VorfuehrProvider>
-      <div className="flex flex-col gap-6">
-        <div className="order-[-20]">
+      <div className="space-y-6">
+        <div>
           <SeitenKopf
             titel="Team"
             werkzeuge
@@ -513,41 +516,230 @@ export default async function MannschaftPage({
           <VorfuehrHinweis />
         </div>
 
-        <div className="order-[-10]">
+        <div>
           <TeamNavigation aktiv={begleiten ? "begleiten" : "ueberblick"} />
         </div>
 
-        {!begleiten && (
-          <details className={`${card} order-10 p-5`}>
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between font-semibold text-ink">
-              Teamlage als Matrix
-              <span aria-hidden className="text-ink-muted">›</span>
-            </summary>
-            <div className="mt-4 border-t border-line pt-4">
-              <MannschaftsMatrix rueckweg={profilRueckweg}
-                personen={lage.leute}
-                einheiten={einheiten}
-                zeigeEinheiten={zeigeEinheiten}
-                kurz={kurzMap}
-              />
-            </div>
-          </details>
+        {begleiten && <Teamziele userId={user.id} kompakt />}
+
+        {/* --- Die ganze Struktur ---------------------------------------------
+          Baumreihenfolge, Direkte prominent, Tiefe eingerueckt und mit dem
+          Namen der Fuehrungskraft davor. Wer hier steht, ist bereits oben
+          abgehandelt - das hier ist zum Nachsehen, nicht zum Entscheiden. */}
+        {!begleiten && lage.baum.length > 0 && (
+          <div>
+          <VorfuehrVerdeckt hinweis="Beim Vorführen ausgeblendet — der Strukturbaum zeigt Klarnamen.">
+            <section className="space-y-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <h2 className={kicker}>
+                  {lage.gesamtstruktur ? "Gesamte Struktur" : "Deine Struktur"}{" "}
+                  ({lage.baum.length})
+                </h2>
+                <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                  {/* Zwei Sichten auf dieselbe Struktur. Das Bild beantwortet
+                  "wer haengt unter wem", die Liste "was ist mit wem los" -
+                  und traegt die Knoepfe, fuer die im Kasten kein Platz ist. */}
+                  <Link
+                    href="/mannschaft?bereich=ueberblick"
+                    scroll={false}
+                    className={filterPill(!alsListe)}
+                  >
+                    Organigramm
+                  </Link>
+                  <Link
+                    href="/mannschaft?bereich=ueberblick&ansicht=liste"
+                    scroll={false}
+                    className={filterPill(alsListe)}
+                  >
+                    Liste
+                  </Link>
+                  <PersonAufnehmen
+                    fuehrungen={fuehrungen}
+                    herkunft={herkunft}
+                  />
+                </div>
+              </div>
+
+              {!alsListe && <Organigramm knoten={knoten} rueckweg={profilRueckweg} />}
+
+              {alsListe && (
+                <ul className="mt-3 space-y-3">
+                  {lage.baum.map((person) => {
+                    const w = person.werte;
+                    const schrittUeberfaellig =
+                      w.naechsterSchritt !== null &&
+                      w.naechsterSchritt.getTime() < heuteStart;
+                    return (
+                      <li
+                        key={person.id}
+                        id={`p-${person.id}`}
+                        className={`${card} p-4 scroll-mt-24 sm:p-5 ${
+                          person.tiefe > 1 ? "border-l-2 border-l-line" : ""
+                        }`}
+                        style={{
+                          marginLeft: `${Math.min(person.tiefe - 1, 3) * 12}px`,
+                        }}
+                      >
+                        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                          <span className="flex items-center gap-2">
+                            <Ampel ampel={person.ampel} variante="punkt" />
+                            <NameLink
+                              person={person}
+                              klasse="text-sm font-semibold text-ink"
+                              zurueck={profilRueckweg}
+                            />
+                            {/* Der Zustand steht jetzt als Wort daneben, nicht mehr
+                          nur im sr-only-Text: "braucht dich" muss man sehen. */}
+                            <Ampel ampel={person.ampel} variante="text" />
+                          </span>
+                          <UeberChip person={person} />
+                          <Merkmale person={person} />
+                          <span className="ml-auto text-xs text-ink-muted">
+                            {/* "seit über 60 Tagen nichts" bei jemandem, der gestern
+                          dazugekommen ist, ist schlicht falsch - und es ist
+                          das Erste, was eine frische Fuehrungskraft liest. */}
+                            {person.platzhalter
+                              ? "nutzt die App noch nicht"
+                              : w.letzteAktivitaet
+                                ? `zuletzt ${datumKurz.format(w.letzteAktivitaet)}`
+                                : !person.angekommen
+                                  ? "noch nicht gestartet"
+                                  : person.tageDabei !== null &&
+                                      person.tageDabei <= RUECKBLICK_TAGE
+                                    ? "noch keine Aktivität eingetragen"
+                                    : `seit über ${RUECKBLICK_TAGE} Tagen keine Aktivität eingetragen`}
+                            {!person.platzhalter &&
+                              (person.pipelineSichtbar ||
+                                person.einblick.offen) && (
+                                <>
+                                  {" · "}
+                                  {w.naechsterSchritt
+                                    ? `${schrittUeberfaellig ? "offen seit" : "nächster"} ${datumKurz.format(w.naechsterSchritt)}`
+                                    : "nichts geplant"}
+                                </>
+                              )}
+                          </span>
+                        </div>
+
+                        {/* Nullen sind bei einem Platzhalter keine Auskunft, sondern
+                      eine Behauptung: "0 Anrufe" liest sich wie Faulheit und
+                      heisst in Wahrheit "noch nie gefragt worden". */}
+                        {!person.platzhalter && (
+                          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-3">
+                            <Kennzahl
+                              wert={w.anrufeWoche}
+                              bezeichnung="Anrufe (Woche)"
+                            />
+                            <Kennzahl
+                              wert={w.vereinbartWoche}
+                              bezeichnung="Termine vereinbart"
+                            />
+                            <Kennzahl
+                              wert={w.gehaltenWoche}
+                              bezeichnung="Termine gehalten"
+                            />
+                            <Kennzahl
+                              wert={w.abschluesseMonat}
+                              bezeichnung="Abschlüsse (Monat)"
+                              betont
+                            />
+                            {person.pipelineSichtbar && (
+                              <>
+                                <Kennzahl
+                                  wert={w.inAkquise}
+                                  bezeichnung="in Akquise"
+                                />
+                                <Kennzahl
+                                  wert={w.ueberfaellig}
+                                  bezeichnung="überfällig"
+                                />
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Der Sponsor sieht denselben Stand wie der Neue selbst auf
+                      /heute - sonst redet er über Zahlen, die der andere nicht
+                      kennt. */}
+                        {person.pass && (
+                          <div className="mt-3 flex items-center gap-3 border-t border-line pt-3">
+                            <span className="text-xs font-medium text-ink-muted">
+                              Starterpass
+                            </span>
+                            <Fortschritt
+                              anteil={
+                                person.pass.geschafft / person.pass.gesamt
+                              }
+                              ton="info"
+                              className="flex-1"
+                              beschriftung={`Starterpass: ${person.pass.geschafft} von ${person.pass.gesamt}`}
+                            />
+                            <span className="text-xs font-semibold tabular-nums text-ink-muted">
+                              {person.pass.geschafft} von {person.pass.gesamt}
+                            </span>
+                          </div>
+                        )}
+
+                        {person.signale.length > 0 && (
+                          <ul className="mt-4 space-y-2 border-t border-line pt-3">
+                            {person.signale.map((signal) => (
+                              <SignalZeile
+                                key={signal.schluessel}
+                                signal={signal}
+                              />
+                            ))}
+                          </ul>
+                        )}
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                          {/* Eine Nachricht an einen Platzhalter kaeme nie an: er hat
+                        kein Konto, das ein Postfach oeffnen koennte. */}
+                          {!person.platzhalter && (
+                            <NachrichtSenden
+                              anId={person.id}
+                              name={person.name}
+                              schnelltexte={SCHNELLTEXTE_FUEHRUNG}
+                              variante="knopf"
+                            />
+                          )}
+                          {/* Wo geschrieben werden kann, muss auch angerufen werden
+                        koennen - der Anruf ist der staerkere Griff, nicht der
+                        seltenere. */}
+                          {person.telefon && (
+                            <a
+                              href={`tel:${person.telefon.replace(/[^+\d]/g, "")}`}
+                              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-13 font-medium text-ink-muted transition hover:bg-sunken hover:text-ink"
+                            >
+                              <PhoneIcon className="h-4 w-4" />
+                              {person.vorname} anrufen
+                            </a>
+                          )}
+                          <Gelesen person={person} />
+                          {person.platzhalter ? (
+                            <p className="ml-auto text-xs text-ink-soft">
+                              {person.eingeladen
+                                ? "Einladung ist raus."
+                                : "Antippen, um einen Einladungslink zu erzeugen."}
+                            </p>
+                          ) : (
+                            !person.pipelineSichtbar && (
+                              <p className="ml-auto text-xs text-ink-soft">
+                                {person.vorname} zeigt nur Zahlen, keinen
+                                Trichter.
+                              </p>
+                            )
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          </VorfuehrVerdeckt>
+          </div>
         )}
-        {!begleiten && einheitenAn.einheiten && direktenZeilen.length > 0 && (
-          <details className={card + " order-10 p-5"}>
-            <summary className="min-h-11 cursor-pointer py-2 font-semibold">
-              Direkte Partner im Monatsvergleich
-            </summary>
-            <div className="mt-3">
-              <DirektenListe rueckweg={profilRueckweg}
-                personen={direktenZeilen}
-                einheitenAn={einheitenAn.einheiten}
-                monatLabel={produktionsmonat(berlinToday()).label}
-                vormonatLabel={monatsvergleich.vormonatLabel}
-              />
-            </div>
-          </details>
-        )}
+
         {begleiten && (
           <VorfuehrVerdeckt hinweis="Gemeinsame Absprachen werden beim Vorführen ausgeblendet.">
             <VereinbarungenHeute userId={user.id} kompakt />
@@ -605,53 +797,6 @@ export default async function MannschaftPage({
             >
               Geschäftspartner einladen →
             </Link>
-          </section>
-        )}
-
-        {begleiten && eigenePartner.length > 0 && (
-          <section className="order-10 space-y-3">
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-2xl font-semibold text-ink">Deine Partner</h2>
-              <Link
-                href="/einladen"
-                className="min-h-11 py-2 text-base font-medium text-navy-800"
-              >
-                Einladen
-              </Link>
-            </div>
-            <ul className="divide-y divide-line">
-              {eigenePartner.map((person) => (
-                <li key={person.id}>
-                  <Link
-                    href={`/mannschaft/${person.id}?zurueck=${encodeURIComponent(profilRueckweg)}`}
-                    className="flex min-h-24 items-center justify-between gap-4 py-5"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xl font-semibold text-ink">
-                        <GpName
-                          name={person.name}
-                          kurz={kurzMap.get(person.name)}
-                        />
-                      </p>
-                      <p className="mt-1 text-base text-ink-muted">
-                        {person.betreuung
-                          ? `Nachfassen am ${datumKurz.format(person.betreuung.faelligAm)}`
-                          : (person.signale[0]?.titel ??
-                            "Keine offenen Unterstützungshinweise")}
-                      </p>
-                      <p className="mt-1 text-sm text-ink-muted">
-                        {person.werte.letzteAktivitaet
-                          ? `Zuletzt eingetragen: ${datumKurz.format(person.werte.letzteAktivitaet)}`
-                          : "Noch keine Aktivität eingetragen"}
-                      </p>
-                    </div>
-                    <span aria-hidden className="text-2xl text-ink-muted">
-                      ›
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
           </section>
         )}
 
@@ -967,222 +1112,28 @@ export default async function MannschaftPage({
           </section>
         )}
 
-        {/* --- Die ganze Struktur ---------------------------------------------
-          Baumreihenfolge, Direkte prominent, Tiefe eingerueckt und mit dem
-          Namen der Fuehrungskraft davor. Wer hier steht, ist bereits oben
-          abgehandelt - das hier ist zum Nachsehen, nicht zum Entscheiden. */}
-        {!begleiten && lage.baum.length > 0 && (
-          <div className="order-[-5]">
-          <VorfuehrVerdeckt hinweis="Beim Vorführen ausgeblendet — der Strukturbaum zeigt Klarnamen.">
-            <section className="space-y-3">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <h2 className={kicker}>
-                  {lage.gesamtstruktur ? "Gesamte Struktur" : "Deine Struktur"}{" "}
-                  ({lage.baum.length})
-                </h2>
-                <div className="ml-auto flex flex-wrap items-center gap-1.5">
-                  {/* Zwei Sichten auf dieselbe Struktur. Das Bild beantwortet
-                  "wer haengt unter wem", die Liste "was ist mit wem los" -
-                  und traegt die Knoepfe, fuer die im Kasten kein Platz ist. */}
-                  <Link
-                    href="/mannschaft?bereich=ueberblick"
-                    scroll={false}
-                    className={filterPill(!alsListe)}
-                  >
-                    Organigramm
-                  </Link>
-                  <Link
-                    href="/mannschaft?bereich=ueberblick&ansicht=liste"
-                    scroll={false}
-                    className={filterPill(alsListe)}
-                  >
-                    Liste
-                  </Link>
-                  <PersonAufnehmen
-                    fuehrungen={fuehrungen}
-                    herkunft={herkunft}
-                  />
-                </div>
-              </div>
-
-              {!alsListe && <Organigramm knoten={knoten} rueckweg={profilRueckweg} />}
-
-              {alsListe && (
-                <ul className="mt-3 space-y-3">
-                  {lage.baum.map((person) => {
-                    const w = person.werte;
-                    const schrittUeberfaellig =
-                      w.naechsterSchritt !== null &&
-                      w.naechsterSchritt.getTime() < heuteStart;
-                    return (
-                      <li
-                        key={person.id}
-                        id={`p-${person.id}`}
-                        className={`${card} p-4 scroll-mt-24 sm:p-5 ${
-                          person.tiefe > 1 ? "border-l-2 border-l-line" : ""
-                        }`}
-                        style={{
-                          marginLeft: `${Math.min(person.tiefe - 1, 3) * 12}px`,
-                        }}
-                      >
-                        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                          <span className="flex items-center gap-2">
-                            <Ampel ampel={person.ampel} variante="punkt" />
-                            <NameLink
-                              person={person}
-                              klasse="text-sm font-semibold text-ink"
-                              zurueck={profilRueckweg}
-                            />
-                            {/* Der Zustand steht jetzt als Wort daneben, nicht mehr
-                          nur im sr-only-Text: "braucht dich" muss man sehen. */}
-                            <Ampel ampel={person.ampel} variante="text" />
-                          </span>
-                          <UeberChip person={person} />
-                          <Merkmale person={person} />
-                          <span className="ml-auto text-xs text-ink-muted">
-                            {/* "seit über 60 Tagen nichts" bei jemandem, der gestern
-                          dazugekommen ist, ist schlicht falsch - und es ist
-                          das Erste, was eine frische Fuehrungskraft liest. */}
-                            {person.platzhalter
-                              ? "nutzt die App noch nicht"
-                              : w.letzteAktivitaet
-                                ? `zuletzt ${datumKurz.format(w.letzteAktivitaet)}`
-                                : !person.angekommen
-                                  ? "noch nicht gestartet"
-                                  : person.tageDabei !== null &&
-                                      person.tageDabei <= RUECKBLICK_TAGE
-                                    ? "noch keine Aktivität eingetragen"
-                                    : `seit über ${RUECKBLICK_TAGE} Tagen keine Aktivität eingetragen`}
-                            {!person.platzhalter &&
-                              (person.pipelineSichtbar ||
-                                person.einblick.offen) && (
-                                <>
-                                  {" · "}
-                                  {w.naechsterSchritt
-                                    ? `${schrittUeberfaellig ? "offen seit" : "nächster"} ${datumKurz.format(w.naechsterSchritt)}`
-                                    : "nichts geplant"}
-                                </>
-                              )}
-                          </span>
-                        </div>
-
-                        {/* Nullen sind bei einem Platzhalter keine Auskunft, sondern
-                      eine Behauptung: "0 Anrufe" liest sich wie Faulheit und
-                      heisst in Wahrheit "noch nie gefragt worden". */}
-                        {!person.platzhalter && (
-                          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-3">
-                            <Kennzahl
-                              wert={w.anrufeWoche}
-                              bezeichnung="Anrufe (Woche)"
-                            />
-                            <Kennzahl
-                              wert={w.vereinbartWoche}
-                              bezeichnung="Termine vereinbart"
-                            />
-                            <Kennzahl
-                              wert={w.gehaltenWoche}
-                              bezeichnung="Termine gehalten"
-                            />
-                            <Kennzahl
-                              wert={w.abschluesseMonat}
-                              bezeichnung="Abschlüsse (Monat)"
-                              betont
-                            />
-                            {person.pipelineSichtbar && (
-                              <>
-                                <Kennzahl
-                                  wert={w.inAkquise}
-                                  bezeichnung="in Akquise"
-                                />
-                                <Kennzahl
-                                  wert={w.ueberfaellig}
-                                  bezeichnung="überfällig"
-                                />
-                              </>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Der Sponsor sieht denselben Stand wie der Neue selbst auf
-                      /heute - sonst redet er über Zahlen, die der andere nicht
-                      kennt. */}
-                        {person.pass && (
-                          <div className="mt-3 flex items-center gap-3 border-t border-line pt-3">
-                            <span className="text-xs font-medium text-ink-muted">
-                              Starterpass
-                            </span>
-                            <Fortschritt
-                              anteil={
-                                person.pass.geschafft / person.pass.gesamt
-                              }
-                              ton="info"
-                              className="flex-1"
-                              beschriftung={`Starterpass: ${person.pass.geschafft} von ${person.pass.gesamt}`}
-                            />
-                            <span className="text-xs font-semibold tabular-nums text-ink-muted">
-                              {person.pass.geschafft} von {person.pass.gesamt}
-                            </span>
-                          </div>
-                        )}
-
-                        {person.signale.length > 0 && (
-                          <ul className="mt-4 space-y-2 border-t border-line pt-3">
-                            {person.signale.map((signal) => (
-                              <SignalZeile
-                                key={signal.schluessel}
-                                signal={signal}
-                              />
-                            ))}
-                          </ul>
-                        )}
-
-                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-                          {/* Eine Nachricht an einen Platzhalter kaeme nie an: er hat
-                        kein Konto, das ein Postfach oeffnen koennte. */}
-                          {!person.platzhalter && (
-                            <NachrichtSenden
-                              anId={person.id}
-                              name={person.name}
-                              schnelltexte={SCHNELLTEXTE_FUEHRUNG}
-                              variante="knopf"
-                            />
-                          )}
-                          {/* Wo geschrieben werden kann, muss auch angerufen werden
-                        koennen - der Anruf ist der staerkere Griff, nicht der
-                        seltenere. */}
-                          {person.telefon && (
-                            <a
-                              href={`tel:${person.telefon.replace(/[^+\d]/g, "")}`}
-                              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-13 font-medium text-ink-muted transition hover:bg-sunken hover:text-ink"
-                            >
-                              <PhoneIcon className="h-4 w-4" />
-                              {person.vorname} anrufen
-                            </a>
-                          )}
-                          <Gelesen person={person} />
-                          {person.platzhalter ? (
-                            <p className="ml-auto text-xs text-ink-soft">
-                              {person.eingeladen
-                                ? "Einladung ist raus."
-                                : "Antippen, um einen Einladungslink zu erzeugen."}
-                            </p>
-                          ) : (
-                            !person.pipelineSichtbar && (
-                              <p className="ml-auto text-xs text-ink-soft">
-                                {person.vorname} zeigt nur Zahlen, keinen
-                                Trichter.
-                              </p>
-                            )
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
-          </VorfuehrVerdeckt>
-          </div>
+        {begleiten && eigenePartner.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-2xl font-semibold text-ink">Deine Partner</h2>
+              <Link
+                href="/einladen"
+                className="inline-flex min-h-11 items-center text-base font-medium text-link"
+              >
+                Einladen
+              </Link>
+            </div>
+            <PartnerBegleitung
+              userId={user.id}
+              personen={eigenePartner}
+              struktur={lage.leute}
+              kompakt
+              rueckweg={profilRueckweg}
+            />
+            <VorfuehrVerdeckt hinweis="Persönliche Erfolge werden beim Vorführen ausgeblendet.">
+              <ErfolgeHeute userId={user.id} team />
+            </VorfuehrVerdeckt>
+          </section>
         )}
 
         {/* --- Verlauf deiner Struktur ------------------------------------------
@@ -1411,7 +1362,39 @@ export default async function MannschaftPage({
           </section>
         )}
 
-        <p className={`${kicker} order-20`}>
+        {!begleiten && (
+          <details className={`${card} p-5`}>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between font-semibold text-ink">
+              Teamlage als Matrix
+              <span aria-hidden className="text-ink-muted">›</span>
+            </summary>
+            <div className="mt-4 border-t border-line pt-4">
+              <MannschaftsMatrix rueckweg={profilRueckweg}
+                personen={lage.leute}
+                einheiten={einheiten}
+                zeigeEinheiten={zeigeEinheiten}
+                kurz={kurzMap}
+              />
+            </div>
+          </details>
+        )}
+        {!begleiten && einheitenAn.einheiten && direktenZeilen.length > 0 && (
+          <details className={card + " p-5"}>
+            <summary className="min-h-11 cursor-pointer py-2 font-semibold">
+              Direkte Partner im Monatsvergleich
+            </summary>
+            <div className="mt-3">
+              <DirektenListe rueckweg={profilRueckweg}
+                personen={direktenZeilen}
+                einheitenAn={einheitenAn.einheiten}
+                monatLabel={produktionsmonat(berlinToday()).label}
+                vormonatLabel={monatsvergleich.vormonatLabel}
+              />
+            </div>
+          </details>
+        )}
+
+        <p className={kicker}>
           Woche ab Montag, Monat ab dem Ersten, beides nach Berliner Kalender.
           Signale werden bei jedem Aufruf neu berechnet und nirgends
           gespeichert. Von den Kontakten siehst du die ersten{" "}

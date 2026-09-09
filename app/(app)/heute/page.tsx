@@ -16,7 +16,6 @@ import {
 import { arbeitslageFuer } from "@/lib/arbeitslage";
 import {
   faelligeAufgaben,
-  fuehrungsSchritt,
   mannschaftsLage,
 } from "@/lib/fuehrung";
 import { ladeHeuteVereinbarungen } from "@/lib/vereinbarungen";
@@ -29,6 +28,10 @@ import { startOptions } from "@/lib/start/settings";
 import FuehrungsAufgabe from "@/components/FuehrungsAufgabe";
 import VereinbarungenHeute from "@/components/vereinbarungen/VereinbarungenHeute";
 import ZielHeute from "@/components/ziele/ZielHeute";
+import Teamziele from "@/components/ziele/Teamziele";
+import PartnerBegleitung from "@/components/PartnerBegleitung";
+import EinstiegsBegleitung from "@/components/EinstiegsBegleitung";
+import ErfolgeHeute from "@/components/ErfolgeHeute";
 import EinheitenErinnerungen from "@/components/ziele/EinheitenErinnerungen";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import ErsteWoche from "@/components/ErsteWoche";
@@ -57,8 +60,6 @@ const kurzerTag = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-d
 type Kontakt = ContactLite & {
   nextStepType: string | null;
   nextStepAt: Date | null;
-  note: string | null;
-  letzteNotiz: string | null;
 };
 
 function Arbeitsliste({ kontakte, rueckweg = "/heute" }: { kontakte: Kontakt[]; rueckweg?: string }) {
@@ -133,13 +134,6 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
         nextStepAt: { lt: addDays(dayToUtcDate(heute), 8) },
       },
       orderBy: { nextStepAt: "asc" },
-      include: {
-        activities: {
-          orderBy: { date: "desc" },
-          take: 1,
-          select: { text: true },
-        },
-      },
     }),
     prisma.contact.findMany({
       where: {
@@ -149,13 +143,6 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
         stage: { not: "ABSCHLUSS" },
       },
       orderBy: { lastProgressAt: "asc" },
-      include: {
-        activities: {
-          orderBy: { date: "desc" },
-          take: 1,
-          select: { text: true },
-        },
-      },
     }),
     prisma.contact.count({
       where: {
@@ -187,7 +174,7 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
         createdAt: { gte: new Date(Date.now() - 3 * 86400000) },
       },
       orderBy: { createdAt: "desc" },
-      take: 5,
+      take: 3,
       select: {
         id: true,
         text: true,
@@ -235,7 +222,8 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
     ["overdue", "today"].includes(dueState(k.nextStepAt!, heute)),
   );
   const spaeter = kontakte.filter((k) => !jetzt.includes(k));
-  const brauchenDich = lage?.dringend.filter((p) => p.ampel === "rot") ?? [];
+  const partner = lage?.leute.filter(p => p.istDirekt && !p.platzhalter && !p.ausgetreten).sort((a, b) => b.rang - a.rang) ?? [];
+  const brauchenDich = lage?.dringend.filter(p => !p.platzhalter && !p.ausgetreten) ?? [];
   const activeStart =
     startKonfiguration.guidance &&
     user.role !== "ADMIN" &&
@@ -264,8 +252,6 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
     referralsAsked: k.referralsAskedAt !== null,
     nextStepType: k.nextStepType,
     nextStepAt: k.nextStepAt,
-    note: k.note,
-    letzteNotiz: k.activities[0]?.text ?? null,
   });
   const eigeneAktion = naechster
     ? {
@@ -276,8 +262,12 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
         text: naechster.name,
         label:
           naechster.nextStepType === "TERMIN"
-            ? "Termin bearbeiten"
-            : "Kontakt öffnen",
+            ? naechster.appointmentAt && naechster.appointmentAt < new Date()
+              ? "Terminergebnis eintragen"
+              : "Termin ansehen"
+            : naechster.nextStepType === "ANRUF"
+              ? "Anruf vorbereiten"
+              : "Nächsten Schritt ansehen",
         href: `/contacts/${naechster.id}?zurueck=${encodeURIComponent(rueckweg)}`,
       }
     : namen === 0
@@ -300,39 +290,42 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
             label: "Anrufe starten",
             href: `/namen/anrufen${liste}`,
           };
-  const hauptaktion =
-    arbeitslage === "FUEHRUNG"
+  const gemeinsameZeit = absprachen.find(a => a.art === "TERMIN" && a.status === "BESTAETIGT" && a.faelligAm <= new Date() && a.endetAm && a.endetAm > new Date());
+  const hervorgehobeneAbsprache = arbeitslage === "FUEHRUNG" ? absprachen[0] : gemeinsameZeit;
+  const dringend = brauchenDich.find(p => p.istDirekt) ?? brauchenDich[0];
+  const hauptaktion = hervorgehobeneAbsprache
+    ? {
+        titel: "Gemeinsam dran",
+        text: hervorgehobeneAbsprache.titel,
+        label: "Absprache ansehen",
+        href: `/mannschaft/vereinbarungen?partner=${hervorgehobeneAbsprache.partner.id}#absprache-${hervorgehobeneAbsprache.id}`,
+      }
+    : arbeitslage === "FUEHRUNG"
       ? {
-          titel: absprachen.length
-            ? "Gemeinsam dran"
-            : "Deine Partner im Blick",
-          text:
-            absprachen[0]?.titel ??
-            (brauchenDich.length
-              ? `${brauchenDich.length} Partner näher ansehen`
-              : "Zeit für dein Team"),
-          label: absprachen.length ? "Absprachen ansehen" : "Partner begleiten",
-          href: absprachen.length
-            ? "/mannschaft/vereinbarungen"
-            : "/mannschaft",
+          titel: "Deine Partner im Blick",
+          text: dringend ? dringend.name : "Zeit für dein Team",
+          label: "Partner begleiten",
+          href: dringend ? `/mannschaft/${dringend.istDirekt ? dringend.id : (dringend.ueberId ?? dringend.id)}?zurueck=%2Fheute` : "/mannschaft",
         }
       : eigeneAktion;
   // Die hervorgehobene Person erscheint nicht noch einmal als nächste Aufgabe.
-  const obenGezeigt = !startVorne && arbeitslage !== "FUEHRUNG" ? naechster?.id : null;
+  const obenGezeigt = !startVorne && !hervorgehobeneAbsprache && arbeitslage !== "FUEHRUNG" ? naechster?.id : null;
   const offeneTerminergebnisse = terminFragen.filter(k => k.id !== obenGezeigt);
   const offeneArbeit = jetzt.filter(k => k.id !== obenGezeigt && !terminFragenIds.has(k.id));
-  const betreuung = <div className="space-y-6">
-    <VereinbarungenHeute userId={user.id} kompakt auslassenId={arbeitslage === "FUEHRUNG" ? absprachen[0]?.id : undefined} />
+  const betreuung = <section className="space-y-6" aria-label="Partner begleiten">
+    <VereinbarungenHeute userId={user.id} kompakt auslassenId={hervorgehobeneAbsprache?.id} />
     {aufgaben.length > 0 && <section className="space-y-3">
       <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">Betreuungsaufgaben</h2><Link href="/mannschaft" className="inline-flex min-h-11 items-center text-sm text-link">Alle {aufgaben.length}</Link></div>
       <ul className="space-y-3">{aufgaben.slice(0, 3).map(a => <FuehrungsAufgabe key={a.id} aufgabe={a} />)}</ul>
     </section>}
-    {brauchenDich.length > 0 && <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">Hier lohnt ein Gespräch</h2><Link href="/mannschaft" className="inline-flex min-h-11 items-center text-sm text-link">Alle {brauchenDich.length}</Link></div>
-      <div className="crm-list">{brauchenDich.slice(0, 3).map(p => <Link key={p.id} href={`/mannschaft/${p.istDirekt ? p.id : (p.ueberId ?? p.id)}?zurueck=%2Fheute`} className="crm-list-row">
-        <span className="min-w-0 flex-1"><span className="block text-base font-semibold">{p.name}</span><span className="mt-1 block text-sm text-ink-muted">{p.istDirekt || !p.ueber ? fuehrungsSchritt(p) : `Mit ${p.ueber} gemeinsam besprechen.`}</span></span><span aria-hidden className="text-xl text-ink-muted">›</span>
-      </Link>)}</div>
-    </section>}
+    {partner.length > 0 ? <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">Deine Partner</h2><Link href="/mannschaft" className="inline-flex min-h-11 items-center text-sm text-link">Team →</Link></div>
+      <PartnerBegleitung userId={user.id} personen={partner} struktur={lage?.leute} limit={3} kompakt rueckweg={rueckweg} />
+    </section> : arbeitslage === "FUEHRUNG" && <Link href="/einladen" className="inline-flex min-h-11 items-center text-link">Geschäftspartner einladen →</Link>}
+  </section>;
+  const eigeneEinheiten = flags.einheiten && <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-surface px-4 py-2">
+    <p className="text-sm text-ink-muted"><strong className="text-base font-semibold text-ink">{formatEinheiten(einheitenMonat)}</strong> eigene Einheiten · {produktionsmonat(heute).label}</p>
+    <Link href="/einheiten" className="inline-flex min-h-11 items-center text-sm font-medium text-link">Einheiten eintragen →</Link>
   </div>;
   return <div className={`${column} space-y-6`}>
     <SeitenKopf titel="Heute" werkzeuge unterzeile={datum.format(new Date())} />
@@ -342,13 +335,12 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
     </section>}
 
     <section className="space-y-3" aria-labelledby="heute-fortschritt">
-      <div className="flex items-center justify-between gap-3"><h2 id="heute-fortschritt" className="text-xl font-semibold">Dein Fortschritt</h2><Link href="/fortschritt" className="inline-flex min-h-11 items-center text-sm text-link">Ansehen</Link></div>
-      <ZielHeute userId={user.id} />
-      {flags.einheiten && <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-surface px-4 py-2">
-        <p className="text-sm text-ink-muted"><strong className="text-base font-semibold text-ink">{formatEinheiten(einheitenMonat)}</strong> eigene Einheiten · {produktionsmonat(heute).label}</p>
-        <Link href="/einheiten" className="inline-flex min-h-11 items-center text-sm font-medium text-link">Einheiten eintragen →</Link>
-      </div>}
+      <div className="flex items-center justify-between gap-3"><h2 id="heute-fortschritt" className="text-xl font-semibold">{arbeitslage === "FUEHRUNG" ? "Euer Fortschritt" : "Dein Fortschritt"}</h2><Link href={arbeitslage === "FUEHRUNG" ? "/mannschaft/ziele" : "/fortschritt"} className="inline-flex min-h-11 items-center text-sm text-link">Ansehen</Link></div>
+      {arbeitslage !== "FUEHRUNG" && <ZielHeute userId={user.id} />}
+      {arbeitslage !== "START" && <Teamziele userId={user.id} wurzelId={user.id} kompakt />}
+      {arbeitslage !== "FUEHRUNG" && eigeneEinheiten}
       {arbeitslage === "FUEHRUNG" && bericht && <Link href="/mannschaft/auswertung" className="crm-list-row rounded-xl bg-surface"><span className="min-w-0 flex-1"><span className="block text-sm text-ink-muted">Team · dieser Monat</span><span className="block text-xl font-semibold">{formatEinheiten(bericht.team.einheitenZeitraum)} Einheiten</span></span><span aria-hidden className="text-xl text-ink-muted">›</span></Link>}
+      {arbeitslage === "FUEHRUNG" && <details className="border-t border-line"><summary className="min-h-11 cursor-pointer py-3 text-base font-medium">Dein eigenes Geschäft</summary><div className="space-y-3 pb-2"><ZielHeute userId={user.id} />{eigeneEinheiten}</div></details>}
     </section>
 
     {(arbeitslage !== "START" || absprachen.length > 0) && betreuung}
@@ -363,6 +355,9 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
 
     <section className="space-y-3" aria-label="Einstieg und Erfolge">
       {activeStart && !startVorne && <details className="border-t border-line"><summary className="min-h-11 cursor-pointer py-3 text-base font-medium">Deinen Einstieg fortsetzen</summary><StartHinweis phase={activeStart.phase} kompakt /></details>}
+      {arbeitslage !== "FUEHRUNG" && <EinstiegsBegleitung userId={user.id} warum={user.whyLetter} kompakt />}
+      {arbeitslage !== "FUEHRUNG" && <ErfolgeHeute userId={user.id} />}
+      {partner.length > 0 && <ErfolgeHeute userId={user.id} team />}
       <WettbewerbHeute userId={user.id} />
     </section>
     <details className="border-t border-line" id="weitere-schritte" open={alle}>
@@ -370,7 +365,7 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
       <div className="space-y-6 pt-2">
         {spaeter.length > 0 && <section className="space-y-3"><h2 className="text-xl font-semibold">Diese Woche · {spaeter.length}</h2><Arbeitsliste kontakte={(alle ? spaeter : spaeter.slice(0, 3)).map(lite)} rueckweg={rueckweg} />{!alle && spaeter.length > 3 && <Link href="/heute?alle=1#weitere-schritte" className="inline-flex min-h-11 items-center text-sm text-link">Alle {spaeter.length} Schritte ansehen →</Link>}</section>}
         {ohneSchritt.length > 0 && <section className="space-y-3"><h2 className="text-xl font-semibold">Nächsten Schritt festlegen · {ohneSchritt.length}</h2><Arbeitsliste kontakte={(alle ? ohneSchritt : ohneSchritt.slice(0, 3)).map(lite)} rueckweg={rueckweg} />{!alle && ohneSchritt.length > 3 && <Link href="/heute?alle=1#weitere-schritte" className="inline-flex min-h-11 items-center text-sm text-link">Alle {ohneSchritt.length} Kontakte ansehen →</Link>}</section>}
-        {arbeitslage !== "FUEHRUNG" && <ErsteWoche user={{...user, pledgeTarget: null, pledgeSetAt: null, pledgeShownAt: null}} />}
+        {arbeitslage !== "FUEHRUNG" && <ErsteWoche user={{...user, pledgeTarget: null, pledgeSetAt: null, pledgeShownAt: null}} ohnePass />}
       </div>
     </details>
     {nachrichten.length > 0 && <Postfach nachrichten={nachrichten.map(n => ({id: n.id, von: n.von.name, text: n.text, neu: n.gelesenAt === null}))} ungelesen={nachrichten.filter(n => n.gelesenAt === null).length} />}

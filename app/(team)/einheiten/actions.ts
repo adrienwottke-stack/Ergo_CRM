@@ -10,13 +10,17 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { ladeHauptziel } from "@/lib/ziele";
-import { berlinToday, dayToUtcDate, isValidDay, shiftDay } from "@/lib/dates";
-import { bucheZugeordneteEinheiten, EinheitenBereitsErfasst } from "@/lib/einheiten-erinnerung";
 import {
-  eigenerGesamtstand,
-  eigenerMonatsstand,
-  formatEinheiten,
+  einheitenBestaetigung,
+  teileErsteEinheiten,
+  type EinheitenBestaetigung,
+} from "@/lib/einheiten-erfolg";
+import { berlinToday, dayToUtcDate, isValidDay, shiftDay } from "@/lib/dates";
+import {
+  bucheZugeordneteEinheiten,
+  EinheitenBereitsErfasst,
+} from "@/lib/einheiten-erinnerung";
+import {
   hatZweiNachkommastellen,
   istKarrierestufe,
   parseEinheiten,
@@ -80,14 +84,14 @@ async function buchen(
   tagRoh: string,
   notizRoh: string,
   erinnerungId?: string,
-): Promise<boolean> {
+): Promise<number | null> {
   const hundertstel = parseEinheiten(mengeRoh);
   // 0 ist keine Buchung, sondern ein Fehlgriff im Formular.
-  if (hundertstel === null || hundertstel === 0) return false;
+  if (hundertstel === null || hundertstel === 0) return null;
   // Zwei Nachkommastellen, ohne Ausnahme: "300" ist keine Kurzform fuer
   // "300,00", sondern eine halbe Angabe. Die Pruefung sitzt hier und nicht in
   // parseEinheiten - hier gibt es einen Fehlertext, der beim Nutzer ankommt.
-  if (!hatZweiNachkommastellen(mengeRoh)) return false;
+  if (!hatZweiNachkommastellen(mengeRoh)) return null;
 
   const heute = berlinToday();
   const gewuenscht = tagRoh && isValidDay(tagRoh) ? tagRoh : heute;
@@ -97,17 +101,33 @@ async function buchen(
       ? heute
       : gewuenscht;
 
-  const daten = { userId, hundertstel, tag: dayToUtcDate(tag), notiz: notizRoh.slice(0, 120) || null };
+  const daten = {
+    userId,
+    hundertstel,
+    tag: dayToUtcDate(tag),
+    notiz: notizRoh.slice(0, 120) || null,
+  };
   if (erinnerungId) {
     try {
-      await prisma.$transaction((tx) => bucheZugeordneteEinheiten(tx, { ...daten, erinnerungId }));
+      await prisma.$transaction((tx) =>
+        bucheZugeordneteEinheiten(tx, { ...daten, erinnerungId }),
+      );
     } catch (fehler) {
-      if (!(fehler instanceof EinheitenBereitsErfasst)) return false;
+      if (!(fehler instanceof EinheitenBereitsErfasst)) return null;
     }
   } else await prisma.einheitenbuchung.create({ data: daten });
 
+  // Bei einer Wiederholung zählt der gespeicherte Betrag der Zuordnung.
+  const betrag = erinnerungId
+    ? ((
+        await prisma.einheitenErinnerung.findFirst({
+          where: { id: erinnerungId, userId },
+          select: { buchung: { select: { hundertstel: true } } },
+        })
+      )?.buchung?.hundertstel ?? null)
+    : hundertstel;
   neuRechnen();
-  return true;
+  return betrag;
 }
 
 /**
@@ -126,15 +146,30 @@ export async function einheitenBuchen(
   tagRoh: string,
   notizRoh: string,
   erinnerungId?: string,
-): Promise<{ ok: true } | { ok: false; fehler: string }> {
+): Promise<
+  ({ ok: true } & EinheitenBestaetigung) | { ok: false; fehler: string }
+> {
   const user = await requireUser();
   const fehler = mengenFehler(mengeRoh);
   if (fehler) return { ok: false, fehler };
-  const gebucht = await buchen(user.id, mengeRoh, tagRoh, notizRoh, erinnerungId);
-  if (!gebucht) {
-    return { ok: false, fehler: "Die Buchung konnte nicht gespeichert werden. Bitte prüfe, ob der zugehörige Abschluss noch offen ist." };
+  const gebucht = await buchen(
+    user.id,
+    mengeRoh,
+    tagRoh,
+    notizRoh,
+    erinnerungId,
+  );
+  if (gebucht === null) {
+    return {
+      ok: false,
+      fehler:
+        "Die Buchung konnte nicht gespeichert werden. Bitte prüfe, ob der zugehörige Abschluss noch offen ist.",
+    };
   }
-  return { ok: true };
+  return {
+    ok: true,
+    ...(await einheitenBestaetigung(user.id, user.einheitenStart, gebucht)),
+  };
 }
 
 /**
@@ -158,7 +193,7 @@ export async function einheitSchnellBuchen(
   notizRoh = "",
   erinnerungId?: string,
 ): Promise<
-  { ok: true; monat: string; gesamt: string; zielstand: string | null } | { ok: false; fehler: string }
+  ({ ok: true } & EinheitenBestaetigung) | { ok: false; fehler: string }
 > {
   const user = await requireUser();
 
@@ -166,22 +201,26 @@ export async function einheitSchnellBuchen(
   if (fehler) return { ok: false, fehler };
 
   const gebucht = await buchen(user.id, mengeRoh, "", notizRoh, erinnerungId);
-  if (!gebucht) {
-    return { ok: false, fehler: "Die Buchung konnte nicht gespeichert werden. Bitte prüfe, ob der zugehörige Abschluss noch offen ist." };
+  if (gebucht === null) {
+    return {
+      ok: false,
+      fehler:
+        "Die Buchung konnte nicht gespeichert werden. Bitte prüfe, ob der zugehörige Abschluss noch offen ist.",
+    };
   }
-
-  const [monat, gesamt, ziel] = await Promise.all([
-    eigenerMonatsstand(user.id),
-    eigenerGesamtstand(user.id, user.einheitenStart),
-    ladeHauptziel(user.id),
-  ]);
 
   return {
     ok: true,
-    monat: formatEinheiten(monat),
-    gesamt: formatEinheiten(gesamt),
-    zielstand: ziel ? `${ziel.standText} ${ziel.kennzahlText}${ziel.geschafft ? " · Ziel erreicht" : ""}` : null,
+    ...(await einheitenBestaetigung(user.id, user.einheitenStart, gebucht)),
   };
+}
+
+export async function ersteEinheitenTeilen() {
+  const user = await requireUser();
+  await teileErsteEinheiten(user.id);
+  revalidatePath("/arena");
+  revalidatePath("/heute");
+  revalidatePath("/mannschaft");
 }
 
 /**
@@ -216,7 +255,8 @@ export async function standSpeichern(formData: FormData) {
 
   const stufeRoh = feld(formData, "karrierestufe");
   const stufe = stufeRoh ? Number(stufeRoh) : null;
-  const karrierestufe = stufe !== null && istKarrierestufe(stufe) ? stufe : null;
+  const karrierestufe =
+    stufe !== null && istKarrierestufe(stufe) ? stufe : null;
 
   const startRoh = feld(formData, "einheitenStart");
   const start = parseEinheiten(startRoh);

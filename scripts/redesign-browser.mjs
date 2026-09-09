@@ -302,8 +302,12 @@ async function runEngine(engine, name, port, scenarios) {
             if (promoted) assert.equal(await own.locator(`a[href^="/contacts/${promoted.id}?"]`).count(), 0, 'The primary contact is not duplicated in the task group');
             const allLink = own.getByRole('link', { name: new RegExp(`^Alle ${expectedRemaining.length} Aufgaben ansehen`) });
             assert.equal(await allLink.getAttribute('href'), '/heute?alle=1#eigene-arbeit', 'All call reminders are reached through Today rather than Calendar');
-            await allLink.click();
-            await page.waitForURL(url => url.pathname === '/heute' && url.search === '?alle=1' && url.hash === '#eigene-arbeit');
+            await allLink.click({ trial: true });
+            await Promise.all([
+              page.waitForURL(url => url.pathname === '/heute' && url.search === '?alle=1' && url.hash === '#eigene-arbeit', { waitUntil: 'commit' }),
+              allLink.click(),
+            ]);
+            await page.locator(`#eigene-arbeit a[href^="/contacts/${expectedRemaining.at(-1).id}?"]`).waitFor({ state: 'visible' });
             assert.equal(await page.locator('#eigene-arbeit a[href^="/contacts/"]').count(), expectedRemaining.length, 'The full Today view exposes every remaining due task');
             for (const item of expectedRemaining) {
               const link = page.locator(`#eigene-arbeit a[href^="/contacts/${item.id}?"]`);
@@ -316,16 +320,22 @@ async function runEngine(engine, name, port, scenarios) {
             const back = page.locator('main .crm-page-head a').first();
             assert.equal(await back.getAttribute('href'), '/heute?alle=1', 'A contact opened from all tasks returns to the full view');
             await back.click();
-            await page.waitForURL(url => url.pathname === '/heute' && url.search === '?alle=1');
+            await page.waitForURL(url => url.pathname === '/heute' && url.search === '?alle=1', { waitUntil: 'commit' });
+            await page.locator(`#eigene-arbeit a[href^="/contacts/${last.id}?"]`).waitFor({ state: 'visible' });
             assert.equal(await page.locator('#eigene-arbeit a[href^="/contacts/"]').count(), expectedRemaining.length);
             await page.getByRole('link', { name: /Zur Tagesübersicht/ }).click();
-            await page.waitForURL(url => url.pathname === '/heute' && url.search === '');
+            await page.waitForURL(url => url.pathname === '/heute' && url.search === '', { waitUntil: 'commit' });
+            await page.getByRole('heading', { name: 'Heute', exact: true }).waitFor();
             await page.locator('#weitere-schritte > summary').click();
             assert.equal(await page.locator('#weitere-schritte a[href^="/contacts/"]:visible').count(), 6, 'Default week and unscheduled groups each show at most three contacts');
             const allWeek = page.locator('#weitere-schritte').getByRole('link', { name: /^Alle 4 Schritte ansehen/ });
             assert.equal(await allWeek.getAttribute('href'), '/heute?alle=1#weitere-schritte');
-            await allWeek.click();
-            await page.waitForURL(url => url.search === '?alle=1' && url.hash === '#weitere-schritte');
+            await allWeek.click({ trial: true });
+            await Promise.all([
+              page.waitForURL(url => url.search === '?alle=1' && url.hash === '#weitere-schritte', { waitUntil: 'commit' }),
+              allWeek.click(),
+            ]);
+            await page.locator(`#weitere-schritte a[href^="/contacts/${scenario.allTasks.unscheduled.at(-1).id}?"]`).waitFor({ state: 'visible' });
             assert.equal(await page.locator('#weitere-schritte').evaluate(el => el.open), true, 'The full extended view opens the week and unscheduled groups');
             for (const item of [...scenario.allTasks.week, ...scenario.allTasks.unscheduled]) {
               const link = page.locator(`#weitere-schritte a[href^="/contacts/${item.id}?"]:visible`);
@@ -340,6 +350,7 @@ async function runEngine(engine, name, port, scenarios) {
             await back.click();
             await page.waitForURL(url => `${url.pathname}${url.search}${url.hash}` === scenario.expectedBack);
             if (scenario.expectedSearch) {
+              await page.getByLabel('Kontakte suchen', { exact: true }).waitFor({ state: 'visible' });
               assert.equal(await page.getByLabel('Kontakte suchen', { exact: true }).inputValue(), scenario.expectedSearch, 'Profile Back restores the list search');
               assert.equal(await page.locator('[data-contact-id]:visible').count(), 1, 'Restored search preserves the filtered result');
             }
@@ -348,6 +359,9 @@ async function runEngine(engine, name, port, scenarios) {
           result.passed = true;
         } catch (error) {
           result.error = error.stack;
+          result.failureURL = page.url();
+          result.failurePage = await page.locator('body').innerText().catch(() => 'Page content unavailable');
+          result.failureContactLinks = await page.locator('main a[href^="/contacts/"]').evaluateAll(links => links.map(link => ({ text: link.textContent, href: link.getAttribute('href') }))).catch(() => []);
           report.failures.push(`${name}/${scenario.name}/${viewport.width}: ${error.message}`);
           await page.screenshot({ path: fileURLToPath(new URL(screenshot, output)), fullPage: false }).catch(() => {});
           console.error(report.failures.at(-1));

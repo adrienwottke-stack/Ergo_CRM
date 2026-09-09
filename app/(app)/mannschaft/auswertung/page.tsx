@@ -6,6 +6,7 @@ import { ladeTeamauswertung, type Berichtsfilter } from "@/lib/team-auswertung";
 import Berichtsgruppe from "@/components/auswertung/Berichtsgruppe";
 import TeamNavigation from "@/app/(app)/mannschaft/TeamNavigation";
 import SeitenKopf from "@/components/SeitenKopf";
+import Teamziele from "@/components/ziele/Teamziele";
 
 export const dynamic = "force-dynamic";
 
@@ -165,6 +166,19 @@ export default async function AuswertungPage({
         />
       )}
 
+      {!meeting && bericht.umfang !== "direkte" && (
+        <section className="space-y-3">
+          <h2 className="text-xl font-semibold text-ink">
+            Teamziele am gewählten Stichtag
+          </h2>
+          <Teamziele
+            userId={user.id}
+            wurzelId={bericht.wurzel.id}
+            tag={bericht.stand}
+          />
+        </section>
+      )}
+
       <Berichtsgruppe
         id="eigen"
         titel={
@@ -182,7 +196,7 @@ export default async function AuswertungPage({
             href="/teamabend"
             className="flex min-h-14 items-center justify-between rounded-xl border border-line-strong bg-surface px-4 py-3 font-semibold text-ink transition hover:bg-sunken"
           >
-            Teamabend öffnen <span aria-hidden>›</span>
+            Netzwerkabend öffnen <span aria-hidden>›</span>
           </Link>
           <Link
             href="/mannschaft/bericht"

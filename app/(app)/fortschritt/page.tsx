@@ -6,6 +6,7 @@ import { ladeEinheitenErinnerungen } from "@/lib/einheiten-erinnerung";
 import { formatEinheiten, ladeEinheiten } from "@/lib/einheiten";
 import { berlinToday } from "@/lib/dates";
 import ZielKarte from "@/components/ziele/ZielKarte";
+import Teamziele from "@/components/ziele/Teamziele";
 import SeitenKopf from "@/components/SeitenKopf";
 import { ChevronRightIcon, PlusIcon } from "@/components/icons";
 import {
@@ -163,11 +164,13 @@ export default async function FortschrittPage() {
         </Link>
       </section>
 
+      <Teamziele userId={user.id} kompakt />
+
       {weitereZiele.length > 0 && (
         <section aria-labelledby="weitere-ziele-titel" className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h2 id="weitere-ziele-titel" className={sectionTitle}>
-              Weitere aktive Ziele
+              Weitere Ziele
             </h2>
           </div>
           {weitereZiele.map((ziel) => (

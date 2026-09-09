@@ -19,7 +19,7 @@ export function arbeitslageFuer(
 }
 
 export const arbeitslageTitel: Record<Arbeitslage, string> = {
-  START: "Ich starte",
-  AUFBAU: "Ich baue auf",
-  FUEHRUNG: "Ich führe",
+  START: "Eigenes Geschäft",
+  AUFBAU: "Geschäft und Partneraufbau",
+  FUEHRUNG: "Team führen",
 };

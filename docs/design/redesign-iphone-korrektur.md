@@ -21,12 +21,14 @@ Auf den fünf Hauptseiten ersetzt ein Seitenkopf die zusätzliche mobile Logozei
 
 - **Kontakte:** Kopf → Anzahl und Name hinzufügen → Recruiting/Verkauf → eine nächste Aktion → Suche in dieser Liste → Kontaktzeilen. Die ganze Zeile öffnet das Profil. Einstufung, Verschieben und Mehrfachauswahl stehen unter „Liste organisieren“.
 - **Kontaktprofil:** Rückweg/Bearbeiten → Name → Anrufen/Termin/Notiz → nächster und letzter Kontakt → erforderliches Ergebnis → Kandidatur → Verlauf und weitere Aktionen.
-- **Heute:** nächste Handlung → Ziele und kompakter Stand → eigene Arbeit und Begleitung passend zur Arbeitslage → Einstieg/Erfolge → weitere Schritte. Die hervorgehobene Person wird in den Tagesaufgaben nicht wiederholt. Gruppen zeigen höchstens drei Einträge und einen Weg zu den übrigen.
+- **Heute:** nächste Handlung → Ziele und kompakter Stand → eigene Arbeit und Begleitung passend zur Arbeitslage → Einstieg/Erfolge → weitere Schritte. Die hervorgehobene Person wird in den Tagesaufgaben nicht wiederholt. Gruppen zeigen höchstens drei Einträge. „Alle Aufgaben“ führt zur vollständigen Tagesliste, die auch Anruf-Wiedervorlagen enthält; der Rückweg aus einem Profil erhält diese Vollansicht. Ein gerade stattfindender bestätigter Betreuungstermin hat auch beim eigenen Geschäft Vorrang.
 - **Kalender:** Kopf und Termin anlegen → Datum und Ansicht → Agenda. Verbindungen und Abonnements stehen unter „Kalender verwalten“. Ein tatsächlicher Synchronisationsfehler bleibt sichtbar. Die gespeicherte Ansicht hat Vorrang vor der Geräte-Voreinstellung.
 - **Fortschritt:** Hauptziel → offene Bestätigungen und Einheiten-Nachträge → kompakte Einheiten mit Eintrag → weitere Ziele → Wettbewerb, Trichter und persönliches Warum.
 - **Team:** Begleiten · Auswertung · Struktur. Gemeinsame Absprachen und Unterstützung stehen vor der Partnerliste. Die Strukturmatrix und der Monatsvergleich sind aufklappbar. Das Partnerprofil führt vom aktuellen Stand über Vereinbarung und Betreuung zu Kennzahlen und Verlauf.
 
-Der Arbeitsfokus liegt im Profil. Teampräsentation und Teamabend gehören in Team. Ein Rückweg im Parameter `zurueck` bleibt innerhalb der Anwendung und erhält die aufrufende Liste oder Kalenderansicht; ungültige Werte fallen auf Kontakte beziehungsweise Team zurück.
+Der Arbeitsfokus liegt im Profil. Teampräsentation und Netzwerkabend gehören in Team. Ein Rückweg im Parameter `zurueck` bleibt innerhalb der Anwendung und erhält die aufrufende Liste, deren Suchbegriff oder die Kalenderansicht; ungültige Werte fallen auf Kontakte beziehungsweise Team zurück. Auch Bearbeiten und Speichern eines Kontakts erhalten den Rückweg. Der Termineinstieg im Profil fragt direkt Datum und Uhrzeit ab und leitet den nächsten Schritt aus der bestehenden Terminlogik ab.
+
+Die gemeinsamen Teamziele und die Begleitung der ersten Geschäftsrunde sind angebunden. Führung stellt das Teamziel voran, Aufbau ergänzt es zum eigenen Ziel. Partnerdetails und zusätzliche Aktionen bleiben in „Begleitung & Aktionen“ erreichbar. Fehlende Freigabe wird ausdrücklich angezeigt. Das Teammeeting zeigt weiterhin ausschließlich aggregierte Auswertungen ohne persönliche Ziele, Wünsche oder Betreuungsnotizen.
 
 ## Prüfung
 

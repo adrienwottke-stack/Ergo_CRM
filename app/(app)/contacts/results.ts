@@ -13,26 +13,43 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { offenerUndoEintrag, undoAusfuehren, withUndo } from "@/lib/undo";
-import { addDays, berlinLocalToUtc, berlinToday, dayToUtcDate } from "@/lib/dates";
-import { empfehlungenAnlegen, empfehlungenAusFormular } from "@/lib/empfehlungen";
+import {
+  addDays,
+  berlinLocalToUtc,
+  berlinToday,
+  dayToUtcDate,
+} from "@/lib/dates";
+import {
+  empfehlungenAnlegen,
+  empfehlungenAusFormular,
+} from "@/lib/empfehlungen";
 import { meldeNebenbei } from "@/lib/push";
 import { fortschrittJetzt } from "@/lib/liegenbleiber";
 import { createActivity, quickLogCall } from "@/app/(app)/contacts/actions";
-import { schreibeKontaktPhase, sperreEigenenKontakt } from "@/lib/pipeline-schreiben";
+import {
+  schreibeKontaktPhase,
+  sperreEigenenKontakt,
+} from "@/lib/pipeline-schreiben";
 import { ladeHauptziel } from "@/lib/ziele";
 
-export type CallResult = "appointment" | "unreachable" | "later";
+export type CallResult =
+  | "appointment"
+  | "unreachable"
+  | "later"
+  | "no_interest";
 
 const RESULT_NOTES: Record<CallResult, string> = {
   appointment: "Termin vereinbart",
   unreachable: "Nicht erreicht",
   later: "Später nochmal ansprechen",
+  no_interest: "Kein Interesse",
 };
 
 const RESULT_LABELS: Record<CallResult, string> = {
   appointment: "Termin vereinbart",
   unreachable: "Nicht erreicht",
   later: "Auf später gelegt",
+  no_interest: "Kein Interesse",
 };
 
 function text(formData: FormData, field: string): string | null {
@@ -85,7 +102,8 @@ export async function recordAppointmentResult(formData: FormData) {
   if (!contactId || !resultRaw) throw new Error("Ergebnis fehlt.");
 
   const result = resultRaw as AppointmentResult;
-  if (!Object.hasOwn(APPOINTMENT_LABELS, result)) throw new Error("Unbekanntes Ergebnis.");
+  if (!Object.hasOwn(APPOINTMENT_LABELS, result))
+    throw new Error("Unbekanntes Ergebnis.");
 
   const contact = await loadOwnContact(user.id, contactId);
   const empfehlungen = empfehlungenAusFormular(formData);
@@ -96,49 +114,74 @@ export async function recordAppointmentResult(formData: FormData) {
       contactId,
       label: `${APPOINTMENT_LABELS[result]}: ${contact.name}`,
     },
-    () => prisma.$transaction(async (tx) => {
-      const aktuell = await sperreEigenenKontakt(tx, user.id, contactId);
-      const bereitsGespeichert = result === "abschluss"
-        ? aktuell.stage === "ABSCHLUSS" && aktuell.outcome === "GEWONNEN"
-        : aktuell.stage === "TERMIN_GEHALTEN" && (result === "offen"
-          ? aktuell.outcome === "OFFEN"
-          : aktuell.outcome === "VERLOREN" && aktuell.lostReason === "KEIN_BEDARF");
-      // Ein Retry verändert weder Chronik, Punkte, Empfehlungen noch Reminder.
-      // Ein neu vereinbarter Termin verlässt diese Ergebnisphase und darf
-      // später wieder als gehalten erfasst werden.
-      if (bereitsGespeichert) return { einheiten: null, abschlussNeu: false };
+    () =>
+      prisma.$transaction(async (tx) => {
+        const aktuell = await sperreEigenenKontakt(tx, user.id, contactId);
+        const bereitsGespeichert =
+          result === "abschluss"
+            ? aktuell.stage === "ABSCHLUSS" && aktuell.outcome === "GEWONNEN"
+            : aktuell.stage === "TERMIN_GEHALTEN" &&
+              (result === "offen"
+                ? aktuell.outcome === "OFFEN"
+                : aktuell.outcome === "VERLOREN" &&
+                  aktuell.lostReason === "KEIN_BEDARF");
+        // Ein Retry verändert weder Chronik, Punkte, Empfehlungen noch Reminder.
+        // Ein neu vereinbarter Termin verlässt diese Ergebnisphase und darf
+        // später wieder als gehalten erfasst werden.
+        if (bereitsGespeichert) return { einheiten: null, abschlussNeu: false };
 
-      await tx.activity.create({ data: { contactId, type: "MEETING", text: APPOINTMENT_LABELS[result] } });
-      const gespeichert = await schreibeKontaktPhase(tx, {
-        userId: user.id,
-        personId: person.id,
-        aktuell,
-        stage: result === "abschluss" ? "ABSCHLUSS" : "TERMIN_GEHALTEN",
-      });
-      if (result === "kein_abschluss") {
-        await tx.contact.update({ where: { id: contactId }, data: {
-          outcome: "VERLOREN", lostReason: "KEIN_BEDARF", lostAt: new Date(),
-          nextStepType: null, nextStepAt: null, nextStepNote: null,
-          ...fortschrittJetzt(),
-        } });
-        await tx.stageEvent.create({ data: {
-          contactId, fromStage: "TERMIN_GEHALTEN", toStage: "VERLOREN:KEIN_BEDARF", userId: user.id,
-        } });
-      } else if (result === "offen" && aktuell.outcome === "GEWONNEN") {
-        // Eine ausdrücklich wieder offene Beratung hat auch ein offenes
-        // Ergebnis; der historische Abschlusszähler wird nicht erneut gebucht.
-        await tx.contact.update({ where: { id: contactId }, data: { outcome: "OFFEN", lostReason: null, lostAt: null } });
-      }
+        await tx.activity.create({
+          data: {
+            contactId,
+            type: "MEETING",
+            text: APPOINTMENT_LABELS[result],
+          },
+        });
+        const gespeichert = await schreibeKontaktPhase(tx, {
+          userId: user.id,
+          personId: person.id,
+          aktuell,
+          stage: result === "abschluss" ? "ABSCHLUSS" : "TERMIN_GEHALTEN",
+        });
+        if (result === "kein_abschluss") {
+          await tx.contact.update({
+            where: { id: contactId },
+            data: {
+              outcome: "VERLOREN",
+              lostReason: "KEIN_BEDARF",
+              lostAt: new Date(),
+              nextStepType: null,
+              nextStepAt: null,
+              nextStepNote: null,
+              ...fortschrittJetzt(),
+            },
+          });
+          await tx.stageEvent.create({
+            data: {
+              contactId,
+              fromStage: "TERMIN_GEHALTEN",
+              toStage: "VERLOREN:KEIN_BEDARF",
+              userId: user.id,
+            },
+          });
+        } else if (result === "offen" && aktuell.outcome === "GEWONNEN") {
+          // Eine ausdrücklich wieder offene Beratung hat auch ein offenes
+          // Ergebnis; der historische Abschlusszähler wird nicht erneut gebucht.
+          await tx.contact.update({
+            where: { id: contactId },
+            data: { outcome: "OFFEN", lostReason: null, lostAt: null },
+          });
+        }
 
-      await empfehlungenAnlegen(tx, {
-        userId: user.id,
-        personId: person.id,
-        contactId,
-        contactName: aktuell.name,
-        entries: empfehlungen,
-      });
-      return gespeichert;
-    })
+        await empfehlungenAnlegen(tx, {
+          userId: user.id,
+          personId: person.id,
+          contactId,
+          contactName: aktuell.name,
+          entries: empfehlungen,
+        });
+        return gespeichert;
+      }),
   );
 
   // Ein Abschluss ist das seltenste Ereignis im Netzwerk - und das einzige,
@@ -156,7 +199,7 @@ export async function recordAppointmentResult(formData: FormData) {
         text: "Steht in der Rangliste. Wo stehst du?",
         url: "/arena",
         kennung: "abschluss",
-      }
+      },
     );
   }
 
@@ -200,7 +243,7 @@ export async function recordAppointmentMissed(formData: FormData) {
           nextStepNote: "Neuen Termin holen",
         },
       });
-    }
+    },
   );
 
   refreshViews(contactId);
@@ -214,7 +257,8 @@ export async function recordCallResult(formData: FormData) {
   if (!contactId || !resultRaw) throw new Error("Ergebnis fehlt.");
 
   const result = resultRaw as CallResult;
-  if (!(result in RESULT_NOTES)) throw new Error("Unbekanntes Ergebnis.");
+  if (!Object.hasOwn(RESULT_NOTES, result))
+    throw new Error("Unbekanntes Ergebnis.");
 
   const contact = await loadOwnContact(user.id, contactId);
   const note = text(formData, "note") ?? RESULT_NOTES[result];
@@ -228,11 +272,51 @@ export async function recordCallResult(formData: FormData) {
     },
     async () => {
       switch (result) {
+        case "no_interest": {
+          await prisma.$transaction(async (tx) => {
+            const aktuell = await sperreEigenenKontakt(tx, user.id, contactId);
+            if (aktuell.outcome === "VERLOREN") return;
+            const activity = await tx.activity.create({
+              data: { contactId, type: "CALL", text: note },
+            });
+            await tx.dailyLog.create({
+              data: {
+                personId: person.id,
+                activityId: activity.id,
+                type: "CALL",
+                count: 1,
+                date: dayToUtcDate(berlinToday()),
+              },
+            });
+            await tx.contact.update({
+              where: { id: contactId },
+              data: {
+                outcome: "VERLOREN",
+                lostReason: "KEIN_INTERESSE",
+                lostAt: new Date(),
+                nextStepType: null,
+                nextStepAt: null,
+                nextStepNote: null,
+                ...fortschrittJetzt(),
+              },
+            });
+            await tx.stageEvent.create({
+              data: {
+                contactId,
+                fromStage: aktuell.stage,
+                toStage: "VERLOREN:KEIN_INTERESSE",
+                userId: user.id,
+              },
+            });
+          });
+          break;
+        }
         case "unreachable":
         case "later": {
           // quickLogCall loggt den Anruf, hebt NEU auf KONTAKTIERT und setzt
           // die Wiedervorlage – genau das, was hier gebraucht wird.
-          const days = result === "unreachable" ? "2" : (text(formData, "days") ?? "7");
+          const days =
+            result === "unreachable" ? "2" : (text(formData, "days") ?? "7");
           const data = new FormData();
           data.set("contactId", contactId);
           data.set("note", note);
@@ -243,25 +327,44 @@ export async function recordCallResult(formData: FormData) {
 
         case "appointment": {
           const appointment = text(formData, "appointmentAt");
-          const appointmentAt = appointment ? berlinLocalToUtc(appointment) : null;
+          const appointmentAt = appointment
+            ? berlinLocalToUtc(appointment)
+            : null;
           if (!appointmentAt) {
-            throw new Error("Für den Termin werden Datum und Uhrzeit gebraucht.");
+            throw new Error(
+              "Für den Termin werden Datum und Uhrzeit gebraucht.",
+            );
           }
           await prisma.$transaction(async (tx) => {
             const aktuell = await sperreEigenenKontakt(tx, user.id, contactId);
-            const activity = await tx.activity.create({ data: { contactId, type: "CALL", text: note } });
-            await tx.dailyLog.create({ data: {
-              personId: person.id, activityId: activity.id, type: "CALL", count: 1, date: dayToUtcDate(berlinToday()),
-            } });
-            await schreibeKontaktPhase(tx, {
-              userId: user.id, personId: person.id, aktuell, stage: "TERMIN_VEREINBART", appointmentAt,
+            const activity = await tx.activity.create({
+              data: { contactId, type: "CALL", text: note },
             });
-            await tx.contact.update({ where: { id: contactId }, data: fortschrittJetzt() });
+            await tx.dailyLog.create({
+              data: {
+                personId: person.id,
+                activityId: activity.id,
+                type: "CALL",
+                count: 1,
+                date: dayToUtcDate(berlinToday()),
+              },
+            });
+            await schreibeKontaktPhase(tx, {
+              userId: user.id,
+              personId: person.id,
+              aktuell,
+              stage: "TERMIN_VEREINBART",
+              appointmentAt,
+            });
+            await tx.contact.update({
+              where: { id: contactId },
+              data: fortschrittJetzt(),
+            });
           });
           break;
         }
       }
-    }
+    },
   );
 
   refreshViews(contactId);
@@ -284,19 +387,22 @@ export async function snoozeStepQuick(formData: FormData) {
       ? `Auf morgen gelegt: ${contact.name}`
       : `Um ${days} Tage verschoben: ${contact.name}`;
 
-  await withUndo({ userId: user.id, personId: person.id, contactId, label }, async () => {
-    await prisma.contact.update({
-      where: { id: contactId },
-      data: {
-        nextStepAt: addDays(dayToUtcDate(berlinToday()), days),
-        nextStepType: contact.nextStepType ?? "ANRUF",
-        // Wer verschiebt, hat sich gekuemmert - der Liegenbleiber-Alarm
-        // schweigt bis zur neuen Frist. Ohne das waere "auf morgen legen"
-        // ein Knopf, der die Meldung NICHT wegbekommt.
-        ...fortschrittJetzt(),
-      },
-    });
-  });
+  await withUndo(
+    { userId: user.id, personId: person.id, contactId, label },
+    async () => {
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: {
+          nextStepAt: addDays(dayToUtcDate(berlinToday()), days),
+          nextStepType: contact.nextStepType ?? "ANRUF",
+          // Wer verschiebt, hat sich gekuemmert - der Liegenbleiber-Alarm
+          // schweigt bis zur neuen Frist. Ohne das waere "auf morgen legen"
+          // ein Knopf, der die Meldung NICHT wegbekommt.
+          ...fortschrittJetzt(),
+        },
+      });
+    },
+  );
 
   refreshViews(contactId);
 }
@@ -337,7 +443,7 @@ export async function completeStepQuick(formData: FormData) {
         where: { id: contactId },
         data: { nextStepType: null, nextStepAt: null, nextStepNote: null },
       });
-    }
+    },
   );
 
   refreshViews(contactId);
@@ -346,8 +452,18 @@ export async function completeStepQuick(formData: FormData) {
 /** Der juengste noch zurueckenehmbare Eintrag, fuer die Anzeige unten. */
 export async function getOpenUndo() {
   const user = await requireUser();
-  const [eintrag, ziel] = await Promise.all([offenerUndoEintrag(user.id), ladeHauptziel(user.id)]);
-  return eintrag ? { ...eintrag, zielstand: ziel ? `${ziel.standText} ${ziel.kennzahlText}${ziel.geschafft ? " · Ziel erreicht" : ""}` : null } : null;
+  const [eintrag, ziel] = await Promise.all([
+    offenerUndoEintrag(user.id),
+    ladeHauptziel(user.id),
+  ]);
+  return eintrag
+    ? {
+        ...eintrag,
+        zielstand: ziel
+          ? `${ziel.standText} ${ziel.kennzahlText}${ziel.geschafft ? " · Ziel erreicht" : ""}`
+          : null,
+      }
+    : null;
 }
 
 export async function undoLast(formData: FormData) {

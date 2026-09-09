@@ -294,6 +294,8 @@ model User {
   eigeneZiele                  Ziel[]                @relation("ZielInhaber")
   erstellteZiele               Ziel[]                @relation("ZielErsteller")
   zielBeteiligungen            ZielBeteiligung[]
+  teamziele                   Teamziel[]            @relation("TeamzielWurzel")
+  verantworteteTeamziele       Teamziel[]            @relation("TeamzielVerantwortlich")
   hauptzielId                  String?
   hauptziel                    Ziel?                 @relation("Hauptziel", fields: [hauptzielId], references: [id], onDelete: SetNull)
   einheitenErinnerungen        EinheitenErinnerung[]
@@ -1301,6 +1303,26 @@ model Ziel {
 
   @@index([inhaberId, start, ende])
   @@index([erstelltVonId])
+}
+
+model Teamziel {
+  id                String       @id @default(cuid())
+  wurzelId          String
+  wurzel            User         @relation("TeamzielWurzel", fields: [wurzelId], references: [id], onDelete: Cascade)
+  verantwortlichId String
+  verantwortlich   User         @relation("TeamzielVerantwortlich", fields: [verantwortlichId], references: [id], onDelete: Cascade)
+  titel             String
+  wunsch            String?
+  kennzahl          ZielKennzahl
+  zeitraum          ZielZeitraum
+  start             DateTime
+  ende              DateTime
+  zielwert          Int
+  archiviertAt      DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([wurzelId, start, ende])
 }
 
 model ZielBeteiligung {

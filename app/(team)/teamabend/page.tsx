@@ -3,7 +3,11 @@ import { berlinToday, dayToUtcDate, startOfWeek } from "@/lib/dates";
 import { ladePuls, ladeRangliste } from "@/lib/arena";
 import { ladeFeed } from "@/lib/feed";
 import { ladeTitelStaende } from "@/lib/titel";
-import { aktiveKonten, indexkurveFuer, produktionsmonat } from "@/lib/einheiten";
+import {
+  aktiveKonten,
+  indexkurveFuer,
+  produktionsmonat,
+} from "@/lib/einheiten";
 import { istAn, merkeNutzung } from "@/lib/features";
 import IndexKurve from "@/components/IndexKurve";
 import LeerZustand from "@/components/LeerZustand";
@@ -57,10 +61,10 @@ export default async function TeamabendPage() {
   if (!an) {
     return (
       <div className="space-y-6">
-        <span className={kicker}>Teamabend</span>
+        <span className={kicker}>Netzwerkabend</span>
         <LeerZustand
           symbol={<MonitorIcon className="h-6 w-6" />}
-          titel="Teamabend ist gerade abgeschaltet"
+          titel="Netzwerkabend ist gerade abgeschaltet"
           text="Dieser Bildschirm ist derzeit aus. Die Werkstatt schaltet ihn wieder an."
         />
       </div>
@@ -89,11 +93,16 @@ export default async function TeamabendPage() {
     <div className="space-y-8">
       {/* --- Kopf: Kicker + Datum, gross genug fuer den Beamer -------------- */}
       <div>
-        <span className={kicker}>Teamabend</span>
+        <span className={kicker}>Netzwerkabend</span>
         <h1 className="mt-1 text-5xl font-bold leading-[1.1] tracking-tight text-ink sm:text-6xl">
           {vollDatumFormat.format(dayToUtcDate(heute))}
         </h1>
       </div>
+
+      <p className="text-base text-ink-muted">
+        Gemeinsamer Wettbewerb und geteilte Erfolge im gesamten Netzwerk. Die
+        Auswertung deines Teams findest du unter Team → Auswertung.
+      </p>
 
       {/* --- Titel: mehrere Wege, vorn zu sein - hier ohne "dein Titel",
           es geht um die Woche des Teams, nicht um die Person davor. -------- */}
@@ -183,14 +192,14 @@ export default async function TeamabendPage() {
                 key={zeile.personId}
                 className={cn(
                   "flex items-center justify-between gap-4 rounded-xl px-3 py-3",
-                  index === 0 && "bg-gold-100/30"
+                  index === 0 && "bg-gold-100/30",
                 )}
               >
                 <span className="flex items-baseline gap-3">
                   <span
                     className={cn(
                       "w-6 text-lg font-semibold tabular-nums",
-                      index === 0 ? "text-gold-600" : "text-ink-soft"
+                      index === 0 ? "text-gold-600" : "text-ink-soft",
                     )}
                   >
                     {index + 1}
@@ -198,7 +207,7 @@ export default async function TeamabendPage() {
                   <span
                     className={cn(
                       "text-lg font-semibold",
-                      index === 0 ? "text-gold-600" : "text-ink"
+                      index === 0 ? "text-gold-600" : "text-ink",
                     )}
                   >
                     {zeile.name}
@@ -207,7 +216,7 @@ export default async function TeamabendPage() {
                 <span
                   className={cn(
                     "text-lg font-semibold tabular-nums",
-                    index === 0 ? "text-gold-600" : "text-ink"
+                    index === 0 ? "text-gold-600" : "text-ink",
                   )}
                 >
                   {zeile.punkte}

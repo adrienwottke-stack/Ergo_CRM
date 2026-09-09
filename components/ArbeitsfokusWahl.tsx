@@ -48,9 +48,9 @@ export default function ArbeitsfokusWahl({
           Automatisch ·{" "}
           {arbeitslageTitel[arbeitslageFuer("AUTO", aktiveDirekte)]}
         </option>
-        <option value="EIGEN">Ich starte · eigenes Geschäft</option>
-        <option value="AUFBAU">Ich baue auf</option>
-        <option value="FUEHRUNG">Ich führe</option>
+        <option value="EIGEN">Eigenes Geschäft</option>
+        <option value="AUFBAU">Geschäft und Partneraufbau</option>
+        <option value="FUEHRUNG">Team führen</option>
       </select>
       {fehler && (
         <p role="alert" className="mt-2 text-sm text-red-600">

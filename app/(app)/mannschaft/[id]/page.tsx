@@ -26,6 +26,7 @@ import KuemmereMich from "@/components/KuemmereMich";
 import { PhoneIcon } from "@/components/icons";
 import { card, kicker } from "@/components/ui";
 import PartnerVereinbarungen from "@/components/vereinbarungen/PartnerVereinbarungen";
+import PartnerZielstand from "@/components/ziele/PartnerZielstand";
 import SeitenKopf from "@/components/SeitenKopf";
 import { internerRueckweg } from "@/lib/rueckweg";
 
@@ -290,7 +291,10 @@ export default async function PersonPage({
       </section>
 
       {!person.istDu && !person.platzhalter && (
-        <PartnerVereinbarungen userId={user.id} partnerId={person.id} kompakt />
+        <>
+          <PartnerVereinbarungen userId={user.id} partnerId={person.id} kompakt />
+          <PartnerZielstand userId={user.id} partnerId={person.id} />
+        </>
       )}
 
       {/* Status und nächster Schritt stehen direkt bei den Vereinbarungen. */}
@@ -321,7 +325,9 @@ export default async function PersonPage({
                 ? `${zuletzt.was} · ${namensListe(zuletzt)}${zuletzt.zusatz ? ` · ${zuletzt.zusatz}` : ""} · ${tagKurz.format(zuletzt.wann)}`
                 : person.werte.letzteAktivitaet
                   ? `Aktivität am ${tagKurz.format(person.werte.letzteAktivitaet)}`
-                  : "Noch keine Aktivität eingetragen."
+                  : !person.einblick.offen
+                    ? "Aktivitätsdetails nicht freigegeben."
+                    : "Noch keine Aktivität eingetragen."
             }
           />
           <SchrittZeile
