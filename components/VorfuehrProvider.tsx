@@ -9,11 +9,9 @@
 // Navigation und Reload, stirbt mit dem Tab - ein Vorfuehr-Schalter, der nach
 // dem naechsten Termin noch an ist, waere die schlechtere Ueberraschung.
 //
-// Start immer false, auch wenn sessionStorage schon "an" sagt, und erst in
-// useEffect nachgezogen: der Server kennt sessionStorage nicht, ein
-// abweichender Startwert braeche die Hydration. Beide sessionStorage-Zugriffe
-// mit try/catch - privater Modus oder deaktiviertes Storage werfen, und ein
-// Anzeige-Schalter soll daran nicht die Seite reissen.
+// Bis zum Lesen des Tab-Zustands bleiben Inhalte vorsorglich verdeckt. So
+// blitzen bei Navigation oder Reload keine Namen auf, wenn bereits vorgeführt
+// wird. Server und erster Client-Render verwenden denselben Startwert.
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
@@ -30,14 +28,15 @@ export function useVorfuehren(): VorfuehrKontext {
 }
 
 export default function VorfuehrProvider({ children }: { children: ReactNode }) {
-  const [aktiv, setAktiv] = useState(false);
+  const [aktiv, setAktiv] = useState(true);
 
   useEffect(() => {
     try {
-      if (sessionStorage.getItem(SPEICHER_SCHLUESSEL) === "1") setAktiv(true);
+      setAktiv(sessionStorage.getItem(SPEICHER_SCHLUESSEL) === "1");
     } catch {
       // Kein Storage (privater Modus, Browser-Einstellung) - der Schalter
       // startet dann einfach aus, wie ohne gespeicherten Zustand.
+      setAktiv(false);
     }
   }, []);
 

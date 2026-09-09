@@ -20,7 +20,9 @@ const db = fixture.client;
 const port = Number(process.env.CRM_TEST_PORT || 3118);
 const origin = `http://127.0.0.1:${port}`;
 const production = process.env.CRM_TEST_PRODUCTION === "1";
-const output = new URL("../test-results/arbeitslagen/", import.meta.url);
+const runName = process.env.CRM_TEST_RUN || "arbeitslagen";
+assert.match(runName, /^[a-z0-9-]+$/, "Test output name contains only letters, digits and hyphens");
+const output = new URL(`../test-results/${runName}/`, import.meta.url);
 await mkdir(output, { recursive: true });
 await writeFile(
   new URL("result.json", output),
@@ -372,9 +374,9 @@ try {
   await page
     .getByText("Deine ersten Einheiten – geschafft!", { exact: true })
     .waitFor();
-  await unitForm
-    .getByRole("progressbar", { name: "12,5 von 12,5 Einheiten", exact: true })
-    .waitFor();
+  const savedGoal = unitForm.getByRole("progressbar", { name: "12,5 von 12,5 Einheiten · Ziel erreicht", exact: true });
+  await savedGoal.waitFor();
+  assert.equal(await savedGoal.getAttribute("aria-valuenow"), "100", "Saved goal feedback shows complete progress");
   assert.equal(
     await db.feedEintrag.count({
       where: { person: { userId: "start" }, schluessel: "erste_einheiten" },
@@ -401,6 +403,8 @@ try {
   await page.getByRole("region", { name: "Dein Fortschritt", exact: true })
     .getByRole("progressbar", { name: "12,5 von 12,5 Einheiten", exact: true }).waitFor();
   assert.equal((await db.einheitenbuchung.aggregate({ where: { userId: "start" }, _sum: { hundertstel: true } }))._sum.hundertstel, 1250, "The saved amount and the Today goal agree");
+  const privateNachricht = "Privater Prüfhinweis: Gespräch mit Anna vorbereiten";
+  await db.nachricht.create({ data: { vonId: "lead", anId: "build", text: privateNachricht } });
   await login("build");
   await openPage(`${origin}/heute`);
   await page
@@ -412,15 +416,45 @@ try {
     .waitFor();
   assert.equal(await page.locator("a.crm-primary-action").getAttribute("href"), `/mannschaft/vereinbarungen?partner=lead#absprache-${gemeinsameAbsprache.id}`, "A currently running shared appointment takes priority over the builder's own call queue");
   const partnerBegleitung = page.getByRole("region", { name: "Partner begleiten", exact: true });
-  await partnerBegleitung.getByText("Begleitung & Aktionen", { exact: true }).first().click();
-  await partnerBegleitung
-    .getByText("Zuletzt passiert", { exact: true })
-    .waitFor();
-  await partnerBegleitung.getByText("Begleitung & Aktionen", { exact: true }).first().click();
+  await partnerBegleitung.getByText("Zuletzt", { exact: true }).waitFor();
+  await partnerBegleitung.getByText("Als Nächstes", { exact: true }).waitFor();
+  const partnerDetails = partnerBegleitung.locator("summary").filter({ hasText: "Begleitung & Aktionen" }).first();
+  await partnerDetails.click();
+  await partnerBegleitung.getByText("Gemeinsam vereinbart", { exact: true }).waitFor();
+  await partnerDetails.click();
   assert.ok(
     await page.getByRole("region", { name: "Dein Fortschritt" }).isVisible(),
   );
   await capture("03-aufbau");
+  // Presentation mode must survive actual navigation from Team to Today.
+  // Establish that the fixture's private contents exist before checking their concealment.
+  await page.getByText(privateNachricht, { exact: true }).waitFor();
+  await page.locator("#eigene-arbeit").getByText("Anna Beispiel", { exact: true }).waitFor();
+  await openPage(`${origin}/mannschaft`);
+  const vorfuehren = page.getByRole("button", { name: "Namen verdecken fürs Vorführen — Zahlen bleiben echt", exact: true });
+  await vorfuehren.click();
+  await page.waitForFunction(() => sessionStorage.getItem("cockpit-vorfuehren") === "1");
+  assert.equal(await vorfuehren.getAttribute("aria-pressed"), "true");
+  await page.getByRole("navigation", { name: "Hauptnavigation", exact: true }).getByRole("link", { name: "Heute", exact: true }).click();
+  await page.getByRole("heading", { name: "Heute", level: 1, exact: true }).waitFor();
+  // The notice is the readiness signal for restored session state; no reload or retry.
+  const vorfuehrenBeenden = page.getByRole("button", { name: "Vorführen beenden", exact: true });
+  await vorfuehrenBeenden.waitFor();
+  for (const text of ["Anna Beispiel", "Ben Beispiel", "Mila Neumann", "Gespräch gemeinsam vorbereiten", privateNachricht]) {
+    assert.equal(await page.getByText(text, { exact: true }).filter({ visible: true }).count(), 0, `Presentation mode conceals ${text} on Today`);
+  }
+  assert.equal(await page.getByRole("button", { name: "Namen verdecken fürs Vorführen — Zahlen bleiben echt", exact: true }).count(), 0, "Today has no additional permanent presentation switch");
+  await capture("03a-heute-vorfuehren");
+  await vorfuehrenBeenden.click();
+  await page.waitForFunction(() => sessionStorage.getItem("cockpit-vorfuehren") === "0");
+  await page.locator("#eigene-arbeit").getByText("Anna Beispiel", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Gespräch gemeinsam vorbereiten", exact: true }).first().waitFor();
+  await partnerBegleitung.getByText("Mila Neumann", { exact: true }).first().waitFor();
+  if (!await page.getByText(privateNachricht, { exact: true }).isVisible()) {
+    await page.getByRole("button", { name: /Für dich.*Anzeigen/ }).click();
+  }
+  await page.getByText(privateNachricht, { exact: true }).waitFor();
+  await capture("03b-heute-vorfuehren-beendet");
   await openPage(`${origin}/namen`);
   await page.getByRole("heading", { name: "Kontakte", exact: true }).waitFor();
   await noOverflow();
@@ -878,6 +912,13 @@ try {
   await writeFile(
     new URL("db-stats.json", output),
     JSON.stringify(fixture.stats(), null, 2),
+  );
+  await writeFile(
+    new URL("failure-goals.json", output),
+    JSON.stringify(await db.ziel.findMany({
+      select: { id: true, titel: true, inhaberId: true, erstelltVonId: true, zielwert: true,
+        beteiligte: { select: { userId: true, zusage: true, bestaetigtAt: true } } },
+    }).catch(() => []), null, 2),
   );
   if (browser)
     for (const context of browser.contexts())

@@ -27,9 +27,15 @@ import { PhoneIcon } from "@/components/icons";
  * DirektenListe) - VorfuehrSchalter.tsx selbst ist Bestand aus b60f15a und
  * bleibt unangetastet.
  */
-export function VorfuehrHinweis() {
-  const { aktiv } = useVorfuehren();
+export function VorfuehrHinweis({ ausschaltbar = false }: { ausschaltbar?: boolean }) {
+  const { aktiv, umschalten } = useVorfuehren();
   if (!aktiv) return null;
+  if (ausschaltbar) return (
+    <div className="rounded-xl border border-line bg-surface px-4 py-2">
+      <p className="pt-2 text-sm text-ink-muted">Vorführmodus aktiv. Persönliche Inhalte sind ausgeblendet.</p>
+      <button type="button" onClick={umschalten} className="inline-flex min-h-11 items-center text-sm font-medium text-link">Vorführen beenden</button>
+    </div>
+  );
   return <p className="text-xs text-ink-soft">Namen sind verdeckt, Zahlen sind echt.</p>;
 }
 

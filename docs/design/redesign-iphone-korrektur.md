@@ -30,6 +30,8 @@ Der Arbeitsfokus liegt im Profil. Teampräsentation und Netzwerkabend gehören i
 
 Die gemeinsamen Teamziele und die Begleitung der ersten Geschäftsrunde sind angebunden. Führung stellt das Teamziel voran, Aufbau ergänzt es zum eigenen Ziel. Partnerdetails und zusätzliche Aktionen bleiben in „Begleitung & Aktionen“ erreichbar. Fehlende Freigabe wird ausdrücklich angezeigt. Das Teammeeting zeigt weiterhin ausschließlich aggregierte Auswertungen ohne persönliche Ziele, Wünsche oder Betreuungsnotizen.
 
+Der Vorführmodus wird weiterhin unter Team eingeschaltet. Beim Wechsel auf Heute schützt er die gesamte persönliche Tagesübersicht einschließlich Kontakten, Zielen, Wünschen, Betreuungsabsprachen und Nachrichten. Nur während des Vorführens erscheint dort ein Hinweis mit „Vorführen beenden“. Bis der gespeicherte Zustand beim Seitenaufbau gelesen ist, bleiben geschützte Inhalte verdeckt.
+
 ## Prüfung
 
 `test:redesign:browser` erzeugt Ansichten mit isolierten Beispieldaten. Der Lauf benötigt `CRM_REDESIGN_EXCLUSIVE=1`; er darf nicht gleichzeitig mit einem Build oder einem anderen Next-Prozess in diesem Worktree laufen. Produktionsläufe verwenden den zuvor mit `build:start:check` geprüften Build. Kein Prüfschritt benötigt eine produktive Datenbank.

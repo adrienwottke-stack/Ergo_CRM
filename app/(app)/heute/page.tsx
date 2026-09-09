@@ -37,6 +37,9 @@ import type { ContactLite } from "@/components/ContactActionDialog";
 import ErsteWoche from "@/components/ErsteWoche";
 import StartHinweis from "@/components/StartHinweis";
 import Postfach from "@/components/Postfach";
+import VorfuehrProvider from "@/components/VorfuehrProvider";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
+import { VorfuehrHinweis } from "@/components/GriffKarte";
 import { column } from "@/components/ui";
 import SeitenKopf from "@/components/SeitenKopf";
 import { ArrowRightIcon, TrophyIcon } from "@/components/icons";
@@ -327,8 +330,10 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
     <p className="text-sm text-ink-muted"><strong className="text-base font-semibold text-ink">{formatEinheiten(einheitenMonat)}</strong> eigene Einheiten · {produktionsmonat(heute).label}</p>
     <Link href="/einheiten" className="inline-flex min-h-11 items-center text-sm font-medium text-link">Einheiten eintragen →</Link>
   </div>;
-  return <div className={`${column} space-y-6`}>
+  return <VorfuehrProvider><div className={`${column} space-y-6`}>
     <SeitenKopf titel="Heute" werkzeuge unterzeile={datum.format(new Date())} />
+    <VorfuehrHinweis ausschaltbar />
+    <VorfuehrVerdeckt hinweis="Deine persönliche Tagesübersicht bleibt beim Vorführen geschützt. Teamzahlen findest du unter Team → Auswertung.">
     {startVorne ? <StartHinweis phase={activeStart.phase} kompakt /> : <section className="space-y-4" aria-labelledby="naechste-handlung">
       <div><p className="text-sm text-ink-muted">{hauptaktion.titel}</p><h2 id="naechste-handlung" className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-ink">{hauptaktion.text}</h2></div>
       <Link href={hauptaktion.href} className="crm-primary-action">{hauptaktion.label}<ArrowRightIcon className="h-5 w-5" /></Link>
@@ -369,5 +374,6 @@ export default async function HeutePage({ searchParams }: { searchParams: Promis
       </div>
     </details>
     {nachrichten.length > 0 && <Postfach nachrichten={nachrichten.map(n => ({id: n.id, von: n.von.name, text: n.text, neu: n.gelesenAt === null}))} ungelesen={nachrichten.filter(n => n.gelesenAt === null).length} />}
-  </div>;
+    </VorfuehrVerdeckt>
+  </div></VorfuehrProvider>;
 }

@@ -14,7 +14,9 @@ import { createSession, authCookieName } from '../lib/session.ts';
 import { berlinToday, dayToUtcDate, shiftDay, berlinLocalToUtc } from '../lib/dates.ts';
 
 assert.equal(process.env.CRM_REDESIGN_EXCLUSIVE, '1', 'Obtain the exclusive .next slot before setting CRM_REDESIGN_EXCLUSIVE=1');
-const output = new URL('../test-results/redesign/', import.meta.url);
+const runName = process.env.CRM_TEST_RUN || 'redesign';
+assert.match(runName, /^[a-z0-9-]+$/, 'Test output name contains only letters, digits and hyphens');
+const output = new URL(`../test-results/${runName}/`, import.meta.url);
 await mkdir(output, { recursive: true });
 const fixture = await testDatabase(0, 50);
 assert.match(fixture.url, /^postgresql:\/\/postgres:postgres@127\.0\.0\.1:\d+\/postgres$/, 'Only a disposable loopback DB is permitted');
