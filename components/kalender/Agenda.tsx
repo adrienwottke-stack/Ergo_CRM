@@ -84,6 +84,7 @@ export function Agenda({
               return (
                 <li
                   key={eintrag.id}
+                  id={`termin-${eintrag.id}`}
                   className={cn(
                     `${card} flex items-center gap-3 p-4`,
                     // Vergangenes bleibt sichtbar, tritt aber zurueck. Dass es

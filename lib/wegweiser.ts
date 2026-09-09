@@ -14,6 +14,8 @@
 // nicht "Einheiten". Wer nur den Ort sucht, findet ihn ueber die Synonyme
 // trotzdem.
 
+import { passenAlle, suchtext, suchwoerter } from "@/lib/suche/modell";
+
 export type WegweiserEintrag = {
   /** Stabiler Schluessel - taucht im Treffer-los-Log nie auf, nur intern. */
   id: string;
@@ -31,6 +33,7 @@ export type WegweiserEintrag = {
    */
   synonyme: string[];
   nurAdmin?: boolean;
+  merkmal?: string;
 };
 
 export const WEGWEISER: WegweiserEintrag[] = [
@@ -38,6 +41,7 @@ export const WEGWEISER: WegweiserEintrag[] = [
   // Steht ganz oben, weil sie der Anlass fuer diesen ganzen Baustein war.
   {
     id: "einheiten-eintragen",
+    merkmal: "einheiten",
     titel: "Einheiten eintragen",
     href: "/einheiten",
     bereich: "Einheiten",
@@ -105,6 +109,9 @@ export const WEGWEISER: WegweiserEintrag[] = [
       "handynummer",
       "kontaktdaten",
       "nummern suchen",
+      "ohne telefonnummer",
+      "kontakte ohne telefonnummer",
+      "ohne nummer",
     ],
   },
   {
@@ -292,6 +299,7 @@ export const WEGWEISER: WegweiserEintrag[] = [
   },
   {
     id: "spiel",
+    merkmal: "spiel",
     titel: "Spiel öffnen",
     href: "/spiel",
     bereich: "Wettbewerb",
@@ -301,6 +309,7 @@ export const WEGWEISER: WegweiserEintrag[] = [
   // --- Multiplikations-Runde (29.08.2026) ----------------------------------
   {
     id: "teamabend",
+    merkmal: "teamabend",
     titel: "Teamabend zeigen",
     href: "/teamabend",
     bereich: "Wettbewerb",
@@ -316,6 +325,7 @@ export const WEGWEISER: WegweiserEintrag[] = [
   },
   {
     id: "bericht-link",
+    merkmal: "bericht",
     titel: "Berichts-Link erzeugen",
     href: "/mannschaft/bericht",
     bereich: "Mannschaft",
@@ -332,6 +342,7 @@ export const WEGWEISER: WegweiserEintrag[] = [
   },
   {
     id: "kandidat-fuehren",
+    merkmal: "aufbau",
     titel: "Kandidaten führen",
     href: "/namen",
     bereich: "Namen",
@@ -359,6 +370,52 @@ export const WEGWEISER: WegweiserEintrag[] = [
       "csv",
       "mitnehmen",
     ],
+  },
+
+  // Die festen Arbeitsbereiche und ihre neueren Unterseiten.
+  {
+    id: "fortschritt", titel: "Fortschritt ansehen", href: "/fortschritt", bereich: "Fortschritt",
+    synonyme: ["entwicklung", "erfolge", "zielstand", "fortschrittsbalken", "meine zahlen"],
+  },
+  {
+    id: "ziel-neu", titel: "Ziel festlegen", href: "/fortschritt/neu", bereich: "Fortschritt",
+    synonyme: ["wochenziel erstellen", "monatsziel anlegen", "neues ziel", "anrufziel", "einheitenziel", "ziel setzen"],
+  },
+  {
+    id: "ziele", titel: "Ziele ansehen und bearbeiten", href: "/fortschritt", bereich: "Fortschritt",
+    synonyme: ["wochenziel andern", "monatsziel andern", "ziel bearbeiten", "andere", "hauptziel", "zielvorschlag", "ziel bestatigen"],
+  },
+  {
+    id: "warum", titel: "Mein Warum bearbeiten", href: "/fortschritt/warum", bereich: "Fortschritt",
+    synonyme: ["motivation", "mindset", "wunsch", "traum", "personlicher antrieb"],
+  },
+  {
+    id: "einheiten-offen", titel: "Offene Einheiten nachtragen", href: "/fortschritt/einheiten-offen", bereich: "Fortschritt",
+    merkmal: "einheiten", synonyme: ["einheiten vergessen", "abschluss nachtragen", "einheiten erinnerung", "produktion fehlt"],
+  },
+  {
+    id: "absprachen", titel: "Absprachen ansehen", href: "/mannschaft/vereinbarungen", bereich: "Team",
+    synonyme: ["vereinbarungen", "gemeinsam vereinbart", "begleitung", "absprache bestatigen", "betreuungstermin"],
+  },
+  {
+    id: "team-auswertung", titel: "Team auswerten", href: "/mannschaft/auswertung", bereich: "Team",
+    synonyme: ["team auswertung", "reporting", "teamzahlen", "teamleistung", "aktivitaten im team", "team trichter"],
+  },
+  {
+    id: "profil", titel: "Profil und Einstellungen öffnen", href: "/profil", bereich: "Profil",
+    synonyme: ["konto", "startseite andern", "arbeitsfokus", "darstellung", "dunkel", "hell", "dark mode", "abmelden", "eigene nummer"],
+  },
+  {
+    id: "meldungen", titel: "Erinnerungen einschalten", href: "/profil", bereich: "Profil",
+    synonyme: ["benachrichtigungen", "push", "meldungen", "erinnerungen aktivieren"],
+  },
+  {
+    id: "einstieg", titel: "Einstieg ansehen", href: "/willkommen", bereich: "Profil",
+    synonyme: ["onboarding", "erste schritte", "einfuhrung", "starthilfe", "anleitung"],
+  },
+  {
+    id: "app-installieren", titel: "App installieren", href: "/profil", bereich: "Profil",
+    synonyme: ["homescreen", "startbildschirm", "iphone installieren", "android installieren"],
   },
 
   // --- Nur der Admin -------------------------------------------------------
@@ -396,80 +453,38 @@ export const WEGWEISER: WegweiserEintrag[] = [
  * selten aus - und wer sie ausschreibt, soll deswegen nicht leer ausgehen.
  */
 export function normalisiere(roh: string): string {
-  return (
-    roh
-      .toLowerCase()
-      .replace(/ß/g, "ss")
-      // Erst den Umlaut auf seine ausgeschriebene Form, dann beide auf den
-      // Grundbuchstaben. In dieser Reihenfolge landen "ü", "ue" und "u" auf
-      // demselben Zeichen - egal, wie jemand am Handy tippt.
-      .replace(/ä/g, "ae")
-      .replace(/ö/g, "oe")
-      .replace(/ü/g, "ue")
-      .replace(/ae/g, "a")
-      .replace(/oe/g, "o")
-      .replace(/ue/g, "u")
-      // Alles, was kein Buchstabe und keine Ziffer ist, wird zur Luecke:
-      // Bindestriche, Punkte und ein versehentliches Komma sollen nicht
-      // entscheiden, ob etwas gefunden wird.
-      .replace(/[^a-z0-9 ]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-  );
+  return suchtext(roh);
 }
 
 /**
  * Sucht im Index. Gibt die Treffer in der Reihenfolge zurueck, in der sie
  * gemeint sein duerften.
  *
- * Drei Stufen statt einer Fuzzy-Bibliothek: der Index hat zwanzig Zeilen, da
- * schlaegt eine Regel, die man lesen kann, jeden Algorithmus, den man nicht
- * mehr nachvollzieht.
- *   3 = der Titel faengt so an          ("einh" -> Einheiten eintragen)
- *   2 = ein Wort im Titel faengt so an  ("eintragen" -> Einheiten eintragen)
- *   1 = ein Synonym oder der Bereich passt
+ * Exakte Titel und Synonyme stehen vor Wortanfängen und Tippfehlern.
+ * Der alte Aufrufer erhält weiterhin dieselbe Eintragsliste; die globale
+ * Suche verwendet zusätzlich die Punktzahl für ihre gemeinsame Rangfolge.
  */
 export function sucheImWegweiser(
   roh: string,
   istAdmin: boolean
 ): WegweiserEintrag[] {
-  const frage = normalisiere(roh);
-  if (!frage) return [];
+  return bewerteFunktionen(WEGWEISER.filter(e => !e.nurAdmin || istAdmin), roh).map(t => t.eintrag);
+}
 
-  const bewertet: { eintrag: WegweiserEintrag; punkte: number }[] = [];
-
-  for (const eintrag of WEGWEISER) {
-    if (eintrag.nurAdmin && !istAdmin) continue;
-
-    const titel = normalisiere(eintrag.titel);
-    let punkte = 0;
-
-    if (titel.startsWith(frage)) {
-      punkte = 3;
-    } else if (titel.split(" ").some((wort) => wort.startsWith(frage))) {
-      punkte = 2;
-    } else if (titel.includes(frage)) {
-      punkte = 2;
-    } else {
-      const felder = [eintrag.bereich, ...eintrag.synonyme];
-      const treffer = felder.some((feld) => {
-        const wert = normalisiere(feld);
-        return (
-          wert.includes(frage) ||
-          // Auch andersherum: wer "termin vereinbaren" tippt, meint das
-          // Synonym "termin anlegen" - die Frage ist dann laenger als das Wort.
-          (frage.length > 4 && frage.includes(wert))
-        );
-      });
-      if (treffer) punkte = 1;
-    }
-
-    if (punkte > 0) bewertet.push({ eintrag, punkte });
-  }
-
-  // Bei gleicher Punktzahl bleibt die Reihenfolge des Index stehen: die ist
-  // von Hand nach Haeufigkeit sortiert, nicht alphabetisch.
-  return bewertet
-    .sort((a, b) => b.punkte - a.punkte)
-    .map((zeile) => zeile.eintrag);
+/** Alle relevanten Wörter müssen passen; eine beiläufige Silbe genügt nicht. */
+export function bewerteFunktionen(eintraege: WegweiserEintrag[], roh: string) {
+  const frage = suchtext(roh);
+  const woerter = suchwoerter(roh);
+  if (!frage || !woerter.length) return [];
+  return eintraege.flatMap((eintrag, position) => {
+    const titel = suchtext(eintrag.titel);
+    const text = [eintrag.titel, eintrag.bereich, ...eintrag.synonyme].join(" ");
+    if (!passenAlle(woerter, text)) return [];
+    const basis = titel === frage ? 1200
+      : eintrag.synonyme.some(s => suchtext(s) === frage) ? 1150
+      : titel.startsWith(frage) ? 1100
+      : passenAlle(woerter, titel, false) ? 1000
+      : passenAlle(woerter, text, false) ? 920 : 680;
+    return [{ eintrag, punkte: basis - position / 100 }];
+  }).sort((a, b) => b.punkte - a.punkte);
 }
