@@ -61,10 +61,10 @@ type Kontakt = ContactLite & {
   letzteNotiz: string | null;
 };
 
-function Arbeitsliste({ kontakte }: { kontakte: Kontakt[] }) {
+function Arbeitsliste({ kontakte, rueckweg = "/heute" }: { kontakte: Kontakt[]; rueckweg?: string }) {
   return <ul className="crm-list">
     {kontakte.map((k) => <li key={k.id}>
-      <Link href={`/contacts/${k.id}?zurueck=%2Fheute`} className="crm-list-row">
+      <Link href={`/contacts/${k.id}?zurueck=${encodeURIComponent(rueckweg)}`} className="crm-list-row">
         <span aria-hidden className="crm-initials">{k.name.trim().split(/\s+/).slice(0, 2).map(teil => teil[0]).join("")}</span>
         <span className="min-w-0 flex-1">
           <span className="crm-contact-name">{k.name}</span>
@@ -105,8 +105,10 @@ async function WettbewerbHeute({ userId }: { userId: string }) {
   );
 }
 
-export default async function HeutePage() {
+export default async function HeutePage({ searchParams }: { searchParams: Promise<{ alle?: string }> }) {
   const user = await requireUser();
+  const alle = (await searchParams).alle === "1";
+  const rueckweg = alle ? "/heute?alle=1" : "/heute";
   after(() => merkeAnwesenheit(user.id));
   const heute = berlinToday();
   const sicht = eigene(user.id);
@@ -126,6 +128,7 @@ export default async function HeutePage() {
     prisma.contact.findMany({
       where: {
         ...sicht.kontakte,
+        outcome: { not: "VERLOREN" },
         nextStepType: { not: null },
         nextStepAt: { lt: addDays(dayToUtcDate(heute), 8) },
       },
@@ -142,11 +145,10 @@ export default async function HeutePage() {
       where: {
         ...sicht.kontakte,
         nextStepType: null,
-        outcome: { not: "VERLOREN" },
+        outcome: "OFFEN",
         stage: { not: "ABSCHLUSS" },
       },
       orderBy: { lastProgressAt: "asc" },
-      take: 25,
       include: {
         activities: {
           orderBy: { date: "desc" },
@@ -276,7 +278,7 @@ export default async function HeutePage() {
           naechster.nextStepType === "TERMIN"
             ? "Termin bearbeiten"
             : "Kontakt öffnen",
-        href: `/contacts/${naechster.id}?zurueck=%2Fheute`,
+        href: `/contacts/${naechster.id}?zurueck=${encodeURIComponent(rueckweg)}`,
       }
     : namen === 0
       ? {
@@ -352,10 +354,10 @@ export default async function HeutePage() {
     {(arbeitslage !== "START" || absprachen.length > 0) && betreuung}
     <section className="space-y-3" id="eigene-arbeit">
       <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">{arbeitslage === "FUEHRUNG" ? "Eigene Aufgaben" : "Anrufe und Termine"}</h2><Link href="/kalender" className="inline-flex min-h-11 shrink-0 items-center text-sm text-link">Kalender →</Link></div>
-      <TerminFrageKarte fragen={offeneTerminergebnisse.slice(0, 3).map(k => ({contact: lite(k), appointmentAt: k.appointmentAt!}))} />
-      {offeneTerminergebnisse.length > 3 && <Link href="/kalender?ansicht=liste" className="inline-flex min-h-11 items-center text-sm text-link">{offeneTerminergebnisse.length - 3} weitere Terminergebnisse →</Link>}
-      {offeneArbeit.length > 0 ? <Arbeitsliste kontakte={offeneArbeit.slice(0, 3).map(lite)} /> : offeneTerminergebnisse.length === 0 && <p className="py-2 text-base text-ink-muted">{obenGezeigt ? "Keine weiteren Kontaktschritte für heute." : "Für heute sind keine Kontaktschritte offen."}</p>}
-      {offeneArbeit.length > 3 && <Link href="/kalender?ansicht=liste" className="inline-flex min-h-11 items-center text-sm text-link">{offeneArbeit.length - 3} weitere Schritte im Kalender →</Link>}
+      <TerminFrageKarte fragen={(alle ? offeneTerminergebnisse : offeneTerminergebnisse.slice(0, 3)).map(k => ({contact: lite(k), appointmentAt: k.appointmentAt!}))} />
+      {offeneArbeit.length > 0 ? <Arbeitsliste kontakte={(alle ? offeneArbeit : offeneArbeit.slice(0, 3)).map(lite)} rueckweg={rueckweg} /> : offeneTerminergebnisse.length === 0 && <p className="py-2 text-base text-ink-muted">{obenGezeigt ? "Keine weiteren Kontaktschritte für heute." : "Für heute sind keine Kontaktschritte offen."}</p>}
+      {!alle && (offeneArbeit.length > 3 || offeneTerminergebnisse.length > 3) && <Link href="/heute?alle=1#eigene-arbeit" className="inline-flex min-h-11 items-center text-sm text-link">Alle {offeneArbeit.length + offeneTerminergebnisse.length} Aufgaben ansehen →</Link>}
+      {alle && <Link href="/heute" className="inline-flex min-h-11 items-center text-sm text-link">Zur Tagesübersicht →</Link>}
       {flags.einheiten && <EinheitenErinnerungen userId={user.id} />}
     </section>
 
@@ -363,11 +365,11 @@ export default async function HeutePage() {
       {activeStart && !startVorne && <details className="border-t border-line"><summary className="min-h-11 cursor-pointer py-3 text-base font-medium">Deinen Einstieg fortsetzen</summary><StartHinweis phase={activeStart.phase} kompakt /></details>}
       <WettbewerbHeute userId={user.id} />
     </section>
-    <details className="border-t border-line" id="weitere-schritte">
+    <details className="border-t border-line" id="weitere-schritte" open={alle}>
       <summary className="min-h-11 cursor-pointer py-3 text-base font-medium">Weitere Schritte</summary>
       <div className="space-y-6 pt-2">
-        {spaeter.length > 0 && <section className="space-y-3"><h2 className="text-xl font-semibold">Diese Woche · {spaeter.length}</h2><Arbeitsliste kontakte={spaeter.slice(0, 3).map(lite)} /><Link href="/kalender?ansicht=liste" className="inline-flex min-h-11 items-center text-sm text-link">Alle im Kalender ansehen →</Link></section>}
-        {ohneSchritt.length > 0 && <section className="space-y-3"><h2 className="text-xl font-semibold">Nächsten Schritt festlegen · {ohneSchritt.length}{ohneSchritt.length === 25 ? "+" : ""}</h2><Arbeitsliste kontakte={ohneSchritt.slice(0, 3).map(lite)} /><Link href={`/namen${liste}`} className="inline-flex min-h-11 items-center text-sm text-link">Alle Kontakte ansehen →</Link></section>}
+        {spaeter.length > 0 && <section className="space-y-3"><h2 className="text-xl font-semibold">Diese Woche · {spaeter.length}</h2><Arbeitsliste kontakte={(alle ? spaeter : spaeter.slice(0, 3)).map(lite)} rueckweg={rueckweg} />{!alle && spaeter.length > 3 && <Link href="/heute?alle=1#weitere-schritte" className="inline-flex min-h-11 items-center text-sm text-link">Alle {spaeter.length} Schritte ansehen →</Link>}</section>}
+        {ohneSchritt.length > 0 && <section className="space-y-3"><h2 className="text-xl font-semibold">Nächsten Schritt festlegen · {ohneSchritt.length}</h2><Arbeitsliste kontakte={(alle ? ohneSchritt : ohneSchritt.slice(0, 3)).map(lite)} rueckweg={rueckweg} />{!alle && ohneSchritt.length > 3 && <Link href="/heute?alle=1#weitere-schritte" className="inline-flex min-h-11 items-center text-sm text-link">Alle {ohneSchritt.length} Kontakte ansehen →</Link>}</section>}
         {arbeitslage !== "FUEHRUNG" && <ErsteWoche user={{...user, pledgeTarget: null, pledgeSetAt: null, pledgeShownAt: null}} />}
       </div>
     </details>
