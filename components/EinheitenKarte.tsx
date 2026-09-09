@@ -1,5 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import EinheitenErfolg from "@/components/EinheitenErfolg";
+import type { EinheitenBestaetigung } from "@/lib/einheiten-erfolg";
+
 // Die Einheiten-Karte oben auf /heute (docs/emil-feedback-plan.md, AP-02).
 //
 // Emils Notiz: "Einheiten eingeben muss einfacher sein, direkt eingebbar, als
@@ -12,14 +16,10 @@
 //
 // 1. EIN SCHREIBWEG. Gebucht wird ausschliesslich ueber einheitSchnellBuchen -
 //    denselben Weg wie das Kopfzeilen-Fenster und die Abschluss-Frage.
-// 2. KEIN REVALIDATEPATH FUER /heute NOETIG. Die Seite ist force-dynamic; das
-//    Hausmuster ist ein direktes Client-State-Update aus dem Rueckgabewert der
-//    Server-Aktion (Vorbild: components/EinheitenNachAbschluss.tsx). Ein
-//    router.refresh() wuerde hier zusaetzlich die ganze Seite neu laden - fuer
-//    zwei Zahlen, die die Aktion schon fertig formatiert mitbringt, waere das
-//    ein Umweg.
+// 2. Die gespeicherten Zahlen erscheinen sofort. Ein Refresh aktualisiert
+//    zugleich Ziele und andere Buchungswege auf derselben Seite.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { einheitSchnellBuchen } from "@/app/(team)/einheiten/actions";
 import Fortschritt from "@/components/Fortschritt";
@@ -65,16 +65,26 @@ export default function EinheitenKarte({
   const [monatStand, setMonatStand] = useState(monat);
   const [gesamtStand, setGesamtStand] = useState(gesamt);
   const [menge, setMenge] = useState("");
+  const router = useRouter();
+  const [erfolg, setErfolg] = useState<EinheitenBestaetigung | null>(null);
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
-  const geschafft = schwelle !== null && zahlAus(gesamtStand) >= zahlAus(schwelle);
-  const anteil = schwelle === null ? 0 : zahlAus(gesamtStand) / zahlAus(schwelle);
+  useEffect(() => {
+    setMonatStand(monat);
+    setGesamtStand(gesamt);
+  }, [monat, gesamt]);
+
+  const geschafft =
+    schwelle !== null && zahlAus(gesamtStand) >= zahlAus(schwelle);
+  const anteil =
+    schwelle === null ? 0 : zahlAus(gesamtStand) / zahlAus(schwelle);
 
   const buchen = async () => {
     if (!menge.trim() || laeuft) return;
     setLaeuft(true);
     setFehler(null);
+    setErfolg(null);
     try {
       const antwort = await einheitSchnellBuchen(menge);
       if (!antwort.ok) {
@@ -84,8 +94,12 @@ export default function EinheitenKarte({
       setMonatStand(antwort.monat);
       setGesamtStand(antwort.gesamt);
       setMenge("");
+      setErfolg(antwort);
+      router.refresh();
     } catch {
-      setFehler("Kam nicht durch. Tipp es nochmal.");
+      setFehler(
+        "Die Bestätigung kam nicht durch. Prüfe deine Einträge, bevor du erneut buchst.",
+      );
     } finally {
       setLaeuft(false);
     }
@@ -146,7 +160,9 @@ export default function EinheitenKarte({
           ) : (
             <p className="mt-2 text-xs text-ink-muted">
               {`${gesamtStand} von ${schwelle}${
-                naechsteStufe !== null ? ` bis Karrierestufe ${naechsteStufe}` : ""
+                naechsteStufe !== null
+                  ? ` bis Karrierestufe ${naechsteStufe}`
+                  : ""
               }`}
             </p>
           )}
@@ -161,7 +177,10 @@ export default function EinheitenKarte({
 
       {karrierestufeFehlt && (
         <p className="mt-4 text-xs text-ink-soft">
-          <Link href="/einheiten" className="font-medium text-navy-600 hover:underline">
+          <Link
+            href="/einheiten"
+            className="font-medium text-navy-600 hover:underline"
+          >
             Trag deine Karrierestufe ein
           </Link>{" "}
           — dann siehst du hier auch den Fortschritt zur nächsten.
@@ -198,7 +217,16 @@ export default function EinheitenKarte({
       </div>
 
       {fehler && (
-        <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{fehler}</p>
+        <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+          {fehler}
+        </p>
+      )}
+
+      {erfolg && !fehler && (
+        <EinheitenErfolg
+          key={`${erfolg.monat}:${erfolg.gesamt}`}
+          stand={erfolg}
+        />
       )}
 
       <Link

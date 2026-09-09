@@ -19,6 +19,8 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { einheitenBuchen } from "@/app/(team)/einheiten/actions";
 import EinheitenHilfe from "@/components/EinheitenHilfe";
+import EinheitenErfolg from "@/components/EinheitenErfolg";
+import type { EinheitenBestaetigung } from "@/lib/einheiten-erfolg";
 import { btnPrimary, card, input, label, sectionTitle } from "@/components/ui";
 
 export default function EinheitenEintragen({ heute }: { heute: string }) {
@@ -29,6 +31,7 @@ export default function EinheitenEintragen({ heute }: { heute: string }) {
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [gespeichert, setGespeichert] = useState(false);
+  const [erfolg, setErfolg] = useState<EinheitenBestaetigung | null>(null);
 
   const speichern = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -47,18 +50,21 @@ export default function EinheitenEintragen({ heute }: { heute: string }) {
         setNotiz("");
         setTag(heute);
         setGespeichert(true);
+        setErfolg(antwort);
         // Die Zahlen oben auf der Seite (Monat, Gesamt, Liste der letzten
         // Eintraege) sind Server-Komponenten - ohne <form action> uebernimmt
         // niemand das Nachladen automatisch. Dasselbe Muster wie in
         // EinheitenNachAbschluss.tsx.
         router.refresh();
       } catch {
-        setFehler("Kam nicht durch. Tipp es nochmal.");
+        setFehler(
+          "Die Bestätigung kam nicht durch. Prüfe deine Einträge, bevor du erneut buchst.",
+        );
       } finally {
         setLaeuft(false);
       }
     },
-    [menge, tag, notiz, laeuft, heute, router]
+    [menge, tag, notiz, laeuft, heute, router],
   );
 
   return (
@@ -134,8 +140,11 @@ export default function EinheitenEintragen({ heute }: { heute: string }) {
       </div>
 
       {fehler && <p className="text-sm text-red-600">{fehler}</p>}
-      {gespeichert && !fehler && (
-        <p className="text-sm text-emerald-700">Eingetragen.</p>
+      {gespeichert && !fehler && erfolg && (
+        <EinheitenErfolg
+          key={`${erfolg.monat}:${erfolg.gesamt}`}
+          stand={erfolg}
+        />
       )}
 
       <div className="flex justify-end border-t border-line pt-5">

@@ -32,6 +32,8 @@ import { einheitSchnellBuchen } from "@/app/(team)/einheiten/actions";
 import { einheitenSpaeter } from "@/app/(app)/fortschritt/einheitenActions";
 import Modal from "@/components/Modal";
 import EinheitenHilfe from "@/components/EinheitenHilfe";
+import EinheitenErfolg from "@/components/EinheitenErfolg";
+import type { EinheitenBestaetigung } from "@/lib/einheiten-erfolg";
 import { btnGhost, cn, inputBlank } from "@/components/ui";
 
 const ABSCHLUSS_EVENT = "crm:abschluss";
@@ -58,11 +60,7 @@ export default function EinheitenNachAbschluss() {
   const [menge, setMenge] = useState("");
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [erfolg, setErfolg] = useState<{
-    monat: string;
-    gesamt: string;
-    zielstand: string | null;
-  } | null>(null);
+  const [erfolg, setErfolg] = useState<EinheitenBestaetigung | null>(null);
 
   useEffect(() => {
     const onFrage = (event: Event) => {
@@ -107,12 +105,14 @@ export default function EinheitenNachAbschluss() {
         setFehler(antwort.fehler);
         return;
       }
-      setErfolg({ monat: antwort.monat, gesamt: antwort.gesamt, zielstand: antwort.zielstand });
+      setErfolg(antwort);
       // Zeigt die Seite im Hintergrund Einheiten, steht dort sonst noch der
       // Stand von vorhin.
       router.refresh();
     } catch {
-      setFehler("Kam nicht durch. Tipp es nochmal.");
+      setFehler(
+        "Die Bestätigung kam nicht durch. Prüfe deine Einträge, bevor du erneut buchst.",
+      );
     } finally {
       setLaeuft(false);
     }
@@ -155,19 +155,7 @@ export default function EinheitenNachAbschluss() {
         subtitle={name}
       >
         <div className="space-y-5">
-          <div role="status" className="space-y-3">
-            <p className="text-2xl font-semibold">
-              {erfolg.monat} Einheiten im Monat
-            </p>
-            <p className="text-base text-ink-muted">
-              {erfolg.gesamt} Einheiten insgesamt
-            </p>
-            {erfolg.zielstand && (
-              <p className="text-base text-ink-muted">
-                Dein Ziel: {erfolg.zielstand}
-              </p>
-            )}
-          </div>
+          <EinheitenErfolg stand={erfolg} />
           <button
             type="button"
             onClick={schliessen}

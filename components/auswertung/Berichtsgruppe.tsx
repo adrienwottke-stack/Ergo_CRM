@@ -50,7 +50,7 @@ export default function Berichtsgruppe({
 
       <div className="mt-7 border-t border-line pt-6">
         <h3 className="text-base font-semibold text-ink">
-          Aktivitäten im Zeitraum
+          Aktivitätstrichter im Zeitraum
         </h3>
         {gruppe.aktivitaetsKonten < gruppe.konten && (
           <p

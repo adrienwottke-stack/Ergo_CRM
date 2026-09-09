@@ -21,25 +21,31 @@ export const dynamic = "force-dynamic";
 export default async function AnrufenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ liste?: string; stufe?: string }>;
+  searchParams: Promise<{ liste?: string; stufe?: string; kontakt?: string }>;
 }) {
   const user = await requireUser();
-  const { liste, stufe } = await searchParams;
-  const kind = listeAus(liste, user.startTrack);
+  const { liste, stufe, kontakt } = await searchParams;
+  const angefragteListe = listeAus(liste, user.startTrack);
   const rating: ContactRating | null =
     stufe && isContactRating(stufe) ? stufe : null;
 
-  const guideKey = guideKeyForList[kind];
-  const contacts = await prisma.contact.findMany({
+  const [contacts, bisherigeAnrufe] = await Promise.all([
+    prisma.contact.findMany({
       where: {
         ...eigene(user.id).kontakte,
-        listKinds: { has: kind },
+        ...(kontakt
+          ? { id: kontakt }
+          : {
+              listKinds: { has: angefragteListe },
+              stage: {
+                in: ["NEU", "KONTAKTIERT"] as ("NEU" | "KONTAKTIERT")[],
+              },
+            }),
         outcome: "OFFEN",
-        stage: { in: ["NEU", "KONTAKTIERT"] },
         // Ohne Nummer laesst sich nicht anrufen – solche Namen bleiben auf
         // der Liste, aber nicht im Durchlauf.
         phone: { not: null },
-        ...(rating ? { rating } : {}),
+        ...(!kontakt && rating ? { rating } : {}),
       },
       select: {
         id: true,
@@ -49,13 +55,22 @@ export default async function AnrufenPage({
         note: true,
         source: true,
         stage: true,
+        listKinds: true,
         activities: {
           orderBy: { date: "desc" },
           take: 2,
           select: { id: true, text: true, date: true },
         },
       },
-  });
+    }),
+    prisma.dailyLog.count({
+      where: { person: { userId: user.id }, type: "CALL" },
+    }),
+  ]);
+  const kind = kontakt
+    ? (contacts[0]?.listKinds[0] ?? angefragteListe)
+    : angefragteListe;
+  const guideKey = guideKeyForList[kind];
 
   // Hier zaehlt die Reihenfolge: enger Kreis zuerst.
   const queue: DialerEntry[] = contacts
@@ -98,6 +113,7 @@ export default async function AnrufenPage({
         kind={kind}
         guideTitle={guide.title}
         guideBody={guide.body}
+        ersterAnruf={bisherigeAnrufe === 0}
       />
     </div>
   );

@@ -13,14 +13,14 @@ export default function TeamNavigation({
       {[
         { key: "begleiten", titel: "Begleiten", href: "/mannschaft" },
         {
-          key: "ueberblick",
-          titel: "Überblick",
-          href: "/mannschaft?bereich=ueberblick",
-        },
-        {
           key: "auswertung",
           titel: "Auswertung",
           href: "/mannschaft/auswertung",
+        },
+        {
+          key: "ueberblick",
+          titel: "Struktur",
+          href: "/mannschaft?bereich=ueberblick",
         },
       ].map((eintrag) => (
         <Link

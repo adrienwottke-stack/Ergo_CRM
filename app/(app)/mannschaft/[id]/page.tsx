@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PartnerZielstand from "@/components/ziele/PartnerZielstand";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -350,7 +351,10 @@ export default async function PersonPage({
       )}
 
       {!person.istDu && !person.platzhalter && (
-        <PartnerVereinbarungen userId={user.id} partnerId={person.id} />
+        <>
+          <PartnerVereinbarungen userId={user.id} partnerId={person.id} />
+          <PartnerZielstand userId={user.id} partnerId={person.id} />
+        </>
       )}
 
       {/* --- Was zu tun ist --------------------------------------------------

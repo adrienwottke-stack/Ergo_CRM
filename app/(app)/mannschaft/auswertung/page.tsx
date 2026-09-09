@@ -5,6 +5,7 @@ import { berlinToday } from "@/lib/dates";
 import { ladeTeamauswertung, type Berichtsfilter } from "@/lib/team-auswertung";
 import Berichtsgruppe from "@/components/auswertung/Berichtsgruppe";
 import TeamNavigation from "@/app/(app)/mannschaft/TeamNavigation";
+import Teamziele from "@/components/ziele/Teamziele";
 
 export const dynamic = "force-dynamic";
 
@@ -173,6 +174,19 @@ export default async function AuswertungPage({
           gruppe={bericht.team}
           meeting={meeting}
         />
+      )}
+
+      {bericht.umfang !== "direkte" && (
+        <section className="space-y-3">
+          <h2 className="text-xl font-semibold">
+            Teamziele am gewählten Stichtag
+          </h2>
+          <Teamziele
+            userId={user.id}
+            wurzelId={bericht.wurzel.id}
+            tag={bericht.stand}
+          />
+        </section>
       )}
 
       <Berichtsgruppe

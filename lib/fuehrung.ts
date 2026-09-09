@@ -303,6 +303,7 @@ export async function mannschaftsLage(betrachter: {
         passwordHash: true,
         onboardingDoneAt: true,
         installedAt: true,
+        arbeitsfokus: true,
         phone: true,
         _count: { select: { team: true } },
       },
@@ -594,6 +595,7 @@ export async function mannschaftsLage(betrachter: {
     const signale = signaleFuer(
       {
         platzhalter,
+        fuehrungsfokus: person.arbeitsfokus === "FUEHRUNG",
         tageSeitAktivitaet: w.letzteAktivitaet
           ? tageSeit(w.letzteAktivitaet)
           : null,
@@ -688,6 +690,36 @@ export async function mannschaftsLage(betrachter: {
       gelesen: gelesenJe.get(person.id) ?? null,
     };
   });
+
+  // Ein Teamleiter bekommt belegte Fälle aus seinem Ast statt einer Bewertung
+  // anhand eigener Anrufe. Private Absprachen anderer Beteiligter bleiben außen vor.
+  const urspruenglicheFaelle = alle
+    .filter((p) => !p.platzhalter && !p.ausgetreten && p.signale.length > 0)
+    .map((p) => ({
+      id: p.id,
+      path: p.path,
+      vorname: p.vorname,
+      signale: [...p.signale],
+    }));
+  for (const leiter of alle) {
+    if (leiter.platzhalter || leiter.ausgetreten || leiter.path === "/")
+      continue;
+    const faelle = urspruenglicheFaelle.filter(
+      (p) => p.id !== leiter.id && p.path.startsWith(leiter.path),
+    );
+    if (faelle.length) {
+      leiter.signale.push({
+        schluessel: "team_begleiten",
+        titel: `${faelle.length} Partner im Team brauchen Unterstützung · Stand ${heute}`,
+        schritt: `Zum Beispiel ${faelle[0].vorname}: ${faelle[0].signale[0].titel}. Mit den zuständigen direkten Partnern den nächsten Schritt besprechen.`,
+        schwere: faelle.some((p) => p.signale.some((s) => s.schwere === "rot"))
+          ? "rot"
+          : "gelb",
+      });
+      leiter.ampel = ampelVon(leiter.signale);
+      leiter.rang = dringlichkeit(leiter.signale);
+    }
+  }
 
   const ich =
     alle.find((person) => person.istDu) ??

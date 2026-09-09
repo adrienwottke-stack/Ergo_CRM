@@ -34,6 +34,18 @@ export type WegweiserEintrag = {
 };
 
 export const WEGWEISER: WegweiserEintrag[] = [
+  {
+    id: "teamziele",
+    titel: "Gemeinsames Teamziel setzen",
+    href: "/mannschaft/ziele",
+    bereich: "Team",
+    synonyme: [
+      "Teamziel",
+      "gemeinsamer Fortschritt",
+      "gemeinsame Einheiten",
+      "Teamfortschritt",
+    ],
+  },
   // --- Die Zahl, in der der Betrieb rechnet --------------------------------
   // Steht ganz oben, weil sie der Anlass fuer diesen ganzen Baustein war.
   {
@@ -288,7 +300,14 @@ export const WEGWEISER: WegweiserEintrag[] = [
     titel: "Arena öffnen",
     href: "/arena",
     bereich: "Wettbewerb",
-    synonyme: ["wettbewerb", "puls", "zweikampf", "duell", "sprint", "bestmarke"],
+    synonyme: [
+      "wettbewerb",
+      "puls",
+      "zweikampf",
+      "duell",
+      "sprint",
+      "bestmarke",
+    ],
   },
   {
     id: "spiel",
@@ -367,7 +386,14 @@ export const WEGWEISER: WegweiserEintrag[] = [
     titel: "Team verwalten",
     href: "/team",
     bereich: "Team",
-    synonyme: ["konten", "nutzer", "passwort", "zugang", "sperren", "verwaltung"],
+    synonyme: [
+      "konten",
+      "nutzer",
+      "passwort",
+      "zugang",
+      "sperren",
+      "verwaltung",
+    ],
     nurAdmin: true,
   },
   {
@@ -431,7 +457,7 @@ export function normalisiere(roh: string): string {
  */
 export function sucheImWegweiser(
   roh: string,
-  istAdmin: boolean
+  istAdmin: boolean,
 ): WegweiserEintrag[] {
   const frage = normalisiere(roh);
   if (!frage) return [];

@@ -4,6 +4,7 @@ import { ladeHauptziel, ladeZiele } from "@/lib/ziele";
 import { zielPruefzeit } from "@/lib/ziele-modell";
 import { ladeEinheitenErinnerungen } from "@/lib/einheiten-erinnerung";
 import ZielKarte from "@/components/ziele/ZielKarte";
+import Teamziele from "@/components/ziele/Teamziele";
 import { column, pageTitle, btnPrimary } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export default async function FortschrittPage() {
           Deine Ziele und das, was du dafür geschafft hast.
         </p>
       </header>
+      <Teamziele userId={user.id} kompakt />
       <nav
         aria-label="Fortschritt entdecken"
         className="divide-y divide-line rounded-xl border border-line bg-surface"

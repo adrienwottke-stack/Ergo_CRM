@@ -42,6 +42,8 @@ import {
   standHeute,
 } from "@/app/(team)/log/quickLogAction";
 import { einheitSchnellBuchen } from "@/app/(team)/einheiten/actions";
+import EinheitenErfolg from "@/components/EinheitenErfolg";
+import type { EinheitenBestaetigung } from "@/lib/einheiten-erfolg";
 import { suchlauf } from "@/app/wegweiserAction";
 import type { SchnellStand } from "@/lib/stats";
 import { sucheImWegweiser, type WegweiserEintrag } from "@/lib/wegweiser";
@@ -56,7 +58,11 @@ import {
   PhoneIcon,
   PlusIcon,
 } from "@/components/icons";
-import { manualQuotaTypes, quotaTypeLabels, quotaTypePoints } from "@/lib/labels";
+import {
+  manualQuotaTypes,
+  quotaTypeLabels,
+  quotaTypePoints,
+} from "@/lib/labels";
 import type { QuotaType } from "@/lib/generated/prisma/enums";
 import { cn, flaeche, inputBlank } from "@/components/ui";
 
@@ -66,7 +72,13 @@ const symbolFarbe: Partial<Record<QuotaType, string>> = {
   APPOINTMENT_SET: "bg-emerald-50 text-emerald-600",
 };
 
-function ArtSymbol({ type, className }: { type: QuotaType; className?: string }) {
+function ArtSymbol({
+  type,
+  className,
+}: {
+  type: QuotaType;
+  className?: string;
+}) {
   if (type === "CALL") return <PhoneIcon className={className} />;
   if (type === "NUMBERS_PULLED") return <HashIcon className={className} />;
   return <CalendarCheckIcon className={className} />;
@@ -100,6 +112,8 @@ export default function Schnellzugriff({
   const [einheitenLaeuft, setEinheitenLaeuft] = useState(false);
   const [einheitenFehler, setEinheitenFehler] = useState<string | null>(null);
   const [gebucht, setGebucht] = useState(false);
+  const [einheitenErfolg, setEinheitenErfolg] =
+    useState<EinheitenBestaetigung | null>(null);
 
   // --- Wegweiser ------------------------------------------------------------
   const [suche, setSuche] = useState("");
@@ -108,11 +122,13 @@ export default function Schnellzugriff({
   // Was zuletzt gesucht wurde und ob etwas kam. Gemeldet wird das EINMAL beim
   // Schliessen (app/wegweiserAction.ts) - sonst stuende jeder Praefix ("e",
   // "ei", "ein") als eigene Zeile im Treffer-los-Log.
-  const letzteSuche = useRef<{ begriff: string; treffer: boolean } | null>(null);
+  const letzteSuche = useRef<{ begriff: string; treffer: boolean } | null>(
+    null,
+  );
 
   const treffer = useMemo(
     () => (suche.trim() ? sucheImWegweiser(suche, istAdmin) : []),
-    [suche, istAdmin]
+    [suche, istAdmin],
   );
   const imWegweiser = wegweiserAn && suche.trim().length > 0;
 
@@ -136,7 +152,9 @@ export default function Schnellzugriff({
         standRef.current = geladen;
         setStand(geladen);
       })
-      .catch(() => setFehler("Der Stand kam nicht durch. Zählen geht trotzdem."));
+      .catch(() =>
+        setFehler("Der Stand kam nicht durch. Zählen geht trotzdem."),
+      );
   }, []);
 
   const schliessen = useCallback(() => {
@@ -188,57 +206,55 @@ export default function Schnellzugriff({
       router.push(eintrag.href);
       schliessen();
     },
-    [router, schliessen]
+    [router, schliessen],
   );
 
-  const zaehlen = useCallback(
-    async (type: QuotaType, richtung: 1 | -1) => {
-      setFehler(null);
-      setDelta((alt) => ({ ...alt, [type]: (alt[type] ?? 0) + richtung }));
-      setGezaehlt(true);
+  const zaehlen = useCallback(async (type: QuotaType, richtung: 1 | -1) => {
+    setFehler(null);
+    setDelta((alt) => ({ ...alt, [type]: (alt[type] ?? 0) + richtung }));
+    setGezaehlt(true);
 
-      try {
-        const neu =
-          richtung === 1 ? await quickLog(type, 1) : await quickLogZurueck(type);
-        if (neu === null) return;
-        // Der Server hat das letzte Wort: greift die Tageskappe, steht danach
-        // wieder die wahre Zahl da statt der erhofften - und die Punktzeile
-        // waechst um genau das, was wirklich gebucht wurde.
-        //
-        // Laedt der Stand noch, bleibt der Tipp im Zwischenspeicher liegen und
-        // wird spaeter auf den geladenen Stand draufgezaehlt: sonst verschwaende
-        // er optisch, bis das Fenster das naechste Mal aufgeht.
-        const alt = standRef.current;
-        if (!alt) return;
-        const vorher = alt.stand[type] ?? 0;
-        const neuerStand: SchnellStand = {
-          ...alt,
-          stand: { ...alt.stand, [type]: neu },
-          punkte: alt.punkte + (neu - vorher) * quotaTypePoints[type],
-        };
-        standRef.current = neuerStand;
-        setStand(neuerStand);
-        // Nur diesen einen Tipp aus dem Zwischenspeicher nehmen, nicht alles auf
-        // null setzen: wer dreimal schnell hintereinander tippt, hat noch zwei
-        // Antworten unterwegs - die Zahl darf zwischendurch nicht zurueckfallen.
-        setDelta((vorherige) => ({
-          ...vorherige,
-          [type]: (vorherige[type] ?? 0) - richtung,
-        }));
-      } catch {
-        // Funkloch im Treppenhaus. Die Zahl geht zurueck, damit niemand mit
-        // einem Punkt rechnet, der nie ankam.
-        setDelta((alt) => ({ ...alt, [type]: (alt[type] ?? 0) - richtung }));
-        setFehler("Kam nicht durch. Tipp es nochmal.");
-      }
-    },
-    []
-  );
+    try {
+      const neu =
+        richtung === 1 ? await quickLog(type, 1) : await quickLogZurueck(type);
+      if (neu === null) return;
+      // Der Server hat das letzte Wort: greift die Tageskappe, steht danach
+      // wieder die wahre Zahl da statt der erhofften - und die Punktzeile
+      // waechst um genau das, was wirklich gebucht wurde.
+      //
+      // Laedt der Stand noch, bleibt der Tipp im Zwischenspeicher liegen und
+      // wird spaeter auf den geladenen Stand draufgezaehlt: sonst verschwaende
+      // er optisch, bis das Fenster das naechste Mal aufgeht.
+      const alt = standRef.current;
+      if (!alt) return;
+      const vorher = alt.stand[type] ?? 0;
+      const neuerStand: SchnellStand = {
+        ...alt,
+        stand: { ...alt.stand, [type]: neu },
+        punkte: alt.punkte + (neu - vorher) * quotaTypePoints[type],
+      };
+      standRef.current = neuerStand;
+      setStand(neuerStand);
+      // Nur diesen einen Tipp aus dem Zwischenspeicher nehmen, nicht alles auf
+      // null setzen: wer dreimal schnell hintereinander tippt, hat noch zwei
+      // Antworten unterwegs - die Zahl darf zwischendurch nicht zurueckfallen.
+      setDelta((vorherige) => ({
+        ...vorherige,
+        [type]: (vorherige[type] ?? 0) - richtung,
+      }));
+    } catch {
+      // Funkloch im Treppenhaus. Die Zahl geht zurueck, damit niemand mit
+      // einem Punkt rechnet, der nie ankam.
+      setDelta((alt) => ({ ...alt, [type]: (alt[type] ?? 0) - richtung }));
+      setFehler("Kam nicht durch. Tipp es nochmal.");
+    }
+  }, []);
 
   const einheitenBuchen = useCallback(async () => {
     if (!menge.trim() || einheitenLaeuft) return;
     setEinheitenLaeuft(true);
     setEinheitenFehler(null);
+    setGebucht(false);
     try {
       const antwort = await einheitSchnellBuchen(menge);
       if (!antwort.ok) {
@@ -249,20 +265,27 @@ export default function Schnellzugriff({
       // der wirklich in der Tabelle steht.
       const alt = standRef.current;
       if (alt) {
-        const neuerStand: SchnellStand = { ...alt, einheitenMonat: antwort.monat };
+        const neuerStand: SchnellStand = {
+          ...alt,
+          einheitenMonat: antwort.monat,
+        };
         standRef.current = neuerStand;
         setStand(neuerStand);
       }
       setMenge("");
       setGebucht(true);
+      setEinheitenErfolg(antwort);
+      router.refresh();
       // Die Seite im Hintergrund muss mitkommen, wenn sie Einheiten zeigt.
       setGezaehlt(true);
     } catch {
-      setEinheitenFehler("Kam nicht durch. Tipp es nochmal.");
+      setEinheitenFehler(
+        "Die Bestätigung kam nicht durch. Prüfe deine Einträge, bevor du erneut buchst.",
+      );
     } finally {
       setEinheitenLaeuft(false);
     }
-  }, [menge, einheitenLaeuft]);
+  }, [menge, einheitenLaeuft, router]);
 
   const zahlVon = (type: QuotaType): number | null =>
     stand === null ? null : (stand.stand[type] ?? 0) + (delta[type] ?? 0);
@@ -275,7 +298,7 @@ export default function Schnellzugriff({
       : stand.punkte +
         manualQuotaTypes.reduce(
           (summe, art) => summe + (delta[art] ?? 0) * quotaTypePoints[art],
-          0
+          0,
         );
 
   return (
@@ -284,7 +307,9 @@ export default function Schnellzugriff({
         type="button"
         onClick={() => oeffnen(false)}
         aria-label={wegweiserAn ? "Eintragen oder suchen" : "Aktivität zählen"}
-        title={wegweiserAn ? "Eintragen oder suchen (Strg+K)" : "Aktivität zählen"}
+        title={
+          wegweiserAn ? "Eintragen oder suchen (Strg+K)" : "Aktivität zählen"
+        }
         // Leichte Flaeche statt nur Umriss: daneben stehen Einstellungen
         // (Thema, Abmelden), das hier ist die eine Handlung in der Leiste.
         className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg bg-akzent text-white transition hover:bg-akzent-stark"
@@ -313,7 +338,9 @@ export default function Schnellzugriff({
                 setMarkiert((alt) => (alt + 1) % treffer.length);
               } else if (event.key === "ArrowUp") {
                 event.preventDefault();
-                setMarkiert((alt) => (alt - 1 + treffer.length) % treffer.length);
+                setMarkiert(
+                  (alt) => (alt - 1 + treffer.length) % treffer.length,
+                );
               } else if (event.key === "Enter") {
                 event.preventDefault();
                 const ziel = treffer[markiert];
@@ -346,7 +373,7 @@ export default function Schnellzugriff({
                     "flex min-h-14 w-full items-center gap-3 rounded-xl border px-4 text-left transition",
                     i === markiert
                       ? "border-line bg-sunken"
-                      : "border-line bg-surface hover:bg-sunken"
+                      : "border-line bg-surface hover:bg-sunken",
                   )}
                 >
                   <span className="min-w-0 flex-1">
@@ -384,7 +411,7 @@ export default function Schnellzugriff({
                     <span
                       className={cn(
                         "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
-                        symbolFarbe[type] ?? "bg-navy-50 text-navy-700"
+                        symbolFarbe[type] ?? "bg-navy-50 text-navy-700",
                       )}
                     >
                       <ArtSymbol type={type} className="h-4.5 w-4.5" />
@@ -398,7 +425,10 @@ export default function Schnellzugriff({
                         {zahl === null ? (
                           <span className="text-ink-soft">—</span>
                         ) : (
-                          <span key={zahl} className="inline-block animate-tick">
+                          <span
+                            key={zahl}
+                            className="inline-block animate-tick"
+                          >
                             {zahl}
                           </span>
                         )}
@@ -433,7 +463,7 @@ export default function Schnellzugriff({
               <p
                 className={cn(
                   flaeche("gefahr"),
-                  "mt-3 px-3 py-2 text-13 text-red-800"
+                  "mt-3 px-3 py-2 text-13 text-red-800",
                 )}
               >
                 {fehler}
@@ -496,10 +526,11 @@ export default function Schnellzugriff({
 
               {einheitenFehler ? (
                 <p className="mt-2 text-13 text-red-700">{einheitenFehler}</p>
-              ) : gebucht ? (
-                <p className="mt-2 text-13 text-emerald-700">
-                  Eingetragen. Ein Storno trägst du mit Minus ein.
-                </p>
+              ) : gebucht && einheitenErfolg ? (
+                <EinheitenErfolg
+                  key={`${einheitenErfolg.monat}:${einheitenErfolg.gesamt}`}
+                  stand={einheitenErfolg}
+                />
               ) : null}
             </div>
 

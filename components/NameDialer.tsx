@@ -40,7 +40,7 @@ export type DialerEntry = {
   lastActivity: string | null;
 };
 
-type Result = "appointment" | "unreachable" | "later";
+type Result = "appointment" | "unreachable" | "later" | "no_interest";
 
 type Tally = Record<Result | "skipped", number>;
 
@@ -48,6 +48,7 @@ const EMPTY_TALLY: Tally = {
   appointment: 0,
   unreachable: 0,
   later: 0,
+  no_interest: 0,
   skipped: 0,
 };
 
@@ -59,11 +60,13 @@ export default function NameDialer({
   kind,
   guideTitle,
   guideBody,
+  ersterAnruf = false,
 }: {
   queue: DialerEntry[];
   kind: ListKind;
   guideTitle: string;
   guideBody: string;
+  ersterAnruf?: boolean;
 }) {
   // Eingefroren: nach jedem Ergebnis laedt der Server die Liste neu, der
   // erledigte Name faellt heraus – ohne diese Kopie wuerde der Durchlauf
@@ -75,7 +78,7 @@ export default function NameDialer({
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [showNote, setShowNote] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
+  const [showGuide, setShowGuide] = useState(ersterAnruf);
   const [copied, setCopied] = useState(false);
   const [dialog, setDialog] = useState<null | "appointment" | "later">(null);
 
@@ -109,7 +112,7 @@ export default function NameDialer({
   }, []);
 
   const submit = async (result: Result, extra?: Record<string, string>) => {
-    if (!current) return;
+    if (!current || pending) return;
     setPending(true);
     setError(null);
     try {
@@ -117,7 +120,9 @@ export default function NameDialer({
       data.set("contactId", current.id);
       data.set("result", result);
       if (note.trim()) data.set("note", note.trim());
-      Object.entries(extra ?? {}).forEach(([key, value]) => data.set(key, value));
+      Object.entries(extra ?? {}).forEach(([key, value]) =>
+        data.set(key, value),
+      );
       await recordCallResult(data);
       undoMoeglich();
       advance(result);
@@ -142,7 +147,8 @@ export default function NameDialer({
   // --- Ende des Durchlaufs --------------------------------------------------
 
   if (!current) {
-    const done = tally.appointment + tally.unreachable + tally.later;
+    const done =
+      tally.appointment + tally.unreachable + tally.later + tally.no_interest;
     return (
       <div className={`${card} space-y-5 p-8 text-center`}>
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -159,15 +165,24 @@ export default function NameDialer({
           <p className="mt-1 text-sm text-ink-muted">
             {done === 0
               ? "In dieser Auswahl steht gerade kein Name mit Nummer."
-              : `${done} ${done === 1 ? "Gespräch" : "Gespräche"} geführt.`}
+              : `${done} ${done === 1 ? "Anrufversuch" : "Anrufversuche"} eingetragen.`}
           </p>
         </div>
 
         {done > 0 && (
-          <dl className="grid grid-cols-3 gap-2 text-left">
+          <dl className="grid grid-cols-2 gap-2 text-left">
             <Stat label="Termine" value={tally.appointment} tone="emerald" />
-            <Stat label="Nicht erreicht" value={tally.unreachable} tone="slate" />
+            <Stat
+              label="Nicht erreicht"
+              value={tally.unreachable}
+              tone="slate"
+            />
             <Stat label="Später" value={tally.later} tone="amber" />
+            <Stat
+              label="Kein Interesse"
+              value={tally.no_interest}
+              tone="slate"
+            />
           </dl>
         )}
 
@@ -216,8 +231,12 @@ export default function NameDialer({
               {current.name}
             </h2>
             <p className="mt-0.5 text-xs text-ink-muted">
-              {current.rating ? ratingLabels[current.rating] : "Nicht eingestuft"}
-              {current.isFirstCall ? " · Erstanruf" : " · schon einmal versucht"}
+              {current.rating
+                ? ratingLabels[current.rating]
+                : "Nicht eingestuft"}
+              {current.isFirstCall
+                ? " · Erstanruf"
+                : " · schon einmal versucht"}
             </p>
           </div>
         </div>
@@ -283,6 +302,8 @@ export default function NameDialer({
           <button
             type="button"
             onClick={() => setShowGuide((value) => !value)}
+            aria-expanded={showGuide}
+            aria-controls="gespraechshilfe"
             className="flex min-h-12 w-full items-center justify-between px-3.5 text-left"
           >
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-muted">
@@ -295,7 +316,10 @@ export default function NameDialer({
             </span>
           </button>
           {showGuide && (
-            <div className="space-y-4 border-t border-line px-3.5 py-3">
+            <div
+              id="gespraechshilfe"
+              className="space-y-4 border-t border-line px-3.5 py-3"
+            >
               <GuideBody body={guideBody} />
               {/* Die Einwaende gehoeren genau hierhin: mitten ins Gespraech,
                   nicht in einen Test von vor zwei Wochen. */}
@@ -323,7 +347,7 @@ export default function NameDialer({
           </p>
         )}
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             disabled={pending}
@@ -347,6 +371,14 @@ export default function NameDialer({
             className={`${bigButton} bg-amber-100 text-amber-900 hover:bg-amber-200`}
           >
             <ClockIcon className="h-5 w-5" /> Später
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => submit("no_interest")}
+            className={`${bigButton} bg-sunken text-ink-muted hover:bg-line`}
+          >
+            <PhoneOffIcon className="h-5 w-5" /> Kein Interesse
           </button>
         </div>
 

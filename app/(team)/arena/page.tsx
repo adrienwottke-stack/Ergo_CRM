@@ -13,7 +13,11 @@ import {
   sprintStand,
   stundenBis,
 } from "@/lib/arena";
-import { abstandInHandlungen, eigenerHinweis, punkteText } from "@/lib/kommentator";
+import {
+  abstandInHandlungen,
+  eigenerHinweis,
+  punkteText,
+} from "@/lib/kommentator";
 import { merkeNutzung, schalter } from "@/lib/features";
 import { merkeAnwesenheit } from "@/lib/anwesenheit";
 import { ladeFeed } from "@/lib/feed";
@@ -27,7 +31,15 @@ import NachrichtSenden from "@/components/NachrichtSenden";
 import Postfach from "@/components/Postfach";
 import Feed from "@/components/Feed";
 import { FlameIcon, MonitorIcon, TrophyIcon } from "@/components/icons";
-import { btnGhost, btnPrimary, btnSecondary, card, kicker, pageTitle, sectionTitle } from "@/components/ui";
+import {
+  btnGhost,
+  btnPrimary,
+  btnSecondary,
+  card,
+  kicker,
+  pageTitle,
+  sectionTitle,
+} from "@/components/ui";
 import { sprintStarten } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +77,7 @@ export default async function ArenaPage() {
     "sprint",
     "stufen",
     "feed",
-    "titel"
+    "titel",
   );
 
   const [
@@ -85,7 +97,11 @@ export default async function ArenaPage() {
     prisma.sprint.findFirst({
       where: { endAt: { gt: new Date() } },
       orderBy: { startAt: "desc" },
-      include: { teilnahmen: { include: { person: { select: { id: true, name: true } } } } },
+      include: {
+        teilnahmen: {
+          include: { person: { select: { id: true, name: true } } },
+        },
+      },
     }),
     // Was Kollegen geschrieben haben. Nur die letzten - ein Verlauf waere ein
     // Postfach, und ein Postfach will gepflegt werden.
@@ -116,7 +132,7 @@ export default async function ArenaPage() {
   const stufe = stufeVon(gesamtpunkte);
 
   const kontoVonPerson = new Map(
-    konten.filter((eintrag) => eintrag.userId).map((e) => [e.id, e.userId!])
+    konten.filter((eintrag) => eintrag.userId).map((e) => [e.id, e.userId!]),
   );
   const ungelesen = nachrichten.filter((n) => n.gelesenAt === null).length;
 
@@ -140,10 +156,15 @@ export default async function ArenaPage() {
   const platz = platzIndex >= 0 ? platzIndex + 1 : null;
   const vorMir = platzIndex > 0 ? zeilen[platzIndex - 1] : null;
   const hinterMir =
-    platzIndex >= 0 && platzIndex < zeilen.length - 1 ? zeilen[platzIndex + 1] : null;
+    platzIndex >= 0 && platzIndex < zeilen.length - 1
+      ? zeilen[platzIndex + 1]
+      : null;
 
   const ueberholtVon =
-    person.lastRank !== null && platz !== null && platz > person.lastRank && vorMir
+    person.lastRank !== null &&
+    platz !== null &&
+    platz > person.lastRank &&
+    vorMir
       ? vorMir.name
       : null;
 
@@ -164,7 +185,9 @@ export default async function ArenaPage() {
 
   // --- Sprint --------------------------------------------------------------
   const sprintIds = sprint?.teilnahmen.map((t) => t.personId) ?? [];
-  const sprintZahlen = sprint ? await sprintStand(sprint, sprintIds) : new Map<string, number>();
+  const sprintZahlen = sprint
+    ? await sprintStand(sprint, sprintIds)
+    : new Map<string, number>();
   const binDabei = sprintIds.includes(person.id);
 
   return (
@@ -177,7 +200,9 @@ export default async function ArenaPage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h1 className={pageTitle}>Arena</h1>
           <span className={kicker}>
-            {stunden > 0 ? `Abpfiff in ${stunden} ${stunden === 1 ? "Stunde" : "Stunden"}` : "Spieltag vorbei"}
+            {stunden > 0
+              ? `Abpfiff in ${stunden} ${stunden === 1 ? "Stunde" : "Stunden"}`
+              : "Spieltag vorbei"}
           </span>
         </div>
         {hinweis && (
@@ -188,14 +213,19 @@ export default async function ArenaPage() {
             Montag bei null an - das hier nicht. */}
         {an.stufen && (
           <p className="mt-2 text-sm text-ink-muted">
-            <Link href="/spiel" className="font-semibold text-ink hover:text-navy-700">
+            <Link
+              href="/spiel"
+              className="font-semibold text-ink hover:text-navy-700"
+            >
               {stufe.stufe.name}
             </Link>
             {stufe.naechste ? (
               <>
-                {" "}— noch{" "}
-                <span className="tabular-nums">{stufe.bisNaechste}</span> bis{" "}
-                {stufe.naechste.name}.
+                {" "}
+                — noch <span className="tabular-nums">
+                  {stufe.bisNaechste}
+                </span>{" "}
+                bis {stufe.naechste.name}.
               </>
             ) : (
               " — höchste Stufe."
@@ -265,7 +295,7 @@ export default async function ArenaPage() {
             className={`${btnGhost} mt-4 inline-flex items-center gap-1.5`}
           >
             <MonitorIcon className="h-4 w-4" />
-            Teamabend zeigen
+            Netzwerkabend zeigen
           </Link>
         </div>
       )}
@@ -280,8 +310,8 @@ export default async function ArenaPage() {
             <div>
               <h2 className={sectionTitle}>Gemeinsamer Sprint</h2>
               <p className="mt-1 text-sm text-ink-muted">
-                {SPRINT_MINUTEN} Minuten, alle gleichzeitig. Gezählt wird, was in
-                dieser Zeit dazukommt.
+                {SPRINT_MINUTEN} Minuten, alle gleichzeitig. Gezählt wird, was
+                in dieser Zeit dazukommt.
               </p>
             </div>
             {sprint ? (
@@ -301,7 +331,10 @@ export default async function ArenaPage() {
                 const wert = sprintZahlen.get(teilnahme.personId) ?? 0;
                 const hoechst = Math.max(1, ...sprintZahlen.values());
                 return (
-                  <div key={teilnahme.id} className="flex items-center gap-3 text-sm">
+                  <div
+                    key={teilnahme.id}
+                    className="flex items-center gap-3 text-sm"
+                  >
                     <span
                       className={`w-32 shrink-0 truncate ${
                         teilnahme.personId === person.id
@@ -349,7 +382,9 @@ export default async function ArenaPage() {
               {puls.zuletzt.map((eintrag) => (
                 <li key={eintrag.name} className="flex justify-between text-sm">
                   <span className="text-ink-muted">{eintrag.name}</span>
-                  <span className="text-xs text-ink-soft">{vorMinuten(eintrag.at)}</span>
+                  <span className="text-xs text-ink-soft">
+                    {vorMinuten(eintrag.at)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -365,19 +400,25 @@ export default async function ArenaPage() {
             {vorMir && (
               <div className="flex items-center justify-between rounded-xl bg-sunken px-4 py-2.5 text-sm">
                 <span className="text-ink-muted">{vorMir.name}</span>
-                <span className="tabular-nums text-ink-muted">{vorMir.punkte}</span>
+                <span className="tabular-nums text-ink-muted">
+                  {vorMir.punkte}
+                </span>
               </div>
             )}
             <div className="flex items-center justify-between rounded-xl bg-navy-50 px-4 py-3 text-sm">
               <span className="font-semibold text-navy-900">
                 {platz}. {meine.name}
               </span>
-              <span className="tabular-nums font-semibold text-navy-900">{meine.punkte}</span>
+              <span className="tabular-nums font-semibold text-navy-900">
+                {meine.punkte}
+              </span>
             </div>
             {hinterMir && (
               <div className="flex items-center justify-between rounded-xl bg-sunken px-4 py-2.5 text-sm">
                 <span className="text-ink-muted">{hinterMir.name}</span>
-                <span className="tabular-nums text-ink-muted">{hinterMir.punkte}</span>
+                <span className="tabular-nums text-ink-muted">
+                  {hinterMir.punkte}
+                </span>
               </div>
             )}
           </div>
@@ -391,7 +432,10 @@ export default async function ArenaPage() {
           )}
           {!vorMir && (
             <p className="mt-3 text-sm text-ink-muted">
-              Du führst. {hinterMir ? `${punkteText(meine.punkte - hinterMir.punkte)} Vorsprung auf ${hinterMir.name}.` : ""}
+              Du führst.{" "}
+              {hinterMir
+                ? `${punkteText(meine.punkte - hinterMir.punkte)} Vorsprung auf ${hinterMir.name}.`
+                : ""}
             </p>
           )}
         </div>
@@ -419,7 +463,9 @@ export default async function ArenaPage() {
                 zeile.personId === person.id ? "bg-navy-50/60" : ""
               }`}
             >
-              <span className="w-6 text-right tabular-nums text-ink-soft">{index + 1}</span>
+              <span className="w-6 text-right tabular-nums text-ink-soft">
+                {index + 1}
+              </span>
               <span className="flex-1 truncate font-medium text-ink">
                 {zeile.name}
                 {zeile.serie >= 2 && (
@@ -430,18 +476,20 @@ export default async function ArenaPage() {
                 )}
               </span>
               <span className="text-xs text-ink-soft">
-                {zeile.ausCrm > 0 && `${Math.round((zeile.ausCrm / zeile.punkte) * 100)}% aus dem CRM`}
+                {zeile.ausCrm > 0 &&
+                  `${Math.round((zeile.ausCrm / zeile.punkte) * 100)}% aus dem CRM`}
               </span>
               <span className="w-10 text-right tabular-nums font-semibold text-ink">
                 {zeile.punkte}
               </span>
               {/* Ein Wort an den Kollegen, im Moment des Ergebnisses. */}
-              {zeile.personId !== person.id && kontoVonPerson.has(zeile.personId) && (
-                <NachrichtSenden
-                  anId={kontoVonPerson.get(zeile.personId)!}
-                  name={zeile.name}
-                />
-              )}
+              {zeile.personId !== person.id &&
+                kontoVonPerson.has(zeile.personId) && (
+                  <NachrichtSenden
+                    anId={kontoVonPerson.get(zeile.personId)!}
+                    name={zeile.name}
+                  />
+                )}
             </div>
           ))
         )}

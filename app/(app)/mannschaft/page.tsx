@@ -3,6 +3,9 @@ import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import TeamNavigation from "./TeamNavigation";
+import Teamziele from "@/components/ziele/Teamziele";
+import PartnerBegleitung from "@/components/PartnerBegleitung";
+import ErfolgeHeute from "@/components/ErfolgeHeute";
 import VereinbarungenHeute from "@/components/vereinbarungen/VereinbarungenHeute";
 import {
   RUECKBLICK_TAGE,
@@ -509,6 +512,8 @@ export default async function MannschaftPage({
 
         <TeamNavigation aktiv={begleiten ? "begleiten" : "ueberblick"} />
 
+        {begleiten && <Teamziele userId={user.id} kompakt />}
+
         {!begleiten && (
           <MannschaftsMatrix
             personen={lage.leute}
@@ -537,7 +542,7 @@ export default async function MannschaftPage({
             className="inline-flex min-h-11 items-center font-medium text-navy-700"
             href="/teamabend"
           >
-            Teamabend öffnen →
+            Netzwerkabend · Wettbewerb und Erfolge →
           </Link>
           <Link
             className="inline-flex min-h-11 items-center font-medium text-navy-700"
@@ -609,47 +614,22 @@ export default async function MannschaftPage({
         {begleiten && eigenePartner.length > 0 && (
           <section className="space-y-3">
             <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-2xl font-semibold text-ink">Deine Partner</h2>
+              <h2 className="text-2xl font-semibold">Deine Partner</h2>
               <Link
                 href="/einladen"
-                className="min-h-11 py-2 text-base font-medium text-navy-800"
+                className="inline-flex min-h-11 items-center text-link"
               >
                 Einladen
               </Link>
             </div>
-            <ul className="divide-y divide-line">
-              {eigenePartner.map((person) => (
-                <li key={person.id}>
-                  <Link
-                    href={`/mannschaft/${person.id}`}
-                    className="flex min-h-24 items-center justify-between gap-4 py-5"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xl font-semibold text-ink">
-                        <GpName
-                          name={person.name}
-                          kurz={kurzMap.get(person.name)}
-                        />
-                      </p>
-                      <p className="mt-1 text-base text-ink-muted">
-                        {person.betreuung
-                          ? `Nachfassen am ${datumKurz.format(person.betreuung.faelligAm)}`
-                          : (person.signale[0]?.titel ??
-                            "Keine offenen Unterstützungshinweise")}
-                      </p>
-                      <p className="mt-1 text-sm text-ink-muted">
-                        {person.werte.letzteAktivitaet
-                          ? `Zuletzt eingetragen: ${datumKurz.format(person.werte.letzteAktivitaet)}`
-                          : "Noch keine Aktivität eingetragen"}
-                      </p>
-                    </div>
-                    <span aria-hidden className="text-2xl text-ink-muted">
-                      ›
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <PartnerBegleitung
+              userId={user.id}
+              personen={eigenePartner}
+              struktur={lage.leute}
+            />
+            <VorfuehrVerdeckt hinweis="Persönliche Erfolge werden beim Vorführen ausgeblendet.">
+              <ErfolgeHeute userId={user.id} team />
+            </VorfuehrVerdeckt>
           </section>
         )}
 

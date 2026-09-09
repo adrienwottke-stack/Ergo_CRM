@@ -17,7 +17,13 @@ import type { User } from "@/lib/generated/prisma/client";
 
 const TAG_MS = 24 * 60 * 60 * 1000;
 
-export default async function ErsteWoche({ user }: { user: User }) {
+export default async function ErsteWoche({
+  user,
+  ohnePass = false,
+}: {
+  user: User;
+  ohnePass?: boolean;
+}) {
   const person = await prisma.person.findUnique({
     where: { userId: user.id },
     select: { id: true },
@@ -26,43 +32,50 @@ export default async function ErsteWoche({ user }: { user: User }) {
 
   const seit = user.onboardingDoneAt ?? user.startedAt ?? user.createdAt;
   const tageSeitStart = Math.floor((Date.now() - seit.getTime()) / TAG_MS);
-  const startwoche = user.onboardingDoneAt !== null && tageSeitStart <= 7;
+  const startwoche =
+    !ohnePass && user.onboardingDoneAt !== null && tageSeitStart <= 7;
 
-  const [namen, logsSeit, empfehlungGefragt, herkunft, letzterLog, pledgeTermine] =
-    await Promise.all([
-      prisma.contact.count({
-        where: { ownerId: user.id, listKinds: { isEmpty: false } },
-      }),
-      prisma.dailyLog.groupBy({
-        by: ["type"],
-        where: { personId: person.id, date: { gte: seit } },
-        _sum: { count: true },
-      }),
-      prisma.contact.count({
-        where: { ownerId: user.id, referralsAskedAt: { not: null } },
-      }),
-      user.herkunftId
-        ? prisma.invite.findUnique({
-            where: { id: user.herkunftId },
-            select: { stake: true, leader: { select: { name: true } } },
-          })
-        : Promise.resolve(null),
-      prisma.dailyLog.findFirst({
-        where: { personId: person.id },
-        orderBy: { date: "desc" },
-        select: { date: true },
-      }),
-      user.pledgeSetAt
-        ? prisma.dailyLog.aggregate({
-            _sum: { count: true },
-            where: {
-              personId: person.id,
-              type: "APPOINTMENT_SET",
-              date: { gte: user.pledgeSetAt },
-            },
-          })
-        : Promise.resolve(null),
-    ]);
+  const [
+    namen,
+    logsSeit,
+    empfehlungGefragt,
+    herkunft,
+    letzterLog,
+    pledgeTermine,
+  ] = await Promise.all([
+    prisma.contact.count({
+      where: { ownerId: user.id, listKinds: { isEmpty: false } },
+    }),
+    prisma.dailyLog.groupBy({
+      by: ["type"],
+      where: { personId: person.id, date: { gte: seit } },
+      _sum: { count: true },
+    }),
+    prisma.contact.count({
+      where: { ownerId: user.id, referralsAskedAt: { not: null } },
+    }),
+    user.herkunftId
+      ? prisma.invite.findUnique({
+          where: { id: user.herkunftId },
+          select: { stake: true, leader: { select: { name: true } } },
+        })
+      : Promise.resolve(null),
+    prisma.dailyLog.findFirst({
+      where: { personId: person.id },
+      orderBy: { date: "desc" },
+      select: { date: true },
+    }),
+    user.pledgeSetAt
+      ? prisma.dailyLog.aggregate({
+          _sum: { count: true },
+          where: {
+            personId: person.id,
+            type: "APPOINTMENT_SET",
+            date: { gte: user.pledgeSetAt },
+          },
+        })
+      : Promise.resolve(null),
+  ]);
 
   const summe = (typ: string) =>
     logsSeit.find((log) => log.type === typ)?._sum.count ?? 0;
@@ -108,7 +121,13 @@ export default async function ErsteWoche({ user }: { user: User }) {
   });
   const geschafft = missionen.filter((mission) => mission.fertig).length;
 
-  if (!briefFaellig && !wiedereinstieg && !startwoche && !pledgeLaeuft && !abrechnungFaellig) {
+  if (
+    !briefFaellig &&
+    !wiedereinstieg &&
+    !startwoche &&
+    !pledgeLaeuft &&
+    !abrechnungFaellig
+  ) {
     return null;
   }
 
@@ -145,13 +164,19 @@ export default async function ErsteWoche({ user }: { user: User }) {
 
       {wiedereinstieg && (
         <section className={`${card} p-5`}>
-          <p className="text-sm font-semibold text-ink">
-            Willkommen zurück.
-          </p>
+          <p className="text-sm font-semibold text-ink">Willkommen zurück.</p>
           <p className="mt-1 text-sm text-ink-muted">
             {tageSeitAktivitaet} Tage nichts — passiert. Fangen wir klein an:
             ein Anruf heute.
           </p>
+          {user.whyLetter && (
+            <Link
+              href="/fortschritt/warum"
+              className="mt-2 inline-flex min-h-11 items-center text-sm text-link"
+            >
+              Dein Warum wiederlesen →
+            </Link>
+          )}
           <Link
             href="/namen"
             className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-akzent px-4 text-sm font-medium text-white transition hover:bg-akzent-stark"
@@ -173,7 +198,10 @@ export default async function ErsteWoche({ user }: { user: User }) {
           </div>
           <ul className="mt-3 space-y-2">
             {missionen.map((mission) => (
-              <li key={mission.titel} className="flex items-center gap-2.5 text-sm">
+              <li
+                key={mission.titel}
+                className="flex items-center gap-2.5 text-sm"
+              >
                 <span
                   aria-hidden
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-11 font-bold ${
@@ -185,7 +213,9 @@ export default async function ErsteWoche({ user }: { user: User }) {
                   {mission.fertig ? "✓" : ""}
                 </span>
                 <span
-                  className={mission.fertig ? "text-ink-muted line-through" : "text-ink"}
+                  className={
+                    mission.fertig ? "text-ink-muted line-through" : "text-ink"
+                  }
                 >
                   {mission.titel}
                 </span>
@@ -197,7 +227,8 @@ export default async function ErsteWoche({ user }: { user: User }) {
           </ul>
           {herkunft?.stake && (
             <p className="mt-3 rounded-lg bg-gold-100/50 px-3 py-2 text-sm text-ink">
-              Einsatz von {herkunft.leader.name}: <strong>{herkunft.stake}</strong>
+              Einsatz von {herkunft.leader.name}:{" "}
+              <strong>{herkunft.stake}</strong>
             </p>
           )}
         </section>
@@ -205,8 +236,9 @@ export default async function ErsteWoche({ user }: { user: User }) {
 
       {pledgeLaeuft && (
         <p className="text-sm text-ink-muted">
-          Dein Versprechen: <strong>{user.pledgeTarget} Termine in 30 Tagen</strong>{" "}
-          · {pledgeGeschafft} geschafft · noch {30 - (pledgeTage ?? 0)}{" "}
+          Dein Versprechen:{" "}
+          <strong>{user.pledgeTarget} Termine in 30 Tagen</strong> ·{" "}
+          {pledgeGeschafft} geschafft · noch {30 - (pledgeTage ?? 0)}{" "}
           {30 - (pledgeTage ?? 0) === 1 ? "Tag" : "Tage"}.
         </p>
       )}

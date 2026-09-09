@@ -59,6 +59,8 @@ export type Signal = {
 };
 
 export type SignalEingabe = {
+  /** Eigene Vertriebszahlen sind im Führungsfokus kein Inaktivitätsmaßstab. */
+  fuehrungsfokus?: boolean;
   /**
    * Konto ohne Zugangsdaten - steht in der Struktur, nutzt sie noch nicht.
    * Schaltet alles Uebrige ab: siehe signaleFuer, erster Absatz.
@@ -100,7 +102,7 @@ export function signaleFuer(
   // Der Parameter ist die Werkstatt-Fassung (lib/ampelKriterien.ts); ohne ihn
   // gilt der Platzhalter oben. Bewusst KEIN Prisma-Import hier - die Datei
   // soll sich ohne Datenbank durchdenken und pruefen lassen.
-  s: AmpelSchwellen = SCHWELLEN
+  s: AmpelSchwellen = SCHWELLEN,
 ): Signal[] {
   const signale: Signal[] = [];
 
@@ -141,6 +143,19 @@ export function signaleFuer(
     return signale;
   }
 
+  if (e.fuehrungsfokus) {
+    if (e.pipelineSichtbar && e.ueberfaelligeSchritte > 0) {
+      signale.push({
+        schluessel: "eigene_verpflichtungen",
+        titel: `${e.ueberfaelligeSchritte} eigene Kontaktschritte überfällig`,
+        schritt:
+          "Die zugesagten eigenen Schritte prüfen und einen nächsten Termin festlegen.",
+        schwere: "gelb",
+      });
+    }
+    return signale;
+  }
+
   // Stille ist das wichtigste Signal ueberhaupt: sie geht der Kuendigung
   // voraus, nicht schlechte Zahlen.
   if (
@@ -153,7 +168,8 @@ export function signaleFuer(
         e.tageSeitAktivitaet === null
           ? "Noch keine Aktivität eingetragen"
           : `Seit ${dauer(e.tageSeitAktivitaet)} keine Aktivität eingetragen`,
-      schritt: "Nachfragen, wie es läuft und welche Unterstützung gerade hilft.",
+      schritt:
+        "Nachfragen, wie es läuft und welche Unterstützung gerade hilft.",
       schwere: "rot",
     });
   }
@@ -165,7 +181,8 @@ export function signaleFuer(
     signale.push({
       schluessel: "termine_platzen",
       titel: `${e.termineGehalten14} von ${termine(e.termineVereinbart14)} gehalten`,
-      schritt: "Den Stand der vereinbarten Termine und die Vorbereitung gemeinsam ansehen.",
+      schritt:
+        "Den Stand der vereinbarten Termine und die Vorbereitung gemeinsam ansehen.",
       schwere: "gelb",
     });
   }
@@ -177,7 +194,8 @@ export function signaleFuer(
     signale.push({
       schluessel: "kein_abschluss",
       titel: `${termine(e.termineGehaltenMonat)}, kein Abschluss`,
-      schritt: "Terminergebnisse gemeinsam besprechen und bei Bedarf eine Begleitung vereinbaren.",
+      schritt:
+        "Terminergebnisse gemeinsam besprechen und bei Bedarf eine Begleitung vereinbaren.",
       schwere: "gelb",
     });
   }
@@ -193,7 +211,8 @@ export function signaleFuer(
     signale.push({
       schluessel: "onboarding",
       titel: `Seit ${dauer(tageDabei)} dabei, noch kein Abschluss`,
-      schritt: "Den Einstieg besprechen und einen passenden gemeinsamen nächsten Schritt vereinbaren.",
+      schritt:
+        "Den Einstieg besprechen und einen passenden gemeinsamen nächsten Schritt vereinbaren.",
       schwere: "rot",
     });
   }
@@ -206,7 +225,8 @@ export function signaleFuer(
           e.kontakteInAkquise === 0
             ? "Keine offenen Namen mehr"
             : `Nur noch ${e.kontakteInAkquise} offene Namen`,
-        schritt: "Gemeinsam prüfen, welche Namen als Nächstes aufgenommen oder angesprochen werden können.",
+        schritt:
+          "Gemeinsam prüfen, welche Namen als Nächstes aufgenommen oder angesprochen werden können.",
         schwere: "gelb",
       });
     }
@@ -215,7 +235,8 @@ export function signaleFuer(
       signale.push({
         schluessel: "ueberfaellig",
         titel: `${e.ueberfaelligeSchritte} überfällige Schritte`,
-        schritt: "Offene Schritte gemeinsam durchgehen und realistische nächste Termine festlegen.",
+        schritt:
+          "Offene Schritte gemeinsam durchgehen und realistische nächste Termine festlegen.",
         schwere: "gelb",
       });
     }
@@ -224,7 +245,8 @@ export function signaleFuer(
       signale.push({
         schluessel: "empfehlungen",
         titel: `${termine(e.termineOhneEmpfehlung)} ohne Empfehlungsfrage`,
-        schritt: "Nachfragen, ob Empfehlungen besprochen wurden, und die Frage bei Bedarf gemeinsam üben.",
+        schritt:
+          "Nachfragen, ob Empfehlungen besprochen wurden, und die Frage bei Bedarf gemeinsam üben.",
         schwere: "gelb",
       });
     }

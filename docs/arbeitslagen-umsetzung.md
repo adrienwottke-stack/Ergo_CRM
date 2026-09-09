@@ -1,6 +1,6 @@
 # Ergo CRM – Umsetzung der Arbeitslagen V1
 
-Stand: 08.09.2026. Dieses Dokument beschreibt den tatsächlich implementierten Nutzerplan einschließlich der integrierten Startführung. Frühere Bildentwürfe dokumentieren die Gestaltungssuche; maßgeblich ist dieser Umsetzungsstand. Die automatisierte technische Prüfung ist abgeschlossen; Geräte- und Nutzerabnahme stehen noch aus.
+Stand: 09.09.2026. Die Erweiterung um dauerhafte Begleitung, gemeinsame Teamziele und Führungsfokus ist in [Geschäftssituationen](geschaeftssituationen-umsetzung.md) beschrieben. Dieses Dokument beschreibt den tatsächlich implementierten Nutzerplan einschließlich der integrierten Startführung. Frühere Bildentwürfe dokumentieren die Gestaltungssuche; maßgeblich ist dieser Umsetzungsstand. Die automatisierte technische Prüfung ist abgeschlossen; Geräte- und Nutzerabnahme stehen noch aus.
 
 ## Orientierung und Arbeitslagen
 
@@ -8,9 +8,9 @@ Die Hauptnavigation hat fünf feste Bereiche: **Heute, Kontakte, Kalender, Forts
 
 „Heute“ ordnet dieselben Funktionen nach der Arbeitssituation:
 
-- **Ich starte:** eigene Kontakte, Anrufe, Termine und persönlicher Fortschritt.
-- **Ich baue auf:** eigene Arbeit plus Begleitung der eigenen Partner.
-- **Ich führe:** Partner, Absprachen und Teamentwicklung zuerst; das eigene Geschäft bleibt erreichbar.
+- **Eigenes Geschäft:** eigene Kontakte, Anrufe, Termine und persönlicher Fortschritt.
+- **Geschäft und Partneraufbau:** eigene Arbeit plus Begleitung der eigenen Partner.
+- **Team führen:** Partner, Absprachen und Teamentwicklung zuerst; das eigene Geschäft bleibt erreichbar.
 
 Im automatischen Modus führt der erste aktive direkte Partner mit aktiviertem Zugang zur Aufbauansicht. Platzhalter und deaktivierte Konten lösen diesen Wechsel nicht aus. Eine bewusst gewählte Ansicht wird am eigenen Konto gespeichert und bleibt erhalten. Die Ansicht ändert die Reihenfolge, niemals die Berechtigung.
 
@@ -46,16 +46,20 @@ Der Morgen-Cron bündelt eigene Arbeit, Führungshinweise, Absprachen und offene
 
 ## Datenbank und Abnahme
 
-Zwei additive Migrationen ergänzen den Bestand:
+Drei additive Migrationen ergänzen den Bestand:
 
 - `20260908190000_arbeitslagen`: Arbeitsfokus, Ziele, Einheiten-Erinnerungen und versionierte Partnerabsprachen.
 - `20260908200000_startfuehrung`: Startfortschritt, Sammeldurchgänge und idempotente Namensvorgänge; `startfuehrung` und `stornoStart` werden als `TEST` angelegt. Bei diesen beiden Schaltern bedeutet ein fehlender Datensatz aus; `TEST` und `LAEUFT` sind aktiv.
+
+- `20260909120000_teamziele`: eigenständige Teamziele mit verantwortlicher Führungskraft, Wurzel, Kennzahl, Zielwert, Zeitraum, Wunsch und Archivierung. Bestehende persönliche Ziele bleiben unverändert.
 
 Der Prisma-Client wurde regeneriert. Es wurde keine produktive Migration und kein Deployment ausgeführt. Fach- und Datenbanktests verwenden ausschließlich neue Speicherdatenbanken mit allen Migrationen.
 
 Der Review enthält außerdem `main` bis `ad63a1a`, einschließlich `20260828120000_einstellungen` und `20260829120000_ausbau_buendel`. Konfigurierte Karrierestufen, Kandidaturen, Teamabend, Berichts-Link und Datenexport bleiben erhalten. Die Details der Konfliktauflösung stehen im [Review-Protokoll](review-arbeitslagen-onboarding.md).
 
-| Prüfung | Aktueller Stand / Befehl |
+Die nachstehende Tabelle dokumentiert die Abnahme vom 08.09.; die Abnahme der Erweiterung folgt im [aktuellen Umsetzungsbericht](geschaeftssituationen-umsetzung.md).
+
+| Prüfung | Stand vom 08.09. / Befehl |
 | --- | --- |
 | Gesamte automatisierte Suite | **51 Tests grün**, `npm test`; enthält die Onboardingtests |
 | Onboarding separat | `npm run test:start` |

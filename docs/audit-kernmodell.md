@@ -1,5 +1,7 @@
 # Audit: CaM CRM gegen das Kern-Geschäftsmodell
 
+> **Aktualisierter Produktmaßstab vom 09.09.2026:** Die unten dokumentierte Bestandsaufnahme bleibt historisch. Für Einsteiger gehören Ziele, Wettbewerb, Zuspruch, Mindset und durchgehende Begleitung zum Kern; für Führungskräfte auch Reporting und Partnerentwicklung. Die damalige pauschale Einordnung indirekter Unterstützung als Ablenkung ist damit überholt. Maßgeblich ist die [Umsetzung der drei Geschäftssituationen](geschaeftssituationen-umsetzung.md).
+
 Stand: 23.08.2026 — **reine Bestandsaufnahme.** Nichts gebaut, nichts gelöscht,
 nichts umgebaut. Grundlage für den nächsten Schritt.
 

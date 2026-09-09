@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { berlinLocalToUtc, berlinToday, dayToUtcDate, endOfBerlinDay } from "@/lib/dates";
+import {
+  berlinLocalToUtc,
+  berlinToday,
+  dayToUtcDate,
+  endOfBerlinDay,
+} from "@/lib/dates";
 import { ampelKriterien } from "@/lib/ampelKriterien";
 import { NACHFUELL_SCHWELLE } from "@/lib/namelist";
 import { pushEingerichtet, sendeMeldung } from "@/lib/push";
@@ -10,9 +15,15 @@ import {
   liegtSelect,
   tageLiegt,
 } from "@/lib/liegenbleiber";
-import { ABGESCHLOSSENE_STAENDE, AUDIO_AUFBEWAHRUNG_TAGE } from "@/lib/rueckmeldung";
+import {
+  ABGESCHLOSSENE_STAENDE,
+  AUDIO_AUFBEWAHRUNG_TAGE,
+} from "@/lib/rueckmeldung";
 import { ladeVereinbarungsErinnerungen } from "@/lib/vereinbarungen";
-import { tagesmeldungenBuendeln, type Tagesmeldung } from "@/lib/vereinbarungen-meldungen";
+import {
+  tagesmeldungenBuendeln,
+  type Tagesmeldung,
+} from "@/lib/vereinbarungen-meldungen";
 import { pipelineFreigegeben } from "@/lib/einblick-regeln";
 import { ladeFaelligeEinheitenMeldungen } from "@/lib/einheiten-meldungen";
 
@@ -51,9 +62,7 @@ export async function GET(request: NextRequest) {
   //
   // Nur die Toene verschwinden. Text, Stand und Notiz bleiben stehen - die
   // kosten nichts und sind das Gedaechtnis, warum etwas so entschieden wurde.
-  const aufbewahrung = new Date(
-    Date.now() - AUDIO_AUFBEWAHRUNG_TAGE * TAG_MS
-  );
+  const aufbewahrung = new Date(Date.now() - AUDIO_AUFBEWAHRUNG_TAGE * TAG_MS);
   let aufnahmenGeloescht = 0;
   try {
     const weg = await prisma.rueckmeldungAudio.deleteMany({
@@ -90,93 +99,94 @@ export async function GET(request: NextRequest) {
 
   const [konten, faellig, offeneNamen, aktivHeute, termineHeute, liegende] =
     await Promise.all([
-    prisma.user.findMany({
-      // Platzhalter fallen hier gar nicht erst herein: sie haben kein
-      // Push-Abo, koennen also nichts empfangen, und sie sollen auch nicht
-      // als Anlass fuer eine Meldung an IHRE Fuehrungskraft taugen. Wer nie
-      // eingeladen wurde, ist nicht still - er ist noch nicht gefragt worden.
-      where: { deactivatedAt: null, passwordHash: { not: null } },
-      // path und onboardingDoneAt fuer die Fuehrungs-Meldung: sie geht ueber
-      // die ganze Struktur, nicht nur ueber die Direkten.
-      select: {
-        id: true,
-        name: true,
-        leaderId: true,
-        path: true,
-        startedAt: true,
-        onboardingDoneAt: true,
-        visibility: true,
-      },
-    }),
-    // Offen und faellig: ueberfaellig plus heute.
-    prisma.contact.groupBy({
-      by: ["ownerId"],
-      where: {
-        outcome: "OFFEN",
-        nextStepType: { not: null },
-        nextStepAt: { lt: heuteEnde },
-      },
-      _count: { _all: true },
-    }),
-    prisma.contact.groupBy({
-      by: ["ownerId"],
-      where: {
-        listKinds: { isEmpty: false },
-        outcome: "OFFEN",
-        stage: { in: ["NEU", "KONTAKTIERT"] },
-      },
-      _count: { _all: true },
-    }),
-    // Wer sich seit der Stille-Grenze ueberhaupt geruehrt hat.
-    prisma.dailyLog.groupBy({
-      by: ["personId"],
-      where: { date: { gte: dayToUtcDate(berlinToday()) } },
-      _count: { _all: true },
-    }),
-    // Die Termine des Tages. Der Kalender kann eine Erinnerung ans Telefon
-    // uebergeben (ICS mit VALARM) - aber nur, wenn der Partner den Termin auch
-    // uebernommen hat. Wer das nie tut, hatte bisher gar keine. Deshalb nennt
-    // die Morgenmeldung den naechsten Termin beim Namen.
-    prisma.contact.findMany({
-      where: {
-        outcome: { not: "VERLOREN" },
-        appointmentAt: {
-          gte: heuteStart,
-          lt: heuteEnde,
+      prisma.user.findMany({
+        // Platzhalter fallen hier gar nicht erst herein: sie haben kein
+        // Push-Abo, koennen also nichts empfangen, und sie sollen auch nicht
+        // als Anlass fuer eine Meldung an IHRE Fuehrungskraft taugen. Wer nie
+        // eingeladen wurde, ist nicht still - er ist noch nicht gefragt worden.
+        where: { deactivatedAt: null, passwordHash: { not: null } },
+        // path und onboardingDoneAt fuer die Fuehrungs-Meldung: sie geht ueber
+        // die ganze Struktur, nicht nur ueber die Direkten.
+        select: {
+          id: true,
+          name: true,
+          leaderId: true,
+          path: true,
+          startedAt: true,
+          onboardingDoneAt: true,
+          visibility: true,
+          arbeitsfokus: true,
         },
-      },
-      orderBy: { appointmentAt: "asc" },
-      select: { ownerId: true, name: true, appointmentAt: true },
-    }),
-    // Die liegen gebliebenen Namen. Bis hierhin war das der blinde Fleck des
-    // ganzen Laufs: ein selbst gezogener Name bekommt keine Frist, zaehlte
-    // also nicht in `faellig` - und eine VOLLE Namensliste liess die Meldung
-    // unten sogar ganz ausfallen. Zwanzig unberuehrte Namen galten als
-    // "alles gut".
-    prisma.contact.findMany({
-      where: liegtFilter(),
-      select: { ...liegtSelect, ownerId: true },
-    }),
-  ]);
+      }),
+      // Offen und faellig: ueberfaellig plus heute.
+      prisma.contact.groupBy({
+        by: ["ownerId"],
+        where: {
+          outcome: "OFFEN",
+          nextStepType: { not: null },
+          nextStepAt: { lt: heuteEnde },
+        },
+        _count: { _all: true },
+      }),
+      prisma.contact.groupBy({
+        by: ["ownerId"],
+        where: {
+          listKinds: { isEmpty: false },
+          outcome: "OFFEN",
+          stage: { in: ["NEU", "KONTAKTIERT"] },
+        },
+        _count: { _all: true },
+      }),
+      // Wer sich seit der Stille-Grenze ueberhaupt geruehrt hat.
+      prisma.dailyLog.groupBy({
+        by: ["personId"],
+        where: { date: { gte: dayToUtcDate(berlinToday()) } },
+        _count: { _all: true },
+      }),
+      // Die Termine des Tages. Der Kalender kann eine Erinnerung ans Telefon
+      // uebergeben (ICS mit VALARM) - aber nur, wenn der Partner den Termin auch
+      // uebernommen hat. Wer das nie tut, hatte bisher gar keine. Deshalb nennt
+      // die Morgenmeldung den naechsten Termin beim Namen.
+      prisma.contact.findMany({
+        where: {
+          outcome: { not: "VERLOREN" },
+          appointmentAt: {
+            gte: heuteStart,
+            lt: heuteEnde,
+          },
+        },
+        orderBy: { appointmentAt: "asc" },
+        select: { ownerId: true, name: true, appointmentAt: true },
+      }),
+      // Die liegen gebliebenen Namen. Bis hierhin war das der blinde Fleck des
+      // ganzen Laufs: ein selbst gezogener Name bekommt keine Frist, zaehlte
+      // also nicht in `faellig` - und eine VOLLE Namensliste liess die Meldung
+      // unten sogar ganz ausfallen. Zwanzig unberuehrte Namen galten als
+      // "alles gut".
+      prisma.contact.findMany({
+        where: liegtFilter(),
+        select: { ...liegtSelect, ownerId: true },
+      }),
+    ]);
 
   const personen = await prisma.person.findMany({
     where: { userId: { not: null } },
     select: { id: true, userId: true },
   });
   const userVonPerson = new Map(
-    personen.filter((p) => p.userId).map((p) => [p.id, p.userId!])
+    personen.filter((p) => p.userId).map((p) => [p.id, p.userId!]),
   );
   const heuteAktiv = new Set(
     aktivHeute
       .map((zeile) => userVonPerson.get(zeile.personId))
-      .filter((id): id is string => Boolean(id))
+      .filter((id): id is string => Boolean(id)),
   );
 
   const faelligJe = new Map(
-    faellig.map((zeile) => [zeile.ownerId ?? "", zeile._count._all ?? 0])
+    faellig.map((zeile) => [zeile.ownerId ?? "", zeile._count._all ?? 0]),
   );
   const namenJe = new Map(
-    offeneNamen.map((zeile) => [zeile.ownerId ?? "", zeile._count._all ?? 0])
+    offeneNamen.map((zeile) => [zeile.ownerId ?? "", zeile._count._all ?? 0]),
   );
 
   // Letzte Aktivitaet je Konto, fuer die Stille-Erkennung.
@@ -231,7 +241,14 @@ export async function GET(request: NextRequest) {
     const termine = termineJe.get(konto.id) ?? [];
     const anzahl = faelligJe.get(konto.id) ?? 0;
     const namen = namenJe.get(konto.id) ?? 0;
-    const liegen = liegtJe.get(konto.id) ?? [];
+    const liegen =
+      konto.arbeitsfokus === "FUEHRUNG" ? [] : (liegtJe.get(konto.id) ?? []);
+    if (
+      konto.arbeitsfokus === "FUEHRUNG" &&
+      termine.length === 0 &&
+      anzahl === 0
+    )
+      continue;
 
     // Ein Termin ist eine feste Verabredung mit einem Menschen. Die Erinnerung
     // geht deshalb auch an den, der heute schon fleissig war - anders als das
@@ -257,7 +274,9 @@ export async function GET(request: NextRequest) {
             ? "Heute ein Termin"
             : `Heute ${termine.length} Termine`,
         text: `${uhrzeit.format(erster.at)} Uhr mit ${erster.name}${
-          weitere > 0 ? `, danach ${weitere} ${weitere === 1 ? "weiterer" : "weitere"}` : ""
+          weitere > 0
+            ? `, danach ${weitere} ${weitere === 1 ? "weiterer" : "weitere"}`
+            : ""
         }.`,
         url: "/kalender",
         kennung: "tagespensum",
@@ -311,7 +330,9 @@ export async function GET(request: NextRequest) {
   // einen Konflikt.
   const nameVon = new Map(konten.map((konto) => [konto.id, konto.name]));
   const kontoVon = new Map(konten.map((konto) => [konto.id, konto]));
-  const ankunftGrenze = new Date(Date.now() - schwellen.ankunftFristTage * TAG_MS);
+  const ankunftGrenze = new Date(
+    Date.now() - schwellen.ankunftFristTage * TAG_MS,
+  );
 
   const auffaellig = (konto: (typeof konten)[number]): string | null => {
     // Wer den Start nie beendet hat, ist der haeufigste stille Abgang - und
@@ -321,9 +342,20 @@ export async function GET(request: NextRequest) {
         ? "hat den Start nie beendet"
         : null;
     }
+    if (konto.arbeitsfokus === "FUEHRUNG") {
+      return pipelineFreigegeben(konto.visibility) &&
+        (faelligJe.get(konto.id) ?? 0) > 0
+        ? "hat fällige eigene Verpflichtungen"
+        : null;
+    }
     const zuletzt = letzteJe.get(konto.id);
-    if (!zuletzt || zuletzt < stilleGrenze) return "hat zuletzt keine Aktivität eingetragen";
-    if (pipelineFreigegeben(konto.visibility) && (namenJe.get(konto.id) ?? 0) < schwellen.pipelineMindestbestand) return "hat wenige offene Namen";
+    if (!zuletzt || zuletzt < stilleGrenze)
+      return "hat zuletzt keine Aktivität eingetragen";
+    if (
+      pipelineFreigegeben(konto.visibility) &&
+      (namenJe.get(konto.id) ?? 0) < schwellen.pipelineMindestbestand
+    )
+      return "hat wenige offene Namen";
     return null;
   };
 
@@ -337,10 +369,14 @@ export async function GET(request: NextRequest) {
     where: { doneAt: null, dueAt: { gt: new Date() } },
     select: { leaderId: true, memberId: true },
   });
-  const ruhtFuer = new Set(ruhend.map((eintrag) => `${eintrag.leaderId}:${eintrag.memberId}`));
+  const ruhtFuer = new Set(
+    ruhend.map((eintrag) => `${eintrag.leaderId}:${eintrag.memberId}`),
+  );
 
   const fuehrende = new Set(
-    konten.map((konto) => konto.leaderId).filter((id): id is string => Boolean(id))
+    konten
+      .map((konto) => konto.leaderId)
+      .filter((id): id is string => Boolean(id)),
   );
   let anFuehrung = 0;
 
@@ -348,37 +384,58 @@ export async function GET(request: NextRequest) {
     const leader = kontoVon.get(leaderId);
     // '/' ist ein noch nicht initialisierter Pfad, keine Freigabe für alle
     // Konten. Die Grenze entspricht strukturKonten/lib/scope.
-    if (!leader || !leader.path.startsWith("/") || !leader.path.endsWith(`/${leader.id}/`)) continue;
+    if (
+      !leader ||
+      !leader.path.startsWith("/") ||
+      !leader.path.endsWith(`/${leader.id}/`)
+    )
+      continue;
 
     const treffer = konten
       .filter(
         (konto) =>
           konto.id !== leaderId &&
           konto.path.startsWith(leader.path) &&
-          !ruhtFuer.has(`${leaderId}:${konto.id}`)
+          !ruhtFuer.has(`${leaderId}:${konto.id}`),
       )
       .map((konto) => ({ konto, grund: auffaellig(konto) }))
       .filter((eintrag) => eintrag.grund !== null);
     if (treffer.length === 0) continue;
 
     // Direkte zuerst: dort handelt die Fuehrungskraft selbst.
-    const direkte = treffer.filter((eintrag) => eintrag.konto.leaderId === leaderId);
-    const tiefer = treffer.filter((eintrag) => eintrag.konto.leaderId !== leaderId);
+    const direkte = treffer.filter(
+      (eintrag) => eintrag.konto.leaderId === leaderId,
+    );
+    const tiefer = treffer.filter(
+      (eintrag) => eintrag.konto.leaderId !== leaderId,
+    );
     const zuerst = (direkte[0] ?? tiefer[0])!;
     const weitere = treffer.length - 1;
 
-    const titel =
+    let titel =
       weitere > 0
         ? `${zuerst.konto.name} und ${weitere} weitere brauchen dich`
         : `${zuerst.konto.name} ${zuerst.grund}`;
     // Der Schritt gehoert in die Meldung, nicht nur die Zahl: sonst ist es
     // eine Sorge ohne Griff.
-    const text =
+    let text =
       direkte.length > 0
         ? "Anrufen — nicht nach Zahlen fragen, sondern wie es läuft."
         : `Hängt unter ${nameVon.get(zuerst.konto.leaderId ?? "") ?? "jemandem"}. Mit ${
             nameVon.get(zuerst.konto.leaderId ?? "")?.split(" ")[0] ?? "ihm"
           } besprechen, nicht daran vorbei.`;
+    if (zuerst.konto.leaderId !== leaderId) {
+      const direkt = konten.find(
+        (konto) =>
+          konto.leaderId === leaderId &&
+          konto.path !== "/" &&
+          zuerst.konto.path.startsWith(konto.path),
+      );
+      if (direkt) {
+        titel = `Mit ${direkt.name} das Team begleiten`;
+        text = `${zuerst.konto.name} ${zuerst.grund} · Stand ${heute}. Mit ${direkt.name} den nächsten Schritt besprechen.`;
+      }
+    }
 
     vormerken(leaderId, {
       titel,
@@ -396,16 +453,28 @@ export async function GET(request: NextRequest) {
   for (const [userId, anzahl] of absprachen) {
     if (!kontoVon.has(userId)) continue;
     const teile = [
-      anzahl.bestaetigen > 0 ? `${anzahl.bestaetigen} ${anzahl.bestaetigen === 1 ? "Vorschlag wartet" : "Vorschläge warten"} auf deine Antwort` : "",
-      anzahl.faellig > 0 ? `${anzahl.faellig} bestätigte ${anzahl.faellig === 1 ? "Absprache ist fällig" : "Absprachen sind fällig"}` : "",
+      anzahl.bestaetigen > 0
+        ? `${anzahl.bestaetigen} ${anzahl.bestaetigen === 1 ? "Vorschlag wartet" : "Vorschläge warten"} auf deine Antwort`
+        : "",
+      anzahl.faellig > 0
+        ? `${anzahl.faellig} bestätigte ${anzahl.faellig === 1 ? "Absprache ist fällig" : "Absprachen sind fällig"}`
+        : "",
     ].filter(Boolean);
-    vormerken(userId, { titel: "Eure Absprachen", text: `${teile.join(". ")}.`, url: "/mannschaft/vereinbarungen", kennung: "absprachen" });
+    vormerken(userId, {
+      titel: "Eure Absprachen",
+      text: `${teile.join(". ")}.`,
+      url: "/mannschaft/vereinbarungen",
+      kennung: "absprachen",
+    });
   }
   for (const [userId, anzahl] of offeneEinheiten) {
     if (!kontoVon.has(userId)) continue;
     vormerken(userId, {
       titel: "Einheiten ergänzen",
-      text: anzahl === 1 ? "Bei einem Abschluss sind die Einheiten noch offen." : `Bei ${anzahl} Abschlüssen sind die Einheiten noch offen.`,
+      text:
+        anzahl === 1
+          ? "Bei einem Abschluss sind die Einheiten noch offen."
+          : `Bei ${anzahl} Abschlüssen sind die Einheiten noch offen.`,
       url: "/heute",
       kennung: "einheiten",
     });

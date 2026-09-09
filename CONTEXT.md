@@ -1,8 +1,25 @@
 # Cockpit
 
-Das Cockpit (früher „Ergo CRM") ist ein Werkzeug für Vertrieb und Führung im Strukturvertrieb: Jede Person pflegt ihre eigene Kontakt-Pipeline, und dieselben Zahlen tragen die Führung der Struktur.
+Das Cockpit (früher „Ergo CRM") ist ein Werkzeug für Vertrieb und Führung im Strukturvertrieb: Jede Person pflegt ihr eigenes Geschäft, erlebt persönlichen Fortschritt und begleitet bei Bedarf die direkten Partner mit ihren Teams. Ziele, Wettbewerb, Zuspruch, Einstieg und Auswertung gehören zu diesem Kerngeschäft.
 
 ## Language
+
+### Geschäftssituationen und Ziele
+
+**Arbeitsfokus**:
+Gespeicherte Auswahl für die Gewichtung auf Heute: Eigenes Geschäft, Geschäft und Partneraufbau, Team führen. Automatisch wird ab dem ersten aktiven direkten Partner Aufbau gewählt. Der Fokus ändert keine Zugriffsrechte.
+
+**Erste Runde**:
+Freiwillige, aus gespeicherter Arbeit abgeleitete Begleitung: Name, Telefonnummer, Anruf, vereinbarter Termin, gehaltenes Ergebnis, Empfehlungen und bei einem Abschluss gegebenenfalls Einheiten. Ohne Ablauf nach sieben Tagen.
+
+**Persönliches Ziel**:
+Zählt ausschließlich die Leistung des Inhabers. Ein Vorschlag einer Führungskraft wird erst mit dessen Zustimmung aktiv. Ein gemeinsam vereinbartes persönliches Ziel ist kein Teamziel.
+
+**Teamziel**:
+Wochen- oder Monatsziel der verantwortlichen Führungskraft für die aktiven Nachfahren ihrer Teamwurzel, ohne deren Eigenleistung. Mitglieder sehen den gemeinsamen Gesamtstand; daraus entstehen keine individuellen Verpflichtungen oder zusätzlichen Einblicke. Die aktuelle Struktur bestimmt die Zuordnung, auch nach Teamwechseln.
+
+**Wunschziel / Mein Warum**:
+Persönlicher Sinn hinter dem Arbeitsziel. Einheiten werden daraus nicht in Verdienst, verfügbares Geld oder Investmentrendite umgerechnet.
 
 ### Trichter
 
@@ -10,7 +27,7 @@ Das Cockpit (früher „Ergo CRM") ist ein Werkzeug für Vertrieb und Führung i
 Die vier Aktivitätsstufen Anrufe → Termine vereinbart → Termine gehalten → Abschlüsse, gezählt aus den eigenen Einträgen.
 
 **Übergangsquote**:
-Der Anteil, den eine Stufe von ihrer Vorstufe im gewählten Zeitraum erreicht. Die Frage dahinter: woran hakt es?
+Das Verhältnis der Periodensummen zweier Aktivitätsstufen. Es ordnet Tätigkeiten nicht derselben Kontaktkohorte zu und belegt keine Abschlusswahrscheinlichkeit.
 
 **Engpass**:
 Der Übergang mit der kleinsten Übergangsquote — gezählt nur dort, wo die Vorstufe überhaupt belegt ist.
@@ -74,8 +91,11 @@ Ein Verlauf, dessen Start auf 100 gesetzt ist. Nach außen gehen ausschließlich
 **Berichts-Link**:
 Der teilbare, jederzeit zurückziehbare Link einer Führungskraft mit indexierten Struktur-Zahlen für die Runde nach oben. Zeigt keine Kundendaten und keine Kontaktnamen.
 
-**Teamabend**:
-Der wöchentliche Teamtermin — und der eine Bildschirm im Werkzeug, der dort gezeigt wird.
+**Netzwerkabend (bestehende Route Teamabend)**:
+Gemeinsames Wettbewerbs- und Erfolgsformat der gesamten Instanz. Kein Bericht eines ausgewählten Teilteams.
+
+**Teammeeting**:
+Präsentationsansicht der gewählten Teamauswertung mit demselben Zeitraum, Teamumfang und denselben Berechtigungen.
 
 **Anfrage**:
 Die Nachricht eines außenstehenden Beraters, der einen Zugang will. Kein Konto, kein Kontakt — nur Name, Erreichbarkeit und Anliegen.
