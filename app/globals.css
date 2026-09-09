@@ -640,7 +640,9 @@ input[type="number"]::-webkit-outer-spin-button {
 .crm-nav-active { color: var(--color-ink); }
 .crm-nav-active svg { stroke-width: 2.4; }
 html:not(.dark) .crm-nav-active { color: #174dab; }
-.crm-nav-link:hover { background: var(--color-surface); }
+@media (hover: hover) and (pointer: fine) {
+  .crm-nav-link:hover { background: var(--color-surface); }
+}
 .crm-undo { bottom: calc(4.9rem + env(safe-area-inset-bottom)); }
 .crm-shell :where(a, button, input, select, textarea):focus-visible { outline: 2px solid #82b3ff; outline-offset: 3px; }
 .crm-list { overflow: hidden; border: 1px solid var(--color-line); border-radius: 1rem; background: var(--color-surface); }

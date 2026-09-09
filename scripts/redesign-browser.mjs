@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { appendFileSync, existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
@@ -96,6 +96,25 @@ async function commonChecks(page, result) {
     const bounds = await link.boundingBox();
     assert.ok(bounds.width >= 44 && bounds.height >= 44, 'Navigation tap targets are at least 44px');
   }
+  if (viewport.width < 768) {
+    assert.equal(await page.evaluate(() => matchMedia('(hover: hover) and (pointer: fine)').matches), false, 'Phone cases emulate a touch pointer');
+    const active = nav.locator('[aria-current="page"]');
+    assert.equal(await active.count(), 1, 'Exactly one navigation destination is active');
+    // Touch browsers can retain :hover after a tap. The coarse-pointer style
+    // must remain unfilled even when that pseudo-state is present.
+    try {
+      await active.hover();
+      result.touchNavigation = await active.evaluate(el => ({
+        background: getComputedStyle(el).backgroundColor,
+        navBackground: getComputedStyle(el.closest('nav')).backgroundColor,
+        backgroundImage: getComputedStyle(el).backgroundImage,
+        boxShadow: getComputedStyle(el).boxShadow,
+      }));
+      assert.ok(['rgba(0, 0, 0, 0)', 'transparent', result.touchNavigation.navBackground].includes(result.touchNavigation.background), 'The active touch navigation item has no persistent hover tile');
+      assert.equal(result.touchNavigation.backgroundImage, 'none');
+      assert.equal(result.touchNavigation.boxShadow, 'none');
+    } finally { await page.mouse.move(0, 0); }
+  }
   const h1 = await page.getByRole('heading', { level: 1 }).boundingBox();
   if (viewport.width < 768 && !result.detail) assert.ok(h1.y < 80, 'The mobile title has no extra logo row above it');
   if (viewport.width < 768 && result.detail) assert.ok(h1.y < 230, 'The detail heading follows one compact return/edit row and avatar');
@@ -103,6 +122,7 @@ async function commonChecks(page, result) {
     result.headerTools = [];
     for (const label of ['Suchen', 'Profil und Einstellungen']) {
       const tool = page.locator('main .crm-page-head').getByRole('link', { name: label, exact: true });
+      await tool.waitFor({ state: 'visible' });
       const bounds = await tool.boundingBox();
       result.headerTools.push({ label, bounds });
       assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= viewport.width + 1 && bounds.y >= 0 && bounds.y + bounds.height < box.y, `${label} remains visible inside the mobile page header`);
@@ -162,13 +182,41 @@ async function runEngine(engine, name, port, scenarios) {
     browser = await engine.launch({ headless: true });
     report.engines.push({ name, status: 'ran' });
     for (const scenario of scenarios) {
+      if (process.env.CRM_REDESIGN_CASE && scenario.name !== process.env.CRM_REDESIGN_CASE) continue;
       const viewports = scenario.viewports || [{ width: 390, height: 844 }, { width: 320, height: 568 }];
       if (scenario.wideSmoke) viewports.push({ width: 430, height: 932 }, { width: 1440, height: 1000 });
       for (const viewport of viewports) {
+        if (process.env.CRM_REDESIGN_WIDTH && viewport.width !== Number(process.env.CRM_REDESIGN_WIDTH)) continue;
         const result = { engine: name, case: scenario.name, viewport, detail: !!scenario.detail, light: !!scenario.light, passed: false };
         report.cases.push(result);
         const context = await browser.newContext({ viewport, isMobile: viewport.width < 768, hasTouch: viewport.width < 768, colorScheme: scenario.colorScheme || 'light', reducedMotion: 'reduce', serviceWorkers: 'block', ...(scenario.theme ? { storageState: { cookies: [], origins: [{ origin, localStorage: [{ name: 'ergo-thema', value: scenario.theme }] }] } } : {}) });
         const page = await context.newPage(); const errors = [];
+        const network = [];
+        const trace = process.env.CRM_TEST_TRACE === '1';
+        if (trace) {
+          await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+          const record = (event, request, extra = {}) => {
+            const entry = { at: Date.now(), event, method: request.method(), resourceType: request.resourceType(), url: request.url(), ...extra };
+            network.push(entry);
+            appendFileSync(new URL(`${name}-${scenario.name}-${viewport.width}-network.jsonl`, output), JSON.stringify(entry) + '\n');
+          };
+          page.on('request', request => {
+            const headers = request.headers();
+            record('request', request, { headers: Object.fromEntries(Object.entries(headers).filter(([key]) => ['rsc', 'next-router-prefetch', 'next-router-segment-prefetch', 'next-router-state-tree', 'next-url', 'next-action', 'accept'].includes(key))) });
+          });
+          page.on('response', response => {
+            const headers = response.headers();
+            record('response', response.request(), { status: response.status(), headers: Object.fromEntries(Object.entries(headers).filter(([key]) => ['content-type', 'content-length', 'transfer-encoding', 'content-encoding', 'cache-control', 'vary', 'location', 'x-action-revalidated', 'x-nextjs-cache'].includes(key))) });
+          });
+          page.on('requestfinished', request => record('finished', request, { timing: request.timing() }));
+          page.on('requestfailed', request => record('failed', request, { failure: request.failure(), timing: request.timing() }));
+          page.on('download', download => {
+            const entry = { at: Date.now(), event: 'download', url: download.url(), suggestedFilename: download.suggestedFilename() };
+            network.push(entry);
+            appendFileSync(new URL(`${name}-${scenario.name}-${viewport.width}-network.jsonl`, output), JSON.stringify(entry) + '\n');
+          });
+          page.on('console', message => { if (message.type() === 'error') network.push({ at: Date.now(), event: 'console-error', text: message.text() }); });
+        }
         page.on('pageerror', e => errors.push(e.message));
         page.setDefaultTimeout(20000);
         const screenshot = `${name}-${scenario.name}-${viewport.width}.png`;
@@ -198,10 +246,10 @@ async function runEngine(engine, name, port, scenarios) {
             await page.getByText(/Keine (?:passenden )?(Kontakte|Treffer|Namen)/).first().waitFor();
           }
           await page.mouse.move(0, 0);
+          await commonChecks(page, result);
           await page.screenshot({ path: fileURLToPath(new URL(screenshot, output)), fullPage: false });
           result.screenshot = screenshot;
           await page.screenshot({ path: fileURLToPath(new URL(screenshot.replace('.png', '-full.png'), output)), fullPage: true });
-          await commonChecks(page, result);
           if (scenario.contacts && !scenario.search) await rowChecks(page, scenario.contacts, viewport.width === 390 ? Math.min(2, scenario.contacts.length) : Math.min(1, scenario.contacts.length));
           if (scenario.route.startsWith('/namen')) {
             assert.equal(await page.locator('main .crm-primary-action:visible').count(), 1, 'Contacts has exactly one primary action');
@@ -301,10 +349,21 @@ async function runEngine(engine, name, port, scenarios) {
             const primaryHref = await page.locator('main .crm-primary-action').first().getAttribute('href');
             const promoted = scenario.allTasks.due.find(item => primaryHref?.startsWith(`/contacts/${item.id}?`));
             const expectedRemaining = scenario.allTasks.due.filter(item => item.id !== promoted?.id);
+            const last = expectedRemaining.at(-1);
+            const assertFullTasks = async () => {
+              await own.locator(`a[href^="/contacts/${last.id}?"]`).waitFor({ state: 'visible' });
+              assert.equal(await own.locator('a[href^="/contacts/"]:visible').count(), expectedRemaining.length, 'The full view exposes every remaining task');
+              for (const item of expectedRemaining) {
+                const link = own.locator(`a[href^="/contacts/${item.id}?"]:visible`);
+                assert.equal(await link.count(), 1, `Due task ${item.name} appears exactly once`);
+                assert.equal(new URL(await link.getAttribute('href'), origin).searchParams.get('zurueck'), '/heute?alle=1');
+              }
+              if (promoted) assert.equal(await page.locator(`main a[href^="/contacts/${promoted.id}?"]:visible`).count(), 1, 'The primary contact remains visible exactly once');
+            };
             if (promoted) assert.equal(await own.locator(`a[href^="/contacts/${promoted.id}?"]`).count(), 0, 'The primary contact is not duplicated in the task group');
             const allLink = own.getByRole('link', { name: new RegExp(`^Alle ${expectedRemaining.length} Aufgaben ansehen`) });
             assert.equal(await allLink.getAttribute('href'), '/heute?alle=1#eigene-arbeit', 'All call reminders are reached through Today rather than Calendar');
-            await allLink.click({ trial: true });
+            if (trace) network.push({ at: Date.now(), event: 'all-tasks-click', href: await allLink.getAttribute('href'), currentURL: page.url(), dbStats: fixture.stats() });
             await Promise.all([
               page.waitForURL(url => url.pathname === '/heute' && url.search === '?alle=1' && url.hash === '#eigene-arbeit', { waitUntil: 'commit' }),
               allLink.click(),
@@ -316,7 +375,15 @@ async function runEngine(engine, name, port, scenarios) {
               assert.equal(await link.count(), 1, `Due task ${item.name} remains reachable exactly once`);
               assert.equal(new URL(await link.getAttribute('href'), origin).searchParams.get('zurueck'), '/heute?alle=1');
             }
-            const last = expectedRemaining.at(-1);
+            await assertFullTasks();
+            // Real browser history must restore both the URL and visible task density.
+            await page.goBack({ waitUntil: 'commit' });
+            await page.waitForURL(url => url.pathname === '/heute' && url.search === '', { waitUntil: 'commit' });
+            await allLink.waitFor({ state: 'visible' });
+            assert.equal(await own.locator('a[href^="/contacts/"]:visible').count(), 3, 'Browser Back restores the short overview');
+            await page.goForward({ waitUntil: 'commit' });
+            await page.waitForURL(url => url.pathname === '/heute' && url.search === '?alle=1' && url.hash === '#eigene-arbeit', { waitUntil: 'commit' });
+            await assertFullTasks();
             await page.locator(`#eigene-arbeit a[href^="/contacts/${last.id}?"]`).click();
             await page.getByRole('heading', { name: last.name, exact: true }).waitFor();
             const back = page.locator('main .crm-page-head a').first();
@@ -325,14 +392,26 @@ async function runEngine(engine, name, port, scenarios) {
             await page.waitForURL(url => url.pathname === '/heute' && url.search === '?alle=1', { waitUntil: 'commit' });
             await page.locator(`#eigene-arbeit a[href^="/contacts/${last.id}?"]`).waitFor({ state: 'visible' });
             assert.equal(await page.locator('#eigene-arbeit a[href^="/contacts/"]').count(), expectedRemaining.length);
+            await assertFullTasks();
+            const todayNav = page.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name: 'Heute', exact: true });
+            assert.equal(await todayNav.getAttribute('aria-current'), 'page');
+            await todayNav.click();
+            await page.waitForURL(url => url.pathname === '/heute' && url.search === '', { waitUntil: 'commit' });
+            await allLink.waitFor({ state: 'visible' });
+            assert.equal(await own.locator('a[href^="/contacts/"]:visible').count(), 3, 'The active Today navigation item restores the short overview after a profile visit');
+            await allLink.click();
+            await page.waitForURL(url => url.pathname === '/heute' && url.search === '?alle=1', { waitUntil: 'commit' });
+            await assertFullTasks();
+            // The explicitly labelled return action remains independently usable.
             await page.getByRole('link', { name: /Zur Tagesübersicht/ }).click();
             await page.waitForURL(url => url.pathname === '/heute' && url.search === '', { waitUntil: 'commit' });
             await page.getByRole('heading', { name: 'Heute', exact: true }).waitFor();
+            await allLink.waitFor({ state: 'visible' });
+            assert.equal(await own.locator('a[href^="/contacts/"]:visible').count(), 3, 'The labelled return action also restores the short overview');
             await page.locator('#weitere-schritte > summary').click();
             assert.equal(await page.locator('#weitere-schritte a[href^="/contacts/"]:visible').count(), 6, 'Default week and unscheduled groups each show at most three contacts');
             const allWeek = page.locator('#weitere-schritte').getByRole('link', { name: /^Alle 4 Schritte ansehen/ });
             assert.equal(await allWeek.getAttribute('href'), '/heute?alle=1#weitere-schritte');
-            await allWeek.click({ trial: true });
             await Promise.all([
               page.waitForURL(url => url.search === '?alle=1' && url.hash === '#weitere-schritte', { waitUntil: 'commit' }),
               allWeek.click(),
@@ -364,10 +443,17 @@ async function runEngine(engine, name, port, scenarios) {
           result.failureURL = page.url();
           result.failurePage = await page.locator('body').innerText().catch(() => 'Page content unavailable');
           result.failureContactLinks = await page.locator('main a[href^="/contacts/"]').evaluateAll(links => links.map(link => ({ text: link.textContent, href: link.getAttribute('href') }))).catch(() => []);
+          if (scenario.editProfile) result.failureStoredContact = await db.contact.findUnique({ where: { id: scenario.editProfile.id }, select: { phone: true, note: true } }).catch(() => null);
+          if (trace) network.push({ at: Date.now(), event: 'case-failure', currentURL: page.url(), dbStats: fixture.stats() });
           report.failures.push(`${name}/${scenario.name}/${viewport.width}: ${error.message}`);
           await page.screenshot({ path: fileURLToPath(new URL(screenshot, output)), fullPage: false }).catch(() => {});
           console.error(report.failures.at(-1));
         } finally {
+          if (trace) {
+            result.dbStats = fixture.stats();
+            await context.tracing.stop({ path: fileURLToPath(new URL(screenshot.replace('.png', '-trace.zip'), output)) });
+            await writeFile(new URL(screenshot.replace('.png', '-network.json'), output), JSON.stringify(network, null, 2));
+          }
           await context.close();
           await writeFile(new URL('result.json', output), JSON.stringify(report, null, 2));
         }

@@ -520,7 +520,7 @@ export default async function MannschaftPage({
           <TeamNavigation aktiv={begleiten ? "begleiten" : "ueberblick"} />
         </div>
 
-        {begleiten && <Teamziele userId={user.id} kompakt />}
+        {begleiten && <VorfuehrVerdeckt hinweis="Teamziele und gemeinsame Wünsche werden beim Vorführen ausgeblendet."><Teamziele userId={user.id} kompakt /></VorfuehrVerdeckt>}
 
         {/* --- Die ganze Struktur ---------------------------------------------
           Baumreihenfolge, Direkte prominent, Tiefe eingerueckt und mit dem

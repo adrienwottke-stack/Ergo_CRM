@@ -28,8 +28,8 @@ import { PhoneIcon } from "@/components/icons";
  * bleibt unangetastet.
  */
 export function VorfuehrHinweis({ ausschaltbar = false }: { ausschaltbar?: boolean }) {
-  const { aktiv, umschalten } = useVorfuehren();
-  if (!aktiv) return null;
+  const { aktiv, bereit, umschalten } = useVorfuehren();
+  if (!bereit || !aktiv) return null;
   if (ausschaltbar) return (
     <div className="rounded-xl border border-line bg-surface px-4 py-2">
       <p className="pt-2 text-sm text-ink-muted">Vorführmodus aktiv. Persönliche Inhalte sind ausgeblendet.</p>

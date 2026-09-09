@@ -17,9 +17,9 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 
 const SPEICHER_SCHLUESSEL = "cockpit-vorfuehren";
 
-type VorfuehrKontext = { aktiv: boolean; umschalten: () => void };
+type VorfuehrKontext = { aktiv: boolean; bereit: boolean; umschalten: () => void };
 
-const Context = createContext<VorfuehrKontext>({ aktiv: false, umschalten: () => {} });
+const Context = createContext<VorfuehrKontext>({ aktiv: false, bereit: true, umschalten: () => {} });
 
 /** Ob gerade vorgefuehrt wird, und der Umschalter dafuer - fuer GpName und
  *  VorfuehrSchalter. Ausserhalb eines VorfuehrProvider bleibt `aktiv` false. */
@@ -29,6 +29,7 @@ export function useVorfuehren(): VorfuehrKontext {
 
 export default function VorfuehrProvider({ children }: { children: ReactNode }) {
   const [aktiv, setAktiv] = useState(true);
+  const [bereit, setBereit] = useState(false);
 
   useEffect(() => {
     try {
@@ -38,9 +39,11 @@ export default function VorfuehrProvider({ children }: { children: ReactNode }) 
       // startet dann einfach aus, wie ohne gespeicherten Zustand.
       setAktiv(false);
     }
+    setBereit(true);
   }, []);
 
   const umschalten = () => {
+    if (!bereit) return;
     setAktiv((vorher) => {
       const naechster = !vorher;
       try {
@@ -53,5 +56,5 @@ export default function VorfuehrProvider({ children }: { children: ReactNode }) 
     });
   };
 
-  return <Context.Provider value={{ aktiv, umschalten }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ aktiv, bereit, umschalten }}>{children}</Context.Provider>;
 }

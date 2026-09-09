@@ -602,7 +602,7 @@ try {
   await noOverflow();
   await capture("06-kalender");
   await openPage(`${origin}/suche?q=Anna`);
-  await page.getByRole("link", { name: /Anna Beispiel/ }).waitFor();
+  await page.getByRole("link", { name: /Anna Beispiel Kontakt/ }).waitFor();
   await login("start");
   await openPage(`${origin}/suche?q=Anna`);
   assert.equal(

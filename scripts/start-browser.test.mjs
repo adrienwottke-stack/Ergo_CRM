@@ -17,7 +17,9 @@ const db=fixture.client;
 const port=Number(process.env.START_TEST_PORT || 3105);
 const origin=`http://localhost:${port}`;
 const production=process.env.CRM_TEST_PRODUCTION === '1';
-const output=new URL('../test-results/start/',import.meta.url);
+const runName=process.env.CRM_TEST_RUN || 'start';
+assert.match(runName,/^[a-z0-9-]+$/,'Test output name contains only letters, digits and hyphens');
+const output=new URL(`../test-results/${runName}/`,import.meta.url);
 await mkdir(output,{recursive:true});
 process.env.SESSION_SECRET=randomBytes(32).toString('hex');
 const env={...process.env,DATABASE_URL:fixture.url,DATABASE_POOL_MAX:'1',NEXT_TELEMETRY_DISABLED:'1'};
@@ -44,16 +46,16 @@ try {
   await game.locator('#btnL').waitFor({state:'visible'});
   await page.screenshot({path:new URL('storno-mobile.png',output).pathname.replace(/^\/([A-Z]:)/,'$1'),fullPage:true});
   await page.setViewportSize({width:320,height:568});
-  await page.screenshot({path:new URL('storno-small.png',output).pathname.replace(/^\/([A-Z]:)/,'$1'),fullPage:true});
   const bounds=await game.locator('#btnR').evaluate(el=>({bottom:el.getBoundingClientRect().bottom,height:innerHeight}));
   assert.ok(bounds.bottom<=bounds.height,'Small-screen choice must stay inside the game frame');
   const readable=await game.locator('.card').evaluate(el=>el.querySelector('.body .note').getBoundingClientRect().bottom <= el.querySelector('.perfo').getBoundingClientRect().top);
   assert.ok(readable,'Small-screen card text must not overlap the footer');
-  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:new URL('storno-small.png',output).pathname.replace(/^\/([A-Z]:)/,'$1'),fullPage:true});
   for(let i=0;i<5;i++) {
     await game.locator('#btnL').click();
     await page.waitForFunction(count=>document.body.innerText.includes(count===5 ? 'Runde geschafft.' : `Karte ${count+1} von 5`),i+1);
     if(i<4) await game.locator('.card').waitFor({state:'visible'});
+    if(i===0) await page.setViewportSize({width:390,height:844});
   }
   assert.equal((await db.startProgress.findUnique({where:{userId:user.id}})).stornoChoices.length,5);
   await page.getByRole('button',{name:'Weiter mit deinem Start'}).click();

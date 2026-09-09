@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { vereinbarungAntworten } from "@/app/(app)/mannschaft/vereinbarungen/actions";
 import type {
   VereinbarungAktion,
@@ -19,7 +18,6 @@ export default function VereinbarungsAktionen({
   status: VereinbarungStatus;
   darfBestaetigen: boolean;
 }) {
-  const router = useRouter();
   const [pending, starten] = useTransition();
   const [fehler, setFehler] = useState("");
   const aktionen: { key: VereinbarungAktion; text: string; stark?: boolean }[] =
@@ -54,7 +52,6 @@ export default function VereinbarungsAktionen({
                   aktion.key,
                 );
                 if (!ergebnis.ok) setFehler(ergebnis.fehler);
-                else router.refresh();
               });
             }}
           >
