@@ -27,6 +27,7 @@
 //    steht einmal in der AppShell und hoert zu.
 
 import { useCallback, useEffect, useState } from "react";
+import { emilArbeitGespeichert } from "@/lib/coach/events";
 import { useRouter } from "next/navigation";
 import { einheitSchnellBuchen } from "@/app/(team)/einheiten/actions";
 import { einheitenSpaeter } from "@/app/(app)/fortschritt/einheitenActions";
@@ -106,6 +107,7 @@ export default function EinheitenNachAbschluss() {
         return;
       }
       setErfolg(antwort);
+      emilArbeitGespeichert();
       // Zeigt die Seite im Hintergrund Einheiten, steht dort sonst noch der
       // Stand von vorhin.
       router.refresh();

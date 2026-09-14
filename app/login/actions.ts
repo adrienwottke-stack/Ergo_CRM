@@ -87,7 +87,7 @@ export async function login(formData: FormData) {
   // ohnehin abweisen - "irgendein Hash" ist nie gleich NULL -, aber ein
   // Riegel, der nur zufaellig haelt, ist keiner. Er steht hier ausdruecklich,
   // damit er beim naechsten Umbau nicht lautlos verschwindet.
-  if (!user || !user.passwordHash || !user.passwordSalt) redirect("/login?error=1");
+  if (!user || user.deactivatedAt || !user.passwordHash || !user.passwordSalt) redirect("/login?error=1");
   if ((await hashPassword(password, user.passwordSalt)) !== user.passwordHash) {
     redirect("/login?error=1");
   }

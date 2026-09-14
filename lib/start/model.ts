@@ -14,11 +14,11 @@ export function introSuccessor(act: string): IntroAct {
   return INTRO_ACTS[Math.min(index + 1, INTRO_ACTS.length - 1)];
 }
 
-export function afterCollection(counts: { names: number; callable: number }): StartPhase {
-  return counts.names === 0 ? "DONE" : counts.callable > 0 ? "CALLS" : "PHONES";
+export function afterCollection(counts: { names: number; callable: number }, extended = false): StartPhase {
+  return counts.names === 0 ? extended ? "COLLECTION" : "DONE" : counts.callable > 0 ? "CALLS" : "PHONES";
 }
 
-export type StartPhase = "INTRO" | "COLLECTION" | "PHONES" | "CALLS" | "DONE";
+export type StartPhase = "INTRO" | "COLLECTION" | "PHONES" | "CALLS" | "APPOINTMENT" | "RESULT" | "REFERRALS" | "UNITS" | "DONE";
 export type StartDestination = {
   phase: string;
   paused: boolean;

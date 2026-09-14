@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 const createdFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium" });
 
 const fehlertexte: Record<string, string> = {
+  struktur: "Diese Änderung ist nicht möglich. Bitte prüfe die Angaben und lade die Struktur neu.",
   invalid: "Die Angabe konnte nicht gelesen werden.",
   sich_selbst_konto: "Das eigene Konto lässt sich hier nicht ändern.",
   sich_selbst: "Ein Berater kann nicht seine eigene Führungskraft sein.",

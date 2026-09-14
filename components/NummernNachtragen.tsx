@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { startNummer, nummernFertig, startVertagen } from "@/app/startActions";
 import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
 import { btnPrimary, btnSecondary, card, input } from "@/components/ui";
 import Fortschritt from "@/components/Fortschritt";
+import { emilArbeitGespeichert } from "@/lib/coach/events";
 
 export type NummerEintrag = { id: string; name: string; rating: ContactRating | null; herkunft: string | null };
 
-export default function NummernNachtragen({ queue, kind, schonAnrufbar, guided = false, userId }: {
-  queue: NummerEintrag[]; kind: ListKind; schonAnrufbar: number; guided?: boolean; userId: string;
+export default function NummernNachtragen({ queue, kind, schonAnrufbar, guided = false, userId, miniEmil = false }: {
+  queue: NummerEintrag[]; kind: ListKind; schonAnrufbar: number; guided?: boolean; userId: string; miniEmil?: boolean;
 }) {
   const router=useRouter();
   const [items]=useState(queue);
@@ -19,29 +20,31 @@ export default function NummernNachtragen({ queue, kind, schonAnrufbar, guided =
   const [callable,setCallable]=useState(schonAnrufbar);
   const [phone,setPhone]=useState("");
   const [error,setError]=useState<string | null>(null);
-  const [pending,startTransition]=useTransition();
+  const [pending,setPending]=useState(false);
   const busy=useRef(false);
   const field=useRef<HTMLInputElement>(null);
   const current=items[index];
   const draftKey=`ergo.start.phone.${userId}.${current?.id ?? "done"}`;
   useEffect(() => {
     try { setPhone(localStorage.getItem(draftKey) ?? ""); } catch { setPhone(""); }
-    field.current?.focus();
-  },[draftKey]);
+    if (!miniEmil) field.current?.focus();
+  },[draftKey, miniEmil]);
   function change(value:string) { setPhone(value); try { localStorage.setItem(draftKey,value); } catch { /* optional draft */ } }
   function run(work: () => Promise<void>) {
     if (busy.current) return;
-    busy.current=true; setError(null);
-    startTransition(async () => {
+    // A parallel coach/router refresh does not own this form's saving state.
+    busy.current=true; setPending(true); setError(null);
+    void (async () => {
       try { await work(); } catch(e) { setError(e instanceof Error ? e.message : "Noch nicht gespeichert. Bitte erneut versuchen."); }
-      finally { busy.current=false; }
-    });
+      finally { busy.current=false; setPending(false); }
+    })();
   }
   async function save(skip=false) {
     if (!current) return;
     if (!skip && !phone.trim()) throw new Error("Trage eine Nummer ein oder wähle „Hab ich nicht“.");
     const stand=await startNummer(kind,current.id,skip ? null : phone);
     setCallable(stand.callable);
+    emilArbeitGespeichert();
     try { localStorage.removeItem(draftKey); } catch { /* optional draft */ }
     setPhone(""); setIndex(i=>i+1);
   }
@@ -66,7 +69,7 @@ export default function NummernNachtragen({ queue, kind, schonAnrufbar, guided =
       <h2 className="text-2xl font-semibold">{callable ? `${callable} ${callable === 1 ? "Name ist" : "Namen sind"} anrufbar.` : "Für Anrufe fehlen noch Nummern."}</h2>
       <p className="text-ink-muted">{callable ? "Bereite jetzt deinen ersten Anruf vor." : "Deine Namen bleiben gespeichert. Du kannst die Nummern später ergänzen."}</p>
       <button disabled={pending} onClick={()=>run(next)} className={`${btnPrimary} min-h-14 w-full`}>{callable ? "Erste Anrufe vorbereiten" : "Für heute fertig"}</button>
-      {!callable && <Link href={`/namen/sammeln?liste=${kind}`} className={`${btnSecondary} w-full`}>Weitere Namen sammeln</Link>}
+      {!callable && <Link href={`/namen/sammeln?liste=${kind}`} prefetch={false} className={`${btnSecondary} w-full`}>Weitere Namen sammeln</Link>}
     </div>}
     <button disabled={pending} onClick={()=>run(async()=>{ if (phone.trim()) await save(); if (guided) await startVertagen(); router.push(guided ? "/heute" : `/namen?liste=${kind}`); })} className="min-h-11 w-full text-center text-sm underline">Später fortsetzen</button>
   </div>;

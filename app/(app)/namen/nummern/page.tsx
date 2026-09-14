@@ -7,6 +7,7 @@ import NummernNachtragen, {
 } from "@/components/NummernNachtragen";
 import { pageTitle, columnNarrow } from "@/components/ui";
 import { startOptions } from "@/lib/start/settings";
+import { ladeCoach } from "@/lib/coach/server";
 import { redirect } from "next/navigation";
 import { isListKind } from "@/lib/namelist";
 
@@ -31,7 +32,7 @@ export default async function NummernPage({
   const { liste } = await searchParams;
   if (!isListKind(liste ?? "") && !user.startTrack) redirect("/namen/sammeln");
   const kind = listeAus(liste, user.startTrack);
-  const [state,options] = await Promise.all([prisma.startProgress.findUnique({where:{userId:user.id}}),startOptions()]);
+  const [state,options,coach] = await Promise.all([prisma.startProgress.findUnique({where:{userId:user.id}}),startOptions(),ladeCoach(user.id)]);
   const guided = options.guidance && state?.phase === "PHONES" && state.kind === kind;
 
   const [ohneNummer, mitNummer] = await Promise.all([
@@ -81,7 +82,7 @@ export default async function NummernPage({
         </div>
       </div>
 
-      <NummernNachtragen key={kind} queue={queue} kind={kind} schonAnrufbar={mitNummer} guided={guided} userId={user.id} />
+      <NummernNachtragen key={kind} queue={queue} kind={kind} schonAnrufbar={mitNummer} guided={guided} userId={user.id} miniEmil={coach?.status === "active"} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { beginCollection, collectionView } from "@/lib/start/service";
 import { startOptions } from "@/lib/start/settings";
+import { ladeCoach } from "@/lib/coach/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
@@ -94,6 +95,7 @@ export default async function SammelnPage({
             <Link
               key={wert}
               href={`/namen/sammeln?liste=${wert}`}
+              prefetch={false}
               className={`${cardInteractive} flex items-center gap-4 p-5`}
             >
               <span className="min-w-0 flex-1">
@@ -135,16 +137,17 @@ export default async function SammelnPage({
   }
   const belongs = await prisma.nameCollection.findFirst({ where: { id: runde, userId: user.id, kind }, select: { id: true } });
   if (!belongs) notFound();
-  const [round, state, options] = await Promise.all([
+  const [round, state, options, coach] = await Promise.all([
     collectionView(prisma, user.id, runde),
     prisma.startProgress.findUnique({ where: { userId: user.id } }),
     startOptions(),
+    ladeCoach(user.id),
   ]);
 
   return (
     <div className={`${columnNarrow} space-y-5`}>
       <h1 className={pageTitle}>Namen sammeln</h1>
-      <NamenSammeln key={round.id} initial={round} userId={user.id} guided={options.guidance && state !== null && state.phase !== "DONE" && state.collectionId === round.id} />
+      <NamenSammeln key={round.id} initial={round} userId={user.id} miniEmil={coach?.status === "active"} guided={options.guidance && state !== null && state.phase !== "DONE" && state.collectionId === round.id} />
     </div>
   );
 }

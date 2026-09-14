@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PersonLink from "@/components/PersonLink";
 import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -111,12 +112,12 @@ function NameLink({
   kurz?: string;
 }) {
   return (
-    <Link
+    <PersonLink
       href={`/mannschaft/${person.id}`}
       className={`${klasse} rounded transition hover:text-navy-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600`}
     >
       <GpName name={person.name} kurz={kurz} />
-    </Link>
+    </PersonLink>
   );
 }
 
@@ -538,6 +539,7 @@ export default async function MannschaftPage({
           </details>
         )}
         <div className="flex flex-wrap gap-x-5 gap-y-2">
+          <PersonLink className="inline-flex min-h-11 items-center font-medium text-navy-700" href="/mannschaft/verwalten">Struktur verwalten →</PersonLink>
           <Link
             className="inline-flex min-h-11 items-center font-medium text-navy-700"
             href="/teamabend"

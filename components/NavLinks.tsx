@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import NamenSammelnLink from "@/components/NamenSammelnLink";
 import { navAktiv, type NavLink, type NavSymbol } from "@/lib/navigation";
 export type { NavLink } from "@/lib/navigation";
 
@@ -47,18 +48,21 @@ function Symbol({ name }: { name?: NavSymbol }) {
 export default function NavLinks({ links }: { links: NavLink[] }) {
   const pathname = usePathname();
   return (
-    <nav aria-label="Hauptnavigation" className="crm-navigation">
-      {links.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          aria-current={navAktiv(link, pathname) ? "page" : undefined}
-          className={`crm-nav-link ${navAktiv(link, pathname) ? "crm-nav-active" : ""}`}
-        >
-          <Symbol name={link.symbol} />
-          <span>{link.label}</span>
-        </Link>
-      ))}
-    </nav>
+    <div className="crm-dock">
+      <NamenSammelnLink className="crm-collection-mobile" />
+      <nav aria-label="Hauptnavigation" className="crm-navigation">
+        {links.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            aria-current={navAktiv(link, pathname) ? "page" : undefined}
+            className={`crm-nav-link ${navAktiv(link, pathname) ? "crm-nav-active" : ""}`}
+          >
+            <Symbol name={link.symbol} />
+            <span>{link.label}</span>
+          </Link>
+        ))}
+      </nav>
+    </div>
   );
 }

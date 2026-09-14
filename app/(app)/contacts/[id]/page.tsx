@@ -17,6 +17,7 @@ import type { ActivityType } from "@/lib/generated/prisma/enums";
 import StageBadge from "@/components/StageBadge";
 import NextStepBadge, { formatDue } from "@/components/NextStepBadge";
 import ContactActions from "@/components/ContactActions";
+import ZinsrechnerEinstieg from "@/components/zinsrechner/Einstieg";
 import QuickRowActions from "@/components/QuickRowActions";
 import DeleteContactButton from "@/components/DeleteContactButton";
 import KandidaturKarte from "@/components/KandidaturKarte";
@@ -229,6 +230,8 @@ export default async function ContactDetailPage({
           </details>
         </div>
       </section>
+
+      <ZinsrechnerEinstieg contactId={contact.id} userId={user.id} />
 
       {/* Aufbau-Trichter: nur fuer Kontakte auf der Recruiting-Liste, gut
           sichtbar direkt unter dem Verkaufs-Schritt, aber ohne ihn zu

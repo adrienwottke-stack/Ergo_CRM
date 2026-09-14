@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PersonLink from "@/components/PersonLink";
 import { letzteSchritte, naechsteSchritte } from "@/lib/einblick";
 import { ladeVereinbarungen } from "@/lib/vereinbarungen";
 import { ladeZiele } from "@/lib/ziele";
@@ -77,13 +78,13 @@ export default async function PartnerBegleitung({
             key={person.id}
             className="rounded-2xl border border-line bg-surface p-5"
           >
-            <Link
+            <PersonLink
               href={`/mannschaft/${person.id}`}
               className="inline-flex min-h-11 items-center text-xl font-semibold"
             >
               <GpName name={person.name} />{" "}
               <span className="ml-3 text-link">→</span>
-            </Link>
+            </PersonLink>
             <VorfuehrVerdeckt hinweis="Persönliche Begleitung wird beim Vorführen ausgeblendet.">
               <dl className="mt-2 space-y-2 text-sm">
                 <div>

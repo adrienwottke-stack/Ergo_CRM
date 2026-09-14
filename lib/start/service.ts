@@ -110,7 +110,7 @@ export async function beginCollection(db: DB, userId: string, kind: ListKind, fr
     const existing = fresh ? null : await tx.nameCollection.findFirst({ where: { userId, kind, completedAt: null }, orderBy: { createdAt: "desc" } });
     const round = existing ?? await tx.nameCollection.create({ data: { userId, kind } });
     const state = await tx.startProgress.findUnique({ where: { userId } });
-    if (state && state.phase !== "INTRO" && state.phase !== "DONE") {
+    if (state && state.phase !== "INTRO" && state.phase !== "DONE" && (state.version < 2 || state.phase === "COLLECTION")) {
       await update(tx, state, { phase: "COLLECTION", paused: false, kind, collectionId: round.id }, "collectionStarted");
     }
     return round;
@@ -186,7 +186,7 @@ export async function planCalls(db: DB, userId: string, kind: ListKind, ids: str
         nextStepType: "ANRUF", nextStepAt: new Date(at.getTime() + index * 15 * 60_000), nextStepNote: "Erster Anruf",
       } });
     }
-    return state && state.phase !== "DONE" && state.kind === kind ? update(tx, state, { phase: "DONE", paused: false, plannedAt: new Date() }, "callsPlanned") : state;
+    return state && state.phase !== "DONE" && state.kind === kind ? update(tx, state, { phase: state.version >= 2 ? "CALLS" : "DONE", paused: false, plannedAt: new Date() }, "callsPlanned") : state;
   });
 }
 
@@ -200,7 +200,7 @@ export async function moveCollection(db: DB, userId: string, id: string, target:
     for (const contact of contacts) await tx.contact.update({ where: { id: contact.id }, data: { listKinds: [...new Set([...contact.listKinds.filter(k => k !== round.kind), target])] } });
     await tx.nameCollection.update({ where: { id }, data: { kind: target, revision: { increment: 1 } } });
     const state = await tx.startProgress.findUnique({ where: { userId } });
-    if (state?.collectionId === id) await update(tx, state, { kind: target, phase: afterCollection(await counts(tx,userId,target)), paused: false }, "collectionMoved");
+    if (state?.collectionId === id) await update(tx, state, { kind: target, phase: afterCollection(await counts(tx,userId,target), state.version >= 2), paused: state.paused }, "collectionMoved");
   });
 }
 
@@ -230,7 +230,7 @@ export async function finishCollection(db: DB, userId: string, id: string) {
       await tx.nameCollection.update({ where: { id }, data: { completedAt: new Date(), revision: { increment: 1 } } });
       const state = await tx.startProgress.findUnique({ where: { userId } });
       if (state?.collectionId === id && state.phase === "COLLECTION") {
-        await update(tx, state, { phase: afterCollection(stand), paused: false, phoneSkipped: [] }, "collectionDone");
+        await update(tx, state, { phase: afterCollection(stand, state.version >= 2), paused: state.paused || state.version >= 2 && stand.names === 0, phoneSkipped: [], ...(state.version >= 2 && stand.names === 0 ? { collectionId: null } : {}) }, "collectionDone");
       }
     }
     return stand;
@@ -251,7 +251,7 @@ export async function resumeStart(db: DB, userId: string) {
     const state = await tx.startProgress.findUnique({ where: { userId } });
     if (!state || state.phase === "DONE") return state;
     let phase = state.phase;
-    if (state.kind && ["PHONES", "CALLS"].includes(phase)) {
+    if (state.version < 2 && state.kind && ["PHONES", "CALLS"].includes(phase)) {
       const stand = await counts(tx, userId, state.kind);
       phase = !stand.names ? "COLLECTION" : stand.callable ? "CALLS" : "PHONES";
     }

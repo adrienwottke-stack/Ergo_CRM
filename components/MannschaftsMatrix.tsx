@@ -1,4 +1,4 @@
-import Link from "next/link";
+import PersonLink from "@/components/PersonLink";
 import { RUECKBLICK_TAGE, type Mannschaftsperson } from "@/lib/fuehrung";
 import { formatEinheiten, type EinheitenAufteilung } from "@/lib/einheiten";
 import type { Ampel as AmpelWert } from "@/lib/signale";
@@ -176,7 +176,7 @@ export default function MannschaftsMatrix({
                         dem Link darin. */}
                     <span className="flex items-center gap-2">
                       <Ampel ampel={person.ampel} variante="punkt" />
-                      <Link
+                      <PersonLink
                         href={`/mannschaft/${person.id}`}
                         className="-my-2.5 flex min-h-11 items-center rounded py-2.5 transition hover:text-navy-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600"
                       >
@@ -186,7 +186,7 @@ export default function MannschaftsMatrix({
                             kurz kommt als kollisionssaubere Server-Map von
                             mannschaft/page.tsx durch. */}
                         <GpName name={person.name} kurz={kurz?.get(person.name)} />
-                      </Link>
+                      </PersonLink>
                     </span>
                   </td>
                   {/* Ein Platzhalter hat nie angerufen, nie einen Termin

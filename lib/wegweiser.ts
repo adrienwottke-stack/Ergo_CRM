@@ -35,6 +35,20 @@ export type WegweiserEintrag = {
 
 export const WEGWEISER: WegweiserEintrag[] = [
   {
+    id: "emil-hilfe",
+    titel: "Mit Emil den nächsten Schritt ansehen",
+    href: "/profil?emil=1",
+    bereich: "Hilfe",
+    synonyme: ["Emil", "Tutorial", "Einführung", "Rundgang", "Hilfe", "Wie geht es weiter"],
+  },
+  {
+    id: "zinsrechner",
+    titel: "Vermögensaufbau berechnen",
+    href: "/zinsrechner",
+    bereich: "Kundengespräch",
+    synonyme: ["Zinsrechner", "Zinseszins", "Zinseszinsrechner", "Sparplan", "Sparrate", "Investment", "Aktien", "Rendite", "Geld anlegen", "Vermögensaufbau", "Wunschziel", "Kunden beraten"],
+  },
+  {
     id: "teamziele",
     titel: "Gemeinsames Teamziel setzen",
     href: "/mannschaft/ziele",

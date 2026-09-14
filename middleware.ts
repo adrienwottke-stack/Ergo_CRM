@@ -66,6 +66,6 @@ export const config = {
   // Admin-Postfach dazu liegt unter /werkstatt/anfragen und damit hinterm
   // Login.
   matcher: [
-    "/((?!login|einladung|neues-passwort|start|offline|api/cron|kalender/feed|bericht|anfrage|manifest\\.webmanifest|sw\\.js|icon-|apple-touch-icon\\.png|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)",
+    "/((?!login|einladung|neues-passwort|start|offline|api/cron|kalender/feed|bericht|anfrage|emil/|manifest\\.webmanifest|sw\\.js|icon-|apple-touch-icon\\.png|_next/static|_next/image|favicon\\.ico|.*\\.svg$).*)",
   ],
 };

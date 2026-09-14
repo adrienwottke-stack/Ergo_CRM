@@ -87,9 +87,9 @@ try {
   await page.getByRole('button',{name:'Später fortsetzen',exact:true}).click();
   await page.waitForURL('**/heute');
   await page.goto(`${origin}/start`);await page.waitForURL('**/heute');
-  await page.getByRole('region',{name:'Dein nächster Startschritt'}).waitFor({state:'visible'});
-  assert.equal(await page.getByRole('region',{name:'Dein nächster Startschritt'}).count(),1);
-  await page.getByRole('button',{name:'Namen sammeln',exact:true}).click();
+  await page.getByRole('region',{name:'Namen sammeln',exact:true}).waitFor({state:'visible'});
+  assert.equal(await page.getByRole('region',{name:'Dein nächster Startschritt'}).count(),0);
+  await page.getByRole('region',{name:'Namen sammeln',exact:true}).getByRole('button',{name:'Jetzt Namen sammeln',exact:true}).click();
   await page.getByRole('heading',{name:'Enge Freunde',exact:true}).waitFor();
   await page.screenshot({path:new URL('collection-mobile.png',output).pathname.replace(/^\/([A-Z]:)/,'$1'),fullPage:true});
   await page.getByRole('button',{name:'Für heute fertig',exact:true}).click();

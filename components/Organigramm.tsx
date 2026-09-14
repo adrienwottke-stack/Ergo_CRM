@@ -12,12 +12,12 @@
 // Prisma nichts, und hier geht es um ein Baumlayout und zwei Gesten - das ist
 // weniger Code als die Einbindung waere.
 //
-// Die Kaesten sind echte <Link>-Elemente im DOM, nicht auf ein Canvas gemalt.
+// Die Kaesten sind echte <PersonLink>-Elemente im DOM, nicht auf ein Canvas gemalt.
 // Damit funktionieren Tab-Reihenfolge und Screenreader ohne Zusatzarbeit, und
 // die Seite traegt auch dann Inhalt, wenn die Gesten auf einem Geraet klemmen.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import PersonLink from "@/components/PersonLink";
 import { ampelFarben, ampelTexte, type Ampel } from "@/lib/signale";
 
 export type OrgaKnoten = {
@@ -279,16 +279,8 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
   const amZeigerRunter = (e: React.PointerEvent) => {
     const p = relativ(e);
     zeiger.current.set(e.pointerId, p);
-    // Das Einfangen ist eine Bequemlichkeit - es haelt den Zug am Leben, wenn
-    // der Finger die Flaeche verlaesst. Es darf aber nicht die Geste
-    // mitreissen, wenn der Browser es verweigert: ohne das Netz bricht der
-    // Handler hier ab, `zug` wird nie gesetzt, und das Schieben ist tot, ohne
-    // dass irgendwo etwas zu sehen waere.
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      // Weiter ohne Einfangen.
-    }
+    // Erst beim echten Ziehen einfangen. Sofortiges Einfangen auf dem Rahmen
+    // lenkt auch einen einfachen Link-Klick auf den Rahmen um.
 
     if (zeiger.current.size === 1) {
       gezogen.current = false;
@@ -304,6 +296,9 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
       };
       // Zwei Finger heissen immer Geste, nie Klick.
       gezogen.current = true;
+      for (const pointerId of zeiger.current.keys()) {
+        try { e.currentTarget.setPointerCapture(pointerId); } catch { /* Geste bleibt auch ohne Einfangen bedienbar. */ }
+      }
     }
   };
 
@@ -332,9 +327,13 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
     const dx = p.x - zug.current.start.x;
     const dy = p.y - zug.current.start.y;
     if (Math.hypot(dx, dy) > ZIEH_SCHWELLE) {
+      if (!gezogen.current) {
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* Weiter ohne Einfangen. */ }
+      }
       gezogen.current = true;
       selbstEingestellt.current = true;
     }
+    if (!gezogen.current) return;
     setSicht({ s: zug.current.sicht.s, x: zug.current.sicht.x + dx, y: zug.current.sicht.y + dy });
   };
 
@@ -354,6 +353,9 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
       onPointerMove={amZeigerBewegt}
       onPointerUp={amZeigerHoch}
       onPointerCancel={amZeigerHoch}
+      onPointerLeave={(event) => {
+        if (!event.currentTarget.hasPointerCapture(event.pointerId)) amZeigerHoch(event);
+      }}
       // Ohne touch-action scrollt das Handy die Seite, statt die Leinwand zu
       // schieben - und Kneifen zoomt den Browser statt des Baums.
       style={{ touchAction: "none" }}
@@ -411,7 +413,7 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
           }
 
           return (
-            <Link
+            <PersonLink
               key={k.id}
               href={`/mannschaft/${k.id}`}
               onClick={(e) => {
@@ -458,7 +460,7 @@ export default function Organigramm({ knoten }: { knoten: OrgaKnoten[] }) {
                   {k.ast}
                 </span>
               )}
-            </Link>
+            </PersonLink>
           );
         })}
       </div>

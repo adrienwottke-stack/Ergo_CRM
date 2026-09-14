@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import MiniEmil from "@/components/coach/MiniEmil";
+import { ladeCoach } from "@/lib/coach/server";
 import { Wordmark } from "@/components/Logo";
 import NavLinks from "@/components/NavLinks";
+import NamenSammelnLink from "@/components/NamenSammelnLink";
 import UndoBar from "@/components/UndoBar";
 import EinheitenNachAbschluss from "@/components/EinheitenNachAbschluss";
 import InstallationMelder from "@/components/InstallationMelder";
@@ -12,13 +16,14 @@ export function navigationFuer() {
   return HAUPTNAVIGATION;
 }
 
-export default function AppShell({
+export default async function AppShell({
   user,
   children,
 }: {
   user: User;
   children: React.ReactNode;
 }) {
+  const coach = await ladeCoach(user.id).catch(() => null);
   const initialen = user.name
     .trim()
     .split(/\s+/)
@@ -41,6 +46,7 @@ export default function AppShell({
             <Wordmark />
           </Link>
           <div className="flex items-center gap-2">
+            <NamenSammelnLink className="crm-collection-header" />
             <Link
               href="/suche"
               className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-ink-muted hover:bg-surface hover:text-ink"
@@ -80,6 +86,7 @@ export default function AppShell({
       <UndoBar />
       <EinheitenNachAbschluss />
       <InstallationMelder melden={user.installedAt === null} />
+      <Suspense fallback={null}><MiniEmil initial={coach} /></Suspense>
     </div>
   );
 }

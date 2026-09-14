@@ -134,6 +134,7 @@ export default function KontoAktionen({
       >
         <form action={benutzerLoeschen}>
           <input type="hidden" name="userId" value={userId} />
+          <input type="hidden" name="bestaetigung" value={name} />
 
           <p className="text-sm text-ink-muted">
             Das lässt sich nicht rückgängig machen.

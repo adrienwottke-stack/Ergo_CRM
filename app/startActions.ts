@@ -7,6 +7,7 @@ import { isListKind } from "@/lib/namelist";
 import { startRoute } from "@/lib/start/model";
 import * as start from "@/lib/start/service";
 import { startOptions } from "@/lib/start/settings";
+import { loadCoach } from "@/lib/coach/service";
 
 function refresh() { revalidatePath("/", "layout"); }
 
@@ -72,8 +73,18 @@ export async function startVertagen(done = false) {
 export async function startFortsetzen() {
   const user = await requireUser();
   const state = await start.resumeStart(prisma, user.id);
+  const coach = await loadCoach(prisma, user.id);
   refresh();
+  if (coach && coach.status !== "available") return coach.status === "active" ? coach.action.href : "/heute";
   return startRoute(state);
+}
+
+/** Opening the dialer is not a completed round in Mini-Emil. */
+export async function startAnrufBeginnen() {
+  const user = await requireUser();
+  const state = await prisma.startProgress.findUnique({ where: { userId: user.id } });
+  if (state && state.version < 2) await start.pauseStart(prisma, user.id, state.revision, true);
+  refresh();
 }
 
 export async function startZahlen(kind: string) {

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { getOpenUndo, undoLast } from "@/app/(app)/contacts/results";
 import { UNDO_WINDOW_SECONDS } from "@/lib/undo-window";
 import { UndoIcon } from "@/components/icons";
+import { emilArbeitGespeichert } from "@/lib/coach/events";
 
 const UNDO_EVENT = "crm:undo";
 
@@ -71,6 +72,7 @@ export default function UndoBar() {
       const data = new FormData();
       data.set("entryId", eintrag.id);
       await undoLast(data);
+      emilArbeitGespeichert();
       setEintrag(null);
       router.refresh();
     } finally {

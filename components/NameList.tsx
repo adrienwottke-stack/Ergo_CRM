@@ -275,27 +275,21 @@ export default function NameList({
                     : "Die offenen Namen sind bearbeitet. Sammle die nächsten Menschen, die du ansprechen möchtest."}
                 </p>
               </div>
-              <Link href={`/namen/sammeln?liste=${kind}`} className="crm-primary-action">
-                <SparkIcon className="h-5 w-5" />
-                Namen sammeln
-              </Link>
             </>
           ) : callable > 0 ? (
-            <Link href={`/namen/anrufen?liste=${kind}`} className="crm-primary-action">
-              <PhoneIcon className="h-5 w-5" />
-              <span>Anrufe starten <span className="ml-1 font-normal">· {callable}</span></span>
-            </Link>
+            <p className="text-base text-ink-muted">
+              {callable} {callable === 1 ? "Kontakt ist" : "Kontakte sind"} bereit für den Anruf.
+            </p>
           ) : (
-            <>
-              <p className="text-base text-ink-muted">Ergänze eine Nummer, dann kannst du mit dem ersten Anruf starten.</p>
-              <Link href={`/namen/nummern?liste=${kind}`} className="crm-primary-action">
-                <PhoneIcon className="h-5 w-5" />
-                Nummern ergänzen · {ohneNummer}
-              </Link>
-            </>
+            <p className="text-base text-ink-muted">Ergänze eine Nummer, dann kannst du mit dem ersten Anruf starten.</p>
           )}
 
-          <div className={`grid gap-2 ${callable > 0 && ohneNummer > 0 ? "sm:grid-cols-2" : ""}`}>
+          <Link href={`/namen/sammeln?liste=${kind}`} prefetch={false} className="crm-primary-action">
+            <SparkIcon className="h-5 w-5" />
+            Namen sammeln
+          </Link>
+
+          <div className={`grid gap-2 ${callable > 0 || ohneNummer > 0 ? "sm:grid-cols-2" : ""}`}>
             <button
               type="button"
               onClick={() => setShowAdd((value) => !value)}
@@ -304,13 +298,17 @@ export default function NameList({
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-3 text-base font-medium text-ink"
             >
               {showAdd ? <XIcon className="h-5 w-5" /> : <PlusIcon className="h-5 w-5" />}
-              {showAdd ? "Eingabe schließen" : "Name hinzufügen"}
+              {showAdd ? "Eingabe schließen" : "Einzeln eintragen"}
             </button>
-            {callable > 0 && ohneNummer > 0 && (
-              <Link href={`/namen/nummern?liste=${kind}`} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-3 text-base font-medium text-ink">
-                Nummern ergänzen · {ohneNummer}
+            {callable > 0 ? (
+              <Link href={`/namen/anrufen?liste=${kind}`} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-3 text-base font-medium text-ink">
+                <PhoneIcon className="h-5 w-5" /> Anrufe starten · {callable}
               </Link>
-            )}
+            ) : ohneNummer > 0 ? (
+              <Link href={`/namen/nummern?liste=${kind}`} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-3 text-base font-medium text-ink">
+                <PhoneIcon className="h-5 w-5" /> Nummern ergänzen · {ohneNummer}
+              </Link>
+            ) : null}
           </div>
 
           {showAdd && (
@@ -328,7 +326,7 @@ export default function NameList({
               <button type="submit" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-akzent px-4 py-3 text-base font-semibold text-white sm:w-auto">
                 <PlusIcon className="h-5 w-5" /> Name speichern
               </button>
-              <Link href={`/namen/sammeln?liste=${kind}`} className="flex min-h-11 items-center gap-2 text-sm font-medium text-navy-700">
+              <Link href={`/namen/sammeln?liste=${kind}`} prefetch={false} className="flex min-h-11 items-center gap-2 text-sm font-medium text-navy-700">
                 <SparkIcon className="h-4 w-4" /> Mehrere Namen sammeln →
               </Link>
             </form>
@@ -336,8 +334,7 @@ export default function NameList({
           {hint && <p role="status" className="text-sm text-ink-muted">{hint}</p>}
           {nachfuellen && open.length > 0 && (
             <p className="text-sm leading-relaxed text-ink-muted">
-              Noch {open.length} {open.length === 1 ? "offener Name" : "offene Namen"}.{" "}
-              <Link href={`/namen/sammeln?liste=${kind}`} className="inline-flex min-h-11 items-center font-medium text-navy-700">Namen sammeln →</Link>
+              Noch {open.length} {open.length === 1 ? "offener Name" : "offene Namen"}. Fülle deine Liste regelmäßig mit neuen Menschen auf.
             </p>
           )}
         </section>
@@ -427,7 +424,7 @@ export default function NameList({
             </div>
             <div className="flex flex-wrap gap-2">
               {auswaehlbar.length > 1 && <button type="button" onClick={() => setAuswahl(new Set())} className="min-h-12 rounded-xl border border-line-strong px-4 py-3 text-sm font-medium text-ink">Mehrere Kontakte verschieben</button>}
-              <Link href={`/namen/sammeln?liste=${kind}`} className="inline-flex min-h-12 items-center gap-2 px-2 py-3 text-sm font-medium text-navy-700"><SparkIcon className="h-4 w-4" /> Namen sammeln</Link>
+              <Link href={`/namen/sammeln?liste=${kind}`} prefetch={false} className="inline-flex min-h-12 items-center gap-2 px-2 py-3 text-sm font-medium text-navy-700"><SparkIcon className="h-4 w-4" /> Namen sammeln</Link>
             </div>
           </div>
         </details>
@@ -485,13 +482,13 @@ function NameRow({ entry, ziel, auswaehlend, gewaehlt, onCycleRating, onToggle, 
     <li>
       <div className="flex min-h-20 items-start gap-3 px-4 py-3">
         <div className="min-w-0 flex-1">
-          {istEcht(entry.id) ? <Link href={`/contacts/${entry.id}`} className="inline-flex min-h-11 max-w-full items-center text-base font-semibold text-ink"><span className="truncate">{entry.name}</span></Link> : <p className="flex min-h-11 items-center text-base font-semibold text-ink">{entry.name}</p>}
+          {istEcht(entry.id) ? <Link href={`/contacts/${entry.id}`} className="flex min-h-11 max-w-full items-center text-base font-semibold text-ink"><span className="truncate">{entry.name}</span></Link> : <p className="flex min-h-11 items-center text-base font-semibold text-ink">{entry.name}</p>}
           {editingPhone ? (
             <input type="tel" aria-label={`Telefonnummer für ${entry.name}`} autoFocus defaultValue={entry.phone ?? ""} placeholder="Telefonnummer" enterKeyHint="done" onBlur={(event) => savePhone(event.currentTarget.value)} onKeyDown={(event) => {
               if (event.key === "Enter") { event.preventDefault(); savePhone(event.currentTarget.value); }
               if (event.key === "Escape") setEditingPhone(false);
-            }} className={`${input} max-w-sm`} />
-          ) : entry.phone ? <p className="truncate text-sm text-ink-muted">{entry.phone}</p> : (
+            }} className={`${input} mt-1 max-w-sm`} />
+          ) : entry.phone ? <p className="mt-1 truncate text-sm text-ink-muted">{entry.phone}</p> : (
             <button type="button" disabled={!istEcht(entry.id)} onClick={() => setEditingPhone(true)} className="inline-flex min-h-11 items-center text-sm font-medium text-navy-700 disabled:opacity-50">Nummer ergänzen</button>
           )}
           {entry.liegtTage !== null && <p className="mt-1 text-xs text-ink-muted">{liegtLabel(entry.liegtTage)} · Nächsten Schritt festlegen</p>}

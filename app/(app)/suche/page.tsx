@@ -29,11 +29,11 @@ export default async function SuchePage({
           take: 40,
         })
       : [],
-    schalter("wegweiser"),
+    schalter("wegweiser", "zinsrechner"),
   ]);
   const funktionen =
     q && flags.wegweiser
-      ? sucheImWegweiser(q, user.role === "ADMIN").slice(0, 8)
+      ? sucheImWegweiser(q, user.role === "ADMIN").filter((f) => f.id !== "zinsrechner" || flags.zinsrechner).slice(0, 8)
       : [];
   return (
     <div className={`${column} space-y-6`}>

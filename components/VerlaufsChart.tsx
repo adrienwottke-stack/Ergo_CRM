@@ -139,6 +139,9 @@ export default function VerlaufsChart({
   heute,
   monatStart,
   fussnote,
+  zahlen = "einheiten",
+  einheit = "Einheiten",
+  leerText = "Sobald du deine erste Zahl einträgst, wächst hier dein Verlauf.",
 }: {
   /** `einheitenStart` in Hundertsteln: der Stand vor der ersten Buchung. */
   sockel: number;
@@ -153,7 +156,11 @@ export default function VerlaufsChart({
    *  Kurve; ein Aufrufer mit anderem Sockel (z. B. eine ganze Struktur statt
    *  einer Person) gibt seinen eigenen mit. */
   fussnote?: string;
+  zahlen?: "einheiten" | "anzahl";
+  einheit?: string;
+  leerText?: string;
 }) {
+  const format = zahlen === "einheiten" ? formatEinheiten : (wert: number) => new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(wert);
   const [zeitraum, setZeitraum] = useState<Zeitraum>("monat");
   // Index in `punkte`, waehrend ein Finger oder Zeiger auf der Kurve liegt.
   const [gelesen, setGelesen] = useState<number | null>(null);
@@ -336,7 +343,7 @@ export default function VerlaufsChart({
       <div className={`${card} px-6 py-10 text-center`}>
         <p className="text-sm font-medium text-ink">Noch keine Kurve</p>
         <p className="mt-1 text-sm text-ink-muted">
-          Sobald du deine erste Zahl einträgst, wächst hier dein Verlauf.
+          {leerText}
         </p>
       </div>
     );
@@ -361,7 +368,7 @@ export default function VerlaufsChart({
       </div>
 
       <p className="mt-2 text-4xl font-semibold tracking-tight tabular-nums text-ink">
-        {formatEinheiten(angezeigterWert)}
+        {format(angezeigterWert)}
       </p>
       <p className="mt-1 text-13 font-medium text-ink-muted">
         <span
@@ -375,7 +382,7 @@ export default function VerlaufsChart({
           )}
         >
           {angezeigteVeraenderung > 0 ? "+" : ""}
-          {formatEinheiten(angezeigteVeraenderung)}
+          {format(angezeigteVeraenderung)}
         </span>{" "}
         {zeitraum === "gesamt" ? "seit dem Start" : `seit ${achseLinks}`}
       </p>
@@ -413,9 +420,9 @@ export default function VerlaufsChart({
           preserveAspectRatio="none"
           className="block h-40 w-full text-link sm:h-56"
           role="img"
-          aria-label={`Verlauf der Einheiten seit ${achseLinks}: von ${formatEinheiten(
+          aria-label={`Verlauf ${einheit} seit ${achseLinks}: von ${format(
             startwert
-          )} auf ${formatEinheiten(endwert)} Einheiten.`}
+          )} auf ${format(endwert)} ${einheit}.`}
         >
           <defs>
             {/* Die Fuellung erbt ihre Farbe ueber currentColor vom <svg> und
@@ -525,13 +532,13 @@ export default function VerlaufsChart({
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <div className="col-span-2 sm:col-span-1">
           <KennzahlKachel
-            wert={`${veraenderung > 0 ? "+" : ""}${formatEinheiten(veraenderung)}`}
+            wert={`${veraenderung > 0 ? "+" : ""}${format(veraenderung)}`}
             bezeichnung="im Zeitraum"
             ton={veraenderung > 0 ? "erfolg" : veraenderung < 0 ? "gefahr" : "neutral"}
           />
         </div>
-        <KennzahlKachel wert={formatEinheiten(proTag)} bezeichnung="je Tag" />
-        <KennzahlKachel wert={formatEinheiten(proWoche)} bezeichnung="je Woche" />
+        <KennzahlKachel wert={format(proTag)} bezeichnung="je Tag" />
+        <KennzahlKachel wert={format(proWoche)} bezeichnung="je Woche" />
       </div>
 
       <p className="mt-3 text-xs text-ink-muted">{fussnote ?? FUSSNOTE_STANDARD}</p>

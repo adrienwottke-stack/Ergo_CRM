@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { addName } from "@/app/(app)/namen/actions";
@@ -10,16 +10,17 @@ import { NAME_TARGET, andereListe, listKindListLabels } from "@/lib/namelist";
 import type { collectionView } from "@/lib/start/service";
 import { btnPrimary, btnSecondary, card, input } from "@/components/ui";
 import Fortschritt from "@/components/Fortschritt";
+import { emilArbeitGespeichert } from "@/lib/coach/events";
 
 type Round = Awaited<ReturnType<typeof collectionView>>;
 
-export default function NamenSammeln({ initial, userId, guided }: { initial: Round; userId: string; guided: boolean }) {
+export default function NamenSammeln({ initial, userId, guided, miniEmil = false }: { initial: Round; userId: string; guided: boolean; miniEmil?: boolean }) {
   const router = useRouter();
   const [round, setRound] = useState(initial);
   const [name, setName] = useState("");
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const busy = useRef(false);
   const operation = useRef<{ name: string; key: string; scene: string } | null>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -49,11 +50,12 @@ export default function NamenSammeln({ initial, userId, guided }: { initial: Rou
 
   function run(work: () => Promise<void>) {
     if (busy.current) return;
-    busy.current = true; setError(null);
-    startTransition(async () => {
+    // Only this write owns the lock; background guidance refreshes must not extend it.
+    busy.current = true; setPending(true); setError(null);
+    void (async () => {
       try { await work(); } catch (e) { setError(e instanceof Error ? e.message : "Speichern hat nicht geklappt. Bitte erneut versuchen."); }
-      finally { busy.current = false; }
-    });
+      finally { busy.current = false; setPending(false); }
+    })();
   }
 
   async function saveDraft() {
@@ -70,6 +72,7 @@ export default function NamenSammeln({ initial, userId, guided }: { initial: Rou
     setName(""); operation.current = null;
     try { localStorage.removeItem(draftKey); } catch { /* optional draft */ }
     setRound(await sammlungStand(round.id));
+    emilArbeitGespeichert();
     setHint(result.status === "already" ? `${result.name} steht schon auf deiner Liste.` : "Gespeichert. Du kannst direkt den nächsten Namen eingeben.");
     field.current?.focus();
   }
@@ -77,6 +80,7 @@ export default function NamenSammeln({ initial, userId, guided }: { initial: Rou
   async function finish() {
     await saveDraft(); await sammlungAbschliessen(round.id);
     setRound(await sammlungStand(round.id));
+    emilArbeitGespeichert();
   }
 
   const errors = error && <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900">{error}<button type="button" onClick={() => window.location.reload()} className="ml-2 min-h-11 underline">Stand neu laden</button>{name && <button type="button" disabled={pending} onClick={() => {changeName("");setError(null);}} className="ml-2 min-h-11 underline">Eingabe verwerfen</button>}</div>;
@@ -118,7 +122,7 @@ export default function NamenSammeln({ initial, userId, guided }: { initial: Rou
       <details className="text-sm text-ink-muted"><summary className="min-h-11 cursor-pointer">Mehr Gedächtnisstützen</summary><ul className="space-y-2">{scene.fragen.slice(1).map(q => <li key={q}>{q}</li>)}</ul></details>
       {round.operations.length === 0 && <p className="text-sm text-ink-muted">Name eingeben und auf Hinzufügen tippen. Telefonnummern kommen danach.</p>}
       <form onSubmit={e => { e.preventDefault(); run(saveDraft); }} className="flex flex-wrap gap-2">
-        <label className="min-w-0 flex-1"><span className="sr-only">Name</span><input ref={field} value={name} onChange={e => changeName(e.target.value)} disabled={pending} maxLength={120} autoFocus autoComplete="off" enterKeyHint="done" placeholder="Name" className={`${input} min-h-14 w-full text-base`} /></label>
+        <label className="min-w-0 flex-1"><span className="sr-only">Name</span><input ref={field} value={name} onChange={e => changeName(e.target.value)} disabled={pending} maxLength={120} autoFocus={!miniEmil} autoComplete="off" enterKeyHint="done" placeholder="Name" className={`${input} min-h-14 w-full text-base`} /></label>
         <button type="submit" disabled={pending || !name.trim()} className={`${btnPrimary} min-h-14`}>{pending ? "Speichern …" : "Hinzufügen"}</button>
       </form>
       {hint && <p role="status" className="text-sm text-ink-muted">{hint}</p>}

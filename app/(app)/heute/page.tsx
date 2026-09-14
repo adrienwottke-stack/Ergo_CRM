@@ -44,7 +44,10 @@ import EinstiegsBegleitung from "@/components/EinstiegsBegleitung";
 import PartnerBegleitung from "@/components/PartnerBegleitung";
 import ErfolgeHeute from "@/components/ErfolgeHeute";
 import StartHinweis from "@/components/StartHinweis";
+import { ladeCoach } from "@/lib/coach/server";
+import NamenSammelnEinstieg from "@/components/NamenSammelnEinstieg";
 import Postfach from "@/components/Postfach";
+import ZinsrechnerEinstieg from "@/components/zinsrechner/Einstieg";
 import { card, column, pageTitle } from "@/components/ui";
 import { ArrowRightIcon, TrophyIcon } from "@/components/icons";
 
@@ -213,14 +216,17 @@ export default async function HeutePage({
   const spaeter = kontakte.filter((k) => !jetzt.includes(k));
   const naechster = jetzt.find((k) => k.nextStepType === "TERMIN") ?? jetzt[0];
   const liste = user.startTrack ? `?liste=${user.startTrack}` : "";
-  const activeStart =
+  const coach = await ladeCoach(user.id);
+  const activeStart = coach && coach.status !== "available" ? (coach.status === "on-demand" ? null : { phase: coach.phase }) :
     startKonfiguration.guidance &&
     user.role !== "ADMIN" &&
     startState?.phase !== "DONE"
       ? startState
       : null;
+  const sammlungFortsetzen = activeStart?.phase === "COLLECTION";
+  const startHinweis = sammlungFortsetzen ? null : activeStart;
   const startVorne =
-    activeStart && !fuehrung && !jetzt.length && !absprachen.length;
+    startHinweis && !fuehrung && !jetzt.length && !absprachen.length;
   const eigenerGriff = naechster
     ? {
         titel:
@@ -242,12 +248,7 @@ export default async function HeutePage({
             : `/contacts/${naechster.id}`,
       }
     : namen === 0
-      ? {
-          titel: "Alles beginnt mit einem Namen",
-          text: "Wen kennst du?",
-          label: "Namen sammeln",
-          href: `/namen/sammeln${liste}`,
-        }
+      ? null
       : ohneNummer === namen
         ? {
             titel: "Mach deine Namen erreichbar",
@@ -450,25 +451,29 @@ export default async function HeutePage({
             {arbeitslageTitel[arbeitslage]}
           </p>
         </header>
-        <VorfuehrVerdeckt hinweis="Deine persönliche nächste Handlung wird beim Vorführen ausgeblendet.">
-          {startVorne ? (
-            <StartHinweis phase={activeStart.phase} />
-          ) : (
-            <section className="space-y-3" aria-labelledby="naechste-handlung">
-              <p className="text-sm text-ink-muted">{hauptaktion.titel}</p>
-              <h2
-                id="naechste-handlung"
-                className="text-3xl font-semibold leading-tight tracking-tight"
-              >
-                {hauptaktion.text}
-              </h2>
-              <Link href={hauptaktion.href} className="crm-primary-action">
-                {hauptaktion.label}
-                <ArrowRightIcon className="h-5 w-5" />
-              </Link>
-            </section>
-          )}
-        </VorfuehrVerdeckt>
+        <NamenSammelnEinstieg fortsetzen={sammlungFortsetzen} />
+        {(startVorne || hauptaktion) && (
+          <VorfuehrVerdeckt hinweis="Deine persönliche nächste Handlung wird beim Vorführen ausgeblendet.">
+            {startVorne ? (
+              <StartHinweis phase={startHinweis.phase} coach={coach} />
+            ) : hauptaktion && (
+              <section className="space-y-3" aria-labelledby="naechste-handlung">
+                <p className="text-sm text-ink-muted">{hauptaktion.titel}</p>
+                <h2
+                  id="naechste-handlung"
+                  className="text-3xl font-semibold leading-tight tracking-tight"
+                >
+                  {hauptaktion.text}
+                </h2>
+                <Link href={hauptaktion.href} className="crm-primary-action">
+                  {hauptaktion.label}
+                  <ArrowRightIcon className="h-5 w-5" />
+                </Link>
+              </section>
+            )}
+          </VorfuehrVerdeckt>
+        )}
+        <ZinsrechnerEinstieg />
         <section className="space-y-3" aria-label="Dein Fortschritt">
           <h2 className="text-xl font-semibold">
             {fuehrung ? "Euer Fortschritt" : "Dein Fortschritt"}
@@ -526,7 +531,7 @@ export default async function HeutePage({
         </VorfuehrVerdeckt>
         {!fuehrung && (
           <VorfuehrVerdeckt hinweis="Deine persönliche Begleitung wird beim Vorführen ausgeblendet.">
-            <EinstiegsBegleitung userId={user.id} warum={user.whyLetter} />
+            {(!coach || coach.status === "available") && <EinstiegsBegleitung userId={user.id} warum={user.whyLetter} />}
             <WettbewerbHeute userId={user.id} />
             <ErsteWoche
               user={{
@@ -622,12 +627,12 @@ export default async function HeutePage({
               )}
             </details>
           )}
-          {activeStart && !startVorne && (
+          {startHinweis && !startVorne && (
             <details className={`${card} p-5`}>
               <summary className="min-h-11 cursor-pointer font-medium">
                 Deinen Einstieg fortsetzen
               </summary>
-              <StartHinweis phase={activeStart.phase} />
+              <StartHinweis phase={startHinweis.phase} coach={coach} />
             </details>
           )}
           {nachrichten.length > 0 && (

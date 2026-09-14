@@ -1,4 +1,4 @@
-import Link from "next/link";
+import PersonLink from "@/components/PersonLink";
 import PartnerZielstand from "@/components/ziele/PartnerZielstand";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -27,6 +27,11 @@ import KuemmereMich from "@/components/KuemmereMich";
 import { PhoneIcon } from "@/components/icons";
 import { card, kicker, pageTitle } from "@/components/ui";
 import PartnerVereinbarungen from "@/components/vereinbarungen/PartnerVereinbarungen";
+import PersonVerwalten from "@/components/PersonVerwalten";
+import PersonenVerlauf from "@/components/PersonenVerlauf";
+import { ladeStrukturperson } from "@/lib/struktur-verwaltung";
+import { ladePersonenverlauf } from "@/lib/personen-verlauf";
+import { KARRIERESTUFE_MIN, KARRIERESTUFE_MAX } from "@/lib/einheiten";
 
 export const dynamic = "force-dynamic";
 
@@ -183,7 +188,7 @@ function AstZeile({ person }: { person: Mannschaftsperson }) {
   const w = person.werte;
   return (
     <li>
-      <Link
+      <PersonLink
         href={`/mannschaft/${person.id}`}
         className="-mx-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg px-2 py-2 transition hover:bg-sunken"
       >
@@ -206,21 +211,37 @@ function AstZeile({ person }: { person: Mannschaftsperson }) {
           {w.anrufeWoche} Anrufe · {w.gehaltenWoche} gehalten ·{" "}
           {w.abschluesseMonat} Abschl.
         </span>
-      </Link>
+      </PersonLink>
     </li>
   );
 }
 
 export default async function PersonPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ geaendert?: string }>;
 }) {
   const { id } = await params;
+  const { geaendert } = await searchParams;
+  const meldung = geaendert === "bearbeiten" ? "Änderungen gespeichert." : geaendert === "austragen" ? "Person ausgetragen." : geaendert === "zurueckholen" ? "Person wieder aufgenommen." : null;
   const user = await requireUser();
   const kopfzeilen = await headers();
   const herkunft = `${kopfzeilen.get("x-forwarded-proto") ?? "http"}://${kopfzeilen.get("host") ?? ""}`;
-  const lage = await astLage(user, id);
+  const [lage, verwaltung, kurven] = await Promise.all([
+    astLage(user, id), ladeStrukturperson(user.id, id), ladePersonenverlauf(user.id, id),
+  ]);
+  const stufen = Array.from({ length: KARRIERESTUFE_MAX - KARRIERESTUFE_MIN + 1 }, (_, i) => i + KARRIERESTUFE_MIN);
+  if (verwaltung?.ausgetragen) return (
+    <div className="space-y-6">
+      <PersonLink href="/mannschaft/verwalten" className="inline-flex min-h-11 items-center text-sm font-medium text-navy-700">← Struktur verwalten</PersonLink>
+      <div><p className={kicker}>Ausgetragen</p><h1 className={pageTitle}>{verwaltung.name}</h1></div>
+      <PersonVerwalten person={verwaltung} stufen={stufen} />
+      {meldung && <p role="status" className="text-sm text-emerald-700">{meldung}</p>}
+      <section className={`${card} p-5`}><p className="text-sm text-ink-muted">Der Zugang ist gesperrt. Die Daten bleiben erhalten, die Person zählt in laufenden Auswertungen nicht mit. Du kannst sie hier bearbeiten, zurückholen oder endgültig löschen.</p></section>
+    </div>
+  );
   if (!lage) notFound();
 
   const { person, ast, direkte, summe, koepfe, wartende, offen, verdeckt } =
@@ -261,12 +282,12 @@ export default async function PersonPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link
+        <PersonLink
           href="/mannschaft"
           className="text-13 font-medium text-navy-700 hover:underline"
         >
           ← Mannschaft
-        </Link>
+        </PersonLink>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <Ampel ampel={person.ampel} variante="punkt" groesse="gross" />
           <h1 className={pageTitle}>{person.name}</h1>
@@ -292,6 +313,10 @@ export default async function PersonPage({
           {person.einblick.hinweis}
         </p>
       </div>
+
+      {verwaltung && <PersonVerwalten person={verwaltung} stufen={stufen} />}
+      {meldung && <p role="status" className="text-sm text-emerald-700">{meldung}</p>}
+      {kurven && (kurven.hatEigen || kurven.teamKoepfe > 0) && <PersonenVerlauf daten={kurven} name={person.vorname} />}
 
       {/* --- Zuletzt und als Naechstes ---------------------------------------
           Ganz oben, noch vor dem eigenen Schritt: das ist die Auskunft, wegen

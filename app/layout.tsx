@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./emil.css";
 import ServiceWorkerRegistrierung from "@/components/ServiceWorkerRegistrierung";
 
 // Chrome meldet die Installierbarkeit ueber "beforeinstallprompt" - und zwar

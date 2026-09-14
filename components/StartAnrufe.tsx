@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { startAnrufePlanen, startVertagen } from "@/app/startActions";
+import { startAnrufePlanen, startVertagen, startAnrufBeginnen } from "@/app/startActions";
 import type { ListKind } from "@/lib/generated/prisma/enums";
 import type { prepareCalls } from "@/lib/start/service";
 import { btnPrimary, btnSecondary, card, input } from "@/components/ui";
@@ -26,7 +26,7 @@ export default function StartAnrufe({ kind, initial, guided }: {
     <p className="text-slate-600">{plan.callable ? "Im Anrufdurchlauf siehst du einen Namen und den passenden Leitfaden. Du startest jeden Anruf selbst." : "Deine Namen sind gespeichert. Ergänze die Nummer einer Person, die du gut kennst."}</p>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-900">{error}</p>}
     {plan.callable ? <>
-      <button disabled={pending} className={`${btnPrimary} min-h-14 w-full`} onClick={()=>run(async()=>{if(guided) await startVertagen(true);router.push(`/namen/anrufen?liste=${kind}`);router.refresh();})}>Jetzt ersten Anruf vorbereiten</button>
+      <button disabled={pending} className={`${btnPrimary} min-h-14 w-full`} onClick={()=>run(async()=>{if(guided) await startAnrufBeginnen();router.push(`/namen/anrufen?liste=${kind}`);router.refresh();})}>Jetzt ersten Anruf vorbereiten</button>
       {plan.candidates.length ? <>
         <button disabled={pending} className={`${btnSecondary} min-h-12 w-full`} onClick={()=>setPlanning(!planning)}>Für später einplanen</button>
         {planning && <form className="space-y-4 border-t border-line pt-4" onSubmit={e=>{e.preventDefault();run(async()=>{await startAnrufePlanen(kind,plan.candidates.map(c=>c.id),at);router.push("/heute");router.refresh();});}}>

@@ -1,4 +1,7 @@
 import Link from "next/link";
+import CoachProfileEntry from "@/components/coach/CoachProfileEntry";
+import { ladeCoach } from "@/lib/coach/server";
+import PersonLink from "@/components/PersonLink";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logout } from "@/app/login/actions";
@@ -12,6 +15,7 @@ import { card, pageTitle, btnSecondary, columnNarrow } from "@/components/ui";
 
 export default async function ProfilPage() {
   const user = await requireUser();
+  const coach = await ladeCoach(user.id);
   const [aktiveDirekte, leader, admin] = await Promise.all([
     prisma.user.count({
       where: {
@@ -50,6 +54,7 @@ export default async function ProfilPage() {
         />
       </section>
       <div className="crm-list">
+        {coach && <CoachProfileEntry />}
         <Link href="/willkommen" className="crm-list-row">
           Einstieg ansehen <span className="ml-auto">›</span>
         </Link>
@@ -62,6 +67,9 @@ export default async function ProfilPage() {
         <Link href="/mannschaft" className="crm-list-row">
           Team und Einblick <span className="ml-auto">›</span>
         </Link>
+        <PersonLink href="/mannschaft/verwalten" className="crm-list-row">
+          Struktur verwalten <span className="ml-auto">›</span>
+        </PersonLink>
         <Link href="/konto/export" className="crm-list-row">
           Eigene Daten exportieren <span className="ml-auto">›</span>
         </Link>

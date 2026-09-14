@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { umhaengen } from "@/lib/struktur";
+import { speichereStrukturperson, strukturpersonAustragen, loescheStrukturperson, StrukturEingabeFehler } from "@/lib/struktur-verwaltung";
 import { ablaufDatum, neuerCode } from "@/lib/einladung";
 import { einladungZurueck } from "@/lib/einladung-ruecknahme";
 import { neuerResetCode, resetAblauf } from "@/lib/passwort";
@@ -71,55 +71,30 @@ export async function einladungBrowserFreigabe(formData: FormData) {
   redirect("/team");
 }
 
-// Prisma meldet einen verletzten Eindeutigkeits-Index als P2002.
-function isDuplicate(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { code?: string }).code === "P2002"
-  );
+async function verwaltungsAktion(arbeit: () => Promise<void>) {
+  try { await arbeit(); }
+  catch (error) {
+    if (error instanceof StrukturEingabeFehler) redirect("/team?error=struktur");
+    throw error;
+  }
+  revalidatePath("/", "layout");
 }
-
-const NAME_MAX = 60;
 
 // Der Name steht an zwei Stellen: User fuers Konto, Person fuer die
 // Rangliste (siehe app/login/actions.ts). Beide muessen gleichzeitig
 // korrigiert werden, sonst laufen Struktur und Rangliste auseinander -
 // Person.name ist ausserdem eindeutig, ein Zusammenstoss bricht sauber ab.
 export async function namenAendern(formData: FormData) {
-  await requireAdmin();
-  const userId = value(formData, "userId");
-  const name = value(formData, "name").slice(0, NAME_MAX);
-  if (!userId || !name) redirect("/team?error=invalid");
-
-  try {
-    await prisma.$transaction([
-      prisma.user.update({ where: { id: userId }, data: { name } }),
-      prisma.person.updateMany({ where: { userId }, data: { name } }),
-    ]);
-  } catch (fehler) {
-    if (isDuplicate(fehler)) redirect("/team?error=name_vergeben");
-    throw fehler;
-  }
-
-  revalidatePath("/team");
-  revalidatePath("/mannschaft");
-  revalidatePath("/leaderboard");
+  const admin = await requireAdmin();
+  await verwaltungsAktion(() => speichereStrukturperson(admin.id, value(formData, "userId"), { name: value(formData, "name") }));
   redirect("/team?umbenannt=1");
 }
 
 // Berater unter eine andere Fuehrungskraft haengen. Leere Auswahl macht ihn zur
 // eigenen Wurzel.
 export async function beraterUmhaengen(formData: FormData) {
-  await requireAdmin();
-  const userId = value(formData, "userId");
-  const leaderIdRaw = value(formData, "leaderId");
-  if (!userId) redirect("/team?error=invalid");
-
-  const fehler = await umhaengen(userId, leaderIdRaw || null);
-  if (fehler) redirect(`/team?error=${fehler}`);
-
-  revalidatePath("/team");
+  const admin = await requireAdmin();
+  await verwaltungsAktion(() => speichereStrukturperson(admin.id, value(formData, "userId"), { leaderId: value(formData, "leaderId") }));
   redirect("/team?moved=1");
 }
 
@@ -131,26 +106,8 @@ export async function beraterUmhaengen(formData: FormData) {
 // Auswertung mehr mit und kann sich nicht mehr anmelden.
 export async function benutzerAustragen(formData: FormData) {
   const admin = await requireAdmin();
-  const userId = value(formData, "userId");
   const wieder = value(formData, "wieder") === "1";
-  if (!userId) redirect("/team?error=invalid");
-  // Sich selbst austragen hiesse, sich selbst aus der Verwaltung aussperren.
-  if (userId === admin.id) redirect("/team?error=sich_selbst");
-
-  const { count } = await prisma.user.updateMany({
-    where: { id: userId },
-    data: { deactivatedAt: wieder ? null : new Date() },
-  });
-  if (count === 0) redirect("/team?error=unbekannt");
-
-  // Sitzungen sind signierte Cookies ohne Gegenstueck in der Datenbank - sie
-  // laufen von selbst ab. Was sofort greift: Push-Meldungen hoeren auf.
-  if (!wieder) {
-    await prisma.pushAbo.deleteMany({ where: { userId } });
-  }
-
-  revalidatePath("/team");
-  revalidatePath("/mannschaft");
+  await verwaltungsAktion(() => strukturpersonAustragen(admin.id, value(formData, "userId"), wieder));
   redirect(wieder ? "/team?zurueck=1" : "/team?ausgetragen=1");
 }
 
@@ -167,49 +124,7 @@ export async function benutzerAustragen(formData: FormData) {
 // eine Ebene hoch, mitsamt ihren eigenen Aesten.
 export async function benutzerLoeschen(formData: FormData) {
   const admin = await requireAdmin();
-  const userId = value(formData, "userId");
-  if (!userId) redirect("/team?error=invalid");
-  if (userId === admin.id) redirect("/team?error=sich_selbst");
-
-  const konto = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, leaderId: true },
-  });
-  if (!konto) redirect("/team?error=unbekannt");
-
-  // Erst umhaengen, dann loeschen. Bricht etwas dazwischen ab, steht der Baum
-  // trotzdem richtig - nur das Konto ist noch da.
-  const direkte = await prisma.user.findMany({
-    where: { leaderId: userId },
-    select: { id: true },
-  });
-  for (const kind of direkte) {
-    await umhaengen(kind.id, konto.leaderId);
-  }
-
-  await prisma.$transaction([
-    // Die Zustimmungen zur Auftragsverarbeitung sind unveraenderlich - ein
-    // Trigger blockt UPDATE und DELETE auch gegen den Eigentuemer der Tabelle.
-    // Dieser eine Weg meldet sich ausdruecklich dabei an, sonst liesse sich
-    // kein Konto mehr loeschen, sobald es einmal zugestimmt hat.
-    //
-    // set_config(..., true) gilt nur fuer DIESE Transaktion. Darum steht es
-    // als erstes Element IM Feld und nicht davor: ausserhalb der Transaktion
-    // waere die Einstellung ueber den Pooler wertlos.
-    prisma.$queryRaw`SELECT set_config('app.avv_loeschen_erlaubt', 'ja', true)`,
-    // Die privaten Kontakte gehen mit. Sie haetten sonst keinen Eigentuemer
-    // mehr und waeren in keiner Ansicht je wieder sichtbar - Daten, die nur
-    // noch Platz belegen.
-    prisma.contact.deleteMany({ where: { ownerId: userId } }),
-    // Das Ranglistenprofil mitsamt seinen Zaehlern. Ohne das bliebe ein Name
-    // in der Rangliste stehen, hinter dem kein Konto mehr steckt.
-    prisma.person.deleteMany({ where: { userId } }),
-    prisma.user.delete({ where: { id: userId } }),
-  ]);
-
-  revalidatePath("/team");
-  revalidatePath("/mannschaft");
-  revalidatePath("/leaderboard");
+  await verwaltungsAktion(() => loescheStrukturperson(admin.id, value(formData, "userId"), value(formData, "bestaetigung")));
   redirect("/team?geloescht=1");
 }
 

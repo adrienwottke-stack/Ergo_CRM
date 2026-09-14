@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PersonLink from "@/components/PersonLink";
 import Ampel from "@/components/Ampel";
 import GpName from "@/components/GpName";
 import Fortschritt from "@/components/Fortschritt";
@@ -90,7 +91,7 @@ export default function DirektenListe({
         <ul className="mt-3 space-y-1">
           {personen.map((person) => (
             <li key={person.id}>
-              <Link
+              <PersonLink
                 href={`/mannschaft/${person.id}`}
                 className="flex min-h-11 flex-col gap-1 rounded-xl px-2 py-2 transition hover:bg-sunken/60 sm:px-3"
               >
@@ -131,7 +132,7 @@ export default function DirektenListe({
                     <StufeZeile stufe={person.stufe} />
                   ) : null}
                 </div>
-              </Link>
+              </PersonLink>
             </li>
           ))}
         </ul>

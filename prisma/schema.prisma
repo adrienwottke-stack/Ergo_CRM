@@ -134,6 +134,9 @@ model StartProgress {
   phoneSkipped  String[]  @default([])
   plannedAt     DateTime?
   milestones    Json      @default("{}")
+  // Mini-Emil: explanations are separate from real work and survive devices.
+  coachSeen     String[]  @default([])
+  coachContactId String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -173,6 +176,7 @@ model NameOperation {
 }
 
 model Contact {
+  zinsSzenarien ZinsSzenario[]
   nameOperations NameOperation[]
   id             String          @id @default(cuid())
   name           String
@@ -285,6 +289,7 @@ model StageEvent {
 }
 
 model User {
+  zinsSzenarien                 ZinsSzenario[]
   startProgress                StartProgress?
   nameCollections              NameCollection[]
   nameOperations               NameOperation[]
@@ -328,10 +333,10 @@ model User {
   role      UserRole @default(MEMBER)
   createdAt DateTime @default(now())
 
-  // Die eigene Nummer, damit die Fuehrungskraft anrufen kann statt zu
-  // schreiben. Traegt IMMER der Mensch selbst ein - nie die Fuehrungskraft,
-  // nie Pflicht. Ohne Nummer fehlt der Anruf-Knopf kommentarlos; ein Hinweis
-  // "Nummer fehlt" waere eine Aufforderung an die Falsche.
+  // Die eigene, freiwillige Nummer für den Anruf durch die Führungskraft.
+  // Die Person selbst und Führungskräfte ihres aktuellen Astes können sie
+  // pflegen (docs/struktur-verwaltung-umsetzung.md). Ohne Nummer fehlt der
+  // Anruf-Knopf; die Nummer ist keine Voraussetzung für die Nutzung.
   phone String?
 
   // Erster Start vom Startbildschirm aus. NULL = arbeitet noch im Browser-Tab.
@@ -369,7 +374,7 @@ model User {
   // Die Zahl, in der der Betrieb rechnet - anders als die Taetigkeiten, die
   // das Werkzeug bisher zaehlt.
   //
-  // karrierestufe traegt der Mensch selbst ein, wie die Telefonnummer. NULL
+  // Karrierestufe pflegen die Person selbst oder ihre Führungskräfte. NULL
   // heisst "nicht eingetragen" und wird NIE auf 1 vorbelegt: eine geratene
   // Stufe stellt jemanden in die falsche Runde, und dort stuenden dann fremde
   // Zahlen neben seinem Namen.
@@ -1402,6 +1407,23 @@ model VereinbarungVersion {
   createdAt      DateTime            @default(now())
 
   @@unique([vereinbarungId, version])
+}
+
+// Private Berechnungen; optional an einen eigenen Kontakt gebunden.
+model ZinsSzenario {
+  id        String   @id
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  title     String
+  values    Json
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, updatedAt])
+  @@index([contactId])
 }
 
 // --- Anfrage von aussen -------------------------------------------------------

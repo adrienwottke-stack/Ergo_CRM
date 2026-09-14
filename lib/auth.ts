@@ -42,7 +42,7 @@ export async function hashPassword(
 export async function currentUser() {
   const store = await cookies();
   const userId = await sessionUserId(store.get(authCookieName)?.value);
-  return userId ? prisma.user.findUnique({ where: { id: userId } }) : null;
+  return userId ? prisma.user.findFirst({ where: { id: userId, deactivatedAt: null } }) : null;
 }
 
 // --- Der AVV-Riegel -----------------------------------------------------------

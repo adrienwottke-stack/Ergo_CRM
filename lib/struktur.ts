@@ -12,6 +12,15 @@
 // Siehe docs/struktur-plan.md, Abschnitt 2.
 
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/lib/generated/prisma/client";
+
+/** Strukturänderungen lesen und schreiben denselben Baum unter einer Sperre. */
+export async function strukturTransaktion<T>(arbeit: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`LOCK TABLE "User" IN SHARE ROW EXCLUSIVE MODE`;
+    return arbeit(tx);
+  }, { timeout: 15000 });
+}
 
 /** Pfad eines Kontos, das unter `leaderPath` haengt. Ohne Fuehrungskraft: Wurzel. */
 export function pfadUnter(leaderPath: string | null, userId: string): string {
@@ -86,16 +95,24 @@ export async function umhaengen(
   userId: string,
   neueLeaderId: string | null
 ): Promise<UmhaengenFehler> {
+  return strukturTransaktion((tx) => umhaengenInTransaktion(tx, userId, neueLeaderId));
+}
+
+export async function umhaengenInTransaktion(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  neueLeaderId: string | null,
+): Promise<UmhaengenFehler> {
   if (neueLeaderId === userId) return "sich_selbst";
 
-  const ich = await prisma.user.findUnique({
+  const ich = await tx.user.findUnique({
     where: { id: userId },
     select: { path: true, leaderId: true },
   });
   if (!ich) return "unbekannt";
 
   if (neueLeaderId) {
-    const leader = await prisma.user.findUnique({
+    const leader = await tx.user.findUnique({
       where: { id: neueLeaderId },
       select: { path: true },
     });
@@ -106,13 +123,13 @@ export async function umhaengen(
     // zweite Zug ist ein ganz gewoehnliches Umhaengen. Beide Zuege schreiben
     // jeweils ihren ganzen Ast mit.
     if (liegtImAst(leader.path, ich.path)) {
-      await verschieben(neueLeaderId, ich.leaderId);
-      await verschieben(userId, neueLeaderId);
+      await verschieben(tx, neueLeaderId, ich.leaderId);
+      await verschieben(tx, userId, neueLeaderId);
       return null;
     }
   }
 
-  await verschieben(userId, neueLeaderId);
+  await verschieben(tx, userId, neueLeaderId);
   return null;
 }
 
@@ -127,10 +144,11 @@ export async function umhaengen(
  * Praefix abschneiden, den neuen davorsetzen. Eine Anweisung fuer den ganzen Ast.
  */
 async function verschieben(
+  tx: Prisma.TransactionClient,
   userId: string,
   neueLeaderId: string | null
 ): Promise<void> {
-  const ich = await prisma.user.findUnique({
+  const ich = await tx.user.findUnique({
     where: { id: userId },
     select: { path: true },
   });
@@ -138,7 +156,7 @@ async function verschieben(
 
   let leaderPath: string | null = null;
   if (neueLeaderId) {
-    const leader = await prisma.user.findUnique({
+    const leader = await tx.user.findUnique({
       where: { id: neueLeaderId },
       select: { path: true },
     });
@@ -149,18 +167,17 @@ async function verschieben(
   const alt = ich.path;
   const neu = pfadUnter(leaderPath, userId);
   if (alt === neu) {
-    await prisma.user.update({
+    await tx.user.update({
       where: { id: userId },
       data: { leaderId: neueLeaderId },
     });
     return;
   }
 
-  await prisma.$transaction([
-    prisma.user.update({
+  await tx.user.update({
       where: { id: userId },
       data: { leaderId: neueLeaderId },
-    }),
+    });
     // Der Cast auf int ist Pflicht, nicht Kosmetik.
     //
     // Ohne ihn kommt die Startposition als text an, und Postgres waehlt dann
@@ -169,10 +186,9 @@ async function verschieben(
     // nichts, liefert NULL, und aus `neu || NULL` wird NULL. Ergebnis war ein
     // Verstoss gegen die NOT-NULL-Regel auf "path": das Umhaengen brach mit
     // einem 500er ab, und zwar lautlos fuer den Nutzer.
-    prisma.$executeRaw`
+    await tx.$executeRaw`
       UPDATE "User"
       SET "path" = ${neu} || substring("path", ${alt.length + 1}::int)
       WHERE "path" LIKE ${`${alt}%`}
-    `,
-  ]);
+    `;
 }

@@ -633,13 +633,22 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 /* Arbeitsansichten: feste, deckende Flächen und dieselben fünf Ziele. */
-.crm-main { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
-.crm-navigation { position: fixed; inset: auto 0 0; z-index: 30; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--color-line); background: var(--color-canvas); padding: .4rem .3rem calc(.4rem + env(safe-area-inset-bottom)); }
+/* Die Gesamthöhe umfasst Navigation, Sammelbutton und Safe Area. Auch die
+   Rückgängig- und Auswahlleisten halten genau diesen Bereich frei. */
+.crm-shell { --crm-collection-height: 0rem; --crm-dock-height: calc(4.4rem + 1px + var(--crm-collection-height) + env(safe-area-inset-bottom)); }
+.crm-shell:has(.crm-collection-mobile) { --crm-collection-height: 4.75rem; }
+.crm-main { padding-bottom: calc(var(--crm-dock-height) + 2rem); }
+.crm-dock { position: fixed; inset: auto 0 0; z-index: 30; border-top: 1px solid var(--color-line); background: var(--color-canvas); }
+.crm-collection-action { display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: 3.5rem; border-radius: 1rem; background: var(--color-akzent); padding: .75rem 1rem; font-size: 1rem; font-weight: 600; color: white; }
+.crm-collection-action:hover { background: var(--color-akzent-stark); }
+.crm-collection-mobile { margin: .75rem 1rem .5rem; }
+.crm-collection-header { display: none; }
+.crm-navigation { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: .4rem .3rem calc(.4rem + env(safe-area-inset-bottom)); }
 .crm-nav-link { min-height: 3.6rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; border-radius: .9rem; color: var(--color-ink-muted); font-size: .68rem; font-weight: 500; }
 .crm-nav-active { color: #82b3ff; background: var(--color-surface); }
 html:not(.dark) .crm-nav-active { color: #174dab; }
 .crm-nav-link:hover { background: var(--color-surface); }
-.crm-undo { bottom: calc(4.9rem + env(safe-area-inset-bottom)); }
+.crm-undo { bottom: calc(var(--crm-dock-height) + .5rem); }
 .crm-shell :where(a, button, input, select, textarea):focus-visible { outline: 2px solid #82b3ff; outline-offset: 3px; }
 .crm-list { overflow: hidden; border: 1px solid var(--color-line); border-radius: 1rem; background: var(--color-surface); }
 .crm-list > * + * { border-top: 1px solid var(--color-line); }
@@ -648,7 +657,10 @@ html:not(.dark) .crm-nav-active { color: #174dab; }
 .crm-primary-action { display: flex; align-items: center; justify-content: center; gap: .7rem; min-height: 3.5rem; border-radius: 1rem; background: var(--color-akzent); padding: 1rem 1.25rem; font-size: 1rem; font-weight: 600; color: white; }
 .crm-primary-action:hover { background: var(--color-akzent-stark); }
 @media (min-width: 768px) {
-  .crm-navigation { position: static; border-top: 0; display: flex; gap: .5rem; padding: 0 0 .65rem; }
+  .crm-dock { position: static; border-top: 0; }
+  .crm-collection-mobile { display: none; }
+  .crm-collection-header { display: flex; min-height: 2.75rem; border-radius: .75rem; font-size: .875rem; }
+  .crm-navigation { display: flex; gap: .5rem; padding: 0 0 .65rem; }
   .crm-nav-link { flex-direction: row; gap: .65rem; min-height: 2.9rem; padding: .6rem 1.25rem; font-size: .875rem; }
   .crm-nav-link svg { width: 1.25rem; height: 1.25rem; }
   .crm-main { padding-bottom: 3rem; }
@@ -657,4 +669,4 @@ html:not(.dark) .crm-nav-active { color: #174dab; }
 @media (max-width: 767px) {
   :where(.crm-shell, [role=dialog]) input:not([type=checkbox]):not([type=radio]), :where(.crm-shell, [role=dialog]) textarea, :where(.crm-shell, [role=dialog]) select { font-size: 16px; }
 }
-@media print { .crm-header, .crm-navigation, .crm-undo { display: none !important; } }
+@media print { .crm-header, .crm-dock, .crm-undo { display: none !important; } }

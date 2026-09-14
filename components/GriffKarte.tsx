@@ -12,6 +12,7 @@
 // nicht in dieses Bundle - der fertige Satz kommt als String-Prop herein.
 
 import Link from "next/link";
+import PersonLink from "@/components/PersonLink";
 import GpName from "@/components/GpName";
 import KuemmereMich from "@/components/KuemmereMich";
 import { useVorfuehren } from "@/components/VorfuehrProvider";
@@ -65,7 +66,7 @@ function GriffKartenZeile({ person, pulst }: { person: GriffPerson; pulst: boole
           bekommen eigens `relative z-10`, um darueber zu liegen und trotzdem
           eigenstaendig klickbar zu bleiben - kein verschachteltes <a> in
           <a>/<button>, alles Geschwister im DOM. */}
-      <Link
+      <PersonLink
         href={`/mannschaft/${person.id}`}
         className="absolute inset-0 rounded-2xl"
         aria-label={`${aktiv ? person.kurz : person.name} — zur Mannschaft`}

@@ -12,6 +12,9 @@ Gespeicherte Auswahl für die Gewichtung auf Heute: Eigenes Geschäft, Geschäft
 **Erste Runde**:
 Freiwillige, aus gespeicherter Arbeit abgeleitete Begleitung: Name, Telefonnummer, Anruf, vereinbarter Termin, gehaltenes Ergebnis, Empfehlungen und bei einem Abschluss gegebenenfalls Einheiten. Ohne Ablauf nach sieben Tagen.
 
+**Mini-Emil**:
+Persönlicher Begleiter durch die erste Runde. Er erklärt einen Arbeitsschritt mit einer kurzen Beispielvorschau, bevor das Mitglied selbst tätig wird. Angesehene Erklärungen sind keine erledigte Arbeit. Die Begleitung ist pausierbar und bleibt nach Abschluss auf Abruf erreichbar.
+
 **Persönliches Ziel**:
 Zählt ausschließlich die Leistung des Inhabers. Ein Vorschlag einer Führungskraft wird erst mit dessen Zustimmung aktiv. Ein gemeinsam vereinbartes persönliches Ziel ist kein Teamziel.
 
@@ -45,6 +48,19 @@ Eine Person und alles, was unter ihr hängt.
 
 **Führungskraft (FK)**:
 Keine Rolle, sondern eine Position: Wer Direkte unter sich hat, führt.
+
+**Person verwalten**:
+Führungskräfte bearbeiten Name, Telefonnummer, Karrierestufe, Eintrittsdatum und
+Zuordnung ihrer Nachfahren auf jeder Ebene. Austragen sperrt den Zugang und
+erhält Daten sowie Struktur; Zurückholen aktiviert wieder. Endgültiges Löschen
+entfernt die Kontodaten nach Bestätigung und lässt untergeordnete Teams zur
+bisherigen Führungskraft hochrücken. Die eigene Person, übergeordnete Personen,
+fremde Äste und Admin-Konten sind für Teamleiter über diesen Weg geschützt.
+
+**Persönlicher Verlauf**:
+Kumulierte Einheiten, Anrufe oder vereinbarte Termine einer Person. Der
+umschaltbare Teamverlauf zählt ausschließlich ihre aktiven Teammitglieder ohne
+ihre Eigenleistung. Dieselbe Kurvenoberfläche wie im Teamüberblick.
 
 **Platzhalter**:
 Ein angelegtes Konto ohne eigenen Zugang. Steht im Baum, zählt in keiner Summe und trägt keine Ampel.
