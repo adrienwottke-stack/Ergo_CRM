@@ -19,6 +19,7 @@ globalThis.prisma = db;
 after(async () => fixture.close());
 const { recordCallResult, recordAppointmentResult, recordAppointmentMissed } = await import('../app/(app)/contacts/results.ts');
 const { undoAusfuehren, offenerUndoEintrag } = await import('../lib/undo.ts');
+const { wiedervorlageVerschieben } = await import('../lib/followups.ts');
 const { bucheZugeordneteEinheiten } = await import('../lib/einheiten-erinnerung.ts');
 const { GET: coachGet, POST: coachPost } = await import('../app/api/emil/route.ts');
 
@@ -92,7 +93,15 @@ test('real call and appointment actions finish a no-deal round; undo reopens it'
   assert.notEqual((await db.startProgress.findUnique({ where: { userId: user.id } })).phase, 'DONE');
   await recordCallResult(form({ contactId: contact.id, result: 'appointment', appointmentAt: '2030-01-02T12:00' }));
   assert.equal((await loadCoach(db, user.id)).phase, 'APPOINTMENT');
-  await db.contact.update({ where: { id: contact.id }, data: { nextStepAt: new Date('2020-01-02'), appointmentAt: new Date('2020-01-02') } });
+  const appointmentFollowUp = await db.contactFollowUp.findFirstOrThrow({
+    where: { contactId: contact.id, ownerId: user.id, status: 'OPEN', isPrimary: true },
+  });
+  await wiedervorlageVerschieben(db, {
+    userId: user.id,
+    followUpId: appointmentFollowUp.id,
+    at: new Date('2020-01-02'),
+  });
+  await db.contact.update({ where: { id: contact.id }, data: { appointmentAt: new Date('2020-01-02') } });
   assert.equal((await loadCoach(db, user.id)).phase, 'RESULT');
   await recordAppointmentResult(form({ contactId: contact.id, result: 'kein_abschluss' }));
   assert.equal((await loadCoach(db, user.id)).status, 'on-demand');

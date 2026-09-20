@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
+import { AssistantContextEntry } from "@/components/ai-crm/AssistantEntry";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
@@ -32,6 +33,10 @@ import {
   PhoneIcon,
 } from "@/components/icons";
 import { btnSecondary, card, kicker, pageTitle, sectionTitle } from "@/components/ui";
+import {
+  followUpErledigen,
+  followUpVerschieben,
+} from "@/app/(app)/contacts/followupActions";
 
 const dateTimeFormat = new Intl.DateTimeFormat("de-DE", {
   dateStyle: "medium",
@@ -81,6 +86,10 @@ export default async function ContactDetailPage({
         select: { id: true, name: true, stage: true, outcome: true },
         orderBy: { createdAt: "desc" },
       },
+      followUps: {
+        where: { ownerId: user.id, status: "OPEN" },
+        orderBy: [{ at: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      },
     },
   });
 
@@ -121,6 +130,10 @@ export default async function ContactDetailPage({
   }
 
   const today = berlinToday();
+  const primaryFollowUp =
+    contact.followUps.find((followUp) => followUp.isPrimary) ??
+    contact.followUps[0] ??
+    null;
   const istOffen = contact.outcome === "OFFEN";
   // Ein geplatzter Termin bleibt in der Phase TERMIN_VEREINBART, verliert
   // aber appointmentAt und erhält einen Anrufschritt. Dann führt die nächste
@@ -168,7 +181,8 @@ export default async function ContactDetailPage({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <AssistantContextEntry context={{ contactId: contact.id, label: contact.name }} />
             <Link href={`/contacts/${contact.id}/edit`} className={btnSecondary}>
               Bearbeiten
             </Link>
@@ -187,16 +201,16 @@ export default async function ContactDetailPage({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className={kicker}>Nächster Schritt</p>
-            {contact.nextStepType && contact.nextStepAt ? (
+            {primaryFollowUp ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <NextStepBadge
-                  type={contact.nextStepType}
-                  at={contact.nextStepAt}
-                  state={dueState(contact.nextStepAt, today)}
-                  withTime={hasTimeOfDay(contact.nextStepAt)}
+                  type={primaryFollowUp.type}
+                  at={primaryFollowUp.at}
+                  state={dueState(primaryFollowUp.at, today)}
+                  withTime={hasTimeOfDay(primaryFollowUp.at)}
                 />
-                {contact.nextStepNote && (
-                  <span className="text-sm text-ink-muted">{contact.nextStepNote}</span>
+                {primaryFollowUp.note && (
+                  <span className="text-sm text-ink-muted">{primaryFollowUp.note}</span>
                 )}
               </div>
             ) : contact.outcome === "VERLOREN" ? (
@@ -219,6 +233,66 @@ export default async function ContactDetailPage({
             </p>
           </div>
         </div>
+        {contact.followUps.length > 0 && (
+          <div className="mt-5 border-t border-line pt-4">
+            <h3 className="text-sm font-semibold text-ink">
+              Offene Wiedervorlagen · {contact.followUps.length}
+            </h3>
+            <ol className="mt-3 space-y-2">
+              {contact.followUps.map((followUp, index) => (
+                <li
+                  key={followUp.id}
+                  className="rounded-xl border border-line bg-surface px-3 py-3"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <NextStepBadge
+                          type={followUp.type}
+                          at={followUp.at}
+                          state={dueState(followUp.at, today)}
+                          withTime={hasTimeOfDay(followUp.at)}
+                        />
+                        {index === 0 && (
+                          <span className="rounded-full bg-navy-50 px-2 py-1 text-[11px] font-semibold text-navy-700">
+                            Nächster Schritt
+                          </span>
+                        )}
+                      </div>
+                      {followUp.note && (
+                        <p className="mt-1 text-sm text-ink-muted">{followUp.note}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <details><summary className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center" aria-label="Weitere Aktionen zur Wiedervorlage">⋯</summary><AssistantContextEntry context={{ contactId: contact.id, label: contact.name, followUpId: followUp.id }} /></details>
+                      <form action={followUpVerschieben}>
+                        <input type="hidden" name="followUpId" value={followUp.id} />
+                        <input type="hidden" name="contactId" value={contact.id} />
+                        <input type="hidden" name="days" value="1" />
+                        <button
+                          type="submit"
+                          className="min-h-11 rounded-lg px-3 text-sm font-medium text-ink-muted hover:bg-sunken"
+                        >
+                          Morgen
+                        </button>
+                      </form>
+                      <form action={followUpErledigen}>
+                        <input type="hidden" name="followUpId" value={followUp.id} />
+                        <input type="hidden" name="contactId" value={contact.id} />
+                        <button
+                          type="submit"
+                          className="min-h-11 rounded-lg px-3 text-sm font-medium text-link hover:bg-navy-50"
+                        >
+                          Erledigt
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
         <div className="mt-4 border-t border-line pt-4">
           {(istTermin || istAnruf) && <div className="space-y-3">
             <p className="text-base font-semibold text-ink">{istTermin ? "Wie ist der Termin gelaufen?" : "Anrufergebnis festhalten"}</p>

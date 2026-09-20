@@ -20,6 +20,7 @@ import {
   type KandidaturKarteDaten,
 } from "@/lib/kandidatur";
 import type { KandidaturPhase } from "@/lib/generated/prisma/enums";
+import { wiedervorlageAnlegenInTransaktion } from "@/lib/followups";
 
 // Der Schalter aus der Werkstatt (lib/features.ts, Regel 1). Steht "aufbau"
 // auf AUS, bleibt der ganze Trichter inert: keine Kandidatur entsteht, keine
@@ -184,6 +185,14 @@ export async function zusageErteilen(
         nextStepAt: addDays(new Date(), 2),
         nextStepNote: "Nachfassen, ob installiert",
       },
+    });
+    await wiedervorlageAnlegenInTransaktion(tx, {
+      userId: user.id,
+      contactId: bestehende.contactId,
+      type: "NACHFASSEN",
+      at: addDays(new Date(), 2),
+      note: "Nachfassen, ob installiert",
+      source: "WORKFLOW",
     });
 
     if (bestehende.phase !== "ZUSAGE") {

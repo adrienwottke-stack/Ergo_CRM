@@ -23,6 +23,7 @@ import {
 } from "@/components/ui";
 import { ChevronRightIcon, XIcon } from "@/components/icons";
 import type { ListKind } from "@/lib/generated/prisma/enums";
+import { AssistantContextEntry } from "@/components/ai-crm/AssistantEntry";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ function Kopf({ unterzeile, zurueck }: { unterzeile: string; zurueck: string }) 
       <div>
         <h1 className={pageTitle}>Namen sammeln</h1>
         <p className="mt-1 text-sm text-ink-muted">{unterzeile}</p>
+        <AssistantContextEntry label="Assistent fragen" prompt="Hilf mir beim Namen sammeln." />
       </div>
       <Link
         href={zurueck}

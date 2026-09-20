@@ -26,6 +26,7 @@
 import { addDays, berlinToday, dayToUtcDate } from "@/lib/dates";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import type { ListKind } from "@/lib/generated/prisma/enums";
+import { wiedervorlageAnlegenInTransaktion } from "@/lib/followups";
 
 // Die Herkunft steht als Klartext in `Contact.source` und nicht nur an
 // `referredById`, weil sie ueberall mitgelesen wird, wo ohnehin schon die
@@ -131,11 +132,6 @@ export async function empfehlungenAnlegen(
         // Ausnahme ist die angekuendigte Empfehlung: da braucht der
         // Empfehlungsgeber einen Tag, um sich zu melden. Wer vorher anruft,
         // verschenkt genau den Vorteil, den die Ankuendigung bringt.
-        nextStepType: "ANRUF",
-        nextStepAt: entry.angekuendigt ? morgen : today,
-        nextStepNote: entry.angekuendigt
-          ? `Erstanruf – ist angekündigt von ${params.contactName}`
-          : "Erstanruf (Empfehlung)",
       },
     });
     await tx.stageEvent.create({
@@ -143,6 +139,16 @@ export async function empfehlungenAnlegen(
     });
     await tx.dailyLog.create({
       data: { personId: params.personId, type: "REFERRAL", count: 1, date: today },
+    });
+    await wiedervorlageAnlegenInTransaktion(tx, {
+      userId: params.userId,
+      contactId: created.id,
+      type: "ANRUF",
+      at: entry.angekuendigt ? morgen : today,
+      note: entry.angekuendigt
+        ? `Erstanruf – ist angekündigt von ${params.contactName}`
+        : "Erstanruf (Empfehlung)",
+      source: "WORKFLOW",
     });
   }
 
@@ -163,13 +169,13 @@ export async function empfehlungenAnlegen(
   });
 
   if (wurdeAngekuendigt) {
-    await tx.contact.updateMany({
-      where: { id: params.contactId, nextStepAt: null },
-      data: {
-        nextStepType: "NACHFASSEN",
-        nextStepAt: morgen,
-        nextStepNote: "Hat er den Empfohlenen Bescheid gesagt?",
-      },
+    await wiedervorlageAnlegenInTransaktion(tx, {
+      userId: params.userId,
+      contactId: params.contactId,
+      type: "NACHFASSEN",
+      at: morgen,
+      note: "Hat er den Empfohlenen Bescheid gesagt?",
+      source: "WORKFLOW",
     });
   }
 
@@ -212,14 +218,18 @@ export async function rueckmeldungAnEmpfehlungsgeber(
   });
   if (gestempelt.count === 0) return false;
 
-  const gesetzt = await tx.contact.updateMany({
-    where: { id: params.referredById, nextStepAt: null },
-    data: {
-      nextStepType: "NACHFASSEN",
-      nextStepAt: dayToUtcDate(berlinToday()),
-      nextStepNote: `Rückmeldung: aus seiner Empfehlung ${params.empfohlenerName} ist ${params.ereignis} geworden`,
-    },
+  const geber = await tx.contact.findFirst({
+    where: { id: params.referredById, ownerId: { not: null } },
+    select: { ownerId: true },
   });
-
-  return gesetzt.count > 0;
+  if (!geber?.ownerId) return false;
+  await wiedervorlageAnlegenInTransaktion(tx, {
+    userId: geber.ownerId,
+    contactId: params.referredById,
+    type: "NACHFASSEN",
+    at: dayToUtcDate(berlinToday()),
+    note: `Rückmeldung: aus seiner Empfehlung ${params.empfohlenerName} ist ${params.ereignis} geworden`,
+    source: "WORKFLOW",
+  });
+  return true;
 }

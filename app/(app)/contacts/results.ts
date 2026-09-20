@@ -31,6 +31,12 @@ import {
   sperreEigenenKontakt,
 } from "@/lib/pipeline-schreiben";
 import { ladeHauptziel } from "@/lib/ziele";
+import {
+  offeneWiedervorlagenAbbrechenInTransaktion,
+  wiedervorlageErledigen,
+  wiedervorlageVerschieben,
+  wiedervorlagenSynchronisieren,
+} from "@/lib/followups";
 
 export type CallResult =
   | "appointment"
@@ -150,11 +156,12 @@ export async function recordAppointmentResult(formData: FormData) {
               outcome: "VERLOREN",
               lostReason: "KEIN_BEDARF",
               lostAt: new Date(),
-              nextStepType: null,
-              nextStepAt: null,
-              nextStepNote: null,
               ...fortschrittJetzt(),
             },
+          });
+          await offeneWiedervorlagenAbbrechenInTransaktion(tx, {
+            userId: user.id,
+            contactId,
           });
           await tx.stageEvent.create({
             data: {
@@ -234,14 +241,31 @@ export async function recordAppointmentMissed(formData: FormData) {
       note.set("text", "Termin geplatzt");
       await createActivity(note);
 
-      await prisma.contact.update({
-        where: { id: contactId },
-        data: {
-          appointmentAt: null,
-          nextStepType: "ANRUF",
-          nextStepAt: addDays(dayToUtcDate(berlinToday()), 2),
-          nextStepNote: "Neuen Termin holen",
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.contact.update({
+          where: { id: contactId },
+          data: { appointmentAt: null },
+        });
+        const primary = await tx.contactFollowUp.findFirst({
+          where: {
+            contactId,
+            ownerId: user.id,
+            status: "OPEN",
+            isPrimary: true,
+          },
+          select: { id: true },
+        });
+        if (primary) {
+          await tx.contactFollowUp.update({
+            where: { id: primary.id },
+            data: {
+              type: "ANRUF",
+              at: addDays(dayToUtcDate(berlinToday()), 2),
+              note: "Neuen Termin holen",
+            },
+          });
+          await wiedervorlagenSynchronisieren(tx, user.id, contactId);
+        }
       });
     },
   );
@@ -294,11 +318,12 @@ export async function recordCallResult(formData: FormData) {
                 outcome: "VERLOREN",
                 lostReason: "KEIN_INTERESSE",
                 lostAt: new Date(),
-                nextStepType: null,
-                nextStepAt: null,
-                nextStepNote: null,
                 ...fortschrittJetzt(),
               },
+            });
+            await offeneWiedervorlagenAbbrechenInTransaktion(tx, {
+              userId: user.id,
+              contactId,
             });
             await tx.stageEvent.create({
               data: {
@@ -390,16 +415,26 @@ export async function snoozeStepQuick(formData: FormData) {
   await withUndo(
     { userId: user.id, personId: person.id, contactId, label },
     async () => {
+      const primary = await prisma.contactFollowUp.findFirst({
+        where: {
+          contactId,
+          ownerId: user.id,
+          status: "OPEN",
+          isPrimary: true,
+        },
+        select: { id: true },
+      });
+      if (!primary) throw new Error("Keine offene Wiedervorlage gefunden.");
+      await wiedervorlageVerschieben(prisma, {
+        userId: user.id,
+        followUpId: primary.id,
+        at: addDays(dayToUtcDate(berlinToday()), days),
+      });
       await prisma.contact.update({
         where: { id: contactId },
-        data: {
-          nextStepAt: addDays(dayToUtcDate(berlinToday()), days),
-          nextStepType: contact.nextStepType ?? "ANRUF",
-          // Wer verschiebt, hat sich gekuemmert - der Liegenbleiber-Alarm
-          // schweigt bis zur neuen Frist. Ohne das waere "auf morgen legen"
-          // ein Knopf, der die Meldung NICHT wegbekommt.
-          ...fortschrittJetzt(),
-        },
+        // Wer verschiebt, hat sich gekuemmert - der Liegenbleiber-Alarm
+        // schweigt bis zur neuen Frist.
+        data: fortschrittJetzt(),
       });
     },
   );
@@ -439,10 +474,21 @@ export async function completeStepQuick(formData: FormData) {
 
       // Ohne Folgeschritt bleibt der Kontakt in der Warnliste "ohne naechsten
       // Schritt" stehen – das ist gewollt und sichtbar, kein stiller Verlust.
-      await prisma.contact.update({
-        where: { id: contactId },
-        data: { nextStepType: null, nextStepAt: null, nextStepNote: null },
+      const primary = await prisma.contactFollowUp.findFirst({
+        where: {
+          contactId,
+          ownerId: user.id,
+          status: "OPEN",
+          isPrimary: true,
+        },
+        select: { id: true },
       });
+      if (primary) {
+        await wiedervorlageErledigen(prisma, {
+          userId: user.id,
+          followUpId: primary.id,
+        });
+      }
     },
   );
 

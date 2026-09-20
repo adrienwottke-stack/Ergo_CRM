@@ -4,6 +4,7 @@ import type { ListKind, ContactRating } from "@/lib/generated/prisma/enums";
 import { berlinToday, dayToUtcDate, berlinLocalToUtc, utcToBerlinLocalInput, shiftDay } from "@/lib/dates";
 import { STUETZEN } from "@/lib/gedaechtnisstuetzen";
 import { INTRO_ACTS, introSuccessor, afterCollection } from "@/lib/start/model";
+import { wiedervorlageAnlegenInTransaktion } from "@/lib/followups";
 
 type DB = PrismaClient;
 type TX = Prisma.TransactionClient;
@@ -160,7 +161,7 @@ export async function finishPhones(db: DB, userId: string, kind: ListKind) {
 export async function prepareCalls(db: DB, userId: string, kind: ListKind) {
   const stand = await counts(db, userId, kind);
   const candidates = await db.contact.findMany({
-    where: { ownerId: userId, listKinds: { has: kind }, phone: { not: null }, outcome: "OFFEN", stage: { in: ["NEU", "KONTAKTIERT"] }, nextStepType: null },
+    where: { ownerId: userId, listKinds: { has: kind }, phone: { not: null }, outcome: "OFFEN", stage: { in: ["NEU", "KONTAKTIERT"] }, followUps: { none: { status: "OPEN" } } },
     orderBy: [{ rating: "asc" }, { createdAt: "asc" }, { id: "asc" }], take: 3,
     select: { id: true, name: true, phone: true },
   });
@@ -182,9 +183,19 @@ export async function planCalls(db: DB, userId: string, kind: ListKind, ids: str
     if (candidates.length !== ids.length) throw new Error("Die Kontakte haben sich geändert. Bitte lade die Seite neu.");
     for (const [index, id] of ids.entries()) {
       // A concurrent manual appointment always wins. Never overwrite it.
-      await tx.contact.updateMany({ where: { id, ownerId: userId, nextStepType: null }, data: {
-        nextStepType: "ANRUF", nextStepAt: new Date(at.getTime() + index * 15 * 60_000), nextStepNote: "Erster Anruf",
-      } });
+      const open = await tx.contactFollowUp.count({
+        where: { contactId: id, ownerId: userId, status: "OPEN" },
+      });
+      if (open === 0) {
+        await wiedervorlageAnlegenInTransaktion(tx, {
+          userId,
+          contactId: id,
+          type: "ANRUF",
+          at: new Date(at.getTime() + index * 15 * 60_000),
+          note: "Erster Anruf",
+          source: "WORKFLOW",
+        });
+      }
     }
     return state && state.phase !== "DONE" && state.kind === kind ? update(tx, state, { phase: state.version >= 2 ? "CALLS" : "DONE", paused: false, plannedAt: new Date() }, "callsPlanned") : state;
   });

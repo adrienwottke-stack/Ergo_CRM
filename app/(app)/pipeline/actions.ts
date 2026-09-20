@@ -26,6 +26,13 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { fortschrittJetzt } from "@/lib/liegenbleiber";
 import { withUndo } from "@/lib/undo";
 import { phaseFolgeschritt as stepFromPlaybook, schreibeKontaktPhase, sperreEigenenKontakt } from "@/lib/pipeline-schreiben";
+import {
+  offeneWiedervorlagenAbbrechenInTransaktion,
+  primaereWiedervorlageErsetzenInTransaktion,
+  wiedervorlageAnlegenInTransaktion,
+  wiedervorlageErledigenInTransaktion,
+  wiedervorlageVerschiebenInTransaktion,
+} from "@/lib/followups";
 
 // --- gemeinsame Bausteine ---------------------------------------------------
 
@@ -72,14 +79,6 @@ function readNextStep(formData: FormData): StepInput | null {
     parseDue(text(formData, "nextStepDate"), text(formData, "nextStepTime")) ??
     dayToUtcDate(berlinToday());
   return { type: typeRaw, at, note: text(formData, "nextStepNote") };
-}
-
-function stepData(step: StepInput) {
-  return {
-    nextStepType: step.type,
-    nextStepAt: step.at,
-    nextStepNote: step.note,
-  };
 }
 
 async function recordStageEvent(
@@ -153,6 +152,15 @@ export async function completeContactStep(formData: FormData) {
   const step = readNextStep(formData) ?? EMPTY_STEP;
 
   await prisma.$transaction(async (tx) => {
+    const primary = await tx.contactFollowUp.findFirst({
+      where: {
+        contactId,
+        ownerId: user.id,
+        status: "OPEN",
+        isPrimary: true,
+      },
+      select: { id: true },
+    });
     const activity = await tx.activity.create({
       data: { contactId, type: activityType, text: note },
     });
@@ -167,9 +175,25 @@ export async function completeContactStep(formData: FormData) {
         },
       });
     }
+    if (primary) {
+      await wiedervorlageErledigenInTransaktion(tx, {
+        userId: user.id,
+        followUpId: primary.id,
+      });
+    }
+    if (step.type && step.at) {
+      await wiedervorlageAnlegenInTransaktion(tx, {
+        userId: user.id,
+        contactId,
+        type: step.type,
+        at: step.at,
+        note: step.note,
+        source: "WORKFLOW",
+      });
+    }
     await tx.contact.update({
       where: { id: contactId },
-      data: { ...stepData(step), ...fortschrittJetzt() },
+      data: fortschrittJetzt(),
     });
   });
 
@@ -184,16 +208,37 @@ export async function snoozeContactStep(formData: FormData) {
   const contact = await loadOwnContact(user.id, contactId);
 
   const base = dayToUtcDate(berlinToday());
-  await prisma.contact.update({
-    where: { id: contactId },
-    data: {
-      nextStepAt: addDays(base, days),
-      nextStepType: contact.nextStepType ?? "ANRUF",
-      // Bewusst vertagen IST eine Entscheidung, keine Versaeumnis. Ohne diese
-      // Zeile bliebe der Liegenbleiber-Alarm stehen, obwohl der Partner sich
-      // gerade gekuemmert hat - und genau daran schaltet man Meldungen ab.
-      ...fortschrittJetzt(),
-    },
+  await prisma.$transaction(async (tx) => {
+    const primary = await tx.contactFollowUp.findFirst({
+      where: {
+        contactId,
+        ownerId: user.id,
+        status: "OPEN",
+        isPrimary: true,
+      },
+      select: { id: true },
+    });
+    if (primary) {
+      await wiedervorlageVerschiebenInTransaktion(tx, {
+        userId: user.id,
+        followUpId: primary.id,
+        at: addDays(base, days),
+      });
+    } else {
+      await wiedervorlageAnlegenInTransaktion(tx, {
+        userId: user.id,
+        contactId,
+        type: contact.nextStepType ?? "ANRUF",
+        at: addDays(base, days),
+        note: contact.nextStepNote,
+        source: "WORKFLOW",
+      });
+    }
+    await tx.contact.update({
+      where: { id: contactId },
+      // Bewusst vertagen IST eine Entscheidung, keine Versaeumnis.
+      data: fortschrittJetzt(),
+    });
   });
 
   refreshPipelineViews(contactId);
@@ -233,11 +278,24 @@ export async function markContactLost(formData: FormData) {
         outcome: "VERLOREN",
         lostReason: reasonRaw,
         lostAt: new Date(),
-        ...stepData(step),
         // Raus ist auch eine Entscheidung.
         ...fortschrittJetzt(),
       },
     });
+    await offeneWiedervorlagenAbbrechenInTransaktion(tx, {
+      userId: user.id,
+      contactId,
+    });
+    if (step.type && step.at) {
+      await wiedervorlageAnlegenInTransaktion(tx, {
+        userId: user.id,
+        contactId,
+        type: step.type,
+        at: step.at,
+        note: step.note,
+        source: "WORKFLOW",
+      });
+    }
     await recordStageEvent(tx, {
       contactId,
       from: contact.stage,
@@ -256,16 +314,25 @@ export async function reopenContact(formData: FormData) {
   const contact = await loadOwnContact(user.id, contactId);
 
   const step = stepFromPlaybook(contact.stage, contact.appointmentAt);
-  await prisma.contact.update({
-    where: { id: contactId },
-    data: {
-      outcome: contact.stage === "ABSCHLUSS" ? "GEWONNEN" : "OFFEN",
-      lostReason: null,
-      lostAt: null,
-      ...stepData(step),
-      // Zurueckgeholt: die Uhr laeuft von hier an neu, nicht von damals.
-      ...fortschrittJetzt(),
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.contact.update({
+      where: { id: contactId },
+      data: {
+        outcome: contact.stage === "ABSCHLUSS" ? "GEWONNEN" : "OFFEN",
+        lostReason: null,
+        lostAt: null,
+        // Zurueckgeholt: die Uhr laeuft von hier an neu, nicht von damals.
+        ...fortschrittJetzt(),
+      },
+    });
+    await primaereWiedervorlageErsetzenInTransaktion(tx, {
+      userId: user.id,
+      contactId,
+      type: step.type,
+      at: step.at,
+      note: step.note,
+      source: "WORKFLOW",
+    });
   });
 
   refreshPipelineViews(contactId);

@@ -145,6 +145,22 @@ export default async function WerkstattPage() {
         </p>
       </div>
 
+      <Link
+        href="/werkstatt/ai"
+        className={cn(cardInteractive, "flex items-center gap-3 p-4")}
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-50 text-navy-600">
+          <BellIcon className="h-5 w-5" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-ink">AI CRM</span>
+          <span className="block text-13 text-ink-muted">
+            Beta, Abos und Nutzung pro Nutzer.
+          </span>
+        </span>
+        <span className="ml-auto text-sm font-medium text-link">Öffnen →</span>
+      </Link>
+
       {/* Der Rueckkanal daneben. Nutzung sagt, WAS keiner anfasst - die
           Rueckmeldung sagt, WARUM. Das eine ersetzt das andere nicht. */}
       <Link

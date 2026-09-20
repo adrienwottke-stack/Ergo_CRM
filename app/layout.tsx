@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./emil.css";
+import "./assistant.css";
+import AssistantProvider from "@/components/ai-crm/AssistantProvider";
+import VorfuehrProvider from "@/components/VorfuehrProvider";
 import ServiceWorkerRegistrierung from "@/components/ServiceWorkerRegistrierung";
 
 // Chrome meldet die Installierbarkeit ueber "beforeinstallprompt" - und zwar
@@ -70,7 +73,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${geistMono.variable} font-sans antialiased`}
       >
-        {children}
+        <VorfuehrProvider><AssistantProvider>{children}</AssistantProvider></VorfuehrProvider>
         <ServiceWorkerRegistrierung />
       </body>
     </html>

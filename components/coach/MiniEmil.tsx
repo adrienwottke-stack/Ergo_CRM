@@ -7,8 +7,10 @@ import { emilAktivieren, emilPausieren } from "@/app/emilActions";
 import { COACH_DEMOS } from "@/lib/coach/demos";
 import { DEMO_IDS, demoForPath, isCoachStepLocation, isDemoId, type CoachView, type DemoId } from "@/lib/coach/model";
 import CoachPreview from "@/components/coach/CoachPreview";
+import { useAssistant } from "@/components/ai-crm/AssistantProvider";
 
 export default function MiniEmil({ initial }: { initial: CoachView | null }) {
+  const assistant = useAssistant();
   const [view, setView] = useState(initial);
   const [open, setOpen] = useState<DemoId | null>(null);
   const [library, setLibrary] = useState(false);
@@ -82,12 +84,12 @@ export default function MiniEmil({ initial }: { initial: CoachView | null }) {
   }, [show]);
   useEffect(() => { if (params.get("emil") === "1") { setLibrary(true); setOpen(null); } }, [params]);
   useEffect(() => {
-    if (!view || suspended || open || library || view.status !== "active" && view.status !== "on-demand") return;
+    if (!view || assistant.visible || suspended || open || library || view.status !== "active" && view.status !== "on-demand") return;
     if (view.status === "on-demand" && view.demo !== "complete") return;
     if (!isCoachStepLocation(view, pathname) || view.seen.includes(view.demo) || introduced.current.has(view.demo)) return;
     const timer = setTimeout(() => show(view.demo), 600);
     return () => clearTimeout(timer);
-  }, [view, pathname, show, suspended, open, library]);
+  }, [view, pathname, show, suspended, open, library, assistant.visible]);
   useEffect(() => {
     const panel = root.current;
     if (!panel) return;
@@ -118,8 +120,8 @@ export default function MiniEmil({ initial }: { initial: CoachView | null }) {
   const demo = open ? COACH_DEMOS[open] : null;
   const pose = open === "complete" ? "bestaetigen" : open === "names" ? "begruessen" : "erklaeren";
   return <>
-    <div aria-hidden style={{ height: suspended ? 0 : height + 16 }} />
-    <aside ref={root} className={`emil-dock ${expanded ? "emil-expanded" : ""}`} hidden={suspended} aria-label="Mini-Emil Begleitung">
+    <div aria-hidden style={{ height: suspended || assistant.visible ? 0 : height + 16 }} />
+    <aside ref={root} className={`emil-dock ${expanded ? "emil-expanded" : ""}`} hidden={suspended || assistant.visible} aria-label="Mini-Emil Begleitung">
       {expanded ? <section className="emil-card" aria-label={library ? "Emil, hilf mir" : demo!.title}>
         <div className="emil-card-head">
           <div className={`emil-portrait emil-pose-${pose}`}><Image src={`/emil/${pose}-v1.png`} alt="" width={112} height={132} sizes="112px" /></div>
@@ -132,12 +134,13 @@ export default function MiniEmil({ initial }: { initial: CoachView | null }) {
             <div className="emil-library">{DEMO_IDS.filter(id => id !== "complete").map(id => <button type="button" key={id} onClick={() => show(id)}>{COACH_DEMOS[id].screen.split(" · ")[0]}<span aria-hidden>↗</span></button>)}</div>
           </> : <>
             <p className="emil-copy">{demo!.text}</p>
-            <CoachPreview key={open} demo={open!} suspended={suspended} />
+            <CoachPreview key={open} demo={open!} suspended={suspended || assistant.visible} />
             {open === view.demo && view.status !== "available" && <p className="emil-next" aria-live="polite">{view.message}</p>}
           </>}
           {error && <p role="alert" className="emil-error">{error}</p>}
         </div>
         <div className="emil-card-foot">
+          {demo && <button type="button" className="emil-secondary" onClick={() => { close(); assistant.open({ prompt: `Hilf mir bei diesem Arbeitsschritt: ${demo.title}` }); }}>Im Assistenten besprechen</button>}
           {view.status === "available" || view.status === "paused" ? <button className="emil-primary" disabled={busy} onClick={() => run(async () => { const next = await emilAktivieren(); setView(next); close(); if (next) router.push(next.waiting || next.status === "on-demand" ? "/heute" : next.action.href); })}>{view.status === "paused" ? "Begleitung fortsetzen" : "Mit Emil starten"}</button>
             : <button className="emil-primary" disabled={busy} onClick={() => { const href = open && open !== view.demo ? demoTarget(open, view) : view.action.href; close(); if (href !== `${pathname}${params.size ? `?${params}` : ""}`) router.push(href); }}>Jetzt selbst machen <span aria-hidden>↗</span></button>}
           <div className="emil-secondary-actions"><button type="button" onClick={() => { setLibrary(!library); setOpen(null); }}>{library ? "Einklappen" : "Andere Erklärung"}</button>{view.status === "active" && <button type="button" disabled={busy} onClick={() => run(async () => { setView(await emilPausieren()); close(); })}>Begleitung pausieren</button>}</div>

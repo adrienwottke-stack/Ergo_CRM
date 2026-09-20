@@ -49,6 +49,19 @@ enum NextStepType {
   SONSTIGES
 }
 
+enum FollowUpStatus {
+  OPEN
+  DONE
+  CANCELED
+}
+
+enum FollowUpSource {
+  WORKFLOW
+  MANUAL
+  AI
+  MIGRATION
+}
+
 enum ActivityType {
   CALL
   MEETING
@@ -118,27 +131,27 @@ enum ListKind {
 
 // Fortsetzungsstand: fachliche Checkpoints, getrennt von onboardingSteps (Messung).
 model StartProgress {
-  userId        String    @id
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  version       Int       @default(1)
-  revision      Int       @default(0)
-  phase         String    @default("INTRO")
-  paused        Boolean   @default(false)
-  kind          ListKind?
-  collectionId  String?
-  introAct      String    @default("chat")
-  answers       Json      @default("{}")
-  stornoChoices String[]  @default([])
-  stornoSkipped Boolean   @default(false)
-  sprintEndAt   DateTime?
-  phoneSkipped  String[]  @default([])
-  plannedAt     DateTime?
-  milestones    Json      @default("{}")
+  userId         String    @id
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version        Int       @default(1)
+  revision       Int       @default(0)
+  phase          String    @default("INTRO")
+  paused         Boolean   @default(false)
+  kind           ListKind?
+  collectionId   String?
+  introAct       String    @default("chat")
+  answers        Json      @default("{}")
+  stornoChoices  String[]  @default([])
+  stornoSkipped  Boolean   @default(false)
+  sprintEndAt    DateTime?
+  phoneSkipped   String[]  @default([])
+  plannedAt      DateTime?
+  milestones     Json      @default("{}")
   // Mini-Emil: explanations are separate from real work and survive devices.
-  coachSeen     String[]  @default([])
+  coachSeen      String[]  @default([])
   coachContactId String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model NameCollection {
@@ -176,7 +189,7 @@ model NameOperation {
 }
 
 model Contact {
-  zinsSzenarien ZinsSzenario[]
+  zinsSzenarien  ZinsSzenario[]
   nameOperations NameOperation[]
   id             String          @id @default(cuid())
   name           String
@@ -256,6 +269,7 @@ model Contact {
   stageEvents           StageEvent[]
   einheitenErinnerungen EinheitenErinnerung[]
   kandidaturen          Kandidatur[]
+  followUps             ContactFollowUp[]
 
   @@index([ownerId, updatedAt])
   @@index([ownerId, nextStepAt])
@@ -263,6 +277,34 @@ model Contact {
   @@index([ownerId, stage, outcome])
   @@index([ownerId, rating])
   @@index([referredById])
+}
+
+// Mehrere Erinnerungen duerfen parallel offen sein. Die frueheste offene
+// Wiedervorlage wird materialisiert und auf Contact.nextStep* gespiegelt,
+// solange die alten CRM-Lesepfade noch auf diesen Kompatibilitaetsfeldern
+// arbeiten.
+model ContactFollowUp {
+  id                   String         @id @default(cuid())
+  contactId            String
+  contact              Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  ownerId              String
+  owner                User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  type                 NextStepType
+  at                   DateTime
+  note                 String?
+  status               FollowUpStatus @default(OPEN)
+  source               FollowUpSource @default(MANUAL)
+  isPrimary            Boolean        @default(false)
+  completedAt          DateTime?
+  canceledAt           DateTime?
+  createdByAiRequestId String?
+  createdByAiRequest   AiRequest?      @relation(fields: [createdByAiRequestId], references: [id], onDelete: SetNull)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([ownerId, status, at])
+  @@index([contactId, status, at])
+  @@index([createdByAiRequestId])
 }
 
 // Phasenhistorie: Grundlage fuer die Kennzahlen der Schleife.
@@ -289,7 +331,7 @@ model StageEvent {
 }
 
 model User {
-  zinsSzenarien                 ZinsSzenario[]
+  zinsSzenarien                ZinsSzenario[]
   startProgress                StartProgress?
   nameCollections              NameCollection[]
   nameOperations               NameOperation[]
@@ -299,7 +341,7 @@ model User {
   eigeneZiele                  Ziel[]                @relation("ZielInhaber")
   erstellteZiele               Ziel[]                @relation("ZielErsteller")
   zielBeteiligungen            ZielBeteiligung[]
-  teamziele                   Teamziel[]            @relation("TeamzielWurzel")
+  teamziele                    Teamziel[]            @relation("TeamzielWurzel")
   verantworteteTeamziele       Teamziel[]            @relation("TeamzielVerantwortlich")
   hauptzielId                  String?
   hauptziel                    Ziel?                 @relation("Hauptziel", fields: [hauptzielId], references: [id], onDelete: SetNull)
@@ -435,6 +477,22 @@ model User {
   avvZustimmungen AvvAcceptance[]
   rueckmeldungen  Rueckmeldung[]
 
+  // --- AI CRM Add-on -------------------------------------------------------
+  // Beta ist eine ausdrueckliche Freischaltung. Bezahlter Zugang steht
+  // getrennt in AiSubscription, damit Stripe-Zustaende nicht ueber das
+  // Benutzerkonto verteilt werden.
+  aiBetaEnabled  Boolean         @default(false)
+  aiSubscription AiSubscription?
+  aiUsage        AiUsage[]
+  aiAuditEvents  AiAuditEvent[]
+  contactFollowUps ContactFollowUp[]
+  aiConversations  AiConversation[]
+  aiRequests       AiRequest[]
+  aiToolExecutions AiToolExecution[]
+  aiLiveSessions   AiLiveSession[]
+  spotifyConnection SpotifyConnection?
+  spotifyOAuthStates SpotifyOAuthState[]
+
   // --- Kalender (docs/struktur-plan.md, Abschnitt 7) -------------------------
   // Der Abo-Schluessel fuer den ICS-Feed. NULL = noch kein Abo erzeugt. Ein
   // undurchsichtiges Zufallswort und kein signiertes Kuerzel, weil es sich so
@@ -468,6 +526,221 @@ model User {
 
   @@index([leaderId])
   @@index([path])
+}
+
+// Der externe Billing-Zustand in der kleinsten Form, die fuer Entitlement,
+// Kuendigung zum Periodenende und idempotente Webhooks gebraucht wird.
+model AiSubscription {
+  userId            String    @id
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          String    @default("stripe")
+  customerId        String?   @unique
+  subscriptionId    String?   @unique
+  priceId           String?
+  status            String    @default("INACTIVE")
+  currentPeriodEnd  DateTime?
+  cancelAtPeriodEnd Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status, currentPeriodEnd])
+}
+
+// Rohmessung je Provider-Aufruf. Keine Prompts, Transkripte oder CRM-Dumps:
+// die Kostenanalyse braucht Mengen, nicht die personenbezogenen Inhalte.
+model AiUsage {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId           String
+  kind                String
+  provider            String   @default("openai")
+  model               String?
+  inputTokens         Int      @default(0)
+  outputTokens        Int      @default(0)
+  audioSeconds        Float    @default(0)
+  toolCalls           Int      @default(0)
+  estimatedCostMicros Int      @default(0)
+  durationMs          Int?
+  status              String   @default("STARTED")
+  errorCode           String?
+  createdAt           DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([requestId])
+}
+
+// Sieben Tage gueltiger Arbeitskontext. Das Ablaufdatum bleibt ab dem ersten
+// Satz fest und wird durch spaetere Nachrichten nicht verlaengert.
+model AiConversation {
+  id        String                  @id @default(cuid())
+  userId    String
+  user      User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  startedAt DateTime                @default(now())
+  expiresAt DateTime
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  messages  AiConversationMessage[]
+  requests  AiRequest[]
+  liveSessions AiLiveSession[]
+
+  @@index([userId, expiresAt, updatedAt])
+}
+
+// Kurzlebige Steuerdaten einer bewusst gestarteten Live-Sprachrunde. Audio,
+// Teiltranskripte, Prompts und Provider-Rohereignisse gehoeren absichtlich
+// nicht in dieses Modell. Sichtbare finale Sätze bleiben ausschliesslich in
+// der zugeordneten, nach sieben Tagen geloeschten Unterhaltung.
+model AiLiveSession {
+  id                 String          @id @default(cuid())
+  userId             String
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId     String?
+  conversation       AiConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  provider           String
+  status             String          @default("ACTIVE")
+  // Fuer eine aktive Session steht hier die userId. Ein UNIQUE-Index bildet
+  // die Multi-Tab-Sperre ab, bei terminalen Sessions ist der Wert NULL.
+  activeKey          String?         @unique
+  // Vom Browser erzeugte, inhaltsfreie UUID. Nur dieselbe Browserinstanz darf
+  // einen verlorenen Start-Request idempotent wiederholen; ein zweiter Tab
+  // bekommt keinen Zugriff auf die offene Runde.
+  clientSessionId    String
+  providerSessionRef String?
+  usageId            String?
+  startedAt          DateTime        @default(now())
+  lastHeartbeatAt    DateTime?
+  expiresAt          DateTime
+  endedAt            DateTime?
+  errorCode          String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([userId, status, expiresAt])
+  @@unique([userId, clientSessionId])
+  @@index([conversationId])
+}
+
+// Die Spotify-Verbindung gehoert immer genau einem CRM-Konto. Es gibt weder
+// ein gemeinsam genutztes Dienstkonto noch gespeicherte Geraete, Tracks oder
+// Zugangsdaten im Klartext: fuer spaetere Refreshes reicht das verschluesselte
+// Refresh-Token und der beim Consent erteilte Scope.
+model SpotifyConnection {
+  userId             String @id
+  user               User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenCipher String
+  scopes             String
+  lastErrorCode      String?
+  connectedAt        DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// Ein nur kurz gueltiger, gehashter OAuth-State bindet den Spotify-Rueckweg
+// an das angemeldete CRM-Konto. Der Klartext erscheint einzig in der
+// einmaligen Authorization-URL und wird weder in der Datenbank noch im Log
+// gespeichert.
+model SpotifyOAuthState {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stateHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model AiConversationMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  source         String?
+  content        String
+  actions        Json?
+  createdAt      DateTime       @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// Nutzerseitige Wiederholungen werden ueber clientRequestId dedupliziert. Die
+// Antwort ist nur solange wie der zugehoerige Kurzzeitkontext abrufbar.
+model AiRequest {
+  id               String            @id @default(cuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientRequestId  String
+  kind             String
+  inputHash        String
+  status           String            @default("IN_PROGRESS")
+  conversationId   String?
+  conversation     AiConversation?   @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  response         Json?
+  errorCode        String?
+  startedAt        DateTime          @default(now())
+  finishedAt       DateTime?
+  expiresAt        DateTime
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  toolExecutions   AiToolExecution[]
+  createdFollowUps ContactFollowUp[]
+
+  @@unique([userId, clientRequestId])
+  @@index([expiresAt])
+  @@index([conversationId])
+}
+
+model AiToolExecution {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId      String
+  request        AiRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  idempotencyKey String
+  tool           String
+  status         String    @default("IN_PROGRESS")
+  result         Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, idempotencyKey])
+  @@index([requestId])
+}
+
+// Nachvollziehbarkeit schreibender AI-Aktionen. Vorher/Nachher enthalten nur
+// die fuer Undo oder Diagnose noetigen Felder, nie komplette Datensaetze.
+model AiAuditEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId  String
+  sessionId  String?
+  action     String
+  entityType String?
+  entityId   String?
+  success    Boolean
+  before     Json?
+  after      Json?
+  errorCode  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([requestId])
+}
+
+// Stripe liefert dasselbe Ereignis erneut, bis es bestaetigt wurde. Der
+// Provider-Schluessel ist deshalb der Primaerschluessel und die Verarbeitung
+// kann sicher genau einmal beansprucht werden.
+model AiWebhookEvent {
+  providerEventId String    @id
+  type            String
+  status          String    @default("PROCESSING")
+  attempts        Int       @default(1)
+  lastAttemptAt   DateTime  @default(now())
+  lastErrorCode   String?
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
 }
 
 // Eine gemeldete Einheiten-Menge mit einem Datum daran (docs/einheiten-plan.md).
@@ -1311,21 +1584,21 @@ model Ziel {
 }
 
 model Teamziel {
-  id                String       @id @default(cuid())
-  wurzelId          String
-  wurzel            User         @relation("TeamzielWurzel", fields: [wurzelId], references: [id], onDelete: Cascade)
+  id               String       @id @default(cuid())
+  wurzelId         String
+  wurzel           User         @relation("TeamzielWurzel", fields: [wurzelId], references: [id], onDelete: Cascade)
   verantwortlichId String
   verantwortlich   User         @relation("TeamzielVerantwortlich", fields: [verantwortlichId], references: [id], onDelete: Cascade)
-  titel             String
-  wunsch            String?
-  kennzahl          ZielKennzahl
-  zeitraum          ZielZeitraum
-  start             DateTime
-  ende              DateTime
-  zielwert          Int
-  archiviertAt      DateTime?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  titel            String
+  wunsch           String?
+  kennzahl         ZielKennzahl
+  zeitraum         ZielZeitraum
+  start            DateTime
+  ende             DateTime
+  zielwert         Int
+  archiviertAt     DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@index([wurzelId, start, ende])
 }

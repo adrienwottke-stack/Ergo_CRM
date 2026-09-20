@@ -50,6 +50,11 @@ import Postfach from "@/components/Postfach";
 import ZinsrechnerEinstieg from "@/components/zinsrechner/Einstieg";
 import { card, column, pageTitle } from "@/components/ui";
 import { ArrowRightIcon, TrophyIcon } from "@/components/icons";
+import { AssistantTodayEntry } from "@/components/ai-crm/AssistantEntry";
+import {
+  followUpErledigen,
+  followUpVerschieben,
+} from "@/app/(app)/contacts/followupActions";
 
 export const dynamic = "force-dynamic";
 const datum = new Intl.DateTimeFormat("de-DE", {
@@ -104,8 +109,8 @@ export default async function HeutePage({
   const heute = berlinToday();
   const sicht = eigene(user.id);
   const [
-    kontakte,
-    ohneSchritt,
+    followUps,
+    ohneSchrittKontakte,
     namen,
     ohneNummer,
     aktiveDirekte,
@@ -118,26 +123,33 @@ export default async function HeutePage({
     einheitenGesamt,
     einheitenSchwelle,
   ] = await Promise.all([
-    prisma.contact.findMany({
+    prisma.contactFollowUp.findMany({
       where: {
-        ...sicht.kontakte,
-        outcome: { not: "VERLOREN" },
-        nextStepType: { not: null },
-        nextStepAt: { lt: addDays(dayToUtcDate(heute), 8) },
+        ownerId: user.id,
+        status: "OPEN",
+        at: { lt: addDays(dayToUtcDate(heute), 8) },
+        contact: {
+          ...sicht.kontakte,
+          outcome: { not: "VERLOREN" },
+        },
       },
-      orderBy: { nextStepAt: "asc" },
+      orderBy: [{ at: "asc" }, { createdAt: "asc" }, { id: "asc" }],
       include: {
-        activities: {
-          orderBy: { date: "desc" },
-          take: 1,
-          select: { text: true },
+        contact: {
+          include: {
+            activities: {
+              orderBy: { date: "desc" },
+              take: 1,
+              select: { text: true },
+            },
+          },
         },
       },
     }),
     prisma.contact.findMany({
       where: {
         ...sicht.kontakte,
-        nextStepType: null,
+        followUps: { none: { status: "OPEN" } },
         outcome: "OFFEN",
         stage: { not: "ABSCHLUSS" },
       },
@@ -196,6 +208,22 @@ export default async function HeutePage({
     eigenerGesamtstand(user.id, user.einheitenStart),
     schwelleFuer(user.karrierestufe),
   ]);
+  const kontakte = followUps.map((followUp) => ({
+    ...followUp.contact,
+    followUpId: followUp.id as string | null,
+    isPrimaryFollowUp: followUp.isPrimary,
+    nextStepType: followUp.type,
+    nextStepAt: followUp.at,
+    nextStepNote: followUp.note,
+  }));
+  const ohneSchritt = ohneSchrittKontakte.map((contact) => ({
+    ...contact,
+    followUpId: null as string | null,
+    isPrimaryFollowUp: false,
+    nextStepType: null,
+    nextStepAt: null,
+    nextStepNote: null,
+  }));
   const arbeitslage = arbeitslageFuer(user.arbeitsfokus, aktiveDirekte);
   const fuehrung = arbeitslage === "FUEHRUNG";
   const [lage, aufgaben, bericht] = await Promise.all([
@@ -290,7 +318,10 @@ export default async function HeutePage({
         }
       : eigenerGriff;
 
-  const lite = (k: (typeof kontakte)[number]): ContactLite => ({
+  type Arbeitskontakt =
+    | (typeof kontakte)[number]
+    | (typeof ohneSchritt)[number];
+  const lite = (k: Arbeitskontakt): ContactLite => ({
     id: k.id,
     name: k.name,
     phone: k.phone,
@@ -302,10 +333,10 @@ export default async function HeutePage({
     hasStep: k.nextStepType !== null,
     referralsAsked: k.referralsAskedAt !== null,
   });
-  const arbeitsliste = (liste: typeof kontakte) => (
+  const arbeitsliste = (liste: Arbeitskontakt[]) => (
     <ul className="crm-list">
       {liste.map((k) => (
-        <li key={k.id} className="p-4">
+        <li key={k.followUpId ?? k.id} className="p-4">
           <div className="flex items-start justify-between gap-3">
             <Link
               href={`/contacts/${k.id}`}
@@ -324,14 +355,48 @@ export default async function HeutePage({
               Zuletzt: {k.activities[0].text}
             </p>
           )}
-          <QuickRowActions
-            contact={lite(k)}
-            istAnruf={
-              k.nextStepType === "ANRUF" ||
-              (!k.nextStepType && ["NEU", "KONTAKTIERT"].includes(k.stage))
-            }
-            istTermin={k.nextStepType === "TERMIN"}
-          />
+          {k.followUpId && !k.isPrimaryFollowUp ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {k.phone && k.nextStepType === "ANRUF" && (
+                <a
+                  href={`tel:${k.phone.replace(/\s/g, "")}`}
+                  className="inline-flex min-h-11 items-center rounded-full bg-emerald-50 px-3 text-sm font-medium text-emerald-700"
+                >
+                  Anrufen
+                </a>
+              )}
+              <form action={followUpVerschieben}>
+                <input type="hidden" name="followUpId" value={k.followUpId} />
+                <input type="hidden" name="contactId" value={k.id} />
+                <input type="hidden" name="days" value="1" />
+                <button
+                  type="submit"
+                  className="min-h-11 rounded-full bg-sunken px-3 text-sm font-medium text-ink-muted"
+                >
+                  Morgen
+                </button>
+              </form>
+              <form action={followUpErledigen}>
+                <input type="hidden" name="followUpId" value={k.followUpId} />
+                <input type="hidden" name="contactId" value={k.id} />
+                <button
+                  type="submit"
+                  className="min-h-11 rounded-full bg-akzent px-3 text-sm font-medium text-white"
+                >
+                  Erledigt
+                </button>
+              </form>
+            </div>
+          ) : (
+            <QuickRowActions
+              contact={lite(k)}
+              istAnruf={
+                k.nextStepType === "ANRUF" ||
+                (!k.nextStepType && ["NEU", "KONTAKTIERT"].includes(k.stage))
+              }
+              istTermin={k.nextStepType === "TERMIN"}
+            />
+          )}
         </li>
       ))}
     </ul>
@@ -451,6 +516,7 @@ export default async function HeutePage({
             {arbeitslageTitel[arbeitslage]}
           </p>
         </header>
+        <AssistantTodayEntry />
         <NamenSammelnEinstieg fortsetzen={sammlungFortsetzen} />
         {(startVorne || hauptaktion) && (
           <VorfuehrVerdeckt hinweis="Deine persönliche nächste Handlung wird beim Vorführen ausgeblendet.">

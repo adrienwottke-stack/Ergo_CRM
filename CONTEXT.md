@@ -26,6 +26,47 @@ Persönlicher Sinn hinter dem Arbeitsziel. Einheiten werden daraus nicht in Verd
 
 ### Trichter
 
+**Wiedervorlage**:
+Ein einzelner offener Reminder an einem Kontakt. Ein Kontakt kann mehrere Wiedervorlagen gleichzeitig haben.
+
+**Nächster Schritt**:
+Die zeitlich früheste offene Wiedervorlage eines Kontakts. Er ist die hervorgehobene Aktion, ohne weitere Wiedervorlagen zu verdrängen.
+
+### AI CRM
+
+**Unterhaltung**:
+Der auf sieben Tage ab Gesprächsbeginn begrenzte Arbeitskontext zwischen einem Mitglied und seinem CRM-Assistenten. Sie ist kein dauerhaftes Wissen.
+
+**Wissensgedächtnis**:
+Ein künftiger, bewusst gepflegter Langzeitkontext mit nachvollziehbaren Quellen. Es ist von Unterhaltungen und normalen CRM-Daten getrennt.
+
+**Live-Session**:
+Eine bewusst durch einen Klick gestartete, kurzlebige Sprachrunde innerhalb
+einer Unterhaltung. Sie speichert nur inhaltsfreie Steuerdaten; Audio und
+unvollständige Transkripte bleiben nicht erhalten. Pro Nutzer darf genau eine
+aktive Browserrunde laufen.
+
+**Finaler Live-Turn**:
+Der erst nach sichtbarer Bestätigung vom Browser an den Server übergebene
+Nutzertext mit seiner finalen Assistentenantwort. Er wird wie ein normaler
+Gesprächsaustausch höchstens sieben Tage gespeichert und ist idempotent.
+
+**Music Provider**:
+Die serverseitige, nutzerbezogene Schnittstelle für einen ausdrücklich
+angeforderten Musikbefehl. Die lokale Simulation ist keine Wiedergabe. Der
+Spotify-Adapter kann entweder als isolierter lokaler Loopback-Test oder in
+expliziter Vercel-Production laufen; er steuert ausschließlich das Konto, das
+der angemeldete Nutzer selbst ausdrücklich verbunden hat.
+
+**Spotify-Verbindung**:
+Die personenbezogene, serverseitige Zustimmung eines Mitglieds zur Steuerung
+seines Spotify-Players. Sie enthält nur einen verschlüsselten Refresh-Token,
+erteilte Wiedergabe-Scopes und sichere Fehlercodes — keine Access-Tokens,
+Gerätenamen, Track-Historie oder Audiodaten. Eine Verbindung ist lokal nur bei
+expliziter `127.0.0.1`-Konfiguration und Loopback-Datenbank oder gehostet nur
+bei `VERCEL_ENV=production`, kanonischer HTTPS-Origin und Production-only-
+Secrets nutzbar; sie gehört nie zu einem anderen CRM-Konto.
+
 **Trichter**:
 Die vier Aktivitätsstufen Anrufe → Termine vereinbart → Termine gehalten → Abschlüsse, gezählt aus den eigenen Einträgen.
 

@@ -5,6 +5,7 @@ import { CONTACT_PLAYBOOK, playbookDueDate } from "@/lib/pipeline";
 import { rueckmeldungAnEmpfehlungsgeber } from "@/lib/empfehlungen";
 import { fortschrittJetzt } from "@/lib/liegenbleiber";
 import { registriereEinheitenAbschluss } from "@/lib/einheiten-erinnerung";
+import { primaereWiedervorlageErsetzenInTransaktion } from "@/lib/followups";
 
 export type KontaktSchritt = {
   type: NextStepType | null;
@@ -103,11 +104,16 @@ export async function schreibeKontaktPhase(
       ...(setsAppointmentPoint ? { appointmentLoggedAt: new Date() } : {}),
       ...(heldAppointmentPoint ? { appointmentHeldLoggedAt: new Date() } : {}),
       ...(wonPoint ? { wonLoggedAt: new Date() } : {}),
-      nextStepType: step.type,
-      nextStepAt: step.at,
-      nextStepNote: step.note,
       ...fortschrittJetzt(),
     },
+  });
+  await primaereWiedervorlageErsetzenInTransaktion(tx, {
+    userId,
+    contactId: aktuell.id,
+    type: step.type,
+    at: step.at,
+    note: step.note,
+    source: "WORKFLOW",
   });
   const ereignis = phaseGeaendert
     ? await tx.stageEvent.create({

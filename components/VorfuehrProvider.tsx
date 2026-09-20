@@ -21,15 +21,16 @@ const SPEICHER_SCHLUESSEL = "cockpit-vorfuehren";
 
 type VorfuehrKontext = { aktiv: boolean; umschalten: () => void };
 
-const Context = createContext<VorfuehrKontext>({ aktiv: false, umschalten: () => {} });
+const Context = createContext<VorfuehrKontext | null>(null);
 
 /** Ob gerade vorgefuehrt wird, und der Umschalter dafuer - fuer GpName und
  *  VorfuehrSchalter. Ausserhalb eines VorfuehrProvider bleibt `aktiv` false. */
 export function useVorfuehren(): VorfuehrKontext {
-  return useContext(Context);
+  return useContext(Context) ?? { aktiv: false, umschalten: () => {} };
 }
 
 export default function VorfuehrProvider({ children }: { children: ReactNode }) {
+  const inherited = useContext(Context);
   const [aktiv, setAktiv] = useState(false);
 
   useEffect(() => {
@@ -54,5 +55,5 @@ export default function VorfuehrProvider({ children }: { children: ReactNode }) 
     });
   };
 
-  return <Context.Provider value={{ aktiv, umschalten }}>{children}</Context.Provider>;
+  return inherited ? <>{children}</> : <Context.Provider value={{ aktiv, umschalten }}>{children}</Context.Provider>;
 }

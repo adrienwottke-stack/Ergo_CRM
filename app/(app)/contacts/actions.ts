@@ -15,7 +15,11 @@ import {
   dayToUtcDate,
 } from "@/lib/dates";
 import { fortschritt } from "@/lib/liegenbleiber";
-import type { ContactStage, NextStepType } from "@/lib/generated/prisma/enums";
+import type { ContactStage } from "@/lib/generated/prisma/enums";
+import {
+  primaereWiedervorlageErsetzenInTransaktion,
+  wiedervorlageAnlegenInTransaktion,
+} from "@/lib/followups";
 
 function optional(formData: FormData, field: string) {
   const value = (formData.get(field) as string | null)?.trim();
@@ -105,9 +109,6 @@ export async function createContact(formData: FormData) {
           formToken,
           ownerId: user.id,
           stage: "NEU",
-          nextStepType: entry.type,
-          nextStepAt: dayToUtcDate(berlinDayOf(playbookDueDate(entry, new Date()))),
-          nextStepNote: entry.note,
         },
       });
       await tx.stageEvent.create({
@@ -115,6 +116,14 @@ export async function createContact(formData: FormData) {
       });
       await tx.dailyLog.create({
         data: { personId: person.id, type: "NUMBERS_PULLED", count: 1, date },
+      });
+      await wiedervorlageAnlegenInTransaktion(tx, {
+        userId: user.id,
+        contactId: created.id,
+        type: entry.type,
+        at: dayToUtcDate(berlinDayOf(playbookDueDate(entry, new Date()))),
+        note: entry.note,
+        source: "WORKFLOW",
       });
       return created;
     });
@@ -262,9 +271,6 @@ export async function quickLogCall(formData: FormData) {
 
     const updateData: {
       stage?: ContactStage;
-      nextStepAt?: Date | null;
-      nextStepType?: NextStepType | null;
-      nextStepNote?: string | null;
       lastProgressAt?: Date;
       // Ein Anruf zaehlt immer als Fortschritt - auch wenn sonst nichts am
       // Kontakt umspringt, weil er schon KONTAKTIERT war und keine
@@ -282,9 +288,14 @@ export async function quickLogCall(formData: FormData) {
       });
     }
     if (followUpDays !== null && followUpDays > 0) {
-      updateData.nextStepAt = addDays(todayDate, followUpDays);
-      updateData.nextStepType = "ANRUF";
-      updateData.nextStepNote = "Wiedervorlage-Anruf";
+      await primaereWiedervorlageErsetzenInTransaktion(tx, {
+        userId: user.id,
+        contactId,
+        type: "ANRUF",
+        at: addDays(todayDate, followUpDays),
+        note: "Wiedervorlage-Anruf",
+        source: "WORKFLOW",
+      });
     }
 
     if (Object.keys(updateData).length > 0) {

@@ -9,6 +9,10 @@
     {
       "path": "/api/cron/kalender",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/ai-crm-retention",
+      "schedule": "30 3 * * *"
     }
   ]
 }

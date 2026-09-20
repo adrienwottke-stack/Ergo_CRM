@@ -11,6 +11,8 @@ import InstallationMelder from "@/components/InstallationMelder";
 import { HAUPTNAVIGATION } from "@/lib/navigation";
 import { shell, gutter } from "@/components/ui";
 import type { User } from "@/lib/generated/prisma/client";
+import AssistantEntry from "@/components/ai-crm/AssistantEntry";
+import AssistantSurface from "@/components/ai-crm/AssistantSurface";
 
 export function navigationFuer() {
   return HAUPTNAVIGATION;
@@ -47,8 +49,10 @@ export default async function AppShell({
           </Link>
           <div className="flex items-center gap-2">
             <NamenSammelnLink className="crm-collection-header" />
+            <AssistantEntry />
             <Link
               href="/suche"
+              aria-label="Suchen"
               className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-ink-muted hover:bg-surface hover:text-ink"
             >
               <svg
@@ -62,7 +66,7 @@ export default async function AppShell({
                 <circle cx="10.5" cy="10.5" r="6.5" />
                 <path d="m16 16 5 5" />
               </svg>
-              <span>Suchen</span>
+              <span className="assistant-search-label">Suchen</span>
             </Link>
             <Link
               href="/profil"
@@ -84,6 +88,7 @@ export default async function AppShell({
         {children}
       </main>
       <UndoBar />
+      <AssistantSurface userId={user.id} />
       <EinheitenNachAbschluss />
       <InstallationMelder melden={user.installedAt === null} />
       <Suspense fallback={null}><MiniEmil initial={coach} /></Suspense>
