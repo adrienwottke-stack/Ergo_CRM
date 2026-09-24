@@ -17,6 +17,18 @@ export class AiCrmError extends Error {
 const providerFailureMessages: Record<string, string> = {
   AI_PROVIDER_AUTH_FAILED:
     "Die Verbindung zu OpenAI ist für dieses Projekt nicht berechtigt. Prüfe den API-Zugang.",
+  AI_CREDIT_BALANCE_EXHAUSTED:
+    "Das API-Guthaben der OpenAI-Organisation ist aufgebraucht. Prüfe das OpenAI-Billing.",
+  AI_ORGANIZATION_SPEND_LIMIT_REACHED:
+    "Das Ausgabenlimit der OpenAI-Organisation ist erreicht. Prüfe die Organisationslimits.",
+  AI_PROJECT_SPEND_LIMIT_REACHED:
+    "Das Ausgabenlimit des OpenAI-Projekts ist erreicht. Prüfe die Projektlimits.",
+  AI_ORGANIZATION_USAGE_LIMIT_REACHED:
+    "Das von OpenAI zugewiesene Nutzungslimit der Organisation ist erreicht.",
+  AI_PROVIDER_SLOW_DOWN:
+    "OpenAI bremst den Anstieg der Anfragen gerade. Warte kurz und versuche es erneut.",
+  AI_PROVIDER_QUOTA_EXHAUSTED:
+    "OpenAI meldet eine ausgeschöpfte API-Quote. Prüfe Projektzuordnung, Billing und Limits.",
   AI_PROVIDER_RATE_LIMITED:
     "OpenAI ist für dieses Projekt gerade ausgelastet oder das Nutzungslimit ist erreicht. Bitte versuche es später erneut.",
   AI_MODEL_UNAVAILABLE:
