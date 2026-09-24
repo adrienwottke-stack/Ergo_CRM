@@ -10,6 +10,7 @@ process.env.AI_CRM_ENABLED = "true";
 process.env.AI_LIVE_PROVIDER = "live";
 process.env.JARVIS_DEMO_ENABLED = "true";
 let creates = 0, speeches = 0, backendCalls = 0;
+globalThis.jarvisVoiceEvents = [];
 globalThis.jarvisVoiceClient = {
   live: { create: async body => { creates++; globalThis.jarvisVoiceCreated = body; return { session: { id: `live_test_${creates}` }, transport: { type: "webrtc", sdp: "test-answer" } }; } },
   audio: { speech: { create: async body => { speeches++; globalThis.jarvisVoiceSpeechRequest = body; globalThis.jarvisVoiceSpoken = body.input; return new Response(new Uint8Array([1, 2, 3]), { headers: { "Content-Type": "audio/mpeg" } }); } } },
@@ -21,7 +22,7 @@ const modules = {
   "@/lib/ai-crm/openai": "export function openAiClient(){return globalThis.jarvisVoiceClient}",
   "@/lib/ai-crm/ux-agent": "export async function runUxCrmAgent(p){return globalThis.jarvisVoiceAgent(p)}",
   "next/cache": "export function revalidatePath(){}",
-  "openai/resources/live/sideband/ws": `export class SidebandWS { handlers={}; on(k,f){(this.handlers[k]??=[]).push(f)} close(){} send(event){globalThis.jarvisVoiceSent=event;queueMicrotask(()=>{
+  "openai/resources/live/sideband/ws": `export class SidebandWS { handlers={}; on(k,f){(this.handlers[k]??=[]).push(f)} close(){} send(event){globalThis.jarvisVoiceSent=event;globalThis.jarvisVoiceEvents.push(event);queueMicrotask(()=>{
     if(globalThis.jarvisVoiceRejectSideband){ for(const f of this.handlers.event??[])f({type:'error',client_event_id:event.event_id,error:{code:'invalid_request_error'}}); for(const f of this.handlers.error??[])f(new Error('rejected')); return; }
     if(globalThis.jarvisVoiceWrongAck){ for(const f of this.handlers.event??[])f({type:'session.input_audio.muted',client_event_id:event.event_id}); for(const f of this.handlers.error??[])f(new Error('no valid acknowledgement')); return; }
     for(const f of this.handlers.event??[])f({type:event.type==='session.close'?'session.closed':event.type==='session.instructions.append'?'session.instructions.appended':'session.commentary.appended',client_event_id:event.event_id})
@@ -50,6 +51,10 @@ test("Live uses actual SDK session configuration with browser instruction/tool e
   assert.equal(config.store, false);
   assert.deepEqual(config.client.data_channel.allowed_client_events, ["session.close", "session.input_audio.mute", "session.input_audio.unmute"]);
   assert.match(config.instructions, /sichtbare Bestätigung/);
+  assert.match(config.instructions, /Warte dafür nicht auf das Fachresultat/);
+  assert.match(config.instructions, /keine erfundenen Fortschritte/);
+  assert.match(config.instructions, /Hallo, Meister Emil/);
+  assert.deepEqual(liveSpeechChunks("Ein Ergebnis. Ein nächster Schritt."), ["Ein Ergebnis. Ein nächster Schritt."]);
   const speech = "Das ist eine längere belegte Vorbereitung. ".repeat(60);
   const chunks = liveSpeechChunks(speech);
   assert.equal(chunks.join(" "), speech.trim());
@@ -65,13 +70,13 @@ test("sideband errors emitted before typed errors and unrelated acknowledgments 
   finally { globalThis.jarvisVoiceWrongAck = false; }
 });
 
-test("authenticated session, exact greeting claim, manual replay and reconnect preserve logical intro", async () => {
+test("native greeting needs no user turn or TTS; claim, manual replay and reconnect preserve logical intro", async () => {
   const clientSessionId = randomUUID();
   const started = await start.POST(req({ clientSessionId, sdp: "v=0\r\na=test-session-offer\r\n" }));
   assert.equal(started.status, 200);
   const payload = await started.json();
   assert.equal(payload.mode, "live");
-  assert.equal(payload.config.greetingText, "Hallo, Meister Emil. Darf es etwas Musik sein?");
+  assert.equal(payload.config.greetingText, "Hallo, Meister Emil.");
   assert.equal(payload.session.introState, "WAITING");
   assert.equal(creates, 1);
   assert.equal(globalThis.jarvisVoiceCreated.session.store, false);
@@ -81,22 +86,64 @@ test("authenticated session, exact greeting claim, manual replay and reconnect p
   globalThis.jarvisVoiceUser = owner;
   const first = await intro.POST(req(), session);
   assert.equal(first.status, 200);
-  assert.equal(first.headers.get("content-type"), "audio/mpeg");
-  assert.equal(globalThis.jarvisVoiceSpoken, payload.config.greetingText);
+  assert.deepEqual(await first.json(), { introState: "DONE", accepted: true });
+  assert.equal(globalThis.jarvisVoiceSent.type, "session.instructions.append");
+  assert.equal(globalThis.jarvisVoiceSent.delegation_id, null);
+  assert.match(globalThis.jarvisVoiceSent.content, /Hallo, Meister Emil/);
+  assert.doesNotMatch(globalThis.jarvisVoiceSent.content, /Musik/);
   assert.equal(globalThis.jarvisVoiceCreated.session.audio.output.voice, "cedar");
-  assert.equal(globalThis.jarvisVoiceSpeechRequest.voice, globalThis.jarvisVoiceCreated.session.audio.output.voice, "intro and Live keep one voice");
-  assert.match(globalThis.jarvisVoiceSpeechRequest.instructions, /tiefer, männlich/);
   assert.match(globalThis.jarvisVoiceCreated.session.instructions, /dezent synthetische/);
-  assert.equal((await intro.POST(req(), session)).status, 409);
+  const delivered = globalThis.jarvisVoiceEvents.length;
+  assert.deepEqual(await (await intro.POST(req(), session)).json(), { introState: "DONE", accepted: false });
+  assert.equal(globalThis.jarvisVoiceEvents.length, delivered);
   assert.equal((await intro.POST(req({ replay: true }), session)).status, 200);
-  assert.equal(speeches, 1);
-  assert.equal((await intro.PATCH(req({ state: "OFFERED" }, "PATCH"), session)).status, 200);
+  assert.equal(globalThis.jarvisVoiceEvents.length, delivered + 1);
+  assert.equal(speeches, 0, "startup never calls the separate TTS provider");
+  assert.equal((await intro.PATCH(req({ state: "OFFERED" }, "PATCH"), session)).status, 400);
   assert.equal((await intro.PATCH(req({ state: "DONE" }, "PATCH"), session)).status, 200);
   const reconnected = await start.POST(req({ clientSessionId, sdp: "v=0\r\na=next-session-offer\r\n", reconnect: true }));
   assert.equal(reconnected.status, 200);
   assert.equal((await reconnected.json()).session.introState, "DONE");
-  assert.equal((await intro.POST(req(), session)).status, 409);
+  assert.match(globalThis.jarvisVoiceCreated.session.instructions, /Begrüße nicht erneut/);
+  assert.equal((await (await intro.POST(req(), session)).json()).accepted, false);
   await lifecycle.DELETE(req({}, "DELETE"), session);
+});
+
+test("uncertain greeting delivery stays claimed across reconnect and only an explicit retry can send again", async () => {
+  const clientSessionId = randomUUID();
+  const { session } = await (await start.POST(req({ clientSessionId, sdp: "v=0\r\na=uncertain-intro\r\n" }))).json();
+  const context = ctx(session.id);
+  globalThis.jarvisVoiceRejectSideband = true;
+  try { assert.equal((await intro.POST(req(), context)).status, 502); }
+  finally { globalThis.jarvisVoiceRejectSideband = false; }
+  assert.equal((await db.aiLiveSession.findUniqueOrThrow({ where: { id: session.id } })).introState, "PLAYING");
+  const sent = globalThis.jarvisVoiceEvents.length;
+  assert.equal((await intro.POST(req(), context)).status, 409);
+  assert.equal(globalThis.jarvisVoiceEvents.length, sent);
+  const reconnect = await start.POST(req({ clientSessionId, sdp: "v=0\r\na=reconnect-intro\r\n", reconnect: true }));
+  assert.equal((await reconnect.json()).session.introState, "PLAYING");
+  assert.match(globalThis.jarvisVoiceCreated.session.instructions, /Begrüße nicht erneut/);
+  assert.equal((await intro.POST(req({ replay: true }), context)).status, 200);
+  await lifecycle.DELETE(req({}, "DELETE"), context);
+});
+
+test("skip and concurrent startup requests cannot produce an automatic duplicate greeting", async () => {
+  const { session } = await (await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=claim-intro\r\n" }))).json();
+  const context = ctx(session.id), before = globalThis.jarvisVoiceEvents.length;
+  const responses = await Promise.all([intro.POST(req(), context), intro.POST(req(), context)]);
+  assert.ok(responses.some(response => response.status === 200));
+  assert.equal(globalThis.jarvisVoiceEvents.length, before + 1);
+  await lifecycle.DELETE(req({}, "DELETE"), context);
+  const next = await (await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=skip-intro-session\r\n" }))).json();
+  const nextContext = ctx(next.session.id);
+  await intro.PATCH(req({ state: "DONE" }, "PATCH"), nextContext);
+  const skipped = globalThis.jarvisVoiceEvents.length;
+  assert.equal((await (await intro.POST(req(), nextContext)).json()).accepted, false);
+  assert.equal(globalThis.jarvisVoiceEvents.length, skipped);
+  assert.equal((await lifecycle.PATCH(req({ revision: 1, interruptAudio: false }, "PATCH"), nextContext)).status, 200);
+  assert.equal((await db.aiLiveSession.findUniqueOrThrow({ where: { id: next.session.id } })).revision, 1);
+  assert.equal(globalThis.jarvisVoiceEvents.length, skipped, "native interruption must not send a second stop that clips the new backchannel");
+  await lifecycle.DELETE(req({}, "DELETE"), nextContext);
 });
 
 test("Live delegates to existing backend, persists sourced results, never replays speech or stale revision", async () => {

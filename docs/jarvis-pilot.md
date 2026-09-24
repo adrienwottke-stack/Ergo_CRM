@@ -1,6 +1,15 @@
 # Jarvis V1 – Führungspilot
 
-Stand: 24.09.2026. Erweiterung des bestehenden Cockpits, kein zweites CRM.
+Stand: 25.09.2026. Erweiterung des bestehenden Cockpits, kein zweites CRM.
+
+Aktueller Spracheinstieg: Jarvis begrüßt unmittelbar nach bestätigtem Start
+über GPT-Live mit dem angeforderten „Hallo, Meister Emil.“. Keine erste
+Nutzeraussage, separate TTS-Erzeugung oder Musikentscheidung erforderlich.
+Kurze natürliche Rückmeldungen sind im Prompt vorgesehen und bleiben während
+CRM-Abfragen hörbar. Die Sprechpausenfrist beträgt jetzt 900 statt 1400 ms.
+Die folgenden historischen Abnahmeangaben vom 24.09. bleiben als Verlauf
+erhalten; aktueller Sprachvertrag und Nachweisgrenzen stehen in
+[jarvis-voice-api.md](jarvis-voice-api.md).
 
 ## Bestand und Integrationsplan
 
@@ -18,7 +27,7 @@ Die lesenden Teilanalysen Sprache/KI, CRM/Rechte und Oberfläche/Audio/Betrieb w
 | Aufgaben und interne Termine | vorhanden, nicht in Jarvis | `LeadershipTask`, `Termin` | vorbereiten/ändern/erledigen/verknüpfen | Versionen, Idempotenz, keine Einladungen |
 | Sichtbare Freigaben | teilweise | `action-plans.ts`, `AssistantTimeline.tsx` | jede Aktion, Einzelauswahl, Bearbeitung, revisionsgebundene Freigabe | kein Schreiben vor Klick, veralteter Stand |
 | Tier-3-Runde | fehlend in Jarvis | `get_leadership_round` | eigene Beteiligungen mit direkten Führungskontakten | keine privaten Unterteamnotizen |
-| Exaktes Intro | fehlend | Live-Session/Intro-Route/Player | kontrollierter TTS-Clip, persistenter einmaliger Zustand | Once-/Reconnect-/Fehlertests |
+| Automatischer Einstieg | vorhanden | Live-Session/Intro-Route | native Live-Begrüßung nach Verbindung, persistenter einmaliger Zustand | Once-/Reconnect-/Fehlertests; hörbarer Wortlaut benötigt echte Abnahme |
 | Musik/Audiokoordination | Spotify teilweise vorhanden | `local-audio.ts`, geschützte Musikroute, `private-music.ts` | lokale Datei oder privater Blob, echte Playerzustände, Ducking | Player-/Rechtetests und echte MP3-Decodierung; siehe Musikbereitstellung unten |
 
 Abhängigkeiten: zentrale Verträge und additive Tabellen zuerst; danach Fachadapter und Sprach-/Playerpakete; gemeinsame Vorschauoberfläche; Integration, unabhängige Prüfung und Betriebshandoff. Baseline: `npm run test:ai` bestand vor den Änderungen mit 57/57 Tests.
@@ -63,8 +72,8 @@ Vorhandene Gates bleiben erforderlich: `AI_CRM_ENABLED=true`, Feature `aiCrm` ve
 | `AI_LIVE_PROVIDER=live` | neue echte GPT-Live-Anbindung; `mock` bleibt ausdrücklich Simulation, `disabled` deaktiviert |
 | `AI_LIVE_MODEL` | dokumentierte GPT-Live-Modellkennung; standardmäßig `gpt-live-1` |
 | `AI_LIVE_VOICE` | unterstützte KI-Stimme |
-| `AI_LIVE_SPEECH_MODEL` | TTS-Modell für exakt vorgegebenen Begrüßungstext |
-| `JARVIS_DEMO_ENABLED` | persönliches Intro bewusst aktivieren |
+| `AI_LIVE_SPEECH_MODEL` | ehemaliger TTS-Pfad; für den nativen Live-Einstieg nicht mehr verwendet |
+| `JARVIS_DEMO_ENABLED` | konfigurierte Vorführ-Anrede statt Profilvorname verwenden; Live begrüßt in beiden Fällen |
 | `JARVIS_GREETING_NAME` | im Vorführmodus `Meister Emil`; kein Rechtebezug |
 | `AI_LIVE_MUSIC_FILE` | absoluter Pfad einer vorhandenen, freigegebenen AC/DC-Datei auf dem Server des lokalen Piloten |
 | `AI_LIVE_MUSIC_TITLE` | sichtbarer Titel der tatsächlich konfigurierten Datei |
@@ -134,8 +143,8 @@ Ebenfalls offen bleiben echte Mikrofon-/Lautsprecher-/Kopfhörerabnahme, Audiofr
 Vorab: geeignete bereits existierende Vorführdaten, aktueller berechtigter Account, richtige direkte Partnerzuordnung, freigegebene Entwicklungsdatenbank mit Migration, API-Projektzugriff, HTTPS oder localhost, Mikrofonrechte, Audioausgang und erlaubte Musikdatei prüfen. Kopfhörer und Lautsprecher getrennt testen. Kein Konto oder Datensatz wird automatisch zur Demo angelegt.
 
 1. Im bestehenden CRM anmelden und Jarvis öffnen; bewusst „Jarvis starten“ wählen.
-2. „Jarvis?“ sagen. Bei aktiviertem Vorführmodus nach abgeschlossener Aussage den exakten Clip „Hallo, Meister Emil. Darf es etwas Musik sein?“ hören.
-3. „Ja, gerne.“ – erst tatsächliches Player-Playback zählt. Bei Browserblockade manuell starten; bei fehlender Datei ist dieser Schritt offen.
+2. Nach dem Start selbst noch nichts sagen: Jarvis soll von sich aus „Hallo, Meister Emil.“ sprechen. Danach direkt die erste Frage stellen und auf eine kurze Rückmeldung während der CRM-Abfrage achten.
+3. Bei gewünschter Musik ausdrücklich „Musik an“ sagen – erst tatsächliches Player-Playback zählt. Bei Browserblockade manuell starten; bei fehlender Datei ist dieser Schritt offen.
 4. „Etwas leiser. Was ist heute für mich offen?“ – Musikstatus und echte Quellen prüfen.
 5. Berechtigten vorhandenen Partner auswählen, 1:1 vorbereiten und „Ausführlicher. Was habe ich selbst zugesagt, und wo steht das?“ fragen.
 6. Quelle öffnen, Zeitpunkt/Autorzugriff prüfen, Leitfaden anfordern.

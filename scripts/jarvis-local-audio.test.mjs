@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { LocalAudioController, splitMusicCommand, musicOfferDecision, isSessionStop } from "../lib/ai-crm/local-audio.ts";
 import { LiveUtteranceBuffer, inputTranscriptDelta, sessionTiming, waitForIceGathering } from "../lib/ai-crm/live-audio-input.ts";
 import { liveTranscriptEvent } from "./fixtures/live-transcript.ts";
+import { isLiveSmallTalk } from "../lib/ai-crm/voice-style.ts";
 
 class AudioFixture {
   src = ""; volume = 1; currentTime = 0; paused = true; listeners = new Map(); calls = 0;
@@ -81,7 +82,7 @@ test("a transcript gap alone is not a speech completion; event retries deduplica
   const buffer = new LiveUtteranceBuffer(); const delta = inputTranscriptDelta(liveTranscriptEvent("Jarvis?", "one"));
   assert.ok(delta, "the real SDK transcript shape must reach the utterance buffer");
   buffer.append(delta, 1000); buffer.append(delta, 1000); assert.equal(buffer.preview(), "Jarvis?"); assert.equal(buffer.ready(50_000), false);
-  buffer.activity(1000); assert.equal(buffer.ready(2200), false); assert.equal(buffer.ready(2500), true);
+  buffer.activity(1000); assert.equal(buffer.ready(1800), false); assert.equal(buffer.ready(1900), true);
   assert.equal(buffer.take(), "Jarvis?"); assert.equal(buffer.ready(10_000), false);
 });
 
@@ -100,6 +101,20 @@ test("real Live delta fragments preserve spaces and trigger a completed spoken r
 test("non-transcript events and the old incorrect content-only fixture are rejected", () => {
   const valid = liveTranscriptEvent("Jarvis?");
   for (const invalid of [null, { ...valid, type: "session.output_transcript.delta" }, { ...valid, delta: undefined, content: "Jarvis?" }, { ...valid, delta: 12 }, { ...valid, event_id: null }, { ...valid, start_ms: -1 }, { ...valid, end_ms: -1 }]) assert.equal(inputTranscriptDelta(invalid), null);
+});
+
+test("short social replies stay in Live while greetings followed by CRM requests still reach the backend", () => {
+  for (const text of ["Hallo Jarvis!", "Danke.", "Wie geht es dir?"]) assert.equal(isLiveSmallTalk(text), true);
+  for (const text of ["Hallo Jarvis, was ist heute offen?", "Ja, erstelle einen Entwurf", "Danke, was habe ich zugesagt?", "Welche Aufgaben habe ich?", "Ja, gerne", "Nein", "Okay"]) assert.equal(isLiveSmallTalk(text), false, "context-dependent answers must still reach the backend");
+});
+
+test("shorter turn hold still waits for continuing speech and a stable final transcript", () => {
+  const buffer = new LiveUtteranceBuffer();
+  buffer.activity(1000); buffer.append({ eventId: "start", content: "Welche", startMs: 0, endMs: 300 }, 1000);
+  buffer.activity(1800); assert.equal(buffer.ready(2600), false);
+  buffer.append({ eventId: "end", content: " Aufgaben?", startMs: 300, endMs: 1100 }, 2600);
+  assert.equal(buffer.ready(2900), false); assert.equal(buffer.ready(3100), true);
+  assert.equal(buffer.take(), "Welche Aufgaben?");
 });
 
 test("noise cannot interrupt speech; recognized words interrupt once and reset for the next utterance", () => {

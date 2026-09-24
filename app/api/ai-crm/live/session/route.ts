@@ -84,7 +84,7 @@ export async function POST(request: Request) {
       retentionDays: config.conversationRetentionDays,
       maxMessages: config.conversationMaxMessages,
       maxSessionSeconds: config.liveMaxSessionSeconds,
-      introEnabled: config.liveDemoEnabled,
+      introEnabled: config.liveProvider === "live",
     });
     let session = started.session;
     if (!started.reused) {
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
       try {
         assertNotCancelled();
         if (started.reused && session.providerSessionRef) await sendProviderUpdate(session.providerSessionRef, "", { close: true });
-        const created = await createProviderSession({ sdp: parsed.data.sdp!, greetingPending: session.introState !== "DONE", profileName: user.name, config });
+        const created = await createProviderSession({ sdp: parsed.data.sdp!, greetingPending: session.introState === "WAITING", profileName: user.name, config });
         cleanup!.providerRef = created.session.id;
         assertNotCancelled();
         transport = created.transport;

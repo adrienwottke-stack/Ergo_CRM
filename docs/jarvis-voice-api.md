@@ -1,6 +1,6 @@
 # Jarvis V1 – Sprachprotokoll und Nachweisgrenzen
 
-Stand: 24.09.2026. Untersuchung und Umsetzung im vorhandenen Next.js-CRM;
+Stand: 25.09.2026. Untersuchung und Umsetzung im vorhandenen Next.js-CRM;
 keine Bestandsdaten geändert, keine Providerverbindung durch die Tests erzeugt.
 
 ## Verifizierter Bestand
@@ -36,9 +36,11 @@ bereitet lediglich eine Bestätigungsvorschau vor.
   Eingangs-/Ausgangstranskripte bestehen aus `delta`, `start_ms`, `end_ms`.
   Es gibt dabei kein `transcript.done` oder Realtime-`speech_started`.
   Audio, Transkript und Aufgaben müssen unabhängig erfasst werden.
-  Für exakten Wortlaut empfiehlt die Dokumentation einen gerenderten Clip
-  mit eigener Playbackkontrolle. Ein Append-Ack beweist keine erfolgte
-  oder wortgetreue Wiedergabe.
+  Für einen Einstieg ohne Nutzeraussage: nach `session.started` einmalig
+  `session.instructions.append` mit `delegation_id:null`, Mikrofontrack aktiv
+  lassen. Ein Append-Ack beweist keine erfolgte oder wortgetreue Wiedergabe.
+  Die Begrüßung erfolgt auf Nutzerwunsch direkt durch Live statt über einen
+  getrennten, wortgetreu gerenderten Clip.
 
 Die eingebauten SDK-Typen sind die zusätzliche compile-time Prüfung; keine
 aus älteren Realtime-Beispielen übernommenen Fantasieevents.
@@ -57,17 +59,21 @@ aus älteren Realtime-Beispielen übernommenen Fantasieevents.
   durch strikte Eingabevalidierung. Ergebnis enthält echte `results`,
   Bestätigungskarten, `requestId`, `revision` und `audioDelivered`.
 - `PATCH /api/ai-crm/live/session/:id`: `{}` als Heartbeat oder
-  `{revision:n}` zum Verwerfen veralteter laufender Antworten. Stale Ergebnisse
-  überschreiben keine aktuelle Vorschau und werden nicht vorgelesen.
+  `{revision:n}` zum Verwerfen veralteter laufender Antworten. Bei bereits
+  nativ erkannter Sprachunterbrechung verhindert `interruptAudio:false` einen
+  zusätzlichen verspäteten Stop-Befehl, der die neue Rückmeldung abschneiden
+  würde. Manuelles Unterbrechen sendet weiterhin den Stop-Befehl. Stale
+  Ergebnisse überschreiben keine aktuelle Vorschau und werden nicht vorgelesen.
 - `DELETE`: Session beenden und Provider über Sideband schließen.
-- `POST /api/ai-crm/live/session/:id/intro`: nach erster abgeschlossener
-  Nutzeraussage `{}`; serverseitiger TTS-Clip, `audio/mpeg`. CAS-Status
-  `WAITING -> PLAYING` verhindert parallele doppelte Erzeugung.
-  `PATCH {state:"OFFERED"}` nach Playback, `PATCH {state:"DONE"}` nach
-  Musikentscheidung oder Wechsel zur Fachfrage. Ein **bewusster**
-  `POST {replay:true}` darf nur den im selben Serverprozess noch vorhandenen
-  Clip erneut liefern. Ein Neustart des Prozesses erzeugt keinen Ersatzclip
-  automatisch. Der Clipcache ist benutzer-/sitzungsgebunden und flüchtig.
+- `POST /api/ai-crm/live/session/:id/intro`: direkt nach `session.started` `{}`;
+  serverseitiger Sprachauftrag „Hallo, Meister Emil.“ per Sideband. Antwort
+  ist JSON `{introState:"DONE",accepted:true}` nach passendem Instruction-Ack.
+  CAS-Status `WAITING -> PLAYING` verhindert parallele automatische Starts;
+  `DONE` bedeutet Annahme des Auftrags, keine gemessene Audiofertigstellung.
+  Unklare Zustellung bleibt beansprucht, Reconnect wiederholt sie nicht.
+  `POST {replay:true}` ist ausschließlich ein bewusster Wiederholungswunsch.
+  `PATCH {state:"DONE"}` überspringt einen noch offenen Einstieg, wenn die
+  Person bereits spricht. Es gibt keinen Clipcache und keine TTS-Anfrage.
 
 Die Browser-Allowlist lässt nur Schließen sowie Input mute/unmute zu.
 Vertrauenswürdige Anweisungen und Ergebnisse gelangen per kurzlebiger
@@ -104,7 +110,7 @@ und den anschließenden erfolgreichen Neustart.
 
 Serverseitig: `OPENAI_API_KEY`, `AI_LIVE_PROVIDER=live`,
 `AI_LIVE_MODEL=gpt-live-1`, `AI_LIVE_VOICE=cedar`,
-`AI_LIVE_SPEECH_MODEL=gpt-4o-mini-tts`, `JARVIS_DEMO_ENABLED=true`,
+`JARVIS_DEMO_ENABLED=true`,
 `JARVIS_GREETING_NAME=Meister Emil`, `AI_LIVE_MAX_SESSION_SECONDS`,
 `AI_LIVE_INACTIVITY_SECONDS`, `AI_LIVE_WARNING_SECONDS`,
 `AI_LIVE_MAX_TURNS`, `AI_LIVE_RECONNECT_LIMIT`.
@@ -115,9 +121,8 @@ konfiguriert; dazu die Pilotanleitung beachten.
 ## Stimme und störungsarme Wiedergabe
 
 Die Rückmeldung zur bisherigen Stimme führte zum Wechsel von `marin` auf
-`cedar`, das sowohl GPT-Live als auch die Begrüßungs-TTS unterstützen.
-`voice-style.ts` definiert dieselbe ruhige, tiefere und dezent synthetische
-deutsche Sprechweise für beide Wege. Begrüßung und Live-Audio verwenden
+`cedar`. `voice-style.ts` definiert eine ruhige, tiefere und dezent synthetische
+deutsche Sprechweise. Begrüßung und Gespräch laufen über dieselbe Live-Stimme und verwenden
 denselben Wiedergabepegel von 0,8; Musik behält ihre separate Steuerung.
 Die Auswahl beschreibt ein eigenes technisches Assistentenprofil; ein
 identischer Filmklang oder ein bereits bestandener Hörtest wird nicht behauptet.
@@ -135,12 +140,32 @@ erkannte Wörter dürfen die Antwort unterbrechen, höchstens einmal pro
 Äußerung. Duplikate, verspätete Fragmente und bloße Satzzeichen zählen nicht.
 Der manuelle Unterbrechen-Knopf bleibt unmittelbar wirksam.
 
-Der kontrollierte Browser-Nachweis prüft Geräusch ohne Unterbrechung, echte
-Sprache mit Unterbrechung, die nächste hörbare Antwort und den gleichen
-Pegel für Intro/Live. Er ersetzt keinen Hörtest am physischen Zielgerät.
+Der kontrollierte Browser-Nachweis prüft Geräusch ohne Unterbrechung, neue
+Sprache mit Widerruf alter CRM-Arbeit und durchgehend freigegebener Live-Ausgabe.
+Die eigentliche hörbare Unterbrechung übernimmt GPT-Live. Der Test ersetzt
+keinen Hörtest am physischen Zielgerät.
 Die genaue Ursache eines dort wahrgenommenen Rauschens ist damit nicht
 abschließend geklärt; Bluetooth-Geräteprofil, Lautsprecher-Echo und die
 Provideraufnahme sind in diesen Tests nicht enthalten.
+
+## Direkter Einstieg und Reaktionszeit
+
+Die Begrüßung startet nach bestätigter Verbindung ohne vorheriges „Jarvis?“.
+Der Einstieg enthält keine Musikfrage und hält die erste CRM-Frage nicht mehr
+zurück. Musik bleibt auf ausdrücklichen Wunsch verfügbar. Der Prompt enthält
+eine sparsame Backchannel-Policy: etwa „Klar, ich schaue kurz nach“, während
+das Backend arbeitet; keine erfundenen Fortschritte oder Zeitversprechen.
+Live darf diese kurzen Rückmeldungen sofort sprechen, der Browser lässt die
+Ausgabe während der Abfrage offen. Fakten benötigen weiterhin Backendbelege.
+
+Die lokale Sprechpausenfrist sinkt von 1400 auf 900 ms. Fortlaufende
+Mikrofonaktivität und ein noch instabiles Transkript verhindern weiterhin
+frühes Absenden. Kurze eigenständige Begrüßungen/Dankesworte bleiben bei Live;
+kontextabhängige Antworten wie „Ja“ sowie Grüße mit einer CRM-Frage gehen
+weiterhin an das Backend. Zusammengehörige kurze Sätze werden in einem
+Sideband-Append gepackt, statt jede Satzgrenze als neue Anweisung zu senden.
+Diese Änderungen belegen keine konkrete reale Gesamtlatenz; Netz, Modell
+und benötigte CRM-Werkzeuge sind separat zu messen.
 
 ## Prüfungen und Grenzen
 

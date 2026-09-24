@@ -53,11 +53,11 @@ try {
     } } });
     window.RTCPeerConnection = class extends EventTarget {
       connectionState = "new"; iceGatheringState = "new"; localDescription = null;
-      constructor() { super(); window.__peer = this; }
+      constructor() { super(); window.__peer = this; window.__providerStarted = false; }
       addTrack() {} async createOffer() { return { type: "offer", sdp: "v=0\r\ncontrolled-ui-test-only-sdp\r\n" }; }
       async setLocalDescription(value) { this.localDescription = value; this.iceGatheringState = "gathering"; setTimeout(() => { this.iceGatheringState = "complete"; this.dispatchEvent(new Event("icegatheringstatechange")); }, 15); }
       createDataChannel() { this.channel = { readyState: "open", send(value) { window.__controls.push(JSON.parse(value)); }, close() {} }; return this.channel; }
-      async setRemoteDescription() { this.connectionState = "connected"; this.onconnectionstatechange?.(); this.ontrack?.({ streams: [{ kind: "output" }] }); setTimeout(() => this.channel.onmessage?.({ data: JSON.stringify({ type: "session.started" }) }), 10); }
+      async setRemoteDescription() { this.connectionState = "connected"; this.onconnectionstatechange?.(); this.ontrack?.({ streams: [{ kind: "output" }] }); setTimeout(() => { window.__providerStarted = true; this.channel.onmessage?.({ data: JSON.stringify({ type: "session.started" }) }); }, 10); }
       close() { this.connectionState = "closed"; }
     };
     window.__say = async text => {
@@ -70,11 +70,13 @@ try {
   }, { transcriptTemplate: liveTranscriptEvent("") });
   const page = await context.newPage(); page.setDefaultTimeout(30_000);
   const errors = []; page.on("pageerror", error => errors.push(error.message));
-  const settings = { demoEnabled: true, greetingText: "Hallo, Meister Emil. Darf es etwas Musik sein?", inactivitySeconds: 180, warningSeconds: 30, maxSessionSeconds: 600, reconnectLimit: 1 };
+  const settings = { demoEnabled: true, greetingText: "Hallo, Meister Emil.", inactivitySeconds: 180, warningSeconds: 30, maxSessionSeconds: 600, reconnectLimit: 1 };
   const conversation = { id: "fixture-conversation", title: "Jarvis UI Test", expiresAt: new Date(Date.now() + 86_400_000).toISOString(), updatedAt: new Date().toISOString(), messageCount: 0 };
   let introState = "WAITING", introCalls = 0, turnCalls = [], revision = 0, ends = 0, failNextTurn = false, lastTurn = null, introDelay = 0, failIntro = false;
   let activeSessionId = "fixture-blocked", failEnd = true, failStart = false, delayedStart = null, startEntered = null;
   const introBodies = [];
+  const greetingAcceptances = [];
+  let turnDelay = 0;
   await page.route("**/api/ai-crm/live/**", async route => {
     const request = route.request(), url = new URL(request.url());
     const body = request.method() === "POST" || request.method() === "PATCH" ? request.postDataJSON() : {};
@@ -83,15 +85,20 @@ try {
     else if (url.pathname.endsWith("/intro")) {
       if (request.method() === "POST") {
         introCalls++; introBodies.push(body); introState = "PLAYING";
-        if (failIntro) { failIntro = false; introState = "WAITING"; return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "Controlled TTS failure; server returned WAITING" }) }); }
+        assert.equal(await page.evaluate(() => window.__providerStarted), true, "greeting waits for session.started");
+        if (failIntro) { failIntro = false; return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "Controlled uncertain greeting delivery" }) }); }
         if (introDelay) await new Promise(resolve => setTimeout(resolve, introDelay));
-        return route.fulfill({ status: 200, contentType: "audio/mpeg", body: "explicit-ui-audio-fixture" });
+        const accepted = introState !== "DONE";
+        if (accepted) greetingAcceptances.push(Date.now());
+        introState = "DONE";
+        return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ introState, accepted }) });
       }
       introState = body.state;
     } else if (url.pathname.endsWith("/turn")) {
       assert.equal("sessionId" in body, false); assert.equal(body.context?.label, undefined);
       assert.ok(body.revision > revision || body.clientTurnId === lastTurn?.clientTurnId); revision = body.revision;
       turnCalls.push(body); lastTurn = body;
+      if (turnDelay) await new Promise(resolve => setTimeout(resolve, turnDelay));
       if (failNextTurn) { failNextTurn = false; return route.abort("failed"); }
       response = { answer: "Dies ist eine gekennzeichnete kontrollierte UI-Testantwort.", requestId: body.clientTurnId, actions: [], results: [{ id: "fixture-read", readAt: new Date().toISOString(), summary: "Kontrolliertes Testresultat", items: [] }], conversation, revision, stale: false, audioDelivered: true };
     } else if (url.pathname.endsWith("/session")) {
@@ -99,6 +106,7 @@ try {
       else {
         if (activeSessionId && !body.reconnect) return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ code: "LIVE_SESSION_ALREADY_ACTIVE", error: "Eine Sprachsitzung ist noch geöffnet." }) });
         activeSessionId = "fixture-session";
+        if (!body.reconnect) introState = "WAITING";
         startEntered?.();
         if (delayedStart) await delayedStart;
         if (failStart) { failStart = false; return route.abort("failed"); }
@@ -137,14 +145,27 @@ try {
   assert.equal(await page.evaluate(() => document.getElementById("assistant-message") === window.__redesignComposer), true, "composer stays mounted during speech and layout changes");
   assert.equal(await page.getByRole("button", { name: "Nachricht diktieren" }).count(), 0, "live owns the microphone while dictation is hidden");
 
-  await page.evaluate(() => window.__say("Was ist heute für mich offen?"));
-  await page.getByRole("button", { name: "Ja, Musik starten", exact: true }).waitFor();
+  // Native startup is requested before any user speech, without a TTS clip or music gate.
   assert.equal(introCalls, 1); assert.equal(turnCalls.length, 0);
-  await page.evaluate(() => window.__say("Ja, gerne."));
+  assert.equal(greetingAcceptances.length, 1);
+  assert.equal(await page.evaluate(() => window.__audio.filter(audio => audio.createdSrc.startsWith("blob:")).length), 0);
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.src.includes("/live/music"))?.paused), true);
+  turnDelay = 800;
+  await page.evaluate(() => window.__say("Was ist heute für mich offen?"));
+  await page.getByText("Jarvis schaut für dich nach", { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), false, "Live backchannels stay audible while CRM work is pending");
   await page.getByText("Kontrolliertes Testresultat", { exact: true }).waitFor();
+  turnDelay = 0;
   assert.equal(turnCalls[0].transcript, "Was ist heute für mich offen?"); assert.equal(introCalls, 1);
-  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.createdSrc.startsWith("blob:"))?.volume), .8);
   assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.volume), .8, "greeting and ongoing speech share a reduced output level");
+  await page.getByRole("button", { name: "Sprachausgabe unterbrechen", exact: true }).click();
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), true);
+  await page.evaluate(() => window.__say("Danke."));
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), false, "a new social reply resumes native Live after manual stop");
+  await new Promise(resolve => setTimeout(resolve, 1600));
+  assert.equal(turnCalls.length, 1, "short social replies do not enter the slower CRM backend");
+  await page.evaluate(() => window.__say("Musik an"));
+  await page.waitForFunction(() => window.__audio.some(audio => audio.src.includes("/live/music") && !audio.paused));
   // Raw microphone noise while Jarvis speaks must not mute or revoke his answer.
   await page.evaluate(() => { window.__outputLevel = .12; });
   await page.getByText("Jarvis spricht", { exact: true }).waitFor();
@@ -161,11 +182,11 @@ try {
   await page.evaluate(() => { window.__outputLevel = .12; });
   await page.getByText("Jarvis spricht", { exact: true }).waitFor();
   await page.evaluate(() => window.__say("Etwas leiser. Was habe ich selbst zugesagt?"));
-  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), true, "recognized interruption still stops the answer");
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), false, "native interruption leaves the new acknowledgment audible");
   await page.evaluate(() => { window.__outputLevel = 0; });
   await page.waitForFunction(() => document.querySelectorAll(".assistant-read-result").length >= 2);
   assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), false, "the next current answer resumes normally");
-  const controlledTiming = await page.evaluate(() => ({ firstMockAudioAfterUtteranceMs: Math.round(window.__firstAudioMs), crmResultVisibleAfterCrmUtteranceMs: Math.round(performance.now() - window.__lastUtteranceEnd), providerLatencyMeasured: false, audioPlaybackHardwareMeasured: false }));
+  const controlledTiming = await page.evaluate(() => ({ crmResultVisibleAfterCrmUtteranceMs: Math.round(performance.now() - window.__lastUtteranceEnd), providerLatencyMeasured: false, audioPlaybackHardwareMeasured: false }));
   assert.equal(turnCalls.at(-1).transcript, "Was habe ich selbst zugesagt?");
   assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.src.includes("/live/music"))?.paused), true);
   await page.evaluate(() => { window.__peer.connectionState = "failed"; window.__peer.onconnectionstatechange(); });
@@ -205,9 +226,12 @@ try {
   await page.screenshot({ path: fileURLToPath(new URL("desktop.png", output)), fullPage: false });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
-  const endButtonBox = await page.getByRole("button", { name: "Sitzung beenden", exact: true }).boundingBox();
-  const liveBox = await page.locator(".assistant-voice-bar").boundingBox();
-  assert.ok(endButtonBox && liveBox && endButtonBox.y >= liveBox.y && endButtonBox.y + endButtonBox.height <= liveBox.y + liveBox.height, "microphone and end controls stay visible while the audio panel is scrolled");
+  // Read both rectangles in the same frame: the responsive panel animates on resize.
+  await page.waitForFunction(() => {
+    const end = document.querySelector('[aria-label="Sitzung beenden"]').getBoundingClientRect();
+    const bar = document.querySelector(".assistant-voice-bar").getBoundingClientRect();
+    return end.height > 0 && end.top >= bar.top - .5 && end.bottom <= bar.bottom + .5;
+  }, undefined, { timeout: 5000 });
   await page.screenshot({ path: fileURLToPath(new URL("mobile.png", output)), fullPage: false });
   await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
   await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).waitFor();
@@ -216,11 +240,12 @@ try {
   // A superseded slow intro response must never start after the user moved to CRM.
   await page.setViewportSize({ width: 1280, height: 900 });
   introState = "WAITING"; introDelay = 3500;
+  const beforeGreetings = greetingAcceptances.length;
+  const slowIntroEntered = page.waitForRequest(request => request.method() === "POST" && request.url().endsWith("/intro"));
   await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
+  await slowIntroEntered;
   const beforeClips = await page.evaluate(() => window.__audio.filter(audio => audio.createdSrc.startsWith("blob:")).length);
-  await page.evaluate(() => window.__say("Jarvis?"));
-  await page.getByText("Jarvis spricht", { exact: true }).waitFor();
   await page.getByLabel("Sprachoptionen", { exact: true }).click();
   await page.getByText("Sprachzeile prüfen oder per Text fortsetzen", { exact: true }).click();
   await page.getByLabel("Deine Aussage", { exact: true }).fill("Was ist für meine Führungsrunde offen?");
@@ -228,17 +253,18 @@ try {
   await page.waitForFunction(() => document.querySelectorAll(".assistant-read-result").length >= 4);
   await new Promise(resolve => setTimeout(resolve, 3800));
   assert.equal(await page.evaluate(() => window.__audio.filter(audio => audio.createdSrc.startsWith("blob:")).length), beforeClips);
+  assert.equal(greetingAcceptances.length, beforeGreetings, "a skipped greeting cannot arrive after the CRM answer");
   await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
-  // Failed TTS resets the durable server claim; explicit retry must request a fresh claim.
+  // Uncertain native delivery stays claimed; only an explicit retry asks again.
   introState = "WAITING"; introDelay = 0; failIntro = true;
   await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
-  await page.evaluate(() => window.__say("Jarvis?"));
+  await page.getByText("Controlled uncertain greeting delivery", { exact: true }).waitFor();
   await page.getByLabel("Sprachoptionen", { exact: true }).click();
-  await page.getByRole("button", { name: "Begrüßung bewusst abspielen", exact: true }).click();
-  await page.getByRole("button", { name: "Ja, Musik starten", exact: true }).waitFor();
-  assert.deepEqual(introBodies.at(-1), {});
-  await page.getByRole("button", { name: "Ohne Musik weiter", exact: true }).click();
+  const retryResponse = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/intro"));
+  await page.getByRole("button", { name: "Begrüßung erneut anfordern", exact: true }).click();
+  await retryResponse;
+  assert.deepEqual(introBodies.at(-1), { replay: true });
   await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
   // An accepted start with a lost HTTP response exposes owner-scoped recovery.
   failStart = true;
@@ -281,7 +307,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: fileURLToPath(new URL("redesign-start-mobile.png", output)) });
   assert.deepEqual(errors, []);
-  await writeFile(new URL("report.json", output), JSON.stringify({ passed: true, simulated: true, controlledTiming, assertions: ["same composer and live transport across panel/workspace", "draft restored after voice", "microphone denied returns to text", "chat and composer align at 320/390/768/1440/1920 in both themes", "WebRTC handshake/ICE", "once-only exact intro clip request", "retained initial question", "music starts only after yes", "pause preserved after speech and ducking", "reconnect preserves intro and does not restart music", "shared timeline sources", "mute separate from end", "lost response retry keeps operation id", "desktop/mobile overflow and persistent microphone/end controls", "tracks and transport cleanup", "superseded slow intro never plays", "TTS failure retry reads durable WAITING before claim"], liveProvider: "not tested", microphoneHardware: "not tested", actualMusic: "not tested" }, null, 2));
+  await writeFile(new URL("report.json", output), JSON.stringify({ passed: true, simulated: true, controlledTiming, assertions: ["same composer and live transport across panel/workspace", "draft restored after voice", "microphone denied returns to text", "chat and composer align at 320/390/768/1440/1920 in both themes", "WebRTC handshake/ICE", "native greeting after session.started without user speech or TTS", "CRM question without music gate", "Live acknowledgments remain audible while backend works", "social replies bypass CRM", "music starts only on explicit request", "noise cannot cancel output", "native interruption without a second delayed stop", "pause preserved after speech and ducking", "reconnect preserves intro and does not restart music", "shared timeline sources", "mute separate from end", "lost response retry keeps operation id", "desktop/mobile overflow and persistent microphone/end controls", "tracks and transport cleanup", "superseded slow intro never plays", "uncertain greeting delivery has explicit retry"], liveProvider: "not tested", microphoneHardware: "not tested", actualMusic: "not tested" }, null, 2));
   console.log("Jarvis pilot controlled browser acceptance passed.");
 } finally {
   await writeFile(new URL("server.log", output), logs);

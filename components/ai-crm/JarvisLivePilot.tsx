@@ -3,9 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AssistantVoiceSurface from "./AssistantVoiceSurface";
 import type { ActionReceipt, AssistantContext, ReadResult } from "@/lib/ai-crm/contracts";
 import type { JarvisLiveConversation, JarvisLiveProps, JarvisLiveSettings } from "@/components/ai-crm/JarvisLive";
-import { LocalAudioController, isSessionStop, musicOfferDecision, splitMusicCommand, type LocalAudioState, type MusicCommand } from "@/lib/ai-crm/local-audio";
+import { LocalAudioController, isSessionStop, splitMusicCommand, type LocalAudioState, type MusicCommand } from "@/lib/ai-crm/local-audio";
 import { inputTranscriptDelta, LiveUtteranceBuffer, monitorAudio, sessionTiming, waitForIceGathering } from "@/lib/ai-crm/live-audio-input";
-import { JARVIS_VOICE_VOLUME } from "@/lib/ai-crm/voice-style";
+import { JARVIS_VOICE_VOLUME, isLiveSmallTalk } from "@/lib/ai-crm/voice-style";
 
 type Connection = "IDLE" | "MICROPHONE" | "CONNECTING" | "CONNECTED" | "DISCONNECTED" | "ENDED";
 type Intro = "WAITING" | "PLAYING" | "OFFERED" | "DONE";
@@ -35,7 +35,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const [inputActive, setInputActive] = useState(false);
   const [outputActive, setOutputActive] = useState(false);
   const [working, setWorking] = useState(false);
-  const [intro, setIntro] = useState<Intro>(settings.demoEnabled ? "WAITING" : "DONE");
+  const [intro, setIntro] = useState<Intro>("WAITING");
   const [music, setMusic] = useState<LocalAudioState>(emptyMusic);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -53,8 +53,6 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const peer = useRef<RTCPeerConnection | null>(null);
   const channel = useRef<RTCDataChannel | null>(null);
   const voice = useRef<HTMLAudioElement | null>(null);
-  const introAudio = useRef<HTMLAudioElement | null>(null);
-  const introUrl = useRef<string | null>(null);
   const inputMeter = useRef<ReturnType<typeof monitorAudio> | null>(null);
   const outputMeter = useRef<ReturnType<typeof monitorAudio> | null>(null);
   const player = useRef<LocalAudioController | null>(null);
@@ -71,7 +69,6 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const jarvisSpeaking = useRef(false);
   const lastActivity = useRef(Date.now());
   const utterance = useRef(new LiveUtteranceBuffer());
-  const initialQuestion = useRef("");
   const delegation = useRef<string | undefined>(undefined);
   const processUtteranceRef = useRef<(text: string) => Promise<void>>(async () => undefined);
   const starting = useRef(false);
@@ -80,7 +77,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
 
   const activity = useCallback(() => { lastActivity.current = Date.now(); setIdleWarning(null); }, []);
   const changeIntro = useCallback((value: Intro) => { introState.current = value; setIntro(value); }, []);
-  const duck = useCallback(() => player.current?.setDucked(userSpeaking.current || jarvisSpeaking.current || introState.current === "PLAYING"), []);
+  const duck = useCallback(() => player.current?.setDucked(userSpeaking.current || jarvisSpeaking.current), []);
   const sendControl = useCallback((type: "session.close" | "session.input_audio.mute" | "session.input_audio.unmute") => {
     if (channel.current?.readyState === "open") channel.current.send(JSON.stringify({ type }));
   }, []);
@@ -94,14 +91,9 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     userSpeaking.current = false; jarvisSpeaking.current = false;
     setInputActive(false); setOutputActive(false);
   }, []);
-  const clearIntroAudio = useCallback(() => {
-    if (introAudio.current) { introAudio.current.onended = null; introAudio.current.pause(); introAudio.current.src = ""; introAudio.current = null; }
-    if (introUrl.current) { URL.revokeObjectURL(introUrl.current); introUrl.current = null; }
-  }, []);
   const releaseIntro = useCallback(() => {
     introEpoch.current++; introRequest.current?.abort(); introRequest.current = null; introInFlight.current = false;
-    clearIntroAudio();
-  }, [clearIntroAudio]);
+  }, []);
   const close = useCallback(async (message = "Sprachsitzung beendet. Bestätigte CRM-Änderungen bleiben erhalten.", notify = true) => {
     const previous = session.current; session.current = null;
     lifecycle.current++; starting.current = false;
@@ -110,7 +102,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     startRequest.current = null; operation.current = null;
     sendControl("session.close"); releaseTransport(); releaseIntro();
     player.current?.dispose(); player.current = null;
-    pending.current = null; utterance.current.clear(); initialQuestion.current = ""; delegation.current = undefined;
+    pending.current = null; utterance.current.clear(); delegation.current = undefined;
     setWorking(false); setRecovery(false); setRetryAvailable(false); setAudioBlocked(false); setIntroRetry(false); setIdleWarning(null); setConnection("ENDED"); setHeard("");
     if (notify) { propsRef.current.onActiveChange?.(false); setNotice(message); }
     if (previous) await fetch(`/api/ai-crm/live/session/${previous.id}`, { method: "DELETE", headers: jsonHeaders, keepalive: true }).then(response => { if (!response.ok) throw new Error("End not acknowledged"); }).catch(() => { if (notify) { setBlockedSessionId(previous.id); setNotice(`${message} Der Serverabschluss konnte noch nicht bestätigt werden; die Verbindung ist lokal geschlossen.`); } });
@@ -140,12 +132,12 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     return () => { window.removeEventListener("offline", offline); window.removeEventListener("pagehide", pageHide); document.removeEventListener("visibilitychange", visibility); void close("", false); };
   }, [close, releaseIntro, releaseTransport]);
 
-  const nextRevision = useCallback((revoke = false) => {
+  const nextRevision = useCallback((revoke = false, interruptAudio = true) => {
     const active = session.current;
     if (!active) return 0;
     active.revision++;
     operation.current?.abort(); operation.current = null;
-    if (revoke) void fetch(`/api/ai-crm/live/session/${active.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ revision: active.revision }) }).catch(() => undefined);
+    if (revoke) void fetch(`/api/ai-crm/live/session/${active.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ revision: active.revision, interruptAudio }) }).catch(() => undefined);
     return active.revision;
   }, []);
 
@@ -153,7 +145,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     if (previousContext.current === selectedContext) return;
     previousContext.current = selectedContext;
     if (!session.current) return;
-    nextRevision(true); utterance.current.clear(); initialQuestion.current = ""; pending.current = null;
+    nextRevision(true); utterance.current.clear(); pending.current = null;
     setWorking(false); setRecovery(false); setRetryAvailable(false); setHeard("");
     if (voice.current) voice.current.muted = true;
     setNotice("Der Personenbezug wurde gewechselt. Die nächste Aussage verwendet die neue Auswahl; frühere offene Anfragen wurden angehalten.");
@@ -166,7 +158,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     propsRef.current.onTurn({ requestId: typeof data.requestId === "string" ? data.requestId : request.clientTurnId, transcript: request.transcript, answer: data.answer, actions: Array.isArray(data.actions) ? data.actions as ActionReceipt[] : [], results: Array.isArray(data.results) ? data.results as ReadResult[] : [], conversation });
     pending.current = null; setRecovery(false); setRetryAvailable(false); setWorking(false);
     setNotice("");
-    if (voice.current && data.audioDelivered === true) voice.current.muted = introState.current !== "DONE";
+    if (voice.current && data.audioDelivered === true) voice.current.muted = false;
     if (data.audioDelivered === false) setNotice("Das CRM-Ergebnis steht im Gespräch. Die Sprachausgabe konnte gerade nicht bestätigt werden.");
     activity();
   }, [activity]);
@@ -179,6 +171,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     delegation.current = undefined; pending.current = request;
     const controller = new AbortController(); operation.current = controller;
     setWorking(true); setRecovery(false); setRetryAvailable(false); setError(""); activity();
+    if (voice.current) voice.current.muted = false; // Keep immediate Live acknowledgments audible during backend work.
     try {
       const response = await fetch(`/api/ai-crm/live/session/${active.id}/turn`, { method: "POST", headers: jsonHeaders, signal: controller.signal, body: turnBody(request) });
       const data = await readJson(response);
@@ -218,66 +211,36 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     finally { if (operation.current === controller) { operation.current = null; setWorking(false); } }
   }, [acceptResponse]);
 
-  const markIntro = useCallback(async (value: "OFFERED" | "DONE") => {
+  const markIntro = useCallback(async () => {
     const active = session.current; if (!active) return;
-    releaseIntro();
-    const epoch = introEpoch.current;
-    const response = await fetch(`/api/ai-crm/live/session/${active.id}/intro`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ state: value }) });
-    if (epoch !== introEpoch.current || session.current?.id !== active.id) return;
+    releaseIntro(); changeIntro("DONE"); setIntroRetry(false);
+    const response = await fetch(`/api/ai-crm/live/session/${active.id}/intro`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ state: "DONE" }) });
     if (!response.ok) throw new Error(errorMessage(await readJson(response), "Der Begrüßungsstatus konnte nicht bestätigt werden."));
-    if (session.current?.id !== active.id) return;
-    changeIntro(value);
-    if (voice.current) voice.current.muted = value !== "DONE";
-    duck();
-  }, [changeIntro, duck, releaseIntro]);
+  }, [changeIntro, releaseIntro]);
 
-  const playIntro = useCallback(async (retry = false) => {
+  const playIntro = useCallback(async (replay = false) => {
     const active = session.current;
-    if (!active || introInFlight.current) return;
-    introInFlight.current = true; setIntroRetry(false);
-    const token = lifecycle.current;
-    const epoch = ++introEpoch.current;
+    if (!active || introInFlight.current || (!replay && introState.current !== "WAITING")) return;
+    introInFlight.current = true; setIntroRetry(false); setError("");
+    const token = lifecycle.current, epoch = ++introEpoch.current;
     const controller = new AbortController(); introRequest.current = controller;
+    changeIntro("PLAYING");
     try {
-      let replay = false;
-      if (retry) {
-        const status = await fetch(`/api/ai-crm/live/session/${active.id}`, { signal: controller.signal, cache: "no-store" });
-        const data = await readJson(status);
-        if (!status.ok) throw new Error(errorMessage(data, "Der Begrüßungsstatus konnte nicht geprüft werden."));
-        const serverState = (data.session as { introState?: Intro } | undefined)?.introState;
-        if (serverState === "OFFERED" || serverState === "DONE") { changeIntro(serverState); return; }
-        if (serverState !== "WAITING" && serverState !== "PLAYING") throw new Error("Der Begrüßungsstatus ist unklar. Bitte Sitzung beenden und bewusst neu starten.");
-        replay = serverState === "PLAYING";
-      }
-      if (token !== lifecycle.current || epoch !== introEpoch.current) return;
-      changeIntro("PLAYING"); duck();
       const response = await fetch(`/api/ai-crm/live/session/${active.id}/intro`, { method: "POST", headers: jsonHeaders, signal: controller.signal, body: JSON.stringify(replay ? { replay: true } : {}) });
-      if (!response.ok) throw new Error(errorMessage(await readJson(response), "Die Begrüßung konnte nicht geladen werden."));
-      const blob = await response.blob();
-      if (token !== lifecycle.current || epoch !== introEpoch.current || introState.current !== "PLAYING" || session.current?.id !== active.id) return;
-      clearIntroAudio();
-      introUrl.current = URL.createObjectURL(blob);
-      const audio = new Audio(introUrl.current); audio.volume = JARVIS_VOICE_VOLUME; introAudio.current = audio;
-      audio.onended = () => { if (session.current?.id === active.id) void markIntro("OFFERED").catch(reason => setError(String(reason.message))); };
-      audio.onerror = () => { setIntroRetry(true); setError("Die Begrüßung konnte nicht abgespielt werden. Prüfe die Audioausgabe und starte sie manuell."); };
-      await audio.play();
-      activity();
+      const data = await readJson(response);
+      if (token !== lifecycle.current || epoch !== introEpoch.current || session.current?.id !== active.id) return;
+      if (!response.ok) throw new Error(errorMessage(data, "Die Begrüßung konnte nicht bestätigt werden."));
+      changeIntro("DONE"); // Instruction acknowledged; no claim of finished audio playback.
     } catch (reason) {
       if (controller.signal.aborted || token !== lifecycle.current || epoch !== introEpoch.current) return;
-      setIntroRetry(true); setError(reason instanceof Error ? reason.message : "Begrüßung derzeit nicht hörbar.");
-    } finally { if (token === lifecycle.current && epoch === introEpoch.current) introInFlight.current = false; if (introRequest.current === controller) introRequest.current = null; }
-  }, [activity, changeIntro, clearIntroAudio, duck, markIntro]);
+      changeIntro("DONE"); setIntroRetry(true); setError(reason instanceof Error ? reason.message : "Begrüßung derzeit nicht bestätigt.");
+    } finally {
+      if (token === lifecycle.current && epoch === introEpoch.current) introInFlight.current = false;
+      if (introRequest.current === controller) introRequest.current = null;
+    }
+  }, [changeIntro]);
 
   const musicAction = useCallback(async (command: MusicCommand) => { activity(); await player.current?.command(command); }, [activity]);
-  const decideMusic = useCallback(async (yes: boolean) => {
-    activity(); setError("");
-    try {
-      await markIntro("DONE");
-      if (yes) await musicAction("start");
-      const retained = initialQuestion.current; initialQuestion.current = "";
-      if (retained) await submit(retained);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Der Einstieg konnte nicht abgeschlossen werden."); }
-  }, [activity, markIntro, musicAction, submit]);
 
   const processUtterance = useCallback(async (text: string) => {
     if (!session.current || !stream.current || !text.trim()) return;
@@ -286,25 +249,13 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     if (/^(?:stumm|mikrofon aus)[.!?]*$/i.test(text.trim())) {
       micMuted.current = true; setMuted(true); for (const track of stream.current?.getAudioTracks() ?? []) track.enabled = false; sendControl("session.input_audio.mute"); return;
     }
-    if (introState.current === "WAITING") {
-      initialQuestion.current = /^(?:(?:hallo|hey)\s*)?jarvis[,.!?\s]*$/i.test(text) ? "" : text;
-      await playIntro(); return;
-    }
-    if (introState.current === "PLAYING") { releaseIntro(); await markIntro("OFFERED"); }
-    if (introState.current === "OFFERED") {
-      const decision = musicOfferDecision(text);
-      if (decision) { await decideMusic(decision === "yes"); return; }
-      if (/^(?:mhm|hm|okay|ok|ähm)[.!?]*$/i.test(text)) return;
-      // A clear CRM question moves on; no second music question is asked.
-      await markIntro("DONE");
-    }
+    if (introState.current !== "DONE") void markIntro().catch(reason => setError(String(reason.message)));
     const media = splitMusicCommand(text);
     if (media.command) await musicAction(media.command);
     const remaining = media.remainder;
-    if (!remaining || /^(?:mhm|hm|okay|ok|ja|nein|danke)[.!?]*$/i.test(remaining)) return;
-    const retained = initialQuestion.current; initialQuestion.current = "";
-    await submit(retained && retained !== remaining ? `${retained}\n${remaining}` : remaining);
-  }, [activity, close, decideMusic, markIntro, musicAction, playIntro, releaseIntro, sendControl, submit]);
+    if (!remaining || isLiveSmallTalk(remaining)) return;
+    await submit(remaining);
+  }, [activity, close, markIntro, musicAction, sendControl, submit]);
   processUtteranceRef.current = processUtterance;
 
   const connect = useCallback(async (reconnecting = false) => {
@@ -313,7 +264,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     const token = ++lifecycle.current;
     const previous = reconnecting ? session.current : null;
     if (reconnecting && (!previous || previous.reconnects >= settings.reconnectLimit)) { starting.current = false; return; }
-    releaseTransport(); player.current?.pause(); setError(""); setNotice(""); setConnection("MICROPHONE");
+    releaseTransport(); player.current?.pause(); setError(""); setNotice(""); setIntroRetry(false); setConnection("MICROPHONE");
     const controller = new AbortController(); startRequest.current = controller;
     try {
       if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection || !window.AudioContext) throw new Error("Dieser Browser bietet keine sichere Mikrofon-/WebRTC-Verbindung. Verwende HTTPS oder localhost und einen aktuellen Browser.");
@@ -323,7 +274,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       const pc = new RTCPeerConnection(); peer.current = pc;
       utterance.current.resetTimeline();
       let providerStarted = false;
-      const speaker = new Audio(); speaker.autoplay = true; speaker.volume = JARVIS_VOICE_VOLUME; speaker.muted = !reconnecting && settings.demoEnabled || introState.current !== "DONE"; voice.current = speaker;
+      const speaker = new Audio(); speaker.autoplay = true; speaker.volume = JARVIS_VOICE_VOLUME; speaker.muted = false; voice.current = speaker;
       pc.ontrack = event => {
         if (peer.current !== pc) return;
         const remote = event.streams[0] ?? new MediaStream([event.track]); speaker.srcObject = remote;
@@ -351,12 +302,15 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
             const accepted = utterance.current.append(delta);
             if (accepted === "late") setNotice("Ein verspätetes Sprachfragment wurde verworfen, damit es nicht zur nächsten Aussage gehört. Wiederhole die vorherige Frage, falls ihr Ende fehlt.");
             else setHeard(utterance.current.preview());
+            // A new spoken turn resumes Live even when it is just a greeting
+            // and will not produce a backend response to unmute the speaker.
+            if (accepted === "added" && /[\p{L}\p{N}]/u.test(delta.content)) speaker.muted = false;
             // Microphone levels include clicks, breathing and residual speaker echo.
             // Only new recognized speech may cancel an answer, once per utterance.
             if (accepted === "added" && session.current && (jarvisSpeaking.current || operation.current || introState.current === "PLAYING") && utterance.current.claimInterruption()) {
-              speaker.muted = true;
-              nextRevision(true); setWorking(false); jarvisSpeaking.current = false; setOutputActive(false);
-              if (introState.current === "PLAYING" && introAudio.current) { releaseIntro(); void markIntro("OFFERED").catch(() => setIntroRetry(true)); }
+              // GPT-Live handles audible interruption; do not mute its next acknowledgment.
+              nextRevision(true, false); setWorking(false); jarvisSpeaking.current = false; setOutputActive(false);
+              if (introState.current !== "DONE") void markIntro().catch(() => setIntroRetry(true));
               duck();
             }
           }
@@ -389,9 +343,9 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       }
       if (!response.ok || !info || typeof info.id !== "string" || !transport?.sdp) throw new Error(errorMessage(data, "Die sichere Sprachverbindung wurde nicht hergestellt."));
       session.current = { id: info.id, clientId, expiresAt: typeof info.expiresAt === "string" ? Date.parse(info.expiresAt) : Date.now() + settings.maxSessionSeconds * 1000, reconnects: previous ? previous.reconnects + 1 : 0, revision: Math.max(previous?.revision ?? 0, typeof info.revision === "number" ? info.revision : 0) };
-      const introValue: Intro = ["WAITING", "PLAYING", "OFFERED", "DONE"].includes(String(info.introState)) ? info.introState as Intro : settings.demoEnabled ? "WAITING" : "DONE";
-      changeIntro(introValue); speaker.muted = introValue !== "DONE";
-      if (introValue === "PLAYING") { setIntroRetry(true); setNotice("Die Begrüßung wurde bereits begonnen. Du kannst sie bei Bedarf bewusst erneut abspielen."); }
+      const introValue: Intro = ["WAITING", "PLAYING", "OFFERED", "DONE"].includes(String(info.introState)) ? info.introState as Intro : "WAITING";
+      changeIntro(introValue); speaker.muted = false;
+      if (introValue === "PLAYING") { changeIntro("DONE"); setIntroRetry(true); setNotice("Der Einstieg wurde bereits angefragt. Du kannst direkt weitersprechen."); }
       await pc.setRemoteDescription({ type: "answer", sdp: transport.sdp });
       const connectDeadline = Date.now() + 12_000;
       while (!(providerStarted && pc.connectionState === "connected")) {
@@ -402,6 +356,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       setConnection("CONNECTED");
       if (data.conversation) propsRef.current.onConversationStarted(data.conversation as JarvisLiveConversation);
       propsRef.current.onActiveChange?.(true); activity();
+      if (introValue === "WAITING" && !utterance.current.preview()) void playIntro();
       if (!reconnecting) {
         const source = await fetch(`/api/ai-crm/live/music?sessionId=${encodeURIComponent(info.id)}&status=1`, { signal: controller.signal, cache: "no-store" });
         const sourceInfo = await readJson(source);
@@ -424,14 +379,14 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
         if (token === lifecycle.current && typeof blocked?.id === "string") setBlockedSessionId(blocked.id);
       }
     } finally { if (startRequest.current === controller) startRequest.current = null; if (token === lifecycle.current) starting.current = false; }
-  }, [activity, changeIntro, close, duck, markIntro, nextRevision, releaseIntro, releaseTransport, settings]);
+  }, [activity, changeIntro, close, duck, markIntro, nextRevision, playIntro, releaseIntro, releaseTransport, settings]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       const active = session.current; if (!active) return;
       const now = Date.now();
       if (userSpeaking.current) utterance.current.activity(now);
-      const busy = userSpeaking.current || jarvisSpeaking.current || Boolean(operation.current) || introState.current === "PLAYING" && Boolean(introAudio.current && !introAudio.current.paused);
+      const busy = userSpeaking.current || jarvisSpeaking.current || Boolean(operation.current);
       if (busy) lastActivity.current = now;
       if (stream.current && !userSpeaking.current && utterance.current.ready(now)) {
         const text = utterance.current.take();
@@ -453,33 +408,31 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   };
   const interrupt = () => {
     nextRevision(true); releaseIntro(); utterance.current.clear();
-    if (introState.current === "PLAYING") void markIntro("DONE").catch(reason => setError(reason instanceof Error ? reason.message : "Der Begrüßungsstatus konnte nicht beendet werden."));
+    if (introState.current === "PLAYING") void markIntro().catch(reason => setError(reason instanceof Error ? reason.message : "Der Begrüßungsstatus konnte nicht beendet werden."));
     if (voice.current) voice.current.muted = true;
     setWorking(false); jarvisSpeaking.current = false; setOutputActive(false); duck();
     setNotice("Sprachausgabe unterbrochen. Neue Frage oder Auswahl verwenden; bereits gespeicherte Änderungen bleiben bestehen.");
   };
   const enableAudio = async () => {
-    try { await inputMeter.current?.resume(); await outputMeter.current?.resume(); if (voice.current) { voice.current.muted = introState.current !== "DONE"; await voice.current.play(); } setAudioBlocked(false); }
+    try { await inputMeter.current?.resume(); await outputMeter.current?.resume(); if (voice.current) { voice.current.muted = false; await voice.current.play(); } setAudioBlocked(false); }
     catch { setError("Der Browser blockiert die Audioausgabe weiterhin. Prüfe die Audiofreigabe dieser Seite."); }
   };
   const active = !["IDLE", "ENDED"].includes(connection);
   useEffect(() => { propsRef.current.onActiveChange?.(active); }, [active]);
-  const status = connection === "MICROPHONE" ? "Mikrofonfreigabe wird angefragt …" : connection === "CONNECTING" ? "Sprachverbindung wird hergestellt …" : connection === "DISCONNECTED" ? "Mikrofon aus · Verbindung unterbrochen" : muted ? "Mikrofon stumm · Verbindung aktiv" : working ? "Jarvis denkt nach" : outputActive || intro === "PLAYING" ? "Jarvis spricht" : inputActive ? "Jarvis hört deine Aussage" : "Mikrofon aktiv · Jarvis hört zu";
+  const status = connection === "MICROPHONE" ? "Mikrofonfreigabe wird angefragt …" : connection === "CONNECTING" ? "Sprachverbindung wird hergestellt …" : connection === "DISCONNECTED" ? "Mikrofon aus · Verbindung unterbrochen" : muted ? "Mikrofon stumm · Verbindung aktiv" : outputActive ? "Jarvis spricht" : working ? "Jarvis schaut für dich nach" : inputActive ? "Jarvis hört deine Aussage" : "Mikrofon aktiv · Jarvis hört zu";
   return <AssistantVoiceSurface
     active={active} status={status} muted={muted} canMute={connection === "CONNECTED"}
     onMute={toggleMute} onInterrupt={interrupt} onEnd={() => void close()}
     composer={props.children?.({ active, disabled: Boolean(props.disabled || blockedSessionId), start: () => void connect() }) ?? <button disabled={props.disabled || Boolean(blockedSessionId)} onClick={() => void connect()}>Jarvis starten</button>}
     options={<>
       <p className="assistant-caption">Schreibaktionen benötigen die sichtbare Bestätigung im Gespräch.</p>
-      {intro === "WAITING" && <p className="assistant-caption">Sprich deine erste Aussage, zum Beispiel „Jarvis?“.</p>}
-      {introRetry && <div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void playIntro(true)}>Begrüßung bewusst abspielen</button><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(false)}>Ohne Begrüßung fortsetzen</button></div>}
+      {introRetry && <div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void playIntro(true)}>Begrüßung erneut anfordern</button><button disabled={connection !== "CONNECTED"} onClick={() => void markIntro().catch(reason => setError(String(reason.message)))}>Ohne Begrüßung fortsetzen</button></div>}
       {heard && <p className="assistant-caption" aria-live="polite">Gehört: {heard}</p>}
       <details><summary>Sprachzeile prüfen oder per Text fortsetzen</summary><form onSubmit={event => { event.preventDefault(); const text = draft.trim(); setDraft(""); void processUtterance(text).catch(reason => setError(String(reason.message))); }}><label className="jarvis-live-label" htmlFor="jarvis-pilot-line">Deine Aussage</label><textarea id="jarvis-pilot-line" rows={2} maxLength={4000} value={draft} onChange={event => { setDraft(event.target.value); activity(); }} /><button disabled={!draft.trim() || connection !== "CONNECTED"}>Aussage verwenden</button></form></details>
       <details><summary>Musik · {music.status === "PLAYING" ? "läuft" : music.status === "PAUSED" ? "pausiert" : music.status === "MISSING" ? "Quelle fehlt" : music.status === "BLOCKED" ? "Start blockiert" : "aus"}</summary><p role="status" className="jarvis-live-music-note">{music.message}</p><p className="assistant-caption">Lautstärke {Math.round(music.volume * 100)} %{music.ducked ? " · während Sprache abgesenkt" : ""}</p><div className="assistant-button-row"><button disabled={music.status === "MISSING" || connection !== "CONNECTED"} onClick={() => void musicAction("start")}>{music.status === "PAUSED" ? "Musik weiter" : "Musik starten"}</button><button onClick={() => void musicAction("pause")}>Musikpause</button><button onClick={() => void musicAction("stop")}>Musik aus</button><button aria-label="Musik leiser" onClick={() => void musicAction("quieter")}>Leiser</button><button aria-label="Musik lauter" onClick={() => void musicAction("louder")}>Lauter</button></div></details>
     </>}
     notices={<>
       {!active && blockedSessionId && <div role="status"><p>Es ist noch eine Sprachsitzung geöffnet. Wenn du sie hier beendest, endet auch eine laufende Runde in einem anderen Tab.</p><button disabled={endingBlockedSession} onClick={() => void endBlockedSession()}>{endingBlockedSession ? "Vorherige Sitzung wird beendet …" : "Vorherige Sitzung beenden"}</button></div>}
-      {active && intro === "OFFERED" && <div><p>{settings.greetingText}</p><div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(true)}>Ja, Musik starten</button><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(false)}>Ohne Musik weiter</button></div></div>}
       {active && audioBlocked && <button onClick={() => void enableAudio()}>Audioausgabe freigeben</button>}
       {active && idleWarning !== null && <div role="alert"><p>Die Sprachverbindung endet in {idleWarning} Sekunden.</p><button onClick={activity}>Ich bin noch da</button></div>}
       {connection === "DISCONNECTED" && session.current && session.current.reconnects < settings.reconnectLimit && <button onClick={() => void connect(true)}>Verbindung wiederherstellen</button>}

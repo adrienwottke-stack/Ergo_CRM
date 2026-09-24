@@ -16,7 +16,7 @@ import {
 export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ sessionId: string }> };
-const emptyBody = z.object({ revision: z.number().int().min(1).max(1_000_000).optional() }).strict();
+const emptyBody = z.object({ revision: z.number().int().min(1).max(1_000_000).optional(), interruptAudio: z.boolean().optional() }).strict();
 
 function responseBody(session: Awaited<ReturnType<typeof requireLiveSession>>) {
   return {
@@ -72,7 +72,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     const session = await heartbeatLiveSession(prisma, { userId: user.id, sessionId });
     if (parsed.data.revision) {
       const revised = await prisma.aiLiveSession.updateMany({ where: { id: sessionId, userId: user.id, revision: { lt: parsed.data.revision } }, data: { revision: parsed.data.revision } });
-      if (revised.count && session.providerSessionRef) await sendProviderUpdate(session.providerSessionRef, "Die Person hat den Auftrag unterbrochen oder korrigiert. Beende die bisherige Sprachausgabe. Erwarte das aktualisierte Backendresultat und behaupte keine Rücknahme gespeicherter Änderungen.", { instruction: true }).catch(() => undefined);
+      // Native speech interruption is already handled by Live. A delayed second
+      // stop instruction would cut off its acknowledgment of the new question.
+      if (revised.count && session.providerSessionRef && parsed.data.interruptAudio !== false) await sendProviderUpdate(session.providerSessionRef, "Die Person hat den Auftrag unterbrochen oder korrigiert. Beende die bisherige Sprachausgabe. Erwarte das aktualisierte Backendresultat und behaupte keine Rücknahme gespeicherter Änderungen.", { instruction: true }).catch(() => undefined);
     }
     const active = await requireLiveSession(prisma, { userId: user.id, sessionId });
     const music = await musicProviderForLive(prisma).state({ userId: user.id, sessionId: session.id });

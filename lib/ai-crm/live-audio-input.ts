@@ -65,7 +65,7 @@ export class LiveUtteranceBuffer {
     this.interruptionClaimed = true;
     return true;
   }
-  ready(now: number, pauseMs = 1400) { return this.observedSpeech && this.text.trim().length > 0 && now - this.lastAudioAt >= pauseMs && now - this.lastDeltaAt >= 500; }
+  ready(now: number, pauseMs = 900) { return this.observedSpeech && this.text.trim().length > 0 && now - this.lastAudioAt >= pauseMs && now - this.lastDeltaAt >= 500; }
   take() { const result = this.text.trim(); this.finalizedBeforeMs = Math.max(this.finalizedBeforeMs, this.maximumEndMs + 1000); this.text = ""; this.observedSpeech = false; this.interruptionClaimed = false; return result; }
   clear() { if (this.maximumEndMs >= 0) this.finalizedBeforeMs = Math.max(this.finalizedBeforeMs, this.maximumEndMs + 1000); this.text = ""; this.observedSpeech = false; this.interruptionClaimed = false; }
   resetTimeline() { this.events.clear(); this.text = ""; this.observedSpeech = false; this.interruptionClaimed = false; this.lastAudioAt = 0; this.lastDeltaAt = 0; this.maximumEndMs = -1; this.finalizedBeforeMs = -1; }
