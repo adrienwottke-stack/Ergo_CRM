@@ -266,6 +266,108 @@ test("chat persists a safe OpenAI authentication failure without leaking provide
   }
 });
 
+test("chat distinguishes safe OpenAI 429 causes without leaking provider details", async () => {
+  const cases = [
+    {
+      providerCode: "credit_balance_exhausted",
+      stableCode: "AI_CREDIT_BALANCE_EXHAUSTED",
+      message:
+        "Das API-Guthaben der OpenAI-Organisation ist aufgebraucht. Prüfe das OpenAI-Billing.",
+    },
+    {
+      providerCode: "organization_spend_limit_exceeded",
+      stableCode: "AI_ORGANIZATION_SPEND_LIMIT_REACHED",
+      message:
+        "Das Ausgabenlimit der OpenAI-Organisation ist erreicht. Prüfe die Organisationslimits.",
+    },
+    {
+      providerCode: "project_spend_limit_exceeded",
+      stableCode: "AI_PROJECT_SPEND_LIMIT_REACHED",
+      message:
+        "Das Ausgabenlimit des OpenAI-Projekts ist erreicht. Prüfe die Projektlimits.",
+    },
+    {
+      providerCode: "organization_usage_limit_exceeded",
+      stableCode: "AI_ORGANIZATION_USAGE_LIMIT_REACHED",
+      message:
+        "Das von OpenAI zugewiesene Nutzungslimit der Organisation ist erreicht.",
+    },
+    {
+      providerCode: "slow_down",
+      stableCode: "AI_PROVIDER_SLOW_DOWN",
+      message:
+        "OpenAI bremst den Anstieg der Anfragen gerade. Warte kurz und versuche es erneut.",
+    },
+    {
+      providerCode: "rate_limit_exceeded",
+      stableCode: "AI_PROVIDER_RATE_LIMITED",
+      message:
+        "OpenAI ist für dieses Projekt gerade ausgelastet oder das Nutzungslimit ist erreicht. Bitte versuche es später erneut.",
+    },
+    {
+      providerCode: null,
+      providerType: "insufficient_quota",
+      stableCode: "AI_PROVIDER_QUOTA_EXHAUSTED",
+      message:
+        "OpenAI meldet eine ausgeschöpfte API-Quote. Prüfe Projektzuordnung, Billing und Limits.",
+    },
+  ];
+
+  try {
+    for (const item of cases) {
+      const providerType = item.providerType ?? "rate_limit_error";
+      const providerLabel = item.providerCode ?? providerType;
+      const privateProviderDetail = `private provider detail: ${providerLabel}`;
+      globalThis.aiApiOpenAiClient = () => ({
+        responses: {
+          async create() {
+            throw new OpenAI.RateLimitError(
+              429,
+              {
+                code: item.providerCode,
+                message: privateProviderDetail,
+                type: providerType,
+              },
+              privateProviderDetail,
+              new Headers(),
+            );
+          },
+        },
+      });
+
+      const clientRequestId = randomUUID();
+      const response = await chatRoute.POST(
+        new Request(origin + "/api/ai-crm/chat", {
+          method: "POST",
+          headers: { origin, "content-type": "application/json" },
+          body: JSON.stringify({
+            message: "Sag nur: Preview bereit.",
+            source: "text",
+            clientRequestId,
+          }),
+        }),
+      );
+
+      assert.equal(response.status, 429, providerLabel);
+      const body = await response.json();
+      assert.equal(body.code, item.stableCode, providerLabel);
+      assert.equal(body.error, item.message, providerLabel);
+      assert.doesNotMatch(JSON.stringify(body), /private provider detail/);
+
+      const request = await fixture.client.aiRequest.findUniqueOrThrow({
+        where: { userId_clientRequestId: { userId: owner.id, clientRequestId } },
+      });
+      const usage = await fixture.client.aiUsage.findFirstOrThrow({
+        where: { requestId: request.id },
+      });
+      assert.equal(request.errorCode, item.stableCode, providerLabel);
+      assert.equal(usage.errorCode, item.stableCode, providerLabel);
+    }
+  } finally {
+    delete globalThis.aiApiOpenAiClient;
+  }
+});
+
 test("recovered provider failures keep their safe, actionable message", async () => {
   const { assistantRecoveryFailureMessage } = await import(
     "../lib/ai-crm/errors.ts"
