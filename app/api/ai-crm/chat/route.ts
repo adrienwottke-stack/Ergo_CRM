@@ -11,6 +11,7 @@ import {
 import { AiCrmError } from "@/lib/ai-crm/errors";
 import { aiErrorResponse, sameOrigin } from "@/lib/ai-crm/http";
 import { openAiClient } from "@/lib/ai-crm/openai";
+import { classifyOpenAiProviderError } from "@/lib/ai-crm/openai-errors";
 import { runUxCrmAgent } from "@/lib/ai-crm/ux-agent";
 import { resolveAssistantContext } from "@/lib/ai-crm/action-plans";
 import { requestView, conversationView } from "@/lib/ai-crm/presentation";
@@ -175,11 +176,12 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    const aborted = request.signal.aborted || isAbort(error);
+    const normalizedError = classifyOpenAiProviderError(error) ?? error;
+    const aborted = request.signal.aborted || isAbort(normalizedError);
     const errorCode = aborted
       ? "REQUEST_ABORTED"
-      : error instanceof AiCrmError
-        ? error.code
+      : normalizedError instanceof AiCrmError
+        ? normalizedError.code
         : "INTERNAL_ERROR";
     if (usageId) {
       await completeAiUsage(prisma, usageId, {
@@ -199,6 +201,6 @@ export async function POST(request: Request) {
       const failed = await prisma.aiRequest.findFirst({ where: { id: aiRequestId, userId, status: { in: ["FAILED", "ABORTED"] } }, select: { id: true } }).catch(() => null);
       if (failed) await prisma.aiToolExecution.updateMany({ where: { requestId: failed.id, userId, status: "PENDING" }, data: { status: "CANCELED" } }).catch(() => undefined);
     }
-    return aiErrorResponse(error, aiRequestId ?? undefined);
+    return aiErrorResponse(normalizedError, aiRequestId ?? undefined);
   }
 }

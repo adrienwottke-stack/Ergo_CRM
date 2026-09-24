@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { usePathname, useRouter } from "next/navigation";
 import { useVorfuehren } from "@/components/VorfuehrProvider";
 import type { ActionReceipt, AssistantAccess, AssistantContext, ConversationSummary, Entry, ReadResult } from "@/lib/ai-crm/contracts";
+import { assistantRecoveryFailureMessage } from "@/lib/ai-crm/errors";
 
 type SendBody = { message: string; source: "text" | "voice"; conversationId?: string; clientRequestId: string; context?: { contactId: string; followUpId?: string } };
 type Reply = { answer: string; requestId: string; actions: ActionReceipt[]; results?: ReadResult[]; conversation: ConversationSummary & { restartReason?: string | null } };
@@ -279,10 +280,10 @@ function useController() {
     if (!body) return;
     setActionBusy("recovery");
     try {
-      const data = await assistantFetch<{ id: string; status: string; actions: ActionReceipt[]; response: Reply | null }>(`/api/ai-crm/requests/${body.clientRequestId}`);
+      const data = await assistantFetch<{ id: string; status: string; errorCode: string | null; actions: ActionReceipt[]; response: Reply | null }>(`/api/ai-crm/requests/${body.clientRequestId}`);
       if (data.response) acceptReply(data.response, body);
       else if (["FAILED", "ABORTED"].includes(data.status)) {
-        setEntries(current => [...current.filter(entry => entry.id !== `response-${body.clientRequestId}`), { id: `response-${body.clientRequestId}`, role: "assistant", content: data.status === "ABORTED" ? "Die Verarbeitung wurde beendet. Bereits gespeicherte Änderungen bleiben erhalten." : "Die Anfrage konnte nicht vollständig abgeschlossen werden. Prüfe die einzelnen Ergebnisse.", actions: data.actions, requestId: data.id }]);
+        setEntries(current => [...current.filter(entry => entry.id !== `response-${body.clientRequestId}`), { id: `response-${body.clientRequestId}`, role: "assistant", content: assistantRecoveryFailureMessage(data.status, data.errorCode), actions: data.actions, requestId: data.id }]);
         setRecovery(null); activeRequest.current = null; setWorking(false);
       } else setRecovery({ body, status: data.status, error: "Die Anfrage läuft noch. Bereits ausgeführte Schritte werden beim Abschluss angezeigt." });
     } catch (reason) { setRecovery({ body, status: reason instanceof AssistantHttpError && reason.status === 404 ? "NOT_FOUND" : "UNKNOWN", error: reason instanceof Error ? reason.message : "Der Status ist gerade nicht erreichbar." }); }

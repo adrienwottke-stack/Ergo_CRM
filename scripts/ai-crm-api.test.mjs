@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test, { after } from "node:test";
 import { registerHooks } from "node:module";
+import OpenAI from "openai";
 import { testDatabase } from "./test-db.mjs";
 
 const fixture = await testDatabase();
@@ -29,6 +30,8 @@ const modules = {
     "export async function requireUser(){return globalThis.aiApiUser}",
   "@/lib/prisma":
     "export const prisma = globalThis.aiApiPrisma",
+  "@/lib/ai-crm/openai":
+    "export function openAiClient(){return globalThis.aiApiOpenAiClient()}",
   "next/cache": "export function revalidatePath(){}",
 };
 registerHooks({
@@ -209,4 +212,114 @@ test("chat HTTP schema rejects browser-supplied history before any provider call
     await fixture.client.aiRequest.count({ where: { userId: owner.id } }),
     before,
   );
+});
+
+test("chat persists a safe OpenAI authentication failure without leaking provider details", async () => {
+  globalThis.aiApiOpenAiClient = () => ({
+    responses: {
+      async create() {
+        throw new OpenAI.AuthenticationError(
+          401,
+          { code: "invalid_api_key", message: "credential rejected" },
+          "credential rejected",
+          new Headers(),
+        );
+      },
+    },
+  });
+  try {
+    const clientRequestId = randomUUID();
+    const response = await chatRoute.POST(
+      new Request(origin + "/api/ai-crm/chat", {
+        method: "POST",
+        headers: { origin, "content-type": "application/json" },
+        body: JSON.stringify({
+          message: "Sag nur: Preview bereit.",
+          source: "text",
+          clientRequestId,
+        }),
+      }),
+    );
+
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.code, "AI_PROVIDER_AUTH_FAILED");
+    assert.equal(
+      body.error,
+      "Die Verbindung zu OpenAI ist für dieses Projekt nicht berechtigt. Prüfe den API-Zugang.",
+    );
+    assert.doesNotMatch(JSON.stringify(body), /credential rejected|invalid_api_key/);
+    assert.ok(body.requestId);
+
+    const request = await fixture.client.aiRequest.findUniqueOrThrow({
+      where: { userId_clientRequestId: { userId: owner.id, clientRequestId } },
+    });
+    const usage = await fixture.client.aiUsage.findFirstOrThrow({
+      where: { requestId: request.id },
+    });
+    assert.equal(request.status, "FAILED");
+    assert.equal(request.errorCode, "AI_PROVIDER_AUTH_FAILED");
+    assert.equal(usage.status, "FAILED");
+    assert.equal(usage.errorCode, "AI_PROVIDER_AUTH_FAILED");
+  } finally {
+    delete globalThis.aiApiOpenAiClient;
+  }
+});
+
+test("recovered provider failures keep their safe, actionable message", async () => {
+  const { assistantRecoveryFailureMessage } = await import(
+    "../lib/ai-crm/errors.ts"
+  );
+  assert.equal(
+    assistantRecoveryFailureMessage("FAILED", "AI_PROVIDER_AUTH_FAILED"),
+    "Die Verbindung zu OpenAI ist für dieses Projekt nicht berechtigt. Prüfe den API-Zugang.",
+  );
+  assert.equal(
+    assistantRecoveryFailureMessage("FAILED", "INTERNAL_ERROR"),
+    "Die Anfrage konnte nicht vollständig abgeschlossen werden. Prüfe die einzelnen Ergebnisse.",
+  );
+});
+
+test("chat identifies an unavailable configured model without exposing the provider response", async () => {
+  globalThis.aiApiOpenAiClient = () => ({
+    responses: {
+      async create() {
+        throw new OpenAI.NotFoundError(
+          404,
+          { code: "model_not_found", message: "model access denied" },
+          "model access denied",
+          new Headers(),
+        );
+      },
+    },
+  });
+  try {
+    const clientRequestId = randomUUID();
+    const response = await chatRoute.POST(
+      new Request(origin + "/api/ai-crm/chat", {
+        method: "POST",
+        headers: { origin, "content-type": "application/json" },
+        body: JSON.stringify({
+          message: "Sag nur: Preview bereit.",
+          source: "text",
+          clientRequestId,
+        }),
+      }),
+    );
+
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.code, "AI_MODEL_UNAVAILABLE");
+    assert.equal(
+      body.error,
+      "Das konfigurierte KI-Modell ist für dieses OpenAI-Projekt nicht verfügbar.",
+    );
+    assert.doesNotMatch(JSON.stringify(body), /model access denied|model_not_found/);
+    const request = await fixture.client.aiRequest.findUniqueOrThrow({
+      where: { userId_clientRequestId: { userId: owner.id, clientRequestId } },
+    });
+    assert.equal(request.errorCode, "AI_MODEL_UNAVAILABLE");
+  } finally {
+    delete globalThis.aiApiOpenAiClient;
+  }
 });
