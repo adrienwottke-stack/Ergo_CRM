@@ -25,7 +25,7 @@ function micError(error: unknown) {
   return error instanceof Error ? error.message : "Die Sprachverbindung konnte nicht gestartet werden.";
 }
 
-export default function JarvisLivePilot(props: JarvisLiveProps & { settings: JarvisLiveSettings }) {
+export default function JarvisLivePilot(props: JarvisLiveProps & { settings: JarvisLiveSettings; initialActiveSessionId?: string | null }) {
   const { settings } = props;
   const propsRef = useRef(props); propsRef.current = props;
   const [connection, setConnection] = useState<Connection>("IDLE");
@@ -44,6 +44,8 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const [idleWarning, setIdleWarning] = useState<number | null>(null);
   const [recovery, setRecovery] = useState(false);
   const [retryAvailable, setRetryAvailable] = useState(false);
+  const [blockedSessionId, setBlockedSessionId] = useState<string | null>(props.initialActiveSessionId ?? null);
+  const [endingBlockedSession, setEndingBlockedSession] = useState(false);
   const session = useRef<Session | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const peer = useRef<RTCPeerConnection | null>(null);
@@ -109,8 +111,19 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     pending.current = null; utterance.current.clear(); initialQuestion.current = ""; delegation.current = undefined;
     setWorking(false); setRecovery(false); setRetryAvailable(false); setAudioBlocked(false); setIntroRetry(false); setIdleWarning(null); setConnection("ENDED"); setHeard("");
     if (notify) { propsRef.current.onActiveChange?.(false); setNotice(message); }
-    if (previous) await fetch(`/api/ai-crm/live/session/${previous.id}`, { method: "DELETE", headers: jsonHeaders, keepalive: true }).then(response => { if (!response.ok) throw new Error("End not acknowledged"); }).catch(() => { if (notify) setNotice(`${message} Der Serverabschluss konnte noch nicht bestätigt werden; die Verbindung ist lokal geschlossen.`); });
+    if (previous) await fetch(`/api/ai-crm/live/session/${previous.id}`, { method: "DELETE", headers: jsonHeaders, keepalive: true }).then(response => { if (!response.ok) throw new Error("End not acknowledged"); }).catch(() => { if (notify) { setBlockedSessionId(previous.id); setNotice(`${message} Der Serverabschluss konnte noch nicht bestätigt werden; die Verbindung ist lokal geschlossen.`); } });
   }, [releaseIntro, releaseTransport, sendControl]);
+
+  const endBlockedSession = async () => {
+    if (!blockedSessionId || endingBlockedSession) return;
+    setEndingBlockedSession(true); setError("");
+    try {
+      const response = await fetch(`/api/ai-crm/live/session/${encodeURIComponent(blockedSessionId)}`, { method: "DELETE", headers: jsonHeaders });
+      if (!response.ok && response.status !== 404) throw new Error(errorMessage(await readJson(response), "Die vorherige Sitzung konnte noch nicht beendet werden. Bitte erneut versuchen."));
+      setBlockedSessionId(null); setNotice("Die vorherige Sitzung ist beendet. Du kannst Jarvis jetzt starten.");
+    } catch (reason) { setError(micError(reason)); }
+    finally { setEndingBlockedSession(false); }
+  };
 
   useEffect(() => {
     const offline = () => {
@@ -360,12 +373,17 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
       await waitForIceGathering(pc, controller.signal);
       const clientId = previous?.clientId ?? crypto.randomUUID();
-      const response = await fetch("/api/ai-crm/live/session", { method: "POST", headers: jsonHeaders, signal: controller.signal, body: JSON.stringify({ clientSessionId: clientId, conversationId: propsRef.current.conversationId ?? undefined, sdp: pc.localDescription?.sdp ?? offer.sdp, reconnect: reconnecting || undefined }) });
+      // Receive the session id even if local setup is cancelled in the meantime:
+      // aborting this fetch loses the only handle needed to close a late start.
+      const response = await fetch("/api/ai-crm/live/session", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ clientSessionId: clientId, conversationId: propsRef.current.conversationId ?? undefined, sdp: pc.localDescription?.sdp ?? offer.sdp, reconnect: reconnecting || undefined }) });
       const data = await readJson(response);
       const info = data.session as Record<string, unknown> | undefined;
       const transport = data.transport as { sdp?: string } | undefined;
+      if (token !== lifecycle.current) {
+        if (info && typeof info.id === "string") await fetch(`/api/ai-crm/live/session/${encodeURIComponent(info.id)}`, { method: "DELETE", headers: jsonHeaders, keepalive: true });
+        return;
+      }
       if (!response.ok || !info || typeof info.id !== "string" || !transport?.sdp) throw new Error(errorMessage(data, "Die sichere Sprachverbindung wurde nicht hergestellt."));
-      if (token !== lifecycle.current) { await fetch(`/api/ai-crm/live/session/${info.id}`, { method: "DELETE", headers: jsonHeaders, keepalive: true }); return; }
       session.current = { id: info.id, clientId, expiresAt: typeof info.expiresAt === "string" ? Date.parse(info.expiresAt) : Date.now() + settings.maxSessionSeconds * 1000, reconnects: previous ? previous.reconnects + 1 : 0, revision: Math.max(previous?.revision ?? 0, typeof info.revision === "number" ? info.revision : 0) };
       const introValue: Intro = ["WAITING", "PLAYING", "OFFERED", "DONE"].includes(String(info.introState)) ? info.introState as Intro : settings.demoEnabled ? "WAITING" : "DONE";
       changeIntro(introValue); speaker.muted = introValue !== "DONE";
@@ -393,6 +411,14 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       if (controller.signal.aborted || token !== lifecycle.current) return;
       releaseTransport(); setConnection(previous ? "DISCONNECTED" : "ENDED"); setError(micError(reason));
       if (!previous && session.current) await close("Die unvollständige Sprachverbindung wurde beendet.");
+      else if (!previous) {
+        // A lost HTTP response can leave a valid server session without a local
+        // id. Discover only this account's lock, then let the user end it.
+        const status = await fetch("/api/ai-crm/live/session", { cache: "no-store" }).catch(() => null);
+        const data = status?.ok ? await readJson(status) : {};
+        const blocked = data.activeSession as { id?: unknown } | undefined;
+        if (token === lifecycle.current && typeof blocked?.id === "string") setBlockedSessionId(blocked.id);
+      }
     } finally { if (startRequest.current === controller) startRequest.current = null; if (token === lifecycle.current) starting.current = false; }
   }, [activity, changeIntro, close, duck, markIntro, nextRevision, releaseIntro, releaseTransport, settings]);
 
@@ -436,7 +462,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   return <section className="jarvis-live" aria-label="Jarvis Sprache" style={{ margin: 0, overflow: active ? "visible" : "hidden" }}>
     <div className="jarvis-live-header" style={active ? { position: "sticky", top: 0, zIndex: 2, flexWrap: "wrap" } : undefined}><div><p className="jarvis-live-kicker">Jarvis · Sprache</p><h3 className="jarvis-live-title">Mit Jarvis sprechen</h3></div><span className="jarvis-live-badge">{connection === "CONNECTED" ? muted ? "Mikrofon stumm" : "Mikrofon aktiv" : connection === "DISCONNECTED" ? "Unterbrochen" : "Bewusst starten"}</span>{active && <div className="assistant-button-row" style={{ width: "100%", marginTop: 0 }}><button disabled={connection !== "CONNECTED"} onClick={toggleMute}>{muted ? "Mikrofon einschalten" : "Stumm"}</button><button className="jarvis-live-end" onClick={() => void close()}>Sitzung beenden</button></div>}</div>
     <div className="jarvis-live-body space-y-3">
-      {!active ? <><p className="jarvis-live-intro">Starte eine begrenzte Sprachsitzung. Das Mikrofon wird erst dann geöffnet. Ergebnisse, Quellen und Bestätigungen bleiben im gemeinsamen Gespräch.</p><button className="assistant-primary" disabled={props.disabled} onClick={() => void connect()}>Jarvis starten</button></> : <>
+      {!active ? <><p className="jarvis-live-intro">Starte eine begrenzte Sprachsitzung. Das Mikrofon wird erst dann geöffnet. Ergebnisse, Quellen und Bestätigungen bleiben im gemeinsamen Gespräch.</p>{blockedSessionId ? <div role="status"><p>Für dich ist noch eine Sprachsitzung geöffnet. Du kannst sie hier beenden, auch wenn der vorige Start hängen geblieben ist. Eine laufende Runde in einem anderen Tab wird dabei ebenfalls beendet.</p><button className="assistant-primary" disabled={endingBlockedSession} onClick={() => void endBlockedSession()}>{endingBlockedSession ? "Vorherige Sitzung wird beendet …" : "Vorherige Sitzung beenden"}</button></div> : <button className="assistant-primary" disabled={props.disabled} onClick={() => void connect()}>Jarvis starten</button>}</> : <>
         <p role="status" className="jarvis-live-status-title">{connection === "MICROPHONE" ? "Mikrofonfreigabe wird angefragt …" : connection === "CONNECTING" ? "Sprachverbindung wird hergestellt …" : connection === "DISCONNECTED" ? "Mikrofon aus · Verbindung unterbrochen" : muted ? "Mikrofon stumm · Verbindung aktiv" : inputActive ? "Jarvis hört deine Aussage" : "Mikrofon aktiv · Jarvis hört zu"}</p>
         <p className="assistant-caption">{outputActive || intro === "PLAYING" ? "Sprachausgabe aktiv. " : ""}{working ? "Deine CRM-Anfrage wird bearbeitet. " : ""}Schreibaktionen benötigen immer die sichtbare Bestätigung im Gespräch.</p>
         <div className="assistant-button-row"><button onClick={interrupt}>Sprachausgabe unterbrechen</button></div>

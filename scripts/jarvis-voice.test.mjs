@@ -140,3 +140,71 @@ test("a correction during backend work discards the late result before persisten
   globalThis.jarvisVoiceAgent = previous;
   await lifecycle.DELETE(req({}, "DELETE"), context);
 });
+
+test("only the owner can discover and end a blocked session before starting again", async () => {
+  const started = await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=blocked-session\r\n" }));
+  const { session } = await started.json();
+  assert.deepEqual((await (await start.GET()).json()).activeSession, { id: session.id });
+  globalThis.jarvisVoiceUser = stranger;
+  assert.equal((await (await start.GET()).json()).activeSession, null);
+  assert.equal((await lifecycle.DELETE(req({}, "DELETE"), ctx(session.id))).status, 404);
+  globalThis.jarvisVoiceUser = owner;
+  const before = creates;
+  assert.equal((await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=other-tab-session\r\n" }))).status, 409);
+  assert.equal(creates, before, "a conflict cannot create another provider session");
+  assert.equal((await lifecycle.DELETE(req({}, "DELETE"), ctx(session.id))).status, 204);
+  assert.equal((await (await start.GET()).json()).activeSession, null);
+  const next = await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=next-session\r\n" }));
+  assert.equal(next.status, 200);
+  await lifecycle.DELETE(req({}, "DELETE"), ctx((await next.json()).session.id));
+});
+
+test("a cancelled start closes a provider created after the browser left", async () => {
+  const original = globalThis.jarvisVoiceClient.live.create;
+  const controller = new AbortController();
+  globalThis.jarvisVoiceClient.live.create = async body => { const result = await original(body); controller.abort(); return result; };
+  try {
+    const request = new Request(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=cancelled-session\r\n" }), { signal: controller.signal });
+    assert.equal((await start.POST(request)).status, 409);
+    assert.equal(await db.aiLiveSession.count({ where: { userId: owner.id, activeKey: owner.id } }), 0);
+    assert.equal(globalThis.jarvisVoiceSent.type, "session.close");
+  } finally { globalThis.jarvisVoiceClient.live.create = original; }
+});
+
+test("ending during provider creation cannot resurrect the connection", async () => {
+  const original = globalThis.jarvisVoiceClient.live.create;
+  globalThis.jarvisVoiceClient.live.create = async body => {
+    const active = await db.aiLiveSession.findFirstOrThrow({ where: { userId: owner.id, activeKey: owner.id } });
+    await lifecycle.DELETE(req({}, "DELETE"), ctx(active.id));
+    return original(body);
+  };
+  try {
+    assert.equal((await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=concurrent-end\r\n" }))).status, 409);
+    assert.equal(await db.aiLiveSession.count({ where: { userId: owner.id, activeKey: owner.id } }), 0);
+    assert.equal(globalThis.jarvisVoiceSent.type, "session.close");
+  } finally { globalThis.jarvisVoiceClient.live.create = original; }
+});
+
+test("an incomplete provider response releases the session lock and usage claim", async () => {
+  const original = globalThis.jarvisVoiceClient.live.create;
+  globalThis.jarvisVoiceClient.live.create = async body => ({ ...(await original(body)), transport: {} });
+  try {
+    const response = await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=incomplete-transport\r\n" }));
+    assert.equal(response.status, 502);
+    assert.equal((await response.json()).code, "LIVE_TRANSPORT_MISSING");
+    assert.equal(await db.aiLiveSession.count({ where: { userId: owner.id, activeKey: owner.id } }), 0);
+    const ended = await db.aiLiveSession.findFirstOrThrow({ where: { userId: owner.id, errorCode: "LIVE_TRANSPORT_MISSING" } });
+    assert.equal((await db.aiUsage.findUniqueOrThrow({ where: { id: ended.usageId } })).status, "FAILED");
+    assert.equal(globalThis.jarvisVoiceSent.type, "session.close");
+  } finally { globalThis.jarvisVoiceClient.live.create = original; }
+});
+
+test("failure preparing the response also closes the already-created provider", async () => {
+  const original = db.aiConversationMessage.count;
+  db.aiConversationMessage.count = async () => { throw new Error("Controlled response preparation failure"); };
+  try {
+    assert.equal((await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=response-preparation\r\n" }))).status, 500);
+    assert.equal(await db.aiLiveSession.count({ where: { userId: owner.id, activeKey: owner.id } }), 0);
+    assert.equal(globalThis.jarvisVoiceSent.type, "session.close");
+  } finally { db.aiConversationMessage.count = original; }
+});

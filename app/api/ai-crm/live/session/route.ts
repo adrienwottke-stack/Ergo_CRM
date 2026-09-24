@@ -42,11 +42,21 @@ export async function GET() {
     const user = await requireUser();
     const config = assertLiveAvailable();
     await requireAiEntitlement(prisma, user.id, new Date(), config);
-    return Response.json({ mode: config.liveProvider === "live" ? "live" : "simulation", config: livePublicConfig(user.name, config) }, { headers: { "Cache-Control": "no-store" } });
+    const activeSession = await prisma.aiLiveSession.findFirst({
+      where: { userId: user.id, activeKey: user.id, status: "ACTIVE", expiresAt: { gt: new Date() } },
+      select: { id: true },
+    });
+    return Response.json({ mode: config.liveProvider === "live" ? "live" : "simulation", config: livePublicConfig(user.name, config), activeSession }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return aiErrorResponse(error); }
 }
 
 export async function POST(request: Request) {
+  // Only this request's new start or reserved reconnect may be rolled back.
+  // A conflicting request must never end another tab's existing session.
+  let cleanup: { userId: string; sessionId: string; providerRef?: string } | null = null;
+  const assertNotCancelled = () => {
+    if (request.signal.aborted) throw new AiCrmError("LIVE_START_CANCELLED", "Der Start wurde abgebrochen. Du kannst Jarvis erneut starten.", 409);
+  };
   try {
     if (!sameOrigin(request)) {
       throw new AiCrmError("ORIGIN_DENIED", "Nicht erlaubt.", 403);
@@ -64,6 +74,7 @@ export async function POST(request: Request) {
     if (config.liveProvider === "live" && !parsed.data.sdp) throw new AiCrmError("LIVE_SDP_REQUIRED", "Die Audioverbindung benötigt ein Verbindungsangebot des Browsers.", 400);
     const now = new Date();
     await requireAiEntitlement(prisma, user.id, now, config);
+    assertNotCancelled();
     const started = await startLiveSession(prisma, {
       userId: user.id,
       provider: config.liveProvider === "live" ? "live" : "mock",
@@ -77,6 +88,7 @@ export async function POST(request: Request) {
     });
     let session = started.session;
     if (!started.reused) {
+      cleanup = { userId: user.id, sessionId: session.id };
       try {
         const usage = await claimAiUsage(
           prisma,
@@ -112,20 +124,22 @@ export async function POST(request: Request) {
       if (started.reused) {
           if (!session.providerSessionRef) throw new AiCrmError("LIVE_START_IN_PROGRESS", "Die Sprachverbindung wird noch gestartet. Bitte warte auf den Abschluss.", 409);
           if (session.reconnectCount >= config.liveReconnectLimit) throw new AiCrmError("LIVE_RECONNECT_LIMIT", "Die maximale Zahl der Wiederverbindungen ist erreicht. Bitte beende die Runde.", 409);
-          const reserved = await prisma.aiLiveSession.updateMany({ where: { id: session.id, userId: user.id, errorCode: null, revision: session.revision, reconnectCount: { lt: config.liveReconnectLimit } }, data: { errorCode: "LIVE_RECONNECTING", revision: { increment: 1 }, reconnectCount: { increment: 1 } } });
+          const reserved = await prisma.aiLiveSession.updateMany({ where: { id: session.id, userId: user.id, activeKey: user.id, status: "ACTIVE", errorCode: null, revision: session.revision, reconnectCount: { lt: config.liveReconnectLimit } }, data: { errorCode: "LIVE_RECONNECTING", revision: { increment: 1 }, reconnectCount: { increment: 1 } } });
           if (!reserved.count) throw new AiCrmError("LIVE_RECONNECT_IN_PROGRESS", "Die Verbindung wird bereits wiederhergestellt.", 409);
+          cleanup = { userId: user.id, sessionId: session.id, providerRef: session.providerSessionRef };
       }
-      let createdProviderRef: string | null = null;
       try {
+        assertNotCancelled();
         if (started.reused && session.providerSessionRef) await sendProviderUpdate(session.providerSessionRef, "", { close: true });
         const created = await createProviderSession({ sdp: parsed.data.sdp!, greetingPending: session.introState !== "DONE", profileName: user.name, config });
-        createdProviderRef = created.session.id;
+        cleanup!.providerRef = created.session.id;
+        assertNotCancelled();
         transport = created.transport;
-        session = await prisma.aiLiveSession.update({ where: { id: session.id }, data: { providerSessionRef: created.session.id, errorCode: null } });
+        if (!transport?.sdp) throw new AiCrmError("LIVE_TRANSPORT_MISSING", "Der Sprachdienst hat keine vollständige Verbindung geliefert. Bitte starte erneut.", 502);
+        const saved = await prisma.aiLiveSession.updateMany({ where: { id: session.id, userId: user.id, activeKey: user.id, status: "ACTIVE", expiresAt: { gt: new Date() } }, data: { providerSessionRef: created.session.id, errorCode: null } });
+        if (!saved.count) throw new AiCrmError("LIVE_START_CANCELLED", "Diese Sprachsitzung wurde bereits beendet. Du kannst Jarvis erneut starten.", 409);
+        session = await prisma.aiLiveSession.findUniqueOrThrow({ where: { id: session.id } });
       } catch (error) {
-        if (createdProviderRef) await sendProviderUpdate(createdProviderRef, "", { close: true }).catch(() => undefined);
-        await endLiveSession(prisma, { userId: user.id, sessionId: session.id, errorCode: "LIVE_PROVIDER_START_FAILED" });
-        if (session.usageId) await prisma.aiUsage.updateMany({ where: { id: session.usageId, userId: user.id }, data: { status: "FAILED", errorCode: "LIVE_PROVIDER_START_FAILED" } });
         throw classifyOpenAiProviderError(error) ?? error;
       }
     }
@@ -136,6 +150,7 @@ export async function POST(request: Request) {
     const messageCount = await prisma.aiConversationMessage.count({
       where: { conversationId: started.conversation.id },
     });
+    assertNotCancelled();
     return Response.json(
       {
         mode: config.liveProvider === "live" ? "live" : "simulation",
@@ -159,6 +174,12 @@ export async function POST(request: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
+    if (cleanup) {
+      const code = error instanceof AiCrmError ? error.code : "LIVE_START_FAILED";
+      const ended = await endLiveSession(prisma, { userId: cleanup.userId, sessionId: cleanup.sessionId, errorCode: code }).catch(() => null);
+      if (cleanup.providerRef) await sendProviderUpdate(cleanup.providerRef, "", { close: true }).catch(() => undefined);
+      if (ended?.usageId) await prisma.aiUsage.updateMany({ where: { id: ended.usageId, userId: cleanup.userId, status: "STARTED" }, data: { status: "FAILED", errorCode: code } }).catch(() => undefined);
+    }
     return aiErrorResponse(error);
   }
 }

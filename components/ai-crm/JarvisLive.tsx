@@ -29,6 +29,7 @@ export default function JarvisLive(props: JarvisLiveProps) {
   const [settings, setSettings] = useState<JarvisLiveSettings | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     void fetch("/api/ai-crm/live/session", { signal: controller.signal, cache: "no-store" }).then(async response => {
@@ -36,11 +37,12 @@ export default function JarvisLive(props: JarvisLiveProps) {
       if (!response.ok || !["live", "simulation"].includes(data.mode)) throw new Error(data.error || "Die Sprachkonfiguration konnte nicht geladen werden.");
       setMode(data.mode);
       setSettings(data.config);
+      setActiveSessionId(typeof data.activeSession?.id === "string" ? data.activeSession.id : null);
       setError("");
     }).catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Die Sprachkonfiguration konnte nicht geladen werden."); });
     return () => controller.abort();
   }, [attempt]);
   if (error) return <div className="jarvis-live-body"><p role="alert" className="jarvis-live-error">{error}</p><button onClick={() => setAttempt(value => value + 1)}>Konfiguration erneut prüfen</button></div>;
   if (!mode || !settings) return <p className="assistant-caption" role="status">Sprachzugang wird geprüft …</p>;
-  return mode === "simulation" ? <JarvisLiveMock {...props} /> : <JarvisLivePilot {...props} settings={settings} />;
+  return mode === "simulation" ? <JarvisLiveMock {...props} /> : <JarvisLivePilot {...props} settings={settings} initialActiveSessionId={activeSessionId} />;
 }

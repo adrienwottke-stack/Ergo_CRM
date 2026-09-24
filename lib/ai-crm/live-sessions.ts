@@ -137,7 +137,7 @@ export async function startLiveSession(
       }
       throw new AiCrmError(
         "LIVE_SESSION_ALREADY_ACTIVE",
-        "Live mit Jarvis läuft bereits in einem anderen Tab. Beende die Runde dort, bevor du hier neu startest.",
+        "Für dich ist noch eine Sprachsitzung geöffnet. Sie kann in einem anderen Tab laufen oder nach einem unterbrochenen Start übrig sein. Du kannst die vorherige Sitzung hier beenden und danach neu starten.",
         409,
       );
     }

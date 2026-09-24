@@ -30,7 +30,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: "block" });
   await context.addCookies([{ name: authCookieName, value: await createSession(user.id), url: origin }]);
   await context.addInitScript(() => {
-    window.__inputLevel = 0; window.__trackStops = 0; window.__audio = []; window.__controls = []; window.__timeline = 0; window.__lastUtteranceEnd = 0; window.__firstAudioMs = null;
+    window.__inputLevel = 0; window.__trackStops = 0; window.__micRequests = 0; window.__audio = []; window.__controls = []; window.__timeline = 0; window.__lastUtteranceEnd = 0; window.__firstAudioMs = null;
     class AudioFixture extends EventTarget {
       src; srcObject = null; volume = 1; paused = true; currentTime = 0; muted = false;
       constructor(src = "") { super(); this.src = src; this.createdSrc = src; window.__audio.push(this); }
@@ -45,6 +45,7 @@ try {
       async resume() { this.state = "running"; } async close() { this.state = "closed"; }
     };
     Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: async () => {
+      window.__micRequests++;
       const track = { enabled: true, stop() { window.__trackStops++; } };
       return { kind: "input", getTracks: () => [track], getAudioTracks: () => [track] };
     } } });
@@ -70,6 +71,7 @@ try {
   const settings = { demoEnabled: true, greetingText: "Hallo, Meister Emil. Darf es etwas Musik sein?", inactivitySeconds: 180, warningSeconds: 30, maxSessionSeconds: 600, reconnectLimit: 1 };
   const conversation = { id: "fixture-conversation", title: "Jarvis UI Test", expiresAt: new Date(Date.now() + 86_400_000).toISOString(), updatedAt: new Date().toISOString(), messageCount: 0 };
   let introState = "WAITING", introCalls = 0, turnCalls = [], revision = 0, ends = 0, failNextTurn = false, lastTurn = null, introDelay = 0, failIntro = false;
+  let activeSessionId = "fixture-blocked", failEnd = true, failStart = false, delayedStart = null, startEntered = null;
   const introBodies = [];
   await page.route("**/api/ai-crm/live/**", async route => {
     const request = route.request(), url = new URL(request.url());
@@ -91,16 +93,35 @@ try {
       if (failNextTurn) { failNextTurn = false; return route.abort("failed"); }
       response = { answer: "Dies ist eine gekennzeichnete kontrollierte UI-Testantwort.", requestId: body.clientTurnId, actions: [], results: [{ id: "fixture-read", readAt: new Date().toISOString(), summary: "Kontrolliertes Testresultat", items: [] }], conversation, revision, stale: false, audioDelivered: true };
     } else if (url.pathname.endsWith("/session")) {
-      response = request.method() === "GET" ? { mode: "live", config: settings } : { mode: "live", session: { id: "fixture-session", introState, revision, expiresAt: new Date(Date.now() + 600_000).toISOString() }, conversation, transport: { type: "webrtc", sdp: "controlled-answer" } };
+      if (request.method() === "GET") response = { mode: "live", config: settings, activeSession: activeSessionId ? { id: activeSessionId } : null };
+      else {
+        if (activeSessionId && !body.reconnect) return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ code: "LIVE_SESSION_ALREADY_ACTIVE", error: "Eine Sprachsitzung ist noch geöffnet." }) });
+        activeSessionId = "fixture-session";
+        startEntered?.();
+        if (delayedStart) await delayedStart;
+        if (failStart) { failStart = false; return route.abort("failed"); }
+        response = { mode: "live", session: { id: activeSessionId, introState, revision, expiresAt: new Date(Date.now() + 600_000).toISOString() }, conversation, transport: { type: "webrtc", sdp: "controlled-answer" } };
+      }
     } else if (request.method() === "GET") response = { session: { introState, revision } };
     else if (request.method() === "PATCH") { revision = Math.max(revision, body.revision || 0); }
-    else if (request.method() === "DELETE") ends++;
+    else if (request.method() === "DELETE") {
+      if (failEnd) { failEnd = false; return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Kontrollierter Fehler beim Beenden" }) }); }
+      ends++; activeSessionId = null;
+    }
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(response) });
   });
   await page.route("**/api/ai-crm/requests/**", route => route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "Controlled not-found fixture" }) }));
   await page.goto(`${origin}/heute`);
   await page.getByRole("button", { name: "Deinen Tag besprechen" }).click();
   await page.locator(".assistant-live-entry > summary").click();
+  await page.getByRole("button", { name: "Vorherige Sitzung beenden", exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.__micRequests), 0, "discovering a stale lock never opens the microphone");
+  await page.getByRole("button", { name: "Vorherige Sitzung beenden", exact: true }).click();
+  await page.getByText("Kontrollierter Fehler beim Beenden", { exact: true }).waitFor();
+  assert.equal(await page.getByRole("button", { name: "Jarvis starten", exact: true }).count(), 0, "do not pretend an unacknowledged end succeeded");
+  await page.getByRole("button", { name: "Vorherige Sitzung beenden", exact: true }).click();
+  await page.getByRole("button", { name: "Jarvis starten", exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.__micRequests), 0, "ending another session does not implicitly start audio");
   await page.getByRole("button", { name: "Jarvis starten", exact: true }).click();
   await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
   await page.evaluate(() => window.__say("Was ist heute für mich offen?"));
@@ -165,6 +186,32 @@ try {
   await page.getByRole("button", { name: "Ja, Musik starten", exact: true }).waitFor();
   assert.deepEqual(introBodies.at(-1), {});
   await page.getByRole("button", { name: "Ohne Musik weiter", exact: true }).click();
+  await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
+  // An accepted start with a lost HTTP response exposes owner-scoped recovery.
+  failStart = true;
+  const endsBeforeLostStart = ends;
+  await page.getByRole("button", { name: "Jarvis starten", exact: true }).click();
+  await page.getByRole("button", { name: "Vorherige Sitzung beenden", exact: true }).waitFor();
+  assert.equal(ends, endsBeforeLostStart, "a lost response must not silently end a possibly different tab");
+  assert.equal(await page.evaluate(() => window.__peer.connectionState), "closed");
+  await page.getByRole("button", { name: "Vorherige Sitzung beenden", exact: true }).click();
+  await page.getByRole("button", { name: "Jarvis starten", exact: true }).waitFor();
+  assert.equal(activeSessionId, null);
+  // Cancelling before the start response arrives still closes the late session.
+  let releaseStart;
+  delayedStart = new Promise(resolve => { releaseStart = resolve; });
+  const entered = new Promise(resolve => { startEntered = resolve; });
+  const endsBeforeCancel = ends;
+  await page.getByRole("button", { name: "Jarvis starten", exact: true }).click();
+  await entered;
+  await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
+  await page.getByRole("button", { name: "Jarvis starten", exact: true }).waitFor();
+  releaseStart(); delayedStart = null; startEntered = null;
+  await page.waitForResponse(response => response.request().method() === "DELETE" && response.url().endsWith("/fixture-session"));
+  assert.equal(ends, endsBeforeCancel + 1);
+  assert.equal(activeSessionId, null);
+  await page.getByRole("button", { name: "Jarvis starten", exact: true }).click();
+  await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
   assert.deepEqual(errors, []);
   await writeFile(new URL("report.json", output), JSON.stringify({ passed: true, simulated: true, controlledTiming, assertions: ["WebRTC handshake/ICE", "once-only exact intro clip request", "retained initial question", "music starts only after yes", "pause preserved after speech and ducking", "reconnect preserves intro and does not restart music", "shared timeline sources", "mute separate from end", "lost response retry keeps operation id", "desktop/mobile overflow and persistent microphone/end controls", "tracks and transport cleanup", "superseded slow intro never plays", "TTS failure retry reads durable WAITING before claim"], liveProvider: "not tested", microphoneHardware: "not tested", actualMusic: "not tested" }, null, 2));

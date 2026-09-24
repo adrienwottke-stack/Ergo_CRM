@@ -76,6 +76,30 @@ ergänzt, kein zusätzlicher Dienst. Lange Antworten gehen vollständig in
 konservativen UTF-8-begrenzten Abschnitten an Live; keine stille 1200-Zeichen-
 Kürzung. Vollständige Quellen und Vorschläge bleiben im bestehenden Jarvis.
 
+## Wiederanlauf nach unterbrochenem Start
+
+`GET /api/ai-crm/live/session` liefert zusätzlich `activeSession: {id} | null`
+für die eigene, noch nicht abgelaufene Sitzung. Providerkennung, Startkennung
+und fremde Sitzungen werden dabei nicht offengelegt. Der Browser bietet bei
+einer bestehenden Sperre „Vorherige Sitzung beenden“ an. Erst nach bestätigtem
+Abschluss erscheint „Jarvis starten“; weder die Statusprüfung noch das
+Beenden öffnet das Mikrofon. Eine fehlgeschlagene Beendigung bleibt sichtbar
+wiederholbar. Der Schutz vor zwei gleichzeitig aktiven Tabs bleibt bestehen.
+
+Ein lokal abgebrochener Start nimmt eine noch ausstehende Startantwort weiter
+entgegen und beendet deren Sitzung sofort. Bei tatsächlich verlorener Antwort
+wird die eigene aktive Sitzung erneut abgefragt und zum bewussten Beenden
+angeboten. Serverseitige Abbrüche, unvollständige Providerantworten und Fehler
+beim Zusammenstellen der Antwort geben die eigene Startreservierung frei und
+schließen eine bereits erzeugte Providerverbindung. Eine zwischenzeitlich
+beendete Sitzung darf durch die späte Providerantwort nicht wieder aktiv werden.
+
+Die API-Tests decken Zugriffsschutz, erneuten Start, Abbruch während des
+Providerstarts, unvollständige Antworten und Fehler nach dem Providerstart ab.
+Der kontrollierte Browser-Test prüft zusätzlich eine vorhandene Sperre,
+fehlgeschlagene Beendigung, verlorene Startantwort, späte Antwort nach Abbruch
+und den anschließenden erfolgreichen Neustart.
+
 ## Konfiguration
 
 Serverseitig: `OPENAI_API_KEY`, `AI_LIVE_PROVIDER=live`,
