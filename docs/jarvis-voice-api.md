@@ -114,6 +114,14 @@ konfiguriert; dazu die Pilotanleitung beachten.
 
 ## Prüfungen und Grenzen
 
+Live-Transkripte tragen ihren Text in `delta`, nicht in `content`.
+Der Parser verwendet den SDK-Typ `InputTranscriptDeltaEvent` und übernimmt
+die Fragmente einschließlich Leerzeichen in den lokalen Äußerungspuffer.
+Die Testereignisse sind ebenfalls gegen den SDK-Typ geprüft. Der Browser-Test
+durchläuft mit diesem Ereignisformat die Begrüßung und die anschließende
+CRM-Antwort; ein falsches Fixture darf den echten Eingabefehler nicht verdecken.
+Referenz: [GPT-Live transcript deltas](https://developers.openai.com/api/docs/guides/live-conversations#transcript-deltas).
+
 `scripts/jarvis-voice.test.mjs` verwendet eine isolierte PGlite-Datenbank
 und kontrollierte SDK-/Sideband-Mocks. Geprüft werden Protokollkonfiguration,
 Frontend-Allowlist, eigene/fremde Sessions, einmalige Intro-Erzeugung,

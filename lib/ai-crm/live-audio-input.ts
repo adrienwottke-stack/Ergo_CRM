@@ -1,3 +1,5 @@
+import type { InputTranscriptDeltaEvent } from "openai/resources/live/live";
+
 /** WebAudio analysis only. The microphone graph is never connected to speakers/music. */
 export function monitorAudio(stream: MediaStream, onActivity: (active: boolean) => void): { close(): void; resume(): Promise<void>; state(): string } {
   const context = new AudioContext();
@@ -31,10 +33,10 @@ export function monitorAudio(stream: MediaStream, onActivity: (active: boolean) 
 export type LiveTranscriptDelta = { content: string; eventId: string; startMs: number; endMs: number };
 export function inputTranscriptDelta(value: unknown): LiveTranscriptDelta | null {
   if (!value || typeof value !== "object") return null;
-  const item = value as Record<string, unknown>;
-  if (item.type !== "session.input_transcript.delta" || typeof item.content !== "string" || typeof item.event_id !== "string") return null;
+  const item = value as Partial<InputTranscriptDeltaEvent>;
+  if (item.type !== "session.input_transcript.delta" || typeof item.delta !== "string" || typeof item.event_id !== "string") return null;
   if (typeof item.start_ms !== "number" || typeof item.end_ms !== "number" || item.start_ms < 0 || item.end_ms < item.start_ms) return null;
-  return { content: item.content, eventId: item.event_id, startMs: item.start_ms, endMs: item.end_ms };
+  return { content: item.delta, eventId: item.event_id, startMs: item.start_ms, endMs: item.end_ms };
 }
 
 /** Deduplicates retries; finalization is driven by audio activity, never text gaps alone. */

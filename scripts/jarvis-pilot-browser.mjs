@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { testDatabase } from "./test-db.mjs";
 import { createSession, authCookieName } from "../lib/session.ts";
+import { liveTranscriptEvent } from "./fixtures/live-transcript.ts";
 
 const fixture = await testDatabase(0, 24);
 const port = Number(process.env.JARVIS_PILOT_BROWSER_PORT || 3147);
@@ -29,7 +30,7 @@ try {
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: "block" });
   await context.addCookies([{ name: authCookieName, value: await createSession(user.id), url: origin }]);
-  await context.addInitScript(() => {
+  await context.addInitScript(({ transcriptTemplate }) => {
     window.__inputLevel = 0; window.__trackStops = 0; window.__micRequests = 0; window.__audio = []; window.__controls = []; window.__timeline = 0; window.__lastUtteranceEnd = 0; window.__firstAudioMs = null;
     class AudioFixture extends EventTarget {
       src; srcObject = null; volume = 1; paused = true; currentTime = 0; muted = false;
@@ -61,11 +62,11 @@ try {
     window.__say = async text => {
       window.__inputLevel = .2; await new Promise(resolve => setTimeout(resolve, 260));
       window.__timeline += 4000;
-      window.__peer.channel.onmessage({ data: JSON.stringify({ type: "session.input_transcript.delta", content: text, event_id: crypto.randomUUID(), start_ms: window.__timeline, end_ms: window.__timeline + 1000 }) });
+      window.__peer.channel.onmessage({ data: JSON.stringify({ ...transcriptTemplate, delta: text, event_id: crypto.randomUUID(), start_ms: window.__timeline, end_ms: window.__timeline + 1000 }) });
       window.__inputLevel = 0;
       window.__lastUtteranceEnd = performance.now();
     };
-  });
+  }, { transcriptTemplate: liveTranscriptEvent("") });
   const page = await context.newPage(); page.setDefaultTimeout(30_000);
   const errors = []; page.on("pageerror", error => errors.push(error.message));
   const settings = { demoEnabled: true, greetingText: "Hallo, Meister Emil. Darf es etwas Musik sein?", inactivitySeconds: 180, warningSeconds: 30, maxSessionSeconds: 600, reconnectLimit: 1 };
