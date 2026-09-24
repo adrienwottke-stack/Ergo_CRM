@@ -48,6 +48,7 @@ export class LiveUtteranceBuffer {
   private lastDeltaAt = 0;
   private maximumEndMs = -1;
   private finalizedBeforeMs = -1;
+  private interruptionClaimed = false;
   append(delta: LiveTranscriptDelta, now = Date.now()): "added" | "duplicate" | "late" {
     if (this.events.has(delta.eventId)) return "duplicate";
     this.events.add(delta.eventId); if (this.events.size > 1000) this.events.delete(this.events.values().next().value!);
@@ -58,10 +59,16 @@ export class LiveUtteranceBuffer {
     this.lastDeltaAt = now; this.text += delta.content; return "added";
   }
   activity(now: number) { this.observedSpeech = true; this.lastAudioAt = now; }
+  /** A level spike is not speech. Revoke output only once for recognized words. */
+  claimInterruption(): boolean {
+    if (this.interruptionClaimed || !/[\p{L}\p{N}]/u.test(this.text)) return false;
+    this.interruptionClaimed = true;
+    return true;
+  }
   ready(now: number, pauseMs = 1400) { return this.observedSpeech && this.text.trim().length > 0 && now - this.lastAudioAt >= pauseMs && now - this.lastDeltaAt >= 500; }
-  take() { const result = this.text.trim(); this.finalizedBeforeMs = Math.max(this.finalizedBeforeMs, this.maximumEndMs + 1000); this.text = ""; this.observedSpeech = false; return result; }
-  clear() { if (this.maximumEndMs >= 0) this.finalizedBeforeMs = Math.max(this.finalizedBeforeMs, this.maximumEndMs + 1000); this.text = ""; this.observedSpeech = false; }
-  resetTimeline() { this.events.clear(); this.text = ""; this.observedSpeech = false; this.lastAudioAt = 0; this.lastDeltaAt = 0; this.maximumEndMs = -1; this.finalizedBeforeMs = -1; }
+  take() { const result = this.text.trim(); this.finalizedBeforeMs = Math.max(this.finalizedBeforeMs, this.maximumEndMs + 1000); this.text = ""; this.observedSpeech = false; this.interruptionClaimed = false; return result; }
+  clear() { if (this.maximumEndMs >= 0) this.finalizedBeforeMs = Math.max(this.finalizedBeforeMs, this.maximumEndMs + 1000); this.text = ""; this.observedSpeech = false; this.interruptionClaimed = false; }
+  resetTimeline() { this.events.clear(); this.text = ""; this.observedSpeech = false; this.interruptionClaimed = false; this.lastAudioAt = 0; this.lastDeltaAt = 0; this.maximumEndMs = -1; this.finalizedBeforeMs = -1; }
   preview() { return this.text.trim(); }
 }
 

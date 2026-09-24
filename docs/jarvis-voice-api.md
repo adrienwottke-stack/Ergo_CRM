@@ -33,7 +33,7 @@ bereitet lediglich eine Bestätigungsvorschau vor.
   `POST /v1/live/sessions` auf. Der Browser erhält die SDP-Antwort und wartet
   auf `session.started`. Er sendet kein `session.start`.
 - [Sitzungen](https://developers.openai.com/api/docs/guides/live-conversations):
-  Eingangs-/Ausgangstranskripte bestehen aus `content`, `start_ms`, `end_ms`.
+  Eingangs-/Ausgangstranskripte bestehen aus `delta`, `start_ms`, `end_ms`.
   Es gibt dabei kein `transcript.done` oder Realtime-`speech_started`.
   Audio, Transkript und Aufgaben müssen unabhängig erfasst werden.
   Für exakten Wortlaut empfiehlt die Dokumentation einen gerenderten Clip
@@ -103,7 +103,7 @@ und den anschließenden erfolgreichen Neustart.
 ## Konfiguration
 
 Serverseitig: `OPENAI_API_KEY`, `AI_LIVE_PROVIDER=live`,
-`AI_LIVE_MODEL=gpt-live-1`, `AI_LIVE_VOICE=marin`,
+`AI_LIVE_MODEL=gpt-live-1`, `AI_LIVE_VOICE=cedar`,
 `AI_LIVE_SPEECH_MODEL=gpt-4o-mini-tts`, `JARVIS_DEMO_ENABLED=true`,
 `JARVIS_GREETING_NAME=Meister Emil`, `AI_LIVE_MAX_SESSION_SECONDS`,
 `AI_LIVE_INACTIVITY_SECONDS`, `AI_LIVE_WARNING_SECONDS`,
@@ -111,6 +111,36 @@ Serverseitig: `OPENAI_API_KEY`, `AI_LIVE_PROVIDER=live`,
 Bestehende AI-Feature-/Entitlement- und Monatslimits bleiben erforderlich.
 Die Anrede gewährt keine Rechte. Musikquelle und Player sind separat
 konfiguriert; dazu die Pilotanleitung beachten.
+
+## Stimme und störungsarme Wiedergabe
+
+Die Rückmeldung zur bisherigen Stimme führte zum Wechsel von `marin` auf
+`cedar`, das sowohl GPT-Live als auch die Begrüßungs-TTS unterstützen.
+`voice-style.ts` definiert dieselbe ruhige, tiefere und dezent synthetische
+deutsche Sprechweise für beide Wege. Begrüßung und Live-Audio verwenden
+denselben Wiedergabepegel von 0,8; Musik behält ihre separate Steuerung.
+Die Auswahl beschreibt ein eigenes technisches Assistentenprofil; ein
+identischer Filmklang oder ein bereits bestandener Hörtest wird nicht behauptet.
+OpenAI empfiehlt `cedar` und `marin` für die TTS-Qualität:
+[Text to speech](https://developers.openai.com/api/docs/guides/text-to-speech).
+Eine andere Live-Stimme gilt erst in einer neu gestarteten Sitzung:
+[Live-Konfiguration](https://developers.openai.com/api/docs/guides/live-conversations).
+
+Ein konkreter Wiedergabefehler wurde vor der Korrektur im Browser reproduziert:
+Eine Mikrofon-Pegelspitze ohne Transkript setzte `speaker.muted = true` und
+widerrief die laufende Antwort. Kurzes Rauschen, Klicks oder Rest-Echo konnten
+so die Ausgabe bis zur nächsten Fachantwort abschneiden. Pegel dienen jetzt
+nur noch Aktivitätsanzeige, Musikabsenkung und Pausenerkennung. Erst neue
+erkannte Wörter dürfen die Antwort unterbrechen, höchstens einmal pro
+Äußerung. Duplikate, verspätete Fragmente und bloße Satzzeichen zählen nicht.
+Der manuelle Unterbrechen-Knopf bleibt unmittelbar wirksam.
+
+Der kontrollierte Browser-Nachweis prüft Geräusch ohne Unterbrechung, echte
+Sprache mit Unterbrechung, die nächste hörbare Antwort und den gleichen
+Pegel für Intro/Live. Er ersetzt keinen Hörtest am physischen Zielgerät.
+Die genaue Ursache eines dort wahrgenommenen Rauschens ist damit nicht
+abschließend geklärt; Bluetooth-Geräteprofil, Lautsprecher-Echo und die
+Provideraufnahme sind in diesen Tests nicht enthalten.
 
 ## Prüfungen und Grenzen
 

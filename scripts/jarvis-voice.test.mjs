@@ -12,7 +12,7 @@ process.env.JARVIS_DEMO_ENABLED = "true";
 let creates = 0, speeches = 0, backendCalls = 0;
 globalThis.jarvisVoiceClient = {
   live: { create: async body => { creates++; globalThis.jarvisVoiceCreated = body; return { session: { id: `live_test_${creates}` }, transport: { type: "webrtc", sdp: "test-answer" } }; } },
-  audio: { speech: { create: async body => { speeches++; globalThis.jarvisVoiceSpoken = body.input; return new Response(new Uint8Array([1, 2, 3]), { headers: { "Content-Type": "audio/mpeg" } }); } } },
+  audio: { speech: { create: async body => { speeches++; globalThis.jarvisVoiceSpeechRequest = body; globalThis.jarvisVoiceSpoken = body.input; return new Response(new Uint8Array([1, 2, 3]), { headers: { "Content-Type": "audio/mpeg" } }); } } },
 };
 globalThis.jarvisVoiceAgent = async params => { backendCalls++; globalThis.jarvisVoiceAgentParams = params; return { answer: "Zugängliche Daten wurden geprüft.", actions: [], results: [{ id: "fact", summary: "Quelle", readAt: new Date().toISOString(), items: [] }], usage: { inputTokens: 3, outputTokens: 4, toolCalls: 0, estimatedCostMicros: 0 } }; };
 const modules = {
@@ -83,6 +83,10 @@ test("authenticated session, exact greeting claim, manual replay and reconnect p
   assert.equal(first.status, 200);
   assert.equal(first.headers.get("content-type"), "audio/mpeg");
   assert.equal(globalThis.jarvisVoiceSpoken, payload.config.greetingText);
+  assert.equal(globalThis.jarvisVoiceCreated.session.audio.output.voice, "cedar");
+  assert.equal(globalThis.jarvisVoiceSpeechRequest.voice, globalThis.jarvisVoiceCreated.session.audio.output.voice, "intro and Live keep one voice");
+  assert.match(globalThis.jarvisVoiceSpeechRequest.instructions, /tiefer, männlich/);
+  assert.match(globalThis.jarvisVoiceCreated.session.instructions, /dezent synthetische/);
   assert.equal((await intro.POST(req(), session)).status, 409);
   assert.equal((await intro.POST(req({ replay: true }), session)).status, 200);
   assert.equal(speeches, 1);

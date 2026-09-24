@@ -143,12 +143,28 @@ try {
   await page.evaluate(() => window.__say("Ja, gerne."));
   await page.getByText("Kontrolliertes Testresultat", { exact: true }).waitFor();
   assert.equal(turnCalls[0].transcript, "Was ist heute für mich offen?"); assert.equal(introCalls, 1);
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.createdSrc.startsWith("blob:"))?.volume), .8);
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.volume), .8, "greeting and ongoing speech share a reduced output level");
+  // Raw microphone noise while Jarvis speaks must not mute or revoke his answer.
+  await page.evaluate(() => { window.__outputLevel = .12; });
+  await page.getByText("Jarvis spricht", { exact: true }).waitFor();
+  const revisionBeforeNoise = revision;
+  await page.evaluate(() => { window.__inputLevel = .08; });
+  await new Promise(resolve => setTimeout(resolve, 450));
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), false, "microphone noise without recognized speech must not cut off Jarvis");
+  assert.equal(revision, revisionBeforeNoise, "noise must not cancel backend work");
+  await page.evaluate(() => { window.__inputLevel = 0; window.__outputLevel = 0; });
   await page.getByLabel("Sprachoptionen", { exact: true }).click();
   await page.getByText("Musik · läuft", { exact: true }).click();
   await page.getByRole("button", { name: "Musikpause", exact: true }).click();
   await page.getByLabel("Sprachoptionen", { exact: true }).click();
+  await page.evaluate(() => { window.__outputLevel = .12; });
+  await page.getByText("Jarvis spricht", { exact: true }).waitFor();
   await page.evaluate(() => window.__say("Etwas leiser. Was habe ich selbst zugesagt?"));
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), true, "recognized interruption still stops the answer");
+  await page.evaluate(() => { window.__outputLevel = 0; });
   await page.waitForFunction(() => document.querySelectorAll(".assistant-read-result").length >= 2);
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), false, "the next current answer resumes normally");
   const controlledTiming = await page.evaluate(() => ({ firstMockAudioAfterUtteranceMs: Math.round(window.__firstAudioMs), crmResultVisibleAfterCrmUtteranceMs: Math.round(performance.now() - window.__lastUtteranceEnd), providerLatencyMeasured: false, audioPlaybackHardwareMeasured: false }));
   assert.equal(turnCalls.at(-1).transcript, "Was habe ich selbst zugesagt?");
   assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.src.includes("/live/music"))?.paused), true);

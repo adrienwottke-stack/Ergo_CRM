@@ -101,6 +101,28 @@ test("non-transcript events and the old incorrect content-only fixture are rejec
   const valid = liveTranscriptEvent("Jarvis?");
   for (const invalid of [null, { ...valid, type: "session.output_transcript.delta" }, { ...valid, delta: undefined, content: "Jarvis?" }, { ...valid, delta: 12 }, { ...valid, event_id: null }, { ...valid, start_ms: -1 }, { ...valid, end_ms: -1 }]) assert.equal(inputTranscriptDelta(invalid), null);
 });
+
+test("noise cannot interrupt speech; recognized words interrupt once and reset for the next utterance", () => {
+  const buffer = new LiveUtteranceBuffer();
+  buffer.activity(1000);
+  assert.equal(buffer.claimInterruption(), false, "microphone activity alone carries no words");
+  buffer.append({ eventId: "punctuation", content: " ... ", startMs: 0, endMs: 100 }, 1100);
+  assert.equal(buffer.claimInterruption(), false);
+  buffer.append({ eventId: "word", content: "Moment", startMs: 100, endMs: 600 }, 1200);
+  assert.equal(buffer.claimInterruption(), true);
+  buffer.append({ eventId: "continuation", content: ", die andere Person", startMs: 600, endMs: 900 }, 1300);
+  assert.equal(buffer.claimInterruption(), false, "fragments cannot repeatedly cancel the same response");
+  buffer.take();
+  assert.equal(buffer.claimInterruption(), false);
+  buffer.append({ eventId: "next", content: "Stopp", startMs: 3000, endMs: 3500 }, 4000);
+  assert.equal(buffer.claimInterruption(), true);
+  buffer.clear();
+  assert.equal(buffer.append({ eventId: "late", content: "weiter", startMs: 3500, endMs: 4000 }, 4100), "late");
+  assert.equal(buffer.claimInterruption(), false, "late words cannot interrupt a new context");
+  buffer.resetTimeline();
+  buffer.append({ eventId: "fresh", content: "Neue Frage", startMs: 0, endMs: 500 }, 5000);
+  assert.equal(buffer.claimInterruption(), true);
+});
 test("late fragments are kept out of a new utterance after partner change", () => {
   const buffer = new LiveUtteranceBuffer();
   buffer.activity(1000); buffer.append({ eventId: "a", content: "Was ist", startMs: 0, endMs: 500 }, 1000);

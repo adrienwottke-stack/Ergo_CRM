@@ -5,6 +5,7 @@ import type { ActionReceipt, AssistantContext, ReadResult } from "@/lib/ai-crm/c
 import type { JarvisLiveConversation, JarvisLiveProps, JarvisLiveSettings } from "@/components/ai-crm/JarvisLive";
 import { LocalAudioController, isSessionStop, musicOfferDecision, splitMusicCommand, type LocalAudioState, type MusicCommand } from "@/lib/ai-crm/local-audio";
 import { inputTranscriptDelta, LiveUtteranceBuffer, monitorAudio, sessionTiming, waitForIceGathering } from "@/lib/ai-crm/live-audio-input";
+import { JARVIS_VOICE_VOLUME } from "@/lib/ai-crm/voice-style";
 
 type Connection = "IDLE" | "MICROPHONE" | "CONNECTING" | "CONNECTED" | "DISCONNECTED" | "ENDED";
 type Intro = "WAITING" | "PLAYING" | "OFFERED" | "DONE";
@@ -256,7 +257,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       if (token !== lifecycle.current || epoch !== introEpoch.current || introState.current !== "PLAYING" || session.current?.id !== active.id) return;
       clearIntroAudio();
       introUrl.current = URL.createObjectURL(blob);
-      const audio = new Audio(introUrl.current); introAudio.current = audio;
+      const audio = new Audio(introUrl.current); audio.volume = JARVIS_VOICE_VOLUME; introAudio.current = audio;
       audio.onended = () => { if (session.current?.id === active.id) void markIntro("OFFERED").catch(reason => setError(String(reason.message))); };
       audio.onerror = () => { setIntroRetry(true); setError("Die Begrüßung konnte nicht abgespielt werden. Prüfe die Audioausgabe und starte sie manuell."); };
       await audio.play();
@@ -322,7 +323,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       const pc = new RTCPeerConnection(); peer.current = pc;
       utterance.current.resetTimeline();
       let providerStarted = false;
-      const speaker = new Audio(); speaker.autoplay = true; speaker.muted = !reconnecting && settings.demoEnabled || introState.current !== "DONE"; voice.current = speaker;
+      const speaker = new Audio(); speaker.autoplay = true; speaker.volume = JARVIS_VOICE_VOLUME; speaker.muted = !reconnecting && settings.demoEnabled || introState.current !== "DONE"; voice.current = speaker;
       pc.ontrack = event => {
         if (peer.current !== pc) return;
         const remote = event.streams[0] ?? new MediaStream([event.track]); speaker.srcObject = remote;
@@ -350,6 +351,14 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
             const accepted = utterance.current.append(delta);
             if (accepted === "late") setNotice("Ein verspätetes Sprachfragment wurde verworfen, damit es nicht zur nächsten Aussage gehört. Wiederhole die vorherige Frage, falls ihr Ende fehlt.");
             else setHeard(utterance.current.preview());
+            // Microphone levels include clicks, breathing and residual speaker echo.
+            // Only new recognized speech may cancel an answer, once per utterance.
+            if (accepted === "added" && session.current && (jarvisSpeaking.current || operation.current || introState.current === "PLAYING") && utterance.current.claimInterruption()) {
+              speaker.muted = true;
+              nextRevision(true); setWorking(false); jarvisSpeaking.current = false; setOutputActive(false);
+              if (introState.current === "PLAYING" && introAudio.current) { releaseIntro(); void markIntro("OFFERED").catch(() => setIntroRetry(true)); }
+              duck();
+            }
           }
           if (data.type === "session.delegation.created" && typeof data.delegation?.id === "string") delegation.current = data.delegation.id;
           if (data.type === "error" || data.type === "session.error") setError("Der Sprachdienst meldet einen Fehler. Das CRM bleibt bedienbar; beende und starte die Verbindung bei Bedarf neu.");
@@ -359,12 +368,6 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       inputMeter.current = monitorAudio(microphone, active => {
         userSpeaking.current = active && !micMuted.current; setInputActive(userSpeaking.current); duck();
         if (userSpeaking.current) { utterance.current.activity(Date.now()); activity(); }
-        if (userSpeaking.current && session.current && (jarvisSpeaking.current || operation.current || introState.current === "PLAYING")) {
-          if (speaker) speaker.muted = true;
-          nextRevision(true); setWorking(false); jarvisSpeaking.current = false; setOutputActive(false);
-          if (introState.current === "PLAYING" && introAudio.current) { releaseIntro(); void markIntro("OFFERED").catch(() => setIntroRetry(true)); }
-          duck();
-        }
       });
       // Some browsers leave resume pending until another user gesture. Do not
       // strand connection setup behind that promise; expose the manual control.
