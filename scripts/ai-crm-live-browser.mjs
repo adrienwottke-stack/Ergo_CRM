@@ -188,13 +188,13 @@ try {
   );
   await desktop.page.getByRole("button", { name: "Deinen Tag besprechen" }).click();
   await desktop.page.locator("#crm-assistant-surface").waitFor();
-  await desktop.page.locator(".assistant-live-entry > summary").click();
-  await desktop.page.getByRole("button", { name: "Live mit Jarvis starten" }).waitFor();
+  await desktop.page.getByRole("button", { name: "Mit Jarvis sprechen" }).waitFor();
+  await desktop.page.getByRole("button", { name: "Mit Jarvis sprechen" }).click();
+  await desktop.page.getByText("Jarvis hört zu", { exact: true }).waitFor();
+  await desktop.page.getByLabel("Sprachoptionen", { exact: true }).click();
   const spotifySetup = desktop.page.getByRole("button", { name: "Spotify einrichten" });
   await spotifySetup.waitFor();
-  assert.equal(await spotifySetup.isDisabled(), true, "without a valid OAuth configuration the UI must explain setup instead of pretending it can connect");
-  await desktop.page.getByRole("button", { name: "Live mit Jarvis starten" }).click();
-  await desktop.page.getByText("Jarvis hört zu", { exact: true }).waitFor();
+  assert.equal(await spotifySetup.isDisabled(), true, "without valid OAuth the UI must explain setup");
   await desktop.page.getByText("Nicht eingerichtet", { exact: true }).waitFor();
   await screenshot(desktop.page, "desktop-live-listening.png");
   await desktop.page.getByLabel("Simulation: gesprochene Zeile").fill("Hey Jarvis, spiel AC/DC.");
@@ -209,7 +209,7 @@ try {
     .getByText(/Lokale Demo: AC\/DC wäre bei einem verbundenen Spotify-Konto gestartet worden\./)
     .first()
     .waitFor();
-  await desktop.page.getByRole("button", { name: "Unterbrechen und weiter sprechen" }).click();
+  await desktop.page.getByRole("button", { name: "Sprachausgabe unterbrechen" }).click();
   await desktop.page.getByText("Jarvis hört zu", { exact: true }).waitFor();
   await desktop.page.waitForTimeout(320);
   assert.equal(
@@ -217,6 +217,7 @@ try {
     0,
     "barge-in cancels the pending local assistant preview before it can become a final response",
   );
+  await desktop.page.getByLabel("Sprachoptionen", { exact: true }).click();
   await desktop.page.getByLabel("Simulation: gesprochene Zeile").fill("Pause.");
   await desktop.page.getByRole("button", { name: "Live-Zeile senden" }).click();
   await desktop.page
@@ -226,7 +227,7 @@ try {
   await desktop.page.getByText("Simulierte Antwortzeile", { exact: true }).waitFor();
   await desktop.page.getByText("Finale Antwort", { exact: true }).waitFor();
   await screenshot(desktop.page, "desktop-live-result.png");
-  await desktop.page.getByRole("button", { name: "Live beenden" }).click();
+  await desktop.page.getByRole("button", { name: "Sitzung beenden" }).click();
   await desktop.page.getByText("Live-Session beendet.").waitFor();
   await waitForNoActiveSession(user.id);
   assert.ok(
@@ -240,11 +241,10 @@ try {
   const mobile = await contextFor({ width: 375, height: 812 }, true);
   await mobile.page.goto(`${origin}/heute`);
   await mobile.page.getByRole("button", { name: "Deinen Tag besprechen" }).click();
-  await mobile.page.locator(".assistant-live-entry > summary").click();
-  await mobile.page.getByRole("button", { name: "Live mit Jarvis starten" }).waitFor();
-  await mobile.page.getByRole("button", { name: "Live mit Jarvis starten" }).click();
+  await mobile.page.getByRole("button", { name: "Mit Jarvis sprechen" }).waitFor();
+  await mobile.page.getByRole("button", { name: "Mit Jarvis sprechen" }).click();
   await mobile.page.getByText("Jarvis hört zu", { exact: true }).waitFor();
-  const end = mobile.page.getByRole("button", { name: "Live beenden" });
+  const end = mobile.page.getByRole("button", { name: "Sitzung beenden" });
   await end.scrollIntoViewIfNeeded();
   assert.ok(
     await end.evaluate((element) => {
@@ -258,6 +258,7 @@ try {
     "mobile Live has no horizontal overflow",
   );
   await screenshot(mobile.page, "mobile-live-listening.png");
+  await mobile.page.getByLabel("Sprachoptionen", { exact: true }).click();
   const mobileSpotifySetup = mobile.page.getByRole("button", { name: "Spotify einrichten" });
   await mobileSpotifySetup.scrollIntoViewIfNeeded();
   assert.ok(

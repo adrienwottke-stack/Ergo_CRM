@@ -4,15 +4,31 @@ import { useAssistant } from "@/components/ai-crm/AssistantProvider";
 import AssistantComposer from "@/components/ai-crm/AssistantComposer";
 import AssistantTimeline from "@/components/ai-crm/AssistantTimeline";
 import JarvisLive from "@/components/ai-crm/JarvisLive";
+import AssistantIcon from "./AssistantIcon";
 
-export function AssistantConversationList() {
+export function AssistantConversationList({ disabled = false, onSelect }: { disabled?: boolean; onSelect?: () => void }) {
   const assistant = useAssistant();
   const [loading, setLoading] = useState(false);
-  const groups = Map.groupBy([...assistant.conversations].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), item => new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeZone: "Europe/Berlin" }).format(new Date(item.updatedAt)));
-  return <div className="assistant-conversation-list"><h2>Unterhaltungen</h2><button className="assistant-new-conversation" disabled={assistant.locked || assistant.loading} onClick={assistant.startNew}>＋ Neue Unterhaltung</button>{assistant.locked && <p className="assistant-caption">Beende zuerst die laufende Anfrage und prüfe ihr Ergebnis.</p>}
-    {[...groups].map(([day, items]) => <section key={day}><h3>{day}</h3>{items.map(item => <div className="assistant-conversation-row" key={item.id}><button disabled={assistant.locked || assistant.loading} aria-current={assistant.conversationId === item.id ? "true" : undefined} onClick={() => void assistant.selectConversation(item.id)}><strong>{item.title}</strong><span>Verfügbar bis {new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(item.expiresAt))}</span></button><button disabled={assistant.locked || assistant.loading} onClick={() => assistant.setDeleteTarget(item)} aria-label={`Unterhaltung löschen: ${item.title}`}>×</button></div>)}</section>)}
+  const day = (date: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  const today = day(new Date());
+  const yesterday = day(new Date(Date.now() - 86400000));
+  const groups = Map.groupBy([...assistant.conversations].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), item => {
+    const value = day(new Date(item.updatedAt));
+    return value === today ? "Heute" : value === yesterday ? "Gestern" : "Letzte 7 Tage";
+  });
+  const locked = disabled || assistant.locked || assistant.loading;
+  return <div className="assistant-conversation-list">
+    <button className="assistant-new-conversation" disabled={locked} onClick={() => { assistant.startNew(); onSelect?.(); }}><AssistantIcon name="compose" />Neuer Chat</button>
+    <h2 className="sr-only">Unterhaltungen</h2>
+    {[...groups].map(([label, items]) => <section key={label}><h3>{label}</h3>{items.map(item => <div className="assistant-conversation-row" key={item.id}>
+      <button disabled={locked} aria-current={assistant.conversationId === item.id ? "true" : undefined} title={item.title} onClick={() => { void assistant.selectConversation(item.id); onSelect?.(); }}><strong>{item.title}</strong></button>
+      <details className="assistant-conversation-menu" onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
+        <summary aria-label={"Optionen für " + item.title}><AssistantIcon name="more" /></summary>
+        <div><p>Verfügbar bis {new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(item.expiresAt))}</p><button disabled={locked} onClick={() => assistant.setDeleteTarget(item)} aria-label={"Unterhaltung löschen: " + item.title}><AssistantIcon name="trash" />Löschen</button></div>
+      </details>
+    </div>)}</section>)}
     {assistant.nextCursor && <button disabled={loading} onClick={async () => { setLoading(true); try { await assistant.loadList(assistant.nextCursor!); } catch { assistant.setError("Weitere Unterhaltungen konnten nicht geladen werden."); } finally { setLoading(false); } }}>{loading ? "Wird geladen …" : "Weitere laden"}</button>}
-    {!assistant.conversations.length && <p className="assistant-caption">Gesendete Gespräche findest du hier bis sieben Tage nach ihrem Beginn.</p>}
+    {!assistant.conversations.length && <p className="assistant-caption assistant-list-empty">Hier findest du deine Gespräche.</p>}
   </div>;
 }
 
@@ -42,28 +58,72 @@ function DeleteDialog() {
 export default function AssistantView() {
   const assistant = useAssistant();
   const header = useRef<HTMLHeadingElement>(null);
+  const navigation = useRef<HTMLElement>(null);
+  const navToggle = useRef<HTMLButtonElement>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [wideDesktop, setWideDesktop] = useState(false);
   const [liveOpen, setLiveOpen] = useState(false);
+  const empty = !assistant.entries.length && !assistant.loading;
   useEffect(() => { header.current?.focus({ preventScroll: true }); }, []);
   useEffect(() => {
-    if (assistant.section !== "chat") setLiveOpen(false);
-  }, [assistant.section]);
-  return <section className="assistant-view" aria-label="CRM-Assistent">
-    <header className="assistant-header"><button className="assistant-mobile-back" onClick={assistant.close} aria-label="Zurück zum CRM">←</button><h2 ref={header} tabIndex={-1}><button onClick={() => assistant.setSection(assistant.section === "conversations" ? "chat" : "conversations")} aria-label="Unterhaltungen öffnen">Assistent <span aria-hidden>⌄</span></button></h2><div className="assistant-header-actions"><button disabled={assistant.locked || assistant.loading} onClick={assistant.startNew} aria-label="Neue Unterhaltung">＋</button><button className="assistant-expand" onClick={() => assistant.mode === "workspace" ? assistant.asPanel() : assistant.expand()} aria-label={assistant.mode === "workspace" ? "Als Panel öffnen" : "Groß öffnen"}>{assistant.mode === "workspace" ? "↙" : "↗"}</button><button onClick={() => assistant.setSection(assistant.section === "details" ? "chat" : "details")} aria-label="Speicherung und Zugang">⋯</button><button className="assistant-desktop-close" onClick={assistant.close} aria-label="Assistent schließen">×</button></div></header>
-    {assistant.section !== "chat" && <button className="assistant-back-to-chat" onClick={() => assistant.setSection("chat")}>← Zurück zum Gespräch</button>}
-    {assistant.error && !assistant.deleteTarget && <div className="assistant-error-banner" role="alert"><p>{assistant.error}</p>{!assistant.access && <button onClick={() => void assistant.initialize()}>Erneut versuchen</button>}</div>}
-    {assistant.section === "details" ? <Details /> : assistant.section === "conversations" ? <AssistantConversationList /> : !assistant.access ? <p className="assistant-loading" role="status">Assistent wird geöffnet …</p> : !assistant.access.enabled ? <div className="assistant-access"><span aria-hidden>○</span><h3>{assistant.access.reason === "NO_ENTITLEMENT" ? "Der Assistent ist für dein Konto noch nicht freigeschaltet." : assistant.access.reason?.startsWith("MONTHLY") ? "Dein Nutzungslimit ist erreicht." : "Der Assistent ist vorübergehend nicht verfügbar."}</h3><p>Du kannst im CRM normal weiterarbeiten.</p><div className="assistant-button-row"><button className="assistant-primary" onClick={assistant.close}>Zurück zum CRM</button><button onClick={() => assistant.setSection("details")}>Zugang ansehen</button></div></div> : <>
-      {!liveOpen && assistant.attachment && <div className="assistant-context"><span>Bezug: <strong>{assistant.attachment.label}</strong>{assistant.attachment.followUpId && " · Wiedervorlage"}</span><button disabled={assistant.working} onClick={() => assistant.setAttachment(null)} aria-label="Bezug entfernen">×</button></div>}
-      <AssistantTimeline />
-      {assistant.access.liveAvailable && <details className="assistant-live-entry" style={liveOpen ? { maxHeight: "48%", overflowY: "auto", flexShrink: 0 } : undefined}><summary onClick={event => { if (liveOpen) event.preventDefault(); }}>{liveOpen ? "Jarvis aktiv · Mikrofon und Sitzung" : "Mit Jarvis sprechen"}</summary><JarvisLive
-        conversationId={assistant.conversationId}
-        context={assistant.attachment}
-        disabled={assistant.locked}
-        onActiveChange={setLiveOpen}
-        onConversationStarted={assistant.acceptLiveConversation}
-        onTurn={assistant.acceptLiveTurn}
-      /></details>}
-      {!liveOpen && <AssistantComposer />}
-    </>}
+    const media = window.matchMedia("(min-width: 1100px)");
+    const sync = () => setWideDesktop(media.matches);
+    sync(); media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+  useEffect(() => { if (drawerOpen) navigation.current?.querySelector<HTMLButtonElement>("button")?.focus(); }, [drawerOpen]);
+  const closeDrawer = () => { setDrawerOpen(false); navToggle.current?.focus(); };
+  const toggleNavigation = () => {
+    if (assistant.mode === "workspace" && window.innerWidth >= 1100) setSidebarOpen(value => !value);
+    else setDrawerOpen(value => !value);
+  };
+  const starters = [["Tag planen", "Was steht heute an?"], ["Kontakt finden", "Hilf mir, einen Kontakt zu finden."], ["Gespräch festhalten", "Ich möchte ein Gespräch dokumentieren."]];
+  return <div className="assistant-layout" data-sidebar-open={sidebarOpen} data-drawer-open={drawerOpen}>
+    {drawerOpen && <button className="assistant-nav-scrim" onClick={closeDrawer} aria-label="Unterhaltungen schließen" tabIndex={-1} />}
+    <nav ref={navigation} className="assistant-workspace-list" aria-label="Unterhaltungen" onKeyDown={event => {
+      if (!drawerOpen) return;
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeDrawer(); }
+      if (event.key === "Tab") {
+        const items = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), summary')].filter(item => item.getClientRects().length);
+        const first = items[0], last = items.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    }}>
+      <div className="assistant-sidebar-top"><span>Chats</span><button className="assistant-icon-button" aria-label="Unterhaltungen schließen" title="Unterhaltungen schließen" onClick={() => { if (drawerOpen) closeDrawer(); else { setSidebarOpen(false); navToggle.current?.focus(); } }}><AssistantIcon name="sidebar" /></button></div>
+      <AssistantConversationList disabled={liveOpen} onSelect={() => { assistant.setSection("chat"); if (drawerOpen) closeDrawer(); }} />
+      <button className="assistant-workspace-details" disabled={liveOpen} onClick={() => { assistant.setSection("details"); if (drawerOpen) closeDrawer(); }}><AssistantIcon name="info" />Speicherung und Zugang</button>
+    </nav>
+    <section className="assistant-view" aria-label="CRM-Assistent" inert={drawerOpen}>
+      <header className="assistant-header">
+        <button className="assistant-mobile-back assistant-icon-button" onClick={assistant.close} aria-label="Zurück zum CRM" title="Zurück zum CRM"><AssistantIcon name="back" /></button>
+        <button ref={navToggle} className="assistant-icon-button assistant-nav-toggle" onClick={toggleNavigation} aria-label="Unterhaltungen öffnen" title="Unterhaltungen" aria-expanded={drawerOpen || (wideDesktop && assistant.mode === "workspace" && sidebarOpen)}><AssistantIcon name="sidebar" /></button>
+        <h2 ref={header} tabIndex={-1}>Assistent</h2>
+        <div className="assistant-header-actions">
+          <button className="assistant-icon-button" disabled={liveOpen || assistant.locked || assistant.loading} onClick={assistant.startNew} aria-label="Neue Unterhaltung" title="Neuer Chat"><AssistantIcon name="compose" /></button>
+          <button className="assistant-expand assistant-icon-button" onClick={() => assistant.mode === "workspace" ? assistant.asPanel() : assistant.expand()} aria-label={assistant.mode === "workspace" ? "Als Panel öffnen" : "Groß öffnen"} title={assistant.mode === "workspace" ? "Als Panel öffnen" : "Groß öffnen"}><AssistantIcon name={assistant.mode === "workspace" ? "collapse" : "expand"} /></button>
+          <button className="assistant-icon-button" disabled={liveOpen} onClick={() => assistant.setSection(assistant.section === "details" ? "chat" : "details")} aria-label="Speicherung und Zugang" title="Speicherung und Zugang"><AssistantIcon name="more" /></button>
+          <button className="assistant-desktop-close assistant-icon-button" onClick={assistant.close} aria-label="Assistent schließen" title="Assistent schließen"><AssistantIcon name="close" /></button>
+        </div>
+      </header>
+      {assistant.section !== "chat" && <button className="assistant-back-to-chat" onClick={() => assistant.setSection("chat")}><AssistantIcon name="back" />Zurück zum Gespräch</button>}
+      {assistant.error && !assistant.deleteTarget && <div className="assistant-error-banner" role="alert"><p>{assistant.error}</p>{!assistant.access && <button onClick={() => void assistant.initialize()}>Erneut versuchen</button>}</div>}
+      {assistant.section === "details" && <Details />}
+      <div className="assistant-chat" hidden={assistant.section !== "chat"} data-empty={empty && !liveOpen}>
+        {!assistant.access ? <p className="assistant-loading" role="status">Assistent wird geöffnet …</p> : !assistant.access.enabled ? <div className="assistant-access"><h3>{assistant.access.reason === "NO_ENTITLEMENT" ? "Der Assistent ist für dein Konto noch nicht freigeschaltet." : assistant.access.reason?.startsWith("MONTHLY") ? "Dein Nutzungslimit ist erreicht." : "Der Assistent ist vorübergehend nicht verfügbar."}</h3><p>Du kannst im CRM normal weiterarbeiten.</p><div className="assistant-button-row"><button className="assistant-primary" onClick={assistant.close}>Zurück zum CRM</button><button onClick={() => assistant.setSection("details")}>Zugang ansehen</button></div></div> : <>
+          {assistant.attachment && <div className="assistant-context"><span>Bezug: <strong>{assistant.attachment.label}</strong>{assistant.attachment.followUpId && " · Wiedervorlage"}</span><button disabled={assistant.working || liveOpen} onClick={() => assistant.setAttachment(null)} aria-label="Bezug entfernen"><AssistantIcon name="close" /></button></div>}
+          <div className="assistant-empty" hidden={!empty || liveOpen}><h2>Was möchtest du heute erledigen?</h2></div>
+          <AssistantTimeline />
+          <div className="assistant-composer-dock">
+            {assistant.access.liveAvailable ? <JarvisLive conversationId={assistant.conversationId} context={assistant.attachment} disabled={assistant.locked || assistant.loading} onActiveChange={setLiveOpen} onConversationStarted={assistant.acceptLiveConversation} onTurn={assistant.acceptLiveTurn}>
+              {controls => <AssistantComposer suspended={controls.active} onStartLive={controls.start} liveDisabled={controls.disabled} />}
+            </JarvisLive> : <AssistantComposer />}
+            <div className="assistant-starters" hidden={!empty || liveOpen}>{starters.map(([label, text]) => <button key={label} disabled={assistant.locked} onClick={() => { assistant.setDraft(text); document.getElementById("assistant-message")?.focus(); }}>{label}</button>)}</div>
+          </div>
+        </>}
+      </div>
+    </section>
     <DeleteDialog />
-  </section>;
+  </div>;
 }

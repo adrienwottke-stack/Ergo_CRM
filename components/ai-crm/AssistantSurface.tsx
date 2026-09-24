@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useAssistant } from "@/components/ai-crm/AssistantProvider";
-import AssistantView, { AssistantConversationList } from "@/components/ai-crm/AssistantView";
+import AssistantView from "@/components/ai-crm/AssistantView";
 
 export default function AssistantSurface({ userId }: { userId: string }) {
   const assistant = useAssistant();
@@ -29,7 +29,7 @@ export default function AssistantSurface({ userId }: { userId: string }) {
       document.body.style.overflow = full ? "hidden" : originalOverflow;
     };
     const keyboard = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !document.querySelector("dialog[open]")) close();
+      if (!event.defaultPrevented && event.key === "Escape" && !document.querySelector("dialog[open]")) close();
       if (event.key === "F6" && window.innerWidth >= 1100 && mode === "panel") {
         event.preventDefault(); const inAssistant = document.activeElement?.closest("#crm-assistant-surface");
         if (inAssistant) { main?.setAttribute("tabindex", "-1"); main?.focus(); }
@@ -48,5 +48,5 @@ export default function AssistantSurface({ userId }: { userId: string }) {
     };
   }, [visible, mode, close]);
   if (!assistant.visible) return null;
-  return <aside id="crm-assistant-surface" className="assistant-surface" data-mode={assistant.mode} aria-label="Assistent Arbeitsbereich"><div className="assistant-workspace-list"><AssistantConversationList /><button className="assistant-workspace-details" onClick={() => assistant.setSection("details")}>Speicherung und Zugang</button></div><AssistantView /></aside>;
+  return <aside id="crm-assistant-surface" className="assistant-surface" data-mode={assistant.mode} aria-label="Assistent Arbeitsbereich"><AssistantView /></aside>;
 }

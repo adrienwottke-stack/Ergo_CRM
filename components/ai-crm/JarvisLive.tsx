@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { ActionReceipt, AssistantContext, ConversationSummary, ReadResult } from "@/lib/ai-crm/contracts";
 import JarvisLiveMock from "@/components/ai-crm/JarvisLiveMock";
 import JarvisLivePilot from "@/components/ai-crm/JarvisLivePilot";
@@ -7,6 +7,7 @@ import JarvisLivePilot from "@/components/ai-crm/JarvisLivePilot";
 export type JarvisLiveActionReceipt = ActionReceipt;
 export type JarvisLiveConversation = ConversationSummary & { restarted?: boolean; restartReason?: "expired" | "limit" | null };
 export type JarvisLiveProps = {
+  children?: (controls: { active: boolean; disabled: boolean; start: () => void }) => ReactNode;
   conversationId: string | null;
   context?: AssistantContext | null;
   disabled?: boolean;
@@ -42,7 +43,7 @@ export default function JarvisLive(props: JarvisLiveProps) {
     }).catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Die Sprachkonfiguration konnte nicht geladen werden."); });
     return () => controller.abort();
   }, [attempt]);
-  if (error) return <div className="jarvis-live-body"><p role="alert" className="jarvis-live-error">{error}</p><button onClick={() => setAttempt(value => value + 1)}>Konfiguration erneut prüfen</button></div>;
-  if (!mode || !settings) return <p className="assistant-caption" role="status">Sprachzugang wird geprüft …</p>;
+  if (error) return <>{props.children?.({ active: false, disabled: true, start: () => undefined })}<div className="assistant-voice-notices"><p role="alert" className="jarvis-live-error">{error}</p><button onClick={() => setAttempt(value => value + 1)}>Konfiguration erneut prüfen</button></div></>;
+  if (!mode || !settings) return <>{props.children?.({ active: false, disabled: true, start: () => undefined })}<span className="sr-only" role="status">Sprachzugang wird geprüft …</span></>;
   return mode === "simulation" ? <JarvisLiveMock {...props} /> : <JarvisLivePilot {...props} settings={settings} initialActiveSessionId={activeSessionId} />;
 }

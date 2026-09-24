@@ -1,8 +1,9 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { ArrowRightIcon, MikrofonIcon, SparkIcon } from "@/components/icons";
-import { btnPrimary, btnSecondary, cn, inputBlank } from "@/components/ui";
+import AssistantVoiceSurface from "./AssistantVoiceSurface";
+import type { JarvisLiveProps } from "./JarvisLive";
+
 import type { ActionReceipt, ConversationSummary, ReadResult } from "@/lib/ai-crm/contracts";
 import {
   initialLiveClientState,
@@ -40,6 +41,7 @@ type PendingTurn = {
 };
 
 type Props = {
+  children?: JarvisLiveProps["children"];
   conversationId: string | null;
   disabled?: boolean;
   onActiveChange?: (active: boolean) => void;
@@ -154,21 +156,8 @@ function asMusic(value: unknown): Music | null {
   };
 }
 
-function SpeechBeacon({ phase }: { phase: LiveClientPhase }) {
-  const active = ["LISTENING", "THINKING", "SPEAKING", "RECONNECTING"].includes(phase);
-  return (
-    <div className="jarvis-live-beacon" aria-hidden="true">
-      <span className={cn("jarvis-live-beacon-ring jarvis-live-beacon-ring-outer", active && "motion-safe:animate-pulse")} />
-      <span className={cn("jarvis-live-beacon-ring jarvis-live-beacon-ring-middle", phase === "LISTENING" && "motion-safe:animate-pulse")} />
-      <span className="jarvis-live-beacon-ring jarvis-live-beacon-ring-inner" />
-      <span className="jarvis-live-beacon-core">
-        <MikrofonIcon className="h-5 w-5" />
-      </span>
-    </div>
-  );
-}
-
 export default function JarvisLiveMock({
+  children,
   conversationId,
   disabled = false,
   onActiveChange,
@@ -176,6 +165,7 @@ export default function JarvisLiveMock({
   onTurn,
 }: Props) {
   const [state, dispatch] = useReducer(transitionLiveClientState, undefined, initialLiveClientState);
+  const [muted, setMuted] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [reconnectLimit, setReconnectLimit] = useState(1);
   const [music, setMusic] = useState<Music>(initialSpotifyState);
@@ -294,7 +284,7 @@ export default function JarvisLiveMock({
   const start = useCallback(async () => {
     if (disabled || !["IDLE", "ENDED", "ERROR"].includes(state.phase)) return;
     const lifecycle = ++lifecycleRef.current;
-    setNotice(null);
+    setNotice(null); setMuted(false);
     dispatch({ type: "START" });
     let stream: MediaStream;
     try {
@@ -585,7 +575,8 @@ export default function JarvisLiveMock({
     }
   }, [acceptTurnResponse, reconnectLimit, state.reconnectAttempts, submitPendingTurn]);
 
-  const isOpen = state.phase !== "IDLE" && state.phase !== "ENDED";
+  const isOpen = state.phase !== "IDLE" && state.phase !== "ENDED" && (state.phase !== "ERROR" || Boolean(sessionId));
+  useEffect(() => { onActiveChange?.(isOpen); }, [isOpen, onActiveChange]);
   const canReconnect =
     state.phase === "ERROR" && Boolean(sessionId) && state.reconnectAttempts < reconnectLimit;
   const connectSpotify = useCallback(async () => {
@@ -678,117 +669,28 @@ export default function JarvisLiveMock({
     </div>
   );
 
-  return (
-    <section
-      className={cn("jarvis-live", isOpen && "jarvis-live-focus")}
-      aria-labelledby="jarvis-live-title"
-      role={isOpen ? "dialog" : undefined}
-      aria-modal={isOpen || undefined}
-    >
-      <div className="jarvis-live-header">
-        <div className="jarvis-live-heading">
-          <span className="jarvis-live-mark">
-            <SparkIcon className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="jarvis-live-kicker">Live · lokale Demo</p>
-            <h3 id="jarvis-live-title" className="jarvis-live-title">Mit Jarvis sprechen</h3>
-          </div>
-        </div>
-        <span className="jarvis-live-badge">Simulation</span>
-      </div>
-
-      {!isOpen ? (
-        <div className="jarvis-live-body space-y-3">
-          <p className="jarvis-live-intro">
-            Eine lokale, ausdrücklich simulierte Live-Runde: Das Mikrofon bleibt im Browser, gespeichert werden erst deine bestätigte Zeile und die sichtbare Antwort in dieser Unterhaltung.
-          </p>
-          {spotifyPanel}
-          <button type="button" disabled={disabled} onClick={() => void start()} className={cn(btnPrimary, "w-full sm:w-auto")}>
-            <MikrofonIcon className="h-5 w-5" /> Live mit Jarvis starten
-          </button>
-          {notice && <p className="jarvis-live-notice" role="status">{notice}</p>}
-          {state.error && <p className="jarvis-live-error" role="alert">{state.error}</p>}
-        </div>
-      ) : (
-        <div className="jarvis-live-body space-y-4">
-          <div className="jarvis-live-status-card">
-            <SpeechBeacon phase={state.phase} />
-            <div className="jarvis-live-status-copy">
-              <p className="jarvis-live-status-title" role="status" aria-live="polite">{phaseCopy[state.phase]}</p>
-              <p className="jarvis-live-status-note">
-                {spotifyControl.mode === "real"
-                  ? "Die Sprachrunde bleibt derzeit simuliert. Spotify-Befehle steuern nur dein ausdrücklich verbundenes Konto."
-                  : "Kein echter Audiostream. Spotify bleibt bis zu deiner eigenen OAuth-Verbindung klar als Simulation markiert."}
-              </p>
-            </div>
-          </div>
-
-          <form onSubmit={(event) => void sendTurn(event)} className="space-y-2">
-            <label htmlFor="jarvis-live-transcript" className="jarvis-live-label">
-              Simulation: gesprochene Zeile
-            </label>
-            <textarea
-              id="jarvis-live-transcript"
-              value={state.partialTranscript}
-              onChange={(event) => {
-                if (state.phase === "SPEAKING") bargeIn();
-                dispatch({ type: "PARTIAL_TRANSCRIPT", value: event.target.value });
-              }}
-              maxLength={4000}
-              rows={2}
-              disabled={state.phase === "THINKING" || state.phase === "RECONNECTING"}
-              placeholder="Zum Beispiel: Hey Jarvis, spiel AC/DC."
-              className={cn(inputBlank, "min-h-20")}
-              aria-describedby="jarvis-live-privacy"
-            />
-            <p id="jarvis-live-privacy" className="jarvis-live-helper">
-              Diese aktuelle Zeile ist noch nicht gespeichert. Erst „Live-Zeile senden“ übergibt sie als finalen Text an dein CRM.
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="submit"
-                disabled={!state.partialTranscript.trim() || state.phase !== "LISTENING"}
-                className={cn(btnPrimary, "w-full sm:w-auto")}
-              >
-                Live-Zeile senden <ArrowRightIcon className="h-5 w-5" />
-              </button>
-              {state.phase === "SPEAKING" && (
-                <button type="button" onClick={bargeIn} className={cn(btnSecondary, "w-full sm:w-auto")}>
-                  Unterbrechen und weiter sprechen
-                </button>
-              )}
-              <button type="button" onClick={() => void closeSession(true)} className="jarvis-live-end">
-                Live beenden
-              </button>
-            </div>
-          </form>
-
-          {state.assistantPartialTranscript && !state.finalTranscript && (
-            <div className="jarvis-live-final" aria-live="polite">
-              <p className="jarvis-live-final-label">Simulierte Antwortzeile</p>
-              <p className="jarvis-live-final-answer">{state.assistantPartialTranscript}</p>
-            </div>
-          )}
-
-          {state.finalTranscript && (
-            <div className="jarvis-live-final" aria-live="polite">
-              <p className="jarvis-live-final-label">Finale Antwort</p>
-              <p className="jarvis-live-final-answer">{state.finalTranscript}</p>
-            </div>
-          )}
-
-          {spotifyPanel}
-
-          {canReconnect && (
-            <button type="button" onClick={() => void reconnect()} className={cn(btnSecondary, "w-full sm:w-auto")}>
-              Verbindung einmal wiederherstellen
-            </button>
-          )}
-          {state.error && <p className="jarvis-live-error" role="alert">{state.error}</p>}
-          {notice && <p className="jarvis-live-notice" role="status">{notice}</p>}
-        </div>
-      )}
-    </section>
-  );
+  return <AssistantVoiceSurface
+    active={isOpen} status={muted ? "Mikrofon stumm · Simulation" : phaseCopy[state.phase]} muted={muted}
+    canMute={Boolean(sessionId) && state.phase !== "ERROR" && state.phase !== "RECONNECTING"}
+    onMute={() => { const next = !muted; setMuted(next); for (const track of streamRef.current?.getTracks() ?? []) track.enabled = !next; }}
+    onInterrupt={bargeIn} onEnd={() => void closeSession(true)} simulation
+    composer={children?.({ active: isOpen, disabled, start: () => void start() }) ?? <button disabled={disabled} onClick={() => void start()}>Live mit Jarvis starten</button>}
+    options={<>
+      <p className="assistant-caption">Die Sprachrunde ist simuliert. Das Mikrofon bleibt im Browser; nur die gesendete Zeile wird verarbeitet.</p>
+      <form onSubmit={event => void sendTurn(event)}>
+        <label htmlFor="jarvis-live-transcript" className="jarvis-live-label">Simulation: gesprochene Zeile</label>
+        <textarea id="jarvis-live-transcript" value={state.partialTranscript} onChange={event => { if (state.phase === "SPEAKING") bargeIn(); dispatch({ type: "PARTIAL_TRANSCRIPT", value: event.target.value }); }} maxLength={4000} rows={2} disabled={state.phase === "THINKING" || state.phase === "RECONNECTING"} placeholder="Zum Beispiel: Hey Jarvis, spiel AC/DC." aria-describedby="jarvis-live-privacy" />
+        <p id="jarvis-live-privacy" className="jarvis-live-helper">Erst „Live-Zeile senden“ übergibt diesen Text an dein CRM.</p>
+        <button type="submit" disabled={!state.partialTranscript.trim() || state.phase !== "LISTENING"}>Live-Zeile senden</button>
+      </form>
+      {state.assistantPartialTranscript && !state.finalTranscript && <div aria-live="polite"><p className="assistant-caption">Simulierte Antwortzeile</p><p>{state.assistantPartialTranscript}</p></div>}
+      {state.finalTranscript && <div aria-live="polite"><p className="assistant-caption">Finale Antwort</p><p>{state.finalTranscript}</p></div>}
+      {spotifyPanel}
+    </>}
+    notices={<>
+      {canReconnect && <button type="button" onClick={() => void reconnect()}>Verbindung einmal wiederherstellen</button>}
+      {state.error && <p className="jarvis-live-error" role="alert">{state.error}</p>}
+      {notice && <p className="jarvis-live-notice" role="status">{notice}</p>}
+    </>}
+  />;
 }

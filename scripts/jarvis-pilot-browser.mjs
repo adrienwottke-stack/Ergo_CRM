@@ -47,6 +47,7 @@ try {
     };
     Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: async () => {
       window.__micRequests++;
+      if (window.__denyMic) throw new DOMException("Controlled microphone denial", "NotAllowedError");
       const track = { enabled: true, stop() { window.__trackStops++; } };
       return { kind: "input", getTracks: () => [track], getAudioTracks: () => [track] };
     } } });
@@ -114,25 +115,38 @@ try {
   await page.route("**/api/ai-crm/requests/**", route => route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "Controlled not-found fixture" }) }));
   await page.goto(`${origin}/heute`);
   await page.getByRole("button", { name: "Deinen Tag besprechen" }).click();
-  await page.locator(".assistant-live-entry > summary").click();
+
   await page.getByRole("button", { name: "Vorherige Sitzung beenden", exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.__micRequests), 0, "discovering a stale lock never opens the microphone");
   await page.getByRole("button", { name: "Vorherige Sitzung beenden", exact: true }).click();
   await page.getByText("Kontrollierter Fehler beim Beenden", { exact: true }).waitFor();
-  assert.equal(await page.getByRole("button", { name: "Jarvis starten", exact: true }).count(), 0, "do not pretend an unacknowledged end succeeded");
+  assert.equal(await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).isDisabled(), true, "do not pretend an unacknowledged end succeeded");
   await page.getByRole("button", { name: "Vorherige Sitzung beenden", exact: true }).click();
-  await page.getByRole("button", { name: "Jarvis starten", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.__micRequests), 0, "ending another session does not implicitly start audio");
-  await page.getByRole("button", { name: "Jarvis starten", exact: true }).click();
+  await page.getByRole("textbox", { name: "Nachricht an den Assistenten" }).fill("Mein Entwurf bleibt erhalten");
+  await page.evaluate(() => { window.__redesignComposer = document.getElementById("assistant-message"); });
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
+  const micBeforeLayout = await page.evaluate(() => window.__micRequests);
+  await page.getByRole("button", { name: "Groß öffnen", exact: true }).click();
+  await page.waitForURL("**/assistent");
+  await page.getByRole("button", { name: "Als Panel öffnen", exact: true }).click();
+  await page.waitForURL("**/heute");
+  assert.equal(await page.evaluate(() => window.__micRequests), micBeforeLayout, "layout switch preserves the one live transport");
+  assert.equal(await page.evaluate(() => document.getElementById("assistant-message") === window.__redesignComposer), true, "composer stays mounted during speech and layout changes");
+  assert.equal(await page.getByRole("button", { name: "Nachricht diktieren" }).count(), 0, "live owns the microphone while dictation is hidden");
+
   await page.evaluate(() => window.__say("Was ist heute für mich offen?"));
   await page.getByRole("button", { name: "Ja, Musik starten", exact: true }).waitFor();
   assert.equal(introCalls, 1); assert.equal(turnCalls.length, 0);
   await page.evaluate(() => window.__say("Ja, gerne."));
   await page.getByText("Kontrolliertes Testresultat", { exact: true }).waitFor();
   assert.equal(turnCalls[0].transcript, "Was ist heute für mich offen?"); assert.equal(introCalls, 1);
+  await page.getByLabel("Sprachoptionen", { exact: true }).click();
   await page.getByText("Musik · läuft", { exact: true }).click();
   await page.getByRole("button", { name: "Musikpause", exact: true }).click();
+  await page.getByLabel("Sprachoptionen", { exact: true }).click();
   await page.evaluate(() => window.__say("Etwas leiser. Was habe ich selbst zugesagt?"));
   await page.waitForFunction(() => document.querySelectorAll(".assistant-read-result").length >= 2);
   const controlledTiming = await page.evaluate(() => ({ firstMockAudioAfterUtteranceMs: Math.round(window.__firstAudioMs), crmResultVisibleAfterCrmUtteranceMs: Math.round(performance.now() - window.__lastUtteranceEnd), providerLatencyMeasured: false, audioPlaybackHardwareMeasured: false }));
@@ -153,24 +167,45 @@ try {
   await page.waitForFunction(() => document.querySelectorAll(".assistant-read-result").length >= 3);
   assert.equal(turnCalls.at(-1).clientTurnId, turnCalls.at(-2).clientTurnId);
   assert.deepEqual(turnCalls.at(-1), turnCalls.at(-2));
+  await page.getByRole("button", { name: "Groß öffnen", exact: true }).click();
+  await page.waitForURL("**/assistent");
+  for (const dark of [true, false]) {
+    await page.evaluate(value => document.documentElement.classList.toggle("dark", value), dark);
+    for (const width of [320, 390, 768, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.screenshot({ path: fileURLToPath(new URL("redesign-live-" + width + (dark ? "-dark" : "-light") + ".png", output)) });
+      const geometry = await page.evaluate(() => {
+        const bar = document.querySelector(".assistant-voice-bar").getBoundingClientRect();
+        const messages = document.querySelector(".assistant-messages").getBoundingClientRect();
+        return { width: innerWidth, scrollWidth: document.documentElement.scrollWidth, barWidth: bar.width, chatWidth: messages.width, barX: bar.x, chatX: messages.x };
+      });
+      assert.ok(geometry.scrollWidth <= geometry.width + 1);
+      assert.ok(Math.abs(geometry.barWidth - geometry.chatWidth) <= 1 && Math.abs(geometry.barX - geometry.chatX) <= 1, "chat and voice composer align exactly: " + JSON.stringify(geometry));
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.evaluate(() => document.documentElement.classList.add("dark"));
+  await page.getByRole("button", { name: "Als Panel öffnen", exact: true }).click();
   await page.screenshot({ path: fileURLToPath(new URL("desktop.png", output)), fullPage: false });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   const endButtonBox = await page.getByRole("button", { name: "Sitzung beenden", exact: true }).boundingBox();
-  const liveBox = await page.locator(".assistant-live-entry").boundingBox();
+  const liveBox = await page.locator(".assistant-voice-bar").boundingBox();
   assert.ok(endButtonBox && liveBox && endButtonBox.y >= liveBox.y && endButtonBox.y + endButtonBox.height <= liveBox.y + liveBox.height, "microphone and end controls stay visible while the audio panel is scrolled");
   await page.screenshot({ path: fileURLToPath(new URL("mobile.png", output)), fullPage: false });
   await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
-  await page.getByRole("button", { name: "Jarvis starten", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).waitFor();
+  assert.equal(await page.getByRole("textbox", { name: "Nachricht an den Assistenten" }).inputValue(), "Mein Entwurf bleibt erhalten");
   assert.ok(ends >= 1); assert.ok(await page.evaluate(() => window.__trackStops >= 1)); assert.equal(introCalls, 1);
   // A superseded slow intro response must never start after the user moved to CRM.
   await page.setViewportSize({ width: 1280, height: 900 });
   introState = "WAITING"; introDelay = 3500;
-  await page.getByRole("button", { name: "Jarvis starten", exact: true }).click();
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
   const beforeClips = await page.evaluate(() => window.__audio.filter(audio => audio.createdSrc.startsWith("blob:")).length);
   await page.evaluate(() => window.__say("Jarvis?"));
-  await page.getByText("Sprachausgabe aktiv.", { exact: false }).waitFor();
+  await page.getByText("Jarvis spricht", { exact: true }).waitFor();
+  await page.getByLabel("Sprachoptionen", { exact: true }).click();
   await page.getByText("Sprachzeile prüfen oder per Text fortsetzen", { exact: true }).click();
   await page.getByLabel("Deine Aussage", { exact: true }).fill("Was ist für meine Führungsrunde offen?");
   await page.getByRole("button", { name: "Aussage verwenden", exact: true }).click();
@@ -180,9 +215,10 @@ try {
   await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
   // Failed TTS resets the durable server claim; explicit retry must request a fresh claim.
   introState = "WAITING"; introDelay = 0; failIntro = true;
-  await page.getByRole("button", { name: "Jarvis starten", exact: true }).click();
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
   await page.evaluate(() => window.__say("Jarvis?"));
+  await page.getByLabel("Sprachoptionen", { exact: true }).click();
   await page.getByRole("button", { name: "Begrüßung bewusst abspielen", exact: true }).click();
   await page.getByRole("button", { name: "Ja, Musik starten", exact: true }).waitFor();
   assert.deepEqual(introBodies.at(-1), {});
@@ -191,31 +227,45 @@ try {
   // An accepted start with a lost HTTP response exposes owner-scoped recovery.
   failStart = true;
   const endsBeforeLostStart = ends;
-  await page.getByRole("button", { name: "Jarvis starten", exact: true }).click();
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await page.getByRole("button", { name: "Vorherige Sitzung beenden", exact: true }).waitFor();
   assert.equal(ends, endsBeforeLostStart, "a lost response must not silently end a possibly different tab");
   assert.equal(await page.evaluate(() => window.__peer.connectionState), "closed");
   await page.getByRole("button", { name: "Vorherige Sitzung beenden", exact: true }).click();
-  await page.getByRole("button", { name: "Jarvis starten", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).waitFor();
   assert.equal(activeSessionId, null);
   // Cancelling before the start response arrives still closes the late session.
   let releaseStart;
   delayedStart = new Promise(resolve => { releaseStart = resolve; });
   const entered = new Promise(resolve => { startEntered = resolve; });
   const endsBeforeCancel = ends;
-  await page.getByRole("button", { name: "Jarvis starten", exact: true }).click();
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await entered;
   await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
-  await page.getByRole("button", { name: "Jarvis starten", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).waitFor();
   releaseStart(); delayedStart = null; startEntered = null;
   await page.waitForResponse(response => response.request().method() === "DELETE" && response.url().endsWith("/fixture-session"));
   assert.equal(ends, endsBeforeCancel + 1);
   assert.equal(activeSessionId, null);
-  await page.getByRole("button", { name: "Jarvis starten", exact: true }).click();
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
+  await page.evaluate(() => { window.__denyMic = true; });
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
+  await page.getByText(/Mikrofonzugriff wurde verweigert/).waitFor();
+  await page.getByRole("textbox", { name: "Nachricht an den Assistenten" }).waitFor();
+  await page.evaluate(() => { window.__denyMic = false; });
+  await page.reload();
+  await page.getByRole("button", { name: "Assistent", exact: true }).click();
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Groß öffnen", exact: true }).click();
+  await page.waitForURL("**/assistent");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: fileURLToPath(new URL("redesign-start-desktop.png", output)) });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: fileURLToPath(new URL("redesign-start-mobile.png", output)) });
   assert.deepEqual(errors, []);
-  await writeFile(new URL("report.json", output), JSON.stringify({ passed: true, simulated: true, controlledTiming, assertions: ["WebRTC handshake/ICE", "once-only exact intro clip request", "retained initial question", "music starts only after yes", "pause preserved after speech and ducking", "reconnect preserves intro and does not restart music", "shared timeline sources", "mute separate from end", "lost response retry keeps operation id", "desktop/mobile overflow and persistent microphone/end controls", "tracks and transport cleanup", "superseded slow intro never plays", "TTS failure retry reads durable WAITING before claim"], liveProvider: "not tested", microphoneHardware: "not tested", actualMusic: "not tested" }, null, 2));
+  await writeFile(new URL("report.json", output), JSON.stringify({ passed: true, simulated: true, controlledTiming, assertions: ["same composer and live transport across panel/workspace", "draft restored after voice", "microphone denied returns to text", "chat and composer align at 320/390/768/1440/1920 in both themes", "WebRTC handshake/ICE", "once-only exact intro clip request", "retained initial question", "music starts only after yes", "pause preserved after speech and ducking", "reconnect preserves intro and does not restart music", "shared timeline sources", "mute separate from end", "lost response retry keeps operation id", "desktop/mobile overflow and persistent microphone/end controls", "tracks and transport cleanup", "superseded slow intro never plays", "TTS failure retry reads durable WAITING before claim"], liveProvider: "not tested", microphoneHardware: "not tested", actualMusic: "not tested" }, null, 2));
   console.log("Jarvis pilot controlled browser acceptance passed.");
 } finally {
   await writeFile(new URL("server.log", output), logs);

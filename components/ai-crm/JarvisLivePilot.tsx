@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import AssistantVoiceSurface from "./AssistantVoiceSurface";
 import type { ActionReceipt, AssistantContext, ReadResult } from "@/lib/ai-crm/contracts";
 import type { JarvisLiveConversation, JarvisLiveProps, JarvisLiveSettings } from "@/components/ai-crm/JarvisLive";
 import { LocalAudioController, isSessionStop, musicOfferDecision, splitMusicCommand, type LocalAudioState, type MusicCommand } from "@/lib/ai-crm/local-audio";
@@ -459,27 +460,30 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     catch { setError("Der Browser blockiert die Audioausgabe weiterhin. Prüfe die Audiofreigabe dieser Seite."); }
   };
   const active = !["IDLE", "ENDED"].includes(connection);
-  return <section className="jarvis-live" aria-label="Jarvis Sprache" style={{ margin: 0, overflow: active ? "visible" : "hidden" }}>
-    <div className="jarvis-live-header" style={active ? { position: "sticky", top: 0, zIndex: 2, flexWrap: "wrap" } : undefined}><div><p className="jarvis-live-kicker">Jarvis · Sprache</p><h3 className="jarvis-live-title">Mit Jarvis sprechen</h3></div><span className="jarvis-live-badge">{connection === "CONNECTED" ? muted ? "Mikrofon stumm" : "Mikrofon aktiv" : connection === "DISCONNECTED" ? "Unterbrochen" : "Bewusst starten"}</span>{active && <div className="assistant-button-row" style={{ width: "100%", marginTop: 0 }}><button disabled={connection !== "CONNECTED"} onClick={toggleMute}>{muted ? "Mikrofon einschalten" : "Stumm"}</button><button className="jarvis-live-end" onClick={() => void close()}>Sitzung beenden</button></div>}</div>
-    <div className="jarvis-live-body space-y-3">
-      {!active ? <><p className="jarvis-live-intro">Starte eine begrenzte Sprachsitzung. Das Mikrofon wird erst dann geöffnet. Ergebnisse, Quellen und Bestätigungen bleiben im gemeinsamen Gespräch.</p>{blockedSessionId ? <div role="status"><p>Für dich ist noch eine Sprachsitzung geöffnet. Du kannst sie hier beenden, auch wenn der vorige Start hängen geblieben ist. Eine laufende Runde in einem anderen Tab wird dabei ebenfalls beendet.</p><button className="assistant-primary" disabled={endingBlockedSession} onClick={() => void endBlockedSession()}>{endingBlockedSession ? "Vorherige Sitzung wird beendet …" : "Vorherige Sitzung beenden"}</button></div> : <button className="assistant-primary" disabled={props.disabled} onClick={() => void connect()}>Jarvis starten</button>}</> : <>
-        <p role="status" className="jarvis-live-status-title">{connection === "MICROPHONE" ? "Mikrofonfreigabe wird angefragt …" : connection === "CONNECTING" ? "Sprachverbindung wird hergestellt …" : connection === "DISCONNECTED" ? "Mikrofon aus · Verbindung unterbrochen" : muted ? "Mikrofon stumm · Verbindung aktiv" : inputActive ? "Jarvis hört deine Aussage" : "Mikrofon aktiv · Jarvis hört zu"}</p>
-        <p className="assistant-caption">{outputActive || intro === "PLAYING" ? "Sprachausgabe aktiv. " : ""}{working ? "Deine CRM-Anfrage wird bearbeitet. " : ""}Schreibaktionen benötigen immer die sichtbare Bestätigung im Gespräch.</p>
-        <div className="assistant-button-row"><button onClick={interrupt}>Sprachausgabe unterbrechen</button></div>
-        {intro === "WAITING" && <p className="assistant-caption">Sprich deine erste Aussage, zum Beispiel „Jarvis?“.</p>}
-        {intro === "OFFERED" && <div><p>{settings.greetingText}</p><div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(true)}>Ja, Musik starten</button><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(false)}>Ohne Musik weiter</button></div></div>}
-        {introRetry && <div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void playIntro(true)}>Begrüßung bewusst abspielen</button><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(false)}>Ohne Begrüßung fortsetzen</button></div>}
-        {audioBlocked && <button onClick={() => void enableAudio()}>Audioausgabe freigeben</button>}
-        {idleWarning !== null && <div role="alert"><p>Die Sprachverbindung endet in {idleWarning} Sekunden.</p><button onClick={activity}>Ich bin noch da</button></div>}
-        {connection === "DISCONNECTED" && session.current && session.current.reconnects < settings.reconnectLimit && <button onClick={() => void connect(true)}>Verbindung wiederherstellen</button>}
-        {heard && <p className="assistant-caption" aria-live="polite">Gehört: {heard}</p>}
-        <details><summary>Sprachzeile prüfen oder per Text fortsetzen</summary><form onSubmit={event => { event.preventDefault(); const text = draft.trim(); setDraft(""); void processUtterance(text).catch(reason => setError(String(reason.message))); }}><label className="jarvis-live-label" htmlFor="jarvis-pilot-line">Deine Aussage</label><textarea id="jarvis-pilot-line" rows={2} maxLength={4000} value={draft} onChange={event => { setDraft(event.target.value); activity(); }} className="w-full" /><button disabled={!draft.trim() || connection !== "CONNECTED"}>Aussage verwenden</button></form></details>
-        <details><summary>Musik · {music.status === "PLAYING" ? "läuft" : music.status === "PAUSED" ? "pausiert" : music.status === "MISSING" ? "Quelle fehlt" : music.status === "BLOCKED" ? "Start blockiert" : "aus"}</summary><p role="status" className="jarvis-live-music-note">{music.message}</p><p className="assistant-caption">Lautstärke {Math.round(music.volume * 100)} %{music.ducked ? " · während Sprache abgesenkt" : ""}</p><div className="assistant-button-row"><button disabled={music.status === "MISSING" || connection !== "CONNECTED"} onClick={() => void musicAction("start")}>{music.status === "PAUSED" ? "Musik weiter" : "Musik starten"}</button><button onClick={() => void musicAction("pause")}>Musikpause</button><button onClick={() => void musicAction("stop")}>Musik aus</button><button aria-label="Musik leiser" onClick={() => void musicAction("quieter")}>Leiser</button><button aria-label="Musik lauter" onClick={() => void musicAction("louder")}>Lauter</button></div></details>
-      </>}
+  useEffect(() => { propsRef.current.onActiveChange?.(active); }, [active]);
+  const status = connection === "MICROPHONE" ? "Mikrofonfreigabe wird angefragt …" : connection === "CONNECTING" ? "Sprachverbindung wird hergestellt …" : connection === "DISCONNECTED" ? "Mikrofon aus · Verbindung unterbrochen" : muted ? "Mikrofon stumm · Verbindung aktiv" : working ? "Jarvis denkt nach" : outputActive || intro === "PLAYING" ? "Jarvis spricht" : inputActive ? "Jarvis hört deine Aussage" : "Mikrofon aktiv · Jarvis hört zu";
+  return <AssistantVoiceSurface
+    active={active} status={status} muted={muted} canMute={connection === "CONNECTED"}
+    onMute={toggleMute} onInterrupt={interrupt} onEnd={() => void close()}
+    composer={props.children?.({ active, disabled: Boolean(props.disabled || blockedSessionId), start: () => void connect() }) ?? <button disabled={props.disabled || Boolean(blockedSessionId)} onClick={() => void connect()}>Jarvis starten</button>}
+    options={<>
+      <p className="assistant-caption">Schreibaktionen benötigen die sichtbare Bestätigung im Gespräch.</p>
+      {intro === "WAITING" && <p className="assistant-caption">Sprich deine erste Aussage, zum Beispiel „Jarvis?“.</p>}
+      {introRetry && <div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void playIntro(true)}>Begrüßung bewusst abspielen</button><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(false)}>Ohne Begrüßung fortsetzen</button></div>}
+      {heard && <p className="assistant-caption" aria-live="polite">Gehört: {heard}</p>}
+      <details><summary>Sprachzeile prüfen oder per Text fortsetzen</summary><form onSubmit={event => { event.preventDefault(); const text = draft.trim(); setDraft(""); void processUtterance(text).catch(reason => setError(String(reason.message))); }}><label className="jarvis-live-label" htmlFor="jarvis-pilot-line">Deine Aussage</label><textarea id="jarvis-pilot-line" rows={2} maxLength={4000} value={draft} onChange={event => { setDraft(event.target.value); activity(); }} /><button disabled={!draft.trim() || connection !== "CONNECTED"}>Aussage verwenden</button></form></details>
+      <details><summary>Musik · {music.status === "PLAYING" ? "läuft" : music.status === "PAUSED" ? "pausiert" : music.status === "MISSING" ? "Quelle fehlt" : music.status === "BLOCKED" ? "Start blockiert" : "aus"}</summary><p role="status" className="jarvis-live-music-note">{music.message}</p><p className="assistant-caption">Lautstärke {Math.round(music.volume * 100)} %{music.ducked ? " · während Sprache abgesenkt" : ""}</p><div className="assistant-button-row"><button disabled={music.status === "MISSING" || connection !== "CONNECTED"} onClick={() => void musicAction("start")}>{music.status === "PAUSED" ? "Musik weiter" : "Musik starten"}</button><button onClick={() => void musicAction("pause")}>Musikpause</button><button onClick={() => void musicAction("stop")}>Musik aus</button><button aria-label="Musik leiser" onClick={() => void musicAction("quieter")}>Leiser</button><button aria-label="Musik lauter" onClick={() => void musicAction("louder")}>Lauter</button></div></details>
+    </>}
+    notices={<>
+      {!active && blockedSessionId && <div role="status"><p>Es ist noch eine Sprachsitzung geöffnet. Wenn du sie hier beendest, endet auch eine laufende Runde in einem anderen Tab.</p><button disabled={endingBlockedSession} onClick={() => void endBlockedSession()}>{endingBlockedSession ? "Vorherige Sitzung wird beendet …" : "Vorherige Sitzung beenden"}</button></div>}
+      {active && intro === "OFFERED" && <div><p>{settings.greetingText}</p><div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(true)}>Ja, Musik starten</button><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(false)}>Ohne Musik weiter</button></div></div>}
+      {active && audioBlocked && <button onClick={() => void enableAudio()}>Audioausgabe freigeben</button>}
+      {active && idleWarning !== null && <div role="alert"><p>Die Sprachverbindung endet in {idleWarning} Sekunden.</p><button onClick={activity}>Ich bin noch da</button></div>}
+      {connection === "DISCONNECTED" && session.current && session.current.reconnects < settings.reconnectLimit && <button onClick={() => void connect(true)}>Verbindung wiederherstellen</button>}
       {notice && <p role="status" className="jarvis-live-notice">{notice}</p>}
       {error && <p role="alert" className="jarvis-live-error">{error}</p>}
       {recovery && <button disabled={working} onClick={() => void recover()}>Ergebnis anhand der Operationskennung prüfen</button>}
       {retryAvailable && <button disabled={working} onClick={() => void retryPending()}>Dieselbe Anfrage erneut senden</button>}
-    </div>
-  </section>;
+    </>}
+  />;
 }

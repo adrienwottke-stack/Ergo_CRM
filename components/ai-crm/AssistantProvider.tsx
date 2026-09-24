@@ -52,6 +52,8 @@ function useController() {
   const activeRequest = useRef<SendBody | null>(null);
   const initialized = useRef(false);
   const owner = useRef<string | null>(null);
+  const previousPath = useRef(pathname);
+  const viewNavigation = useRef<string | null>(null);
   const loadVersion = useRef(0);
   const opener = useRef<HTMLElement | null>(null);
   const active = conversations.find(item => item.id === conversationId) ?? null;
@@ -65,12 +67,20 @@ function useController() {
   }, [router]);
   useEffect(() => { if (presenting) close(); }, [presenting, close]);
   useEffect(() => {
+    if (previousPath.current === pathname) return;
+    previousPath.current = pathname;
+    const viewOnly = viewNavigation.current === pathname;
+    viewNavigation.current = null;
+    if (viewOnly) return;
     setCaptureEpoch(value => value + 1);
     if (pathname !== "/assistent" && window.matchMedia("(max-width: 767px)").matches) setMode("closed");
   }, [pathname]);
 
   const register = useCallback((userId: string) => {
     if (owner.current === userId) return;
+    // The first registration can follow an already hydrated entry click.
+    // Only an actual account change resets an open, initializing assistant.
+    if (owner.current === null) { owner.current = userId; return; }
     owner.current = userId; initialized.current = false; loadVersion.current++;
     setActionBusy(null); setActionErrors({}); setNotice(null); setCaptureEpoch(value => value + 1);
     setAccess(null); setConversations([]); setEntries([]); setConversationId(null); setDraft(""); setAttachment(null); setError(null); setRecovery(null); setWorking(false); setMode("closed"); drafts.current.clear(); activeRequest.current = null;
@@ -131,9 +141,10 @@ function useController() {
 
   const expand = useCallback(() => {
     if (currentPath.current !== "/assistent") returnTo.current = currentPath.current;
+    viewNavigation.current = "/assistent";
     setMode("workspace"); router.push("/assistent", { scroll: false });
   }, [router]);
-  const asPanel = useCallback(() => { setMode("panel"); if (currentPath.current === "/assistent") router.replace(returnTo.current, { scroll: false }); }, [router]);
+  const asPanel = useCallback(() => { setMode("panel"); if (currentPath.current === "/assistent") { viewNavigation.current = returnTo.current; router.replace(returnTo.current, { scroll: false }); } }, [router]);
   const showWorkspace = useCallback(() => { if (!presenting) { setMode("workspace"); void initialize(); } }, [presenting, initialize]);
 
   const selectConversation = useCallback(async (id: string) => {

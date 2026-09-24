@@ -97,6 +97,40 @@ try {
   await panel(page).getByRole("textbox").fill("Entwurf über alle Ansichten");
   await panel(page).getByRole("button", { name: "Groß öffnen", exact: true }).click();
   assert.equal(await panel(page).getByRole("textbox").inputValue(), "Entwurf über alle Ansichten"); await shot(page, "desktop-workspace");
+  await panel(page).getByRole("textbox").fill("");
+  await page.evaluate(() => { window.__composerElement = document.getElementById("assistant-message"); });
+  for (const dark of [true, false]) {
+    await page.evaluate(value => document.documentElement.classList.toggle("dark", value), dark);
+    for (const width of [320, 390, 768, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await noOverflow(page);
+      const geometry = await page.evaluate(() => {
+        const input = document.getElementById("assistant-message"), composer = document.querySelector(".assistant-composer"), heading = document.querySelector(".assistant-empty h2"), header = document.querySelector(".assistant-header");
+        return { stable: input === window.__composerElement, inputScroll: getComputedStyle(input).overflowY, width: composer.getBoundingClientRect().width, top: heading.getBoundingClientRect().top, headerBottom: header.getBoundingClientRect().bottom };
+      });
+      assert.equal(geometry.stable, true); assert.equal(geometry.inputScroll, "hidden"); assert.ok(geometry.width <= 761); assert.ok(geometry.top >= geometry.headerBottom);
+      await shot(page, "redesign-empty-" + width + (dark ? "-dark" : "-light"));
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 600 }); await noOverflow(page); await shot(page, "redesign-short");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.evaluate(() => document.documentElement.classList.add("dark"));
+  await panel(page).getByRole("textbox").fill("Entwurf über alle Ansichten");
+  checks.push("neutral light/dark layouts at 320/390/768/1440/1920, stable composer, no clipped heading or idle textarea scrollbar");
+  const tracksBeforeLayout = await page.evaluate(() => window.__uxStopped);
+  await panel(page).getByRole("button", { name: "Nachricht diktieren", exact: true }).click();
+  await panel(page).getByText("Aufnahme läuft", { exact: true }).waitFor();
+  await panel(page).getByRole("button", { name: "Als Panel öffnen", exact: true }).click();
+  await page.waitForURL("**/heute");
+  await panel(page).getByText("Aufnahme läuft", { exact: true }).waitFor();
+  await panel(page).getByRole("button", { name: "Groß öffnen", exact: true }).click();
+  await page.waitForURL("**/assistent");
+  await panel(page).getByText("Aufnahme läuft", { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.__uxStopped), tracksBeforeLayout, "presentation switches must not stop dictation");
+  await panel(page).getByRole("button", { name: "Aufnahme verwerfen", exact: true }).click();
+  assert.equal(await panel(page).getByRole("textbox").inputValue(), "Entwurf über alle Ansichten");
+  checks.push("active dictation and its draft survive panel/workspace switching");
+
   await panel(page).getByRole("button", { name: "Als Panel öffnen", exact: true }).click();
   await page.getByRole("navigation", { name: "Hauptnavigation" }).getByRole("link", { name: "Team", exact: true }).click();
   await page.waitForURL("**/mannschaft"); assert.equal(await panel(page).getByRole("textbox").inputValue(), "Entwurf über alle Ansichten");
@@ -174,9 +208,10 @@ try {
   await mobile.setViewportSize({ width: 375, height: 512 }); await noOverflow(mobile); const field = await panel(mobile).getByRole("textbox").boundingBox(), navBox = await mobile.locator(".crm-dock").boundingBox(); assert.ok(field.y + field.height <= navBox.y); await shot(mobile, "mobile-short-viewport");
   await mobile.setViewportSize({ width: 375, height: 812 });
   await panel(mobile).getByRole("button", { name: "Unterhaltungen öffnen", exact: true }).click(); await shot(mobile, "mobile-conversations");
+  await panel(mobile).locator(".assistant-conversation-menu summary").first().click();
   await panel(mobile).getByRole("button", { name: /^Unterhaltung löschen:/ }).first().click();
   await mobile.getByRole("dialog").waitFor(); assert.equal(await mobile.getByRole("button", { name: "Behalten", exact: true }).evaluate(element => element === document.activeElement), true); await shot(mobile, "mobile-delete"); await mobile.keyboard.press("Escape");
-  await panel(mobile).getByRole("button", { name: /Zurück zum Gespräch/ }).click();
+  await panel(mobile).locator(".assistant-sidebar-top button").click();
   await mobile.evaluate(() => { document.documentElement.classList.remove("dark"); }); await shot(mobile, "mobile-light");
   await mobile.setViewportSize({ width: 320, height: 812 }); await noOverflow(mobile); await shot(mobile, "mobile-320");
   await mobile.getByRole("link", { name: "Namen sammeln", exact: true }).click(); await mobile.waitForURL("**/namen/sammeln");
@@ -193,8 +228,8 @@ try {
   await panel(second).getByRole("button", { name: "Unterhaltungen öffnen", exact: true }).click();
   await panel(second).getByRole("button", { name: "Weitere laden", exact: true }).click();
   const expectedConversations = await db.aiConversation.count({ where: { userId: owner.id } });
-  await panel(second).getByRole("button", { name: /^Unterhaltung löschen:/ }).nth(expectedConversations - 1).waitFor();
-  assert.equal(await panel(second).getByRole("button", { name: /^Unterhaltung löschen:/ }).count(), expectedConversations);
+  await panel(second).locator(".assistant-conversation-row").nth(expectedConversations - 1).waitFor();
+  assert.equal(await panel(second).locator(".assistant-conversation-row").count(), expectedConversations);
   await shot(second, "desktop-conversations"); checks.push("conversation pagination exposes every valid conversation including long titles");
   const full = await db.aiConversation.create({ data: { userId: owner.id, title: "Vollständiges Gespräch", expiresAt: new Date(Date.now() + 86400000), messages: { create: Array.from({ length: 20 }, (_, index) => ({ role: index % 2 ? "assistant" : "user", content: `Alte Nachricht ${index}`, createdAt: new Date(Date.now() - 10000 + index) })) } } });
   await second.reload(); await second.getByRole("button", { name: "Assistent", exact: true }).click();

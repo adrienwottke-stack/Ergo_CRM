@@ -1,9 +1,9 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MikrofonIcon } from "@/components/icons";
+import AssistantIcon from "./AssistantIcon";
 import { assistantFetch, useAssistant } from "@/components/ai-crm/AssistantProvider";
 
-export default function AssistantComposer() {
+export default function AssistantComposer({ suspended = false, onStartLive, liveDisabled = false }: { suspended?: boolean; onStartLive?: () => void; liveDisabled?: boolean }) {
   const assistant = useAssistant();
   const [recording, setRecording] = useState(false);
   const [requesting, setRequesting] = useState(false);
@@ -29,6 +29,7 @@ export default function AssistantComposer() {
     recorder.current = null; release(); setRecording(false); setRequesting(false); setTranscribing(false); setLevel(0);
   }, [release]);
   useEffect(() => { cancel(); return cancel; }, [assistant.captureEpoch, cancel]);
+  useEffect(() => { if (suspended) cancel(); }, [suspended, cancel]);
   useEffect(() => {
     const hide = () => { if (document.visibilityState !== "visible") cancel(); };
     document.addEventListener("visibilitychange", hide); window.addEventListener("pagehide", cancel);
@@ -45,11 +46,13 @@ export default function AssistantComposer() {
   useEffect(() => {
     const input = textarea.current;
     if (!input) return;
-    input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 128)}px`;
-  }, [assistant.draft, recording, requesting, transcribing]);
+    if (suspended) return;
+    input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
+    input.style.overflowY = input.scrollHeight > 160 ? "auto" : "hidden";
+  }, [assistant.draft, recording, requesting, transcribing, suspended]);
 
   async function start() {
-    if (assistant.locked || requesting || transcribing || recording) return;
+    if (suspended || assistant.locked || requesting || transcribing || recording) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") { assistant.setError("Dieser Browser unterstützt Diktieren nicht. Du kannst deine Nachricht schreiben."); return; }
     const current = ++version.current;
     setRequesting(true); assistant.setError(null); discard.current = false;
@@ -102,13 +105,14 @@ export default function AssistantComposer() {
     {recording && <p className="assistant-caption">Danach kannst du den Text prüfen.</p>}
   </div>;
 
-  return <form className="assistant-composer" onSubmit={event => { event.preventDefault(); void assistant.send(); }}>
+  return <form className="assistant-composer" onSubmit={event => { event.preventDefault(); if (!suspended) void assistant.send(); }}>
     {assistant.source === "voice" && <p className="assistant-transcript-hint" role="status">Bitte prüfe den Text, besonders Namen und Termine.</p>}
     <label htmlFor="assistant-message" className="sr-only">Nachricht an den Assistenten</label>
-    <textarea ref={textarea} id="assistant-message" placeholder="Nachricht an den Assistenten …" rows={1} maxLength={4000} value={assistant.draft} onChange={event => assistant.setDraft(event.target.value)}
+    <textarea ref={textarea} id="assistant-message" placeholder="Frag deinen Assistenten …" rows={1} maxLength={4000} value={assistant.draft} disabled={suspended} onChange={event => assistant.setDraft(event.target.value)}
       onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && window.matchMedia("(min-width: 768px)").matches) { event.preventDefault(); void assistant.send(); } }} />
-    <div className="assistant-button-row"><button type="button" disabled={assistant.locked || assistant.loading} onClick={() => void start()} aria-label="Nachricht diktieren"><MikrofonIcon className="h-5 w-5" />{assistant.source === "voice" ? "Weiter diktieren" : "Diktieren"}</button>
-      {assistant.working ? <button type="button" onClick={() => void assistant.stop()} disabled={Boolean(assistant.actionBusy)}>Stoppen</button> : <button type="submit" className="assistant-primary" disabled={!assistant.draft.trim() || assistant.locked || assistant.loading}>Senden <span aria-hidden>↑</span></button>}
+    <div className="assistant-button-row"><span className="assistant-composer-tools"><button type="button" className="assistant-icon-button" disabled={suspended || assistant.locked || assistant.loading} onClick={() => void start()} aria-label="Nachricht diktieren" title={assistant.source === "voice" ? "Weiter diktieren" : "Nachricht diktieren"}><AssistantIcon name="mic" /></button>
+      {onStartLive && <button type="button" className="assistant-icon-button" disabled={suspended || liveDisabled || assistant.locked || assistant.loading} onClick={onStartLive} aria-label="Mit Jarvis sprechen" title="Mit Jarvis sprechen"><AssistantIcon name="voice" /></button>}</span>
+      {assistant.working ? <button type="button" className="assistant-send assistant-icon-button" aria-label="Stoppen" title="Stoppen" onClick={() => void assistant.stop()} disabled={Boolean(assistant.actionBusy)}><AssistantIcon name="stop" /></button> : <button type="submit" className="assistant-send assistant-icon-button" aria-label="Senden" title="Senden" disabled={suspended || !assistant.draft.trim() || assistant.locked || assistant.loading}><AssistantIcon name="send" /></button>}
     </div>
   </form>;
 }
