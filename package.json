@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:emil": "node --import ./scripts/alias-hook.mjs --test scripts/coach.test.mjs",
-    "test:ai": "node --import ./scripts/alias-hook.mjs --test scripts/ai-crm.test.mjs scripts/ai-crm-api.test.mjs scripts/ai-crm-ux.test.mjs scripts/ai-crm-live.test.mjs scripts/ai-crm-live-session.test.mjs scripts/ai-crm-live-turn.test.mjs scripts/ai-crm-live-api.test.mjs scripts/ai-crm-spotify.test.mjs scripts/ai-crm-spotify-api.test.mjs",
+    "test:ai": "node --import ./scripts/alias-hook.mjs --test scripts/ai-crm.test.mjs scripts/ai-crm-api.test.mjs scripts/ai-crm-ux.test.mjs scripts/ai-crm-live.test.mjs scripts/ai-crm-live-session.test.mjs scripts/ai-crm-live-turn.test.mjs scripts/ai-crm-live-api.test.mjs scripts/ai-crm-spotify.test.mjs scripts/ai-crm-spotify-api.test.mjs scripts/jarvis-leadership.test.mjs scripts/jarvis-integration.test.mjs scripts/jarvis-voice.test.mjs scripts/jarvis-local-audio.test.mjs scripts/jarvis-local-music-api.test.mjs",
     "test:ai:live": "node --import ./scripts/alias-hook.mjs --test scripts/ai-crm-live.test.mjs scripts/ai-crm-live-session.test.mjs scripts/ai-crm-live-turn.test.mjs scripts/ai-crm-live-api.test.mjs scripts/ai-crm-spotify.test.mjs scripts/ai-crm-spotify-api.test.mjs",
     "test:ai:live:browser": "node --import ./scripts/alias-hook.mjs scripts/ai-crm-live-browser.mjs",
     "smoke:spotify:local": "node --import ./scripts/alias-hook.mjs scripts/ai-crm-spotify-local-smoke.mjs",
@@ -24,13 +24,15 @@
     "postinstall": "prisma generate",
     "build:check": "next build",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --import ./scripts/alias-hook.mjs --test scripts/ai-crm.test.mjs scripts/ai-crm-api.test.mjs scripts/ai-crm-ux.test.mjs scripts/ai-crm-live.test.mjs scripts/ai-crm-live-session.test.mjs scripts/ai-crm-live-turn.test.mjs scripts/ai-crm-live-api.test.mjs scripts/ai-crm-spotify.test.mjs scripts/ai-crm-spotify-api.test.mjs scripts/arbeitslagen.test.mjs scripts/coach.test.mjs scripts/vereinbarungen-test.mjs scripts/vereinbarungen-service-test.mjs scripts/team-auswertung-probe.mjs scripts/team-auswertung-db.test.mjs scripts/contact-result-review.test.mjs lib/ziele-modell.test.mjs lib/ziele-service.test.mjs scripts/einheiten-meldungen.test.mjs scripts/cron-meldungen.test.mjs scripts/fuehrung-scope-db.test.mjs scripts/start-state.test.mjs scripts/start-service.test.mjs scripts/storno-tutorial.test.mjs scripts/cockpit-geschaeft.test.mjs scripts/struktur-verwaltung.test.mjs",
+    "test": "node --import ./scripts/alias-hook.mjs --test scripts/ai-crm.test.mjs scripts/ai-crm-api.test.mjs scripts/ai-crm-ux.test.mjs scripts/ai-crm-live.test.mjs scripts/ai-crm-live-session.test.mjs scripts/ai-crm-live-turn.test.mjs scripts/ai-crm-live-api.test.mjs scripts/ai-crm-spotify.test.mjs scripts/ai-crm-spotify-api.test.mjs scripts/arbeitslagen.test.mjs scripts/coach.test.mjs scripts/vereinbarungen-test.mjs scripts/vereinbarungen-service-test.mjs scripts/team-auswertung-probe.mjs scripts/team-auswertung-db.test.mjs scripts/contact-result-review.test.mjs lib/ziele-modell.test.mjs lib/ziele-service.test.mjs scripts/einheiten-meldungen.test.mjs scripts/cron-meldungen.test.mjs scripts/fuehrung-scope-db.test.mjs scripts/start-state.test.mjs scripts/start-service.test.mjs scripts/storno-tutorial.test.mjs scripts/cockpit-geschaeft.test.mjs scripts/struktur-verwaltung.test.mjs scripts/jarvis-leadership.test.mjs scripts/jarvis-integration.test.mjs scripts/jarvis-voice.test.mjs scripts/jarvis-local-audio.test.mjs scripts/jarvis-local-music-api.test.mjs",
     "test:browser": "node --import ./scripts/alias-hook.mjs scripts/arbeitslagen-browser.mjs",
     "test:start": "node --import ./scripts/alias-hook.mjs --test scripts/start-state.test.mjs scripts/start-service.test.mjs scripts/storno-tutorial.test.mjs",
     "test:start:browser": "node --import ./scripts/alias-hook.mjs scripts/start-browser.test.mjs",
     "build:start:check": "node --import ./scripts/alias-hook.mjs scripts/start-build-check.mjs",
     "test:struktur": "node --import ./scripts/alias-hook.mjs --test scripts/struktur-verwaltung.test.mjs",
-    "test:struktur:browser": "node --import ./scripts/alias-hook.mjs scripts/struktur-browser.test.mjs"
+    "test:struktur:browser": "node --import ./scripts/alias-hook.mjs scripts/struktur-browser.test.mjs",
+    "test:jarvis": "node --import ./scripts/alias-hook.mjs --test scripts/jarvis-leadership.test.mjs scripts/jarvis-integration.test.mjs scripts/jarvis-voice.test.mjs scripts/jarvis-local-audio.test.mjs scripts/jarvis-local-music-api.test.mjs",
+    "test:jarvis:browser": "node --import ./scripts/alias-hook.mjs scripts/jarvis-leadership-browser.mjs && node --import ./scripts/alias-hook.mjs scripts/jarvis-pilot-browser.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
@@ -46,6 +48,7 @@
     "react-dom": "19.1.0",
     "stripe": "^22.6.2",
     "web-push": "^3.6.7",
+    "ws": "^8.21.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -56,6 +59,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "15.5.25",

@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { aiCrmConfig } from "@/lib/ai-crm/config";
 import { claimAiUsage, requireAiEntitlement } from "@/lib/ai-crm/entitlement";
 import { AiCrmError } from "@/lib/ai-crm/errors";
 import { aiErrorResponse, sameOrigin } from "@/lib/ai-crm/http";
 import { musicProviderForLive } from "@/lib/ai-crm/live-music";
 import { endLiveSession, startLiveSession } from "@/lib/ai-crm/live-sessions";
+import { assertLiveAvailable, createProviderSession, livePublicConfig, sendProviderUpdate } from "@/lib/ai-crm/live-provider";
+import { classifyOpenAiProviderError } from "@/lib/ai-crm/openai-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ const bodySchema = z
   .object({
     clientSessionId: z.uuid(),
     conversationId: z.string().trim().min(8).max(120).optional(),
+    sdp: z.string().min(20).max(64_000).optional(),
+    reconnect: z.boolean().optional(),
   })
   .strict();
 
@@ -34,39 +37,13 @@ function publicConversation(
   };
 }
 
-function assertMockTransport() {
-  const config = aiCrmConfig();
-  if (config.liveProvider === "disabled") {
-    throw new AiCrmError(
-      "LIVE_NOT_AVAILABLE",
-      "Live mit Jarvis ist in dieser Umgebung noch nicht eingerichtet.",
-      503,
-    );
-  }
-  if (config.liveProvider === "realtime") {
-    if (!config.liveRealtimeApproved) {
-      throw new AiCrmError(
-        "LIVE_REALTIME_NOT_APPROVED",
-        "Der echte Live-Betrieb ist noch nicht freigegeben.",
-        503,
-      );
-    }
-    if (!config.liveSidebandUrl) {
-      throw new AiCrmError(
-        "LIVE_SIDEBAND_REQUIRED",
-        "Der echte Live-Betrieb ist noch nicht vollständig eingerichtet.",
-        503,
-      );
-    }
-    // Do not silently fall back to a browser-controlled tool path. A durable
-    // trusted sideband service is required before any Realtime call is made.
-    throw new AiCrmError(
-      "LIVE_REALTIME_NOT_IMPLEMENTED",
-      "Der echte Live-Betrieb ist noch nicht vollständig eingerichtet.",
-      503,
-    );
-  }
-  return config;
+export async function GET() {
+  try {
+    const user = await requireUser();
+    const config = assertLiveAvailable();
+    await requireAiEntitlement(prisma, user.id, new Date(), config);
+    return Response.json({ mode: config.liveProvider === "live" ? "live" : "simulation", config: livePublicConfig(user.name, config) }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) { return aiErrorResponse(error); }
 }
 
 export async function POST(request: Request) {
@@ -83,18 +60,20 @@ export async function POST(request: Request) {
         400,
       );
     }
-    const config = assertMockTransport();
+    const config = assertLiveAvailable();
+    if (config.liveProvider === "live" && !parsed.data.sdp) throw new AiCrmError("LIVE_SDP_REQUIRED", "Die Audioverbindung benötigt ein Verbindungsangebot des Browsers.", 400);
     const now = new Date();
     await requireAiEntitlement(prisma, user.id, now, config);
     const started = await startLiveSession(prisma, {
       userId: user.id,
-      provider: "mock",
+      provider: config.liveProvider === "live" ? "live" : "mock",
       clientSessionId: parsed.data.clientSessionId,
       conversationId: parsed.data.conversationId,
       now,
       retentionDays: config.conversationRetentionDays,
       maxMessages: config.conversationMaxMessages,
       maxSessionSeconds: config.liveMaxSessionSeconds,
+      introEnabled: config.liveDemoEnabled,
     });
     let session = started.session;
     if (!started.reused) {
@@ -113,7 +92,7 @@ export async function POST(request: Request) {
         });
         await prisma.aiUsage.update({
           where: { id: usage.id },
-          data: { provider: "local-mock", model: "local-mock" },
+          data: { provider: config.liveProvider === "live" ? "openai" : "local-mock", model: config.liveProvider === "live" ? config.liveModel : "local-mock" },
         });
       } catch (error) {
         await endLiveSession(prisma, {
@@ -125,6 +104,31 @@ export async function POST(request: Request) {
         throw error;
       }
     }
+    let transport: { type: "webrtc"; sdp: string } | undefined;
+    if (config.liveProvider === "live") {
+      // SDP is deliberately not persisted. A lost creation response needs a
+      // deliberate new connection; never silently create a second billed call.
+      if (started.reused && !parsed.data.reconnect) return Response.json({ error: "Die Sprachverbindung wurde bereits angelegt. Stelle die Verbindung bewusst wieder her.", code: "LIVE_RECONNECT_REQUIRED", session: { id: session.id, introState: session.introState } }, { status: 409, headers: { "Cache-Control": "no-store" } });
+      if (started.reused) {
+          if (!session.providerSessionRef) throw new AiCrmError("LIVE_START_IN_PROGRESS", "Die Sprachverbindung wird noch gestartet. Bitte warte auf den Abschluss.", 409);
+          if (session.reconnectCount >= config.liveReconnectLimit) throw new AiCrmError("LIVE_RECONNECT_LIMIT", "Die maximale Zahl der Wiederverbindungen ist erreicht. Bitte beende die Runde.", 409);
+          const reserved = await prisma.aiLiveSession.updateMany({ where: { id: session.id, userId: user.id, errorCode: null, revision: session.revision, reconnectCount: { lt: config.liveReconnectLimit } }, data: { errorCode: "LIVE_RECONNECTING", revision: { increment: 1 }, reconnectCount: { increment: 1 } } });
+          if (!reserved.count) throw new AiCrmError("LIVE_RECONNECT_IN_PROGRESS", "Die Verbindung wird bereits wiederhergestellt.", 409);
+      }
+      let createdProviderRef: string | null = null;
+      try {
+        if (started.reused && session.providerSessionRef) await sendProviderUpdate(session.providerSessionRef, "", { close: true });
+        const created = await createProviderSession({ sdp: parsed.data.sdp!, greetingPending: session.introState !== "DONE", profileName: user.name, config });
+        createdProviderRef = created.session.id;
+        transport = created.transport;
+        session = await prisma.aiLiveSession.update({ where: { id: session.id }, data: { providerSessionRef: created.session.id, errorCode: null } });
+      } catch (error) {
+        if (createdProviderRef) await sendProviderUpdate(createdProviderRef, "", { close: true }).catch(() => undefined);
+        await endLiveSession(prisma, { userId: user.id, sessionId: session.id, errorCode: "LIVE_PROVIDER_START_FAILED" });
+        if (session.usageId) await prisma.aiUsage.updateMany({ where: { id: session.usageId, userId: user.id }, data: { status: "FAILED", errorCode: "LIVE_PROVIDER_START_FAILED" } });
+        throw classifyOpenAiProviderError(error) ?? error;
+      }
+    }
     const music = await musicProviderForLive(prisma).state({
       userId: user.id,
       sessionId: session.id,
@@ -134,11 +138,15 @@ export async function POST(request: Request) {
     });
     return Response.json(
       {
-        mode: "simulation",
+        mode: config.liveProvider === "live" ? "live" : "simulation",
+        transport,
+        config: livePublicConfig(user.name, config),
         session: {
           id: session.id,
           expiresAt: session.expiresAt.toISOString(),
           reconnectLimit: config.liveReconnectLimit,
+          introState: session.introState,
+          revision: session.revision,
         },
         conversation: publicConversation(
           started.conversation,

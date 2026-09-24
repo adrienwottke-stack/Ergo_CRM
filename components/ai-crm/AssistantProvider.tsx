@@ -6,11 +6,11 @@ import { useVorfuehren } from "@/components/VorfuehrProvider";
 import type { ActionReceipt, AssistantAccess, AssistantContext, ConversationSummary, Entry, ReadResult } from "@/lib/ai-crm/contracts";
 import { assistantRecoveryFailureMessage } from "@/lib/ai-crm/errors";
 
-type SendBody = { message: string; source: "text" | "voice"; conversationId?: string; clientRequestId: string; context?: { contactId: string; followUpId?: string } };
+type SendBody = { message: string; source: "text" | "voice"; conversationId?: string; clientRequestId: string; context?: Omit<AssistantContext, "label"> };
 type Reply = { answer: string; requestId: string; actions: ActionReceipt[]; results?: ReadResult[]; conversation: ConversationSummary & { restartReason?: string | null } };
 type Recovery = { body: SendBody; status: string; error?: string };
 type LiveConversation = ConversationSummary & { restarted?: boolean; restartReason?: "expired" | "limit" | null };
-type LiveTurn = { requestId: string; transcript: string; answer: string; actions: ActionReceipt[]; conversation: LiveConversation };
+type LiveTurn = { requestId: string; transcript: string; answer: string; actions: ActionReceipt[]; results?: ReadResult[]; conversation: LiveConversation };
 export class AssistantHttpError extends Error { constructor(message: string, public code: string, public status: number, public requestId?: string) { super(message); } }
 export async function assistantFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: "no-store", ...init });
@@ -72,6 +72,7 @@ function useController() {
   const register = useCallback((userId: string) => {
     if (owner.current === userId) return;
     owner.current = userId; initialized.current = false; loadVersion.current++;
+    setActionBusy(null); setActionErrors({}); setNotice(null); setCaptureEpoch(value => value + 1);
     setAccess(null); setConversations([]); setEntries([]); setConversationId(null); setDraft(""); setAttachment(null); setError(null); setRecovery(null); setWorking(false); setMode("closed"); drafts.current.clear(); activeRequest.current = null;
   }, []);
 
@@ -88,9 +89,10 @@ function useController() {
     const version = ++loadVersion.current;
     setLoading(true); setError(null);
     try {
-      const data = await assistantFetch<ConversationSummary & { messages: Entry[] }>(`/api/ai-crm/conversations/${encodeURIComponent(id)}`);
+      const data = await assistantFetch<ConversationSummary & { messages: Entry[]; context?: AssistantContext }>(`/api/ai-crm/conversations/${encodeURIComponent(id)}`);
       if (version !== loadVersion.current) return;
       setConversationId(id); setEntries(data.messages); setScrollTop(-1); setNotice("Frühere Antworten beziehen sich auf den Zeitpunkt des Gesprächs.");
+      if (data.context) setAttachment(data.context);
       setConversations(current => [{ id: data.id, title: data.title, expiresAt: data.expiresAt, updatedAt: data.updatedAt, messageCount: data.messageCount }, ...current.filter(item => item.id !== id)]);
     } catch (reason) { if (version === loadVersion.current) setError(reason instanceof Error ? reason.message : "Die Unterhaltung konnte nicht geladen werden."); }
     finally { if (version === loadVersion.current) setLoading(false); }
@@ -166,6 +168,7 @@ function useController() {
   }, []);
 
   const acceptReply = useCallback((data: Reply, body: SendBody) => {
+    if (activeRequest.current !== body) return;
     if (Date.parse(data.conversation.expiresAt) <= Date.now()) {
       setEntries([]); setConversationId(null); setRecovery(null); activeRequest.current = null;
       setNotice("Das vorherige Gespräch ist abgelaufen. Hier beginnt ein neues. Deine CRM-Einträge bleiben erhalten.");
@@ -221,6 +224,7 @@ function useController() {
       role: "assistant",
       content: turn.answer,
       actions: turn.actions,
+      results: turn.results,
       requestId: turn.requestId,
       createdAt: new Date().toISOString(),
     };
@@ -260,7 +264,7 @@ function useController() {
     if (!draft.trim() || locked || loading || activeRequest.current || !access?.enabled) return;
     if (!navigator.onLine) { setError("Du bist gerade offline. Deine Nachricht wurde noch nicht gesendet."); return; }
     const full = active && active.messageCount >= 20;
-    const body: SendBody = { message: draft.trim(), source, clientRequestId: crypto.randomUUID(), conversationId: conversationId ?? undefined, ...(attachment ? { context: { contactId: attachment.contactId, followUpId: attachment.followUpId } } : {}) };
+    const body: SendBody = { message: draft.trim(), source, clientRequestId: crypto.randomUUID(), conversationId: conversationId ?? undefined, ...(attachment ? { context: { contactId: attachment.contactId, partnerId: attachment.partnerId, followUpId: attachment.followUpId, entityId: attachment.entityId, entityType: attachment.entityType } } : {}) };
     activeRequest.current = body; setWorking(true); setError(null); setNotice(full ? "Diese Nachricht beginnt eine neue Unterhaltung." : null);
     setEntries(current => [...(full ? [] : current), { id: body.clientRequestId, role: "user", content: body.message, source, delivery: "sending" }]); setDraft(""); setSource("text");
     try { const reply = await assistantFetch<Reply>("/api/ai-crm/chat", post(body)); if (activeRequest.current === body) acceptReply(reply, body); }
@@ -278,24 +282,28 @@ function useController() {
   const recover = useCallback(async () => {
     const body = recovery?.body ?? activeRequest.current;
     if (!body) return;
+    const requestedOwner = owner.current;
+    const current = () => owner.current === requestedOwner && activeRequest.current === body;
     setActionBusy("recovery");
     try {
       const data = await assistantFetch<{ id: string; status: string; errorCode: string | null; actions: ActionReceipt[]; response: Reply | null }>(`/api/ai-crm/requests/${body.clientRequestId}`);
+      if (!current()) return;
       if (data.response) acceptReply(data.response, body);
       else if (["FAILED", "ABORTED"].includes(data.status)) {
         setEntries(current => [...current.filter(entry => entry.id !== `response-${body.clientRequestId}`), { id: `response-${body.clientRequestId}`, role: "assistant", content: assistantRecoveryFailureMessage(data.status, data.errorCode), actions: data.actions, requestId: data.id }]);
         setRecovery(null); activeRequest.current = null; setWorking(false);
       } else setRecovery({ body, status: data.status, error: "Die Anfrage läuft noch. Bereits ausgeführte Schritte werden beim Abschluss angezeigt." });
-    } catch (reason) { setRecovery({ body, status: reason instanceof AssistantHttpError && reason.status === 404 ? "NOT_FOUND" : "UNKNOWN", error: reason instanceof Error ? reason.message : "Der Status ist gerade nicht erreichbar." }); }
-    finally { setActionBusy(null); }
+    } catch (reason) { if (current()) setRecovery({ body, status: reason instanceof AssistantHttpError && reason.status === 404 ? "NOT_FOUND" : "UNKNOWN", error: reason instanceof Error ? reason.message : "Der Status ist gerade nicht erreichbar." }); }
+    finally { if (owner.current === requestedOwner) setActionBusy(null); }
   }, [recovery, acceptReply]);
 
   const retryOriginal = useCallback(async () => {
     if (recovery?.status !== "NOT_FOUND") return;
     const body = recovery.body; setWorking(true);
+    const requestedOwner = owner.current;
     try { const reply = await assistantFetch<Reply>("/api/ai-crm/chat", post(body)); acceptReply(reply, body); }
-    catch (reason) { setRecovery({ body, status: "UNKNOWN", error: reason instanceof Error ? reason.message : "Die Anfrage ist noch nicht erreichbar." }); }
-    finally { setWorking(false); }
+    catch (reason) { if (activeRequest.current === body && owner.current === requestedOwner) setRecovery({ body, status: "UNKNOWN", error: reason instanceof Error ? reason.message : "Die Anfrage ist noch nicht erreichbar." }); }
+    finally { if (owner.current === requestedOwner) setWorking(false); }
   }, [recovery, acceptReply]);
 
   const stop = useCallback(async () => {
@@ -325,11 +333,24 @@ function useController() {
     if (actionBusy || working) return;
     setActionBusy(requestId); setActionErrors(current => ({ ...current, [requestId]: "" }));
     try {
-      const result = await assistantFetch<{ actions: ActionReceipt[] }>(`/api/ai-crm/requests/${requestId}`, post({ action, ...(actionIds ? { actionIds } : {}) }));
+      const receipts = entries.flatMap(entry => entry.actions ?? []);
+      const revisions = Object.fromEntries((actionIds ?? []).map(id => [id, receipts.find(item => item.id === id)?.revision ?? ""]));
+      const result = await assistantFetch<{ actions: ActionReceipt[] }>(`/api/ai-crm/requests/${requestId}`, post({ action, ...(actionIds ? { actionIds, ...(action === "confirm" ? { revisions } : {}) } : {}) }));
       mergeActions(requestId, result.actions); router.refresh(); window.dispatchEvent(new Event("crm:work-saved"));
     } catch (reason) { setActionErrors(current => ({ ...current, [requestId]: reason instanceof Error ? reason.message : "Der Abschluss ist unklar. Bitte prüfe das Ergebnis." })); }
     finally { setActionBusy(null); }
-  }, [actionBusy, working, mergeActions, router]);
+  }, [actionBusy, working, entries, mergeActions, router]);
+
+  const revisePlan = useCallback(async (action: ActionReceipt, values: Record<string, string>) => {
+    if (!action.id || !action.requestId || !action.revision || actionBusy || working) return false;
+    setActionBusy(action.requestId); setActionErrors(current => ({ ...current, [action.requestId!]: "" }));
+    try {
+      const result = await assistantFetch<{ actions: ActionReceipt[] }>(`/api/ai-crm/requests/${action.requestId}`, post({ action: "revise", actionId: action.id, revision: action.revision, values }));
+      mergeActions(action.requestId, result.actions);
+      return true;
+    } catch (reason) { setActionErrors(current => ({ ...current, [action.requestId!]: reason instanceof Error ? reason.message : "Die Vorschau konnte nicht bearbeitet werden." })); return false; }
+    finally { setActionBusy(null); }
+  }, [actionBusy, working, mergeActions]);
 
   const refreshActions = useCallback(async (requestId: string) => {
     try { const result = await assistantFetch<{ actions: ActionReceipt[] }>(`/api/ai-crm/requests/${requestId}`); mergeActions(requestId, result.actions); setActionErrors(current => ({ ...current, [requestId]: "" })); }
@@ -374,7 +395,7 @@ function useController() {
     catch (reason) { setError(reason instanceof Error ? reason.message : "Der Zugang konnte nicht geöffnet werden."); setBilling(false); }
   }, []);
 
-  return { mode, setMode, expand, asPanel, showWorkspace, visible, presenting, section, setSection, access, conversations, nextCursor, conversationId, active, entries, draft, setDraft, source, setSource, attachment, setAttachment, loading, working, locked, recovery, error, setError, notice, actionBusy, actionErrors, deleteTarget, setDeleteTarget, billing, captureEpoch, scrollTop, setScrollTop, register, open, close, initialize, loadList, selectConversation, startNew, send, recover, retryOriginal, stop, changePlan, refreshActions, undo, removeConversation, openBilling, acceptLiveConversation, acceptLiveTurn };
+  return { mode, setMode, expand, asPanel, showWorkspace, visible, presenting, section, setSection, access, conversations, nextCursor, conversationId, active, entries, draft, setDraft, source, setSource, attachment, setAttachment, loading, working, locked, recovery, error, setError, notice, actionBusy, actionErrors, deleteTarget, setDeleteTarget, billing, captureEpoch, scrollTop, setScrollTop, register, open, close, initialize, loadList, selectConversation, startNew, send, recover, retryOriginal, stop, changePlan, revisePlan, refreshActions, undo, removeConversation, openBilling, acceptLiveConversation, acceptLiveTurn };
 }
 
 type Controller = ReturnType<typeof useController>;

@@ -331,6 +331,8 @@ model StageEvent {
 }
 
 model User {
+  leadershipNotes             LeadershipNote[] @relation("LeadershipNoteOwner")
+  leadershipNotesAbout        LeadershipNote[] @relation("LeadershipNotePartner")
   zinsSzenarien                ZinsSzenario[]
   startProgress                StartProgress?
   nameCollections              NameCollection[]
@@ -593,6 +595,10 @@ model AiConversation {
 // nicht in dieses Modell. Sichtbare finale Sätze bleiben ausschliesslich in
 // der zugeordneten, nach sieben Tagen geloeschten Unterhaltung.
 model AiLiveSession {
+  introState         String          @default("WAITING")
+  revision           Int             @default(0)
+  reconnectCount     Int             @default(0)
+  turnCount          Int             @default(0)
   id                 String          @id @default(cuid())
   userId             String
   user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -925,6 +931,9 @@ model Kandidatur {
 //      eine zweite Liste. Eine Fuehrungskraft hat EINE Liste; genau das macht
 //      aus einem Berichts-Werkzeug ein Fuehrungs-Werkzeug.
 model LeadershipTask {
+  version      Int             @default(1)
+  sourceNoteId String?
+  sourceNote   LeadershipNote? @relation(fields: [sourceNoteId], references: [id], onDelete: SetNull)
   id       String @id @default(cuid())
   leaderId String
   leader   User   @relation("Fuehrt", fields: [leaderId], references: [id], onDelete: Cascade)
@@ -1358,6 +1367,8 @@ model AvvAcceptance {
 // sondern Pflegeaufwand. Entschaerft wird es ueber die Genauigkeit: "Mi 14-18
 // belegt" reicht. Deshalb ist ausser dem Zeitraum nichts Pflicht.
 model Termin {
+  leadershipNotes LeadershipNote[]
+  linkedAgreements PartnerVereinbarung[]
   id      String @id @default(cuid())
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -1645,6 +1656,10 @@ enum VereinbarungStatus {
 }
 
 model PartnerVereinbarung {
+  sourceNoteId       String?
+  sourceNote         LeadershipNote? @relation(fields: [sourceNoteId], references: [id], onDelete: SetNull)
+  appointmentId      String?
+  appointment        Termin? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   id                 String                @id @default(cuid())
   initiatorId        String
   initiator          User                  @relation("VereinbarungInitiiert", fields: [initiatorId], references: [id], onDelete: Cascade)
@@ -1667,6 +1682,27 @@ model PartnerVereinbarung {
 
   @@index([initiatorId, status, faelligAm])
   @@index([empfaengerId, status, faelligAm])
+}
+
+// Private author's record. Rank and team membership never grant note access.
+model LeadershipNote {
+  id              String @id @default(cuid())
+  ownerId         String
+  owner           User @relation("LeadershipNoteOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  partnerId       String
+  partner         User @relation("LeadershipNotePartner", fields: [partnerId], references: [id], onDelete: Cascade)
+  text            String
+  occurredAt      DateTime
+  version         Int @default(1)
+  sourceRequestId String?
+  appointmentId   String?
+  appointment     Termin? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  tasks           LeadershipTask[]
+  agreements      PartnerVereinbarung[]
+
+  @@index([ownerId, partnerId, occurredAt])
 }
 
 model VereinbarungVersion {

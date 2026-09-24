@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { aiCrmConfig } from "@/lib/ai-crm/config";
-import { requireAiEntitlement } from "@/lib/ai-crm/entitlement";
+import { claimAiUsage, completeAiUsage, requireAiEntitlement } from "@/lib/ai-crm/entitlement";
 import { AiCrmError } from "@/lib/ai-crm/errors";
 import { aiErrorResponse, sameOrigin } from "@/lib/ai-crm/http";
 import { musicProviderForLive } from "@/lib/ai-crm/live-music";
@@ -12,9 +12,16 @@ import {
   requireLiveSession,
 } from "@/lib/ai-crm/live-sessions";
 import { runLocalLiveTurn } from "@/lib/ai-crm/live-turn";
-import { actionReceipts } from "@/lib/ai-crm/action-plans";
+import { actionReceipts, cancelActionPlans, resolveAssistantContext } from "@/lib/ai-crm/action-plans";
 import { persistConversationExchange } from "@/lib/ai-crm/conversations";
+import { conversationView, requestView } from "@/lib/ai-crm/presentation";
 import { claimAiRequest, failAiRequest, hashAiRequestInput } from "@/lib/ai-crm/requests";
+import { runUxCrmAgent } from "@/lib/ai-crm/ux-agent";
+import { openAiClient } from "@/lib/ai-crm/openai";
+import { sendProviderUpdate } from "@/lib/ai-crm/live-provider";
+import { classifyOpenAiProviderError } from "@/lib/ai-crm/openai-errors";
+import type { AssistantContext, ReadResult } from "@/lib/ai-crm/contracts";
+import { assistantContextSchema } from "@/lib/ai-crm/context-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +30,17 @@ const bodySchema = z
   .object({
     clientTurnId: z.uuid(),
     transcript: z.string().trim().min(1).max(4000),
+    delegationId: z.string().min(1).max(120).optional(),
+    revision: z.number().int().min(1).max(1_000_000).optional(),
+    context: assistantContextSchema.optional(),
   })
   .strict();
 
 export async function POST(request: Request, context: RouteContext) {
+  const startedAt = Date.now();
   let aiRequestId: string | null = null;
   let userId: string | null = null;
+  let usageId: string | null = null;
   try {
     if (!sameOrigin(request)) {
       throw new AiCrmError("ORIGIN_DENIED", "Nicht erlaubt.", 403);
@@ -46,7 +58,7 @@ export async function POST(request: Request, context: RouteContext) {
     const { sessionId: routeSessionId } = await context.params;
     const config = aiCrmConfig();
     await requireAiEntitlement(prisma, user.id, new Date(), config);
-    if (config.liveProvider !== "mock") {
+    if (config.liveProvider !== "mock" && config.liveProvider !== "live") {
       throw new AiCrmError(
         "LIVE_TRANSPORT_UNAVAILABLE",
         "Die Live-Verbindung ist gerade nicht verfügbar.",
@@ -68,15 +80,15 @@ export async function POST(request: Request, context: RouteContext) {
       kind: "LIVE_TURN",
       inputHash: hashAiRequestInput({
         sessionId: routeSessionId,
-        transcript: parsed.data.transcript,
+        ...parsed.data,
       }),
       now,
       expiresAt: currentSession.conversation!.expiresAt,
       staleAfterMs: config.providerTimeoutMs + 15_000,
     });
-    aiRequestId = claimed.request.id;
     if (claimed.kind === "REPLAY") {
-      return Response.json(claimed.response, {
+      const current = await requestView(prisma, user.id, claimed.request.id);
+      return Response.json({ ...claimed.response, ...current.response, audioDelivered: false }, {
         headers: { "Cache-Control": "no-store", "X-AI-Replayed": "1" },
       });
     }
@@ -87,6 +99,10 @@ export async function POST(request: Request, context: RouteContext) {
         409,
       );
     }
+    aiRequestId = claimed.request.id;
+    const revision = parsed.data.revision ?? currentSession.revision + 1;
+    const reserved = await prisma.aiLiveSession.updateMany({ where: { id: routeSessionId, userId: user.id, activeKey: user.id, revision: { lt: revision }, turnCount: { lt: config.liveMaxTurns } }, data: { revision, turnCount: { increment: 1 }, lastHeartbeatAt: now } });
+    if (!reserved.count) throw new AiCrmError(currentSession.turnCount >= config.liveMaxTurns ? "LIVE_TURN_LIMIT" : "LIVE_REVISION_STALE", currentSession.turnCount >= config.liveMaxTurns ? "Diese Sprachrunde hat ihr Anfragelimit erreicht. Bitte beende sie." : "Die Anfrage wurde durch einen neueren Auftrag ersetzt.", 409);
     // Reserve both final-message slots only for a new turn. If the existing
     // short-term conversation just reached its boundary, the active Live
     // session is rebound to a fresh one instead of being ended.
@@ -111,7 +127,22 @@ export async function POST(request: Request, context: RouteContext) {
         );
       }
     }
-    const result = await runLocalLiveTurn({
+    let results: ReadResult[] = [];
+    let scopeFingerprint: string | undefined;
+    let resolvedContext: AssistantContext | undefined;
+    let result: { answer: string; actions: Array<{ link?: string }>; music: Awaited<ReturnType<ReturnType<typeof musicProviderForLive>["state"]>> };
+    if (currentSession.provider === "live") {
+      const attachment = parsed.data.context ? await resolveAssistantContext(prisma, user.id, parsed.data.context) : null;
+      const history = await conversationView(prisma, user.id, conversation.id);
+      const usage = await claimAiUsage(prisma, user.id, "CHAT", now, config, claimed.request.id);
+      usageId = usage.id;
+      const agent = await runUxCrmAgent({ client: openAiClient(), db: prisma, userId: user.id, usageId: usage.id, requestId: claimed.request.id, sessionId: conversation.id, message: parsed.data.transcript, history: history.messages.map(message => ({ role: message.role, content: message.content + (message.actions?.length ? `\nAktueller Aktionsstatus: ${JSON.stringify(message.actions.map(action => ({ summary: action.summary, status: action.status })))}` : "") })), context: attachment?.attachment, now, signal: request.signal });
+      results = agent.results;
+      scopeFingerprint = agent.scopeFingerprint;
+      resolvedContext = agent.context;
+      result = { ...agent, music: await musicProviderForLive(prisma).state({ userId: user.id, sessionId: routeSessionId }) };
+      await completeAiUsage(prisma, usage.id, { model: config.model, inputTokens: agent.usage.inputTokens, outputTokens: agent.usage.outputTokens, estimatedCostMicros: agent.usage.estimatedCostMicros, durationMs: Date.now() - startedAt, status: "SUCCEEDED", errorCode: null });
+    } else result = await runLocalLiveTurn({
       db: prisma,
       userId: user.id,
       sessionId: routeSessionId,
@@ -121,12 +152,23 @@ export async function POST(request: Request, context: RouteContext) {
       now,
       music: musicProviderForLive(prisma),
     });
+    const fresh = await requireLiveSession(prisma, { userId: user.id, sessionId: routeSessionId });
+    if (fresh.revision !== revision) {
+      await cancelActionPlans(prisma, user.id, claimed.request.id);
+      await failAiRequest(prisma, claimed.request.id, user.id, "LIVE_REVISION_STALE", "ABORTED");
+      return Response.json({ stale: true, revision, actions: [], results: [], requestId: claimed.request.id }, { headers: { "Cache-Control": "no-store" } });
+    }
     const actions = await actionReceipts(prisma, user.id, claimed.request.id);
     const messageCount = await prisma.aiConversationMessage.count({
       where: { conversationId: conversation.id },
     });
     const response = {
-      mode: "simulation" as const,
+      mode: currentSession.provider === "live" ? "live" as const : "simulation" as const,
+      revision,
+      results,
+      scopeFingerprint,
+      context: resolvedContext,
+      audioDelivered: false,
       requestId: claimed.request.id,
       answer: result.answer,
       actions,
@@ -148,10 +190,19 @@ export async function POST(request: Request, context: RouteContext) {
       source: "LIVE",
       assistantMessage: result.answer,
       actions,
-      presentation: { requestId: claimed.request.id, results: [] },
+      presentation: { requestId: claimed.request.id, results, scopeFingerprint, context: resolvedContext },
       now,
       completeRequest: { id: claimed.request.id, response },
     });
+    // Only persisted, still-current results may reach provider audio. Browser
+    // arguments cannot supply the content, instructions, or target session.
+    if (currentSession.providerSessionRef) {
+      const audioCurrent = await prisma.aiLiveSession.findFirst({ where: { id: routeSessionId, userId: user.id, revision, activeKey: user.id } });
+      if (audioCurrent) {
+        try { await sendProviderUpdate(currentSession.providerSessionRef, result.answer, { delegationId: parsed.data.delegationId }); response.audioDelivered = true; }
+        catch { /* The durable result remains visible; never repeat a write. */ }
+      }
+    }
     if (result.actions.length > 0) {
       revalidatePath("/heute");
       revalidatePath("/namen");
@@ -162,12 +213,14 @@ export async function POST(request: Request, context: RouteContext) {
     }
     return Response.json(response, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    const errorCode = error instanceof AiCrmError ? error.code : "INTERNAL_ERROR";
+    const normalized = classifyOpenAiProviderError(error) ?? error;
+    const errorCode = normalized instanceof AiCrmError ? normalized.code : "INTERNAL_ERROR";
     if (aiRequestId && userId) {
       await failAiRequest(prisma, aiRequestId, userId, errorCode, "FAILED").catch(
         () => undefined,
       );
     }
-    return aiErrorResponse(error, aiRequestId ?? undefined);
+    if (usageId && userId) await prisma.aiUsage.updateMany({ where: { id: usageId, userId, status: "STARTED" }, data: { status: "FAILED", errorCode, durationMs: Date.now() - startedAt } }).catch(() => undefined);
+    return aiErrorResponse(normalized, aiRequestId ?? undefined);
   }
 }

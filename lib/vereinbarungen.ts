@@ -34,7 +34,7 @@ export type VereinbarungAnzeige = VereinbarungInhalt & {
   bestaetigtAm: Date | null;
   verlauf: { version: number; akteur: string; aktion: string; stand: Prisma.JsonValue; createdAt: Date }[];
 };
-export type VereinbarungErgebnis = { ok: true } | { ok: false; fehler: string };
+export type VereinbarungErgebnis = { ok: true; id?: string } | { ok: false; fehler: string };
 
 const fehlenderZugriff: VereinbarungErgebnis = { ok: false, fehler: "Diese Absprache ist nicht verfügbar. Öffne die Teamansicht erneut." };
 const alteVersion: VereinbarungErgebnis = { ok: false, fehler: "Die Absprache wurde inzwischen geändert. Bitte lade die Ansicht neu." };
@@ -77,25 +77,31 @@ export async function vereinbarungspartner(userId: string, partnerId: string): P
 }
 
 export async function vereinbarungVorschlagen(userId: string, partnerId: string, inhalt: VereinbarungInhalt): Promise<VereinbarungErgebnis> {
+  return prisma.$transaction((tx) => vereinbarungVorschlagenInTransaktion(tx, userId, partnerId, inhalt));
+}
+
+/** The caller may include the domain change, AI receipt and audit in one commit. */
+export async function vereinbarungVorschlagenInTransaktion(tx: Prisma.TransactionClient, userId: string, partnerId: string, inhalt: VereinbarungInhalt): Promise<VereinbarungErgebnis> {
   if (!inhaltGueltig(inhalt, userId, partnerId)) return { ok: false, fehler: "Prüfe Inhalt, verantwortliche Person und Termin." };
-  return prisma.$transaction(async (tx) => {
     const konten = await tx.user.findMany({ where: { id: { in: [userId, partnerId] } }, select: kontoSelect });
     const ich = konten.find((konto) => konto.id === userId);
     const partner = konten.find((konto) => konto.id === partnerId);
     if (!ich || !partner || !vereinbarungMoeglich(ich, partner)) return fehlenderZugriff;
     const stand = { ...inhalt, titel: inhalt.titel.trim(), status: "VORGESCHLAGEN" as const, vorgeschlagenVonId: userId, bestaetigtVonId: null, bestaetigtAm: null };
-    await tx.partnerVereinbarung.create({
+    const created = await tx.partnerVereinbarung.create({
       data: {
         ...stand, initiatorId: userId, empfaengerId: partnerId,
         verlauf: { create: { version: 1, akteurId: userId, aktion: "Vorgeschlagen", stand: momentaufnahme(stand) } },
       },
     });
-    return { ok: true };
-  });
+    return { ok: true, id: created.id };
 }
 
 export async function vereinbarungAendern(userId: string, id: string, version: number, inhalt: VereinbarungInhalt): Promise<VereinbarungErgebnis> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction((tx) => vereinbarungAendernInTransaktion(tx, userId, id, version, inhalt));
+}
+
+export async function vereinbarungAendernInTransaktion(tx: Prisma.TransactionClient, userId: string, id: string, version: number, inhalt: VereinbarungInhalt): Promise<VereinbarungErgebnis> {
     const alt = await tx.partnerVereinbarung.findUnique({ where: { id }, include: beteiligte });
     if (!alt || !vereinbarungSichtbar(userId, alt.initiator, alt.empfaenger)) return fehlenderZugriff;
     if (!vereinbarungAenderbar(alt, userId, version)) return alteVersion;
@@ -104,12 +110,14 @@ export async function vereinbarungAendern(userId: string, id: string, version: n
     const geaendert = await tx.partnerVereinbarung.updateMany({ where: { id, version }, data: { ...neu, version: { increment: 1 } } });
     if (geaendert.count !== 1) return alteVersion;
     await tx.vereinbarungVersion.create({ data: { vereinbarungId: id, version: version + 1, akteurId: userId, aktion: "Änderung vorgeschlagen", stand: momentaufnahme(neu) } });
-    return { ok: true };
-  });
+    return { ok: true, id };
 }
 
 export async function vereinbarungReagieren(userId: string, id: string, version: number, aktion: VereinbarungAktion): Promise<VereinbarungErgebnis> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction((tx) => vereinbarungReagierenInTransaktion(tx, userId, id, version, aktion));
+}
+
+export async function vereinbarungReagierenInTransaktion(tx: Prisma.TransactionClient, userId: string, id: string, version: number, aktion: VereinbarungAktion): Promise<VereinbarungErgebnis> {
     const alt = await tx.partnerVereinbarung.findUnique({ where: { id }, include: beteiligte });
     if (!alt || !vereinbarungSichtbar(userId, alt.initiator, alt.empfaenger)) return fehlenderZugriff;
     const status = naechsterVereinbarungsstand(alt, userId, version, aktion);
@@ -122,8 +130,7 @@ export async function vereinbarungReagieren(userId: string, id: string, version:
     if (geaendert.count !== 1) return alteVersion;
     const texte = { BESTAETIGEN: "Bestätigt", ABLEHNEN: "Abgelehnt", ERLEDIGEN: "Erledigt", ABSAGEN: "Abgesagt" };
     await tx.vereinbarungVersion.create({ data: { vereinbarungId: id, version: version + 1, akteurId: userId, aktion: texte[aktion], stand: momentaufnahme(neu) } });
-    return { ok: true };
-  });
+    return { ok: true, id };
 }
 
 function anzeige(stand: VereinbarungMitPersonen, userId: string): Omit<VereinbarungAnzeige, "verlauf"> {
@@ -138,8 +145,8 @@ function anzeige(stand: VereinbarungMitPersonen, userId: string): Omit<Vereinbar
   };
 }
 
-export async function ladeVereinbarungen(userId: string, partnerId?: string): Promise<VereinbarungAnzeige[]> {
-  const staende = await prisma.partnerVereinbarung.findMany({
+export async function ladeVereinbarungen(userId: string, partnerId?: string, db: Prisma.TransactionClient = prisma): Promise<VereinbarungAnzeige[]> {
+  const staende = await db.partnerVereinbarung.findMany({
     where: {
       OR: [{ initiatorId: userId }, { empfaengerId: userId }],
       ...(partnerId ? { AND: [{ OR: [{ initiatorId: partnerId }, { empfaengerId: partnerId }] }] } : {}),

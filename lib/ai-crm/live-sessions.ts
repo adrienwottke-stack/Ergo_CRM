@@ -3,7 +3,7 @@ import { AiCrmError } from "@/lib/ai-crm/errors";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type LiveProvider = "mock" | "realtime";
+type LiveProvider = "mock" | "realtime" | "live";
 
 function conversationExpiry(now: Date, retentionDays: number) {
   return new Date(now.getTime() + retentionDays * DAY_MS);
@@ -96,6 +96,7 @@ export async function startLiveSession(
     retentionDays: number;
     maxMessages: number;
     maxSessionSeconds: number;
+    introEnabled?: boolean;
     usageId?: string | null;
   },
 ) {
@@ -125,6 +126,7 @@ export async function startLiveSession(
       // different tab is not allowed to attach to it: otherwise two media
       // streams could issue turns against the same conversation concurrently.
       if (active.clientSessionId === params.clientSessionId) {
+        if (active.provider !== params.provider) throw new AiCrmError("LIVE_PROVIDER_CHANGED", "Die Sprachkonfiguration wurde geändert. Beende die alte Runde und starte neu.", 409);
         return {
           session: active,
           conversation: active.conversation,
@@ -162,6 +164,7 @@ export async function startLiveSession(
         userId: params.userId,
         conversationId: resolved.conversation.id,
         provider: params.provider,
+        introState: params.introEnabled ? "WAITING" : "DONE",
         status: "ACTIVE",
         activeKey: params.userId,
         clientSessionId: params.clientSessionId,

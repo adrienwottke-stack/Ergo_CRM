@@ -78,7 +78,7 @@ test("the local live path makes music status unmistakably simulated and supports
   assert.match(pause.answer, /simulierte Wiedergabe/);
 });
 
-test("a live follow-up is owner-scoped and duplicate tool events cannot write twice", async () => {
+test("a live follow-up stays an owner-scoped preview and duplicate events cannot stage twice", async () => {
   const owner = await account("Live Action Owner");
   const foreign = await account("Live Action Foreign");
   const ownContact = await db.contact.create({ data: { name: "Jonas Beispiel", ownerId: owner.id } });
@@ -110,8 +110,9 @@ test("a live follow-up is owner-scoped and duplicate tool events cannot write tw
   assert.deepEqual(replay.actions, first.actions);
   assert.equal(
     await db.contactFollowUp.count({ where: { contactId: ownContact.id, ownerId: owner.id } }),
-    1,
+    0,
   );
+  assert.equal(first.actions[0].status, "PENDING");
   assert.equal(
     await db.aiToolExecution.count({ where: { userId: owner.id, requestId: request.id } }),
     1,

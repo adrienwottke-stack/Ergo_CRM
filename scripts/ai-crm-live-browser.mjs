@@ -16,6 +16,8 @@ const port = Number(process.env.AI_CRM_LIVE_BROWSER_PORT || 3131);
 const origin = `http://127.0.0.1:${port}`;
 const output = new URL("../test-results/ai-crm-live/", import.meta.url);
 await mkdir(output, { recursive: true });
+await mkdir(new URL("../.cache/ai-live-browser/", import.meta.url), { recursive: true });
+await writeFile(new URL("../.cache/ai-live-browser/tsconfig.json", import.meta.url), JSON.stringify({ extends: "../../tsconfig.json", compilerOptions: { baseUrl: "../..", paths: { "@/*": ["./*"] } } }));
 await writeFile(new URL("server.log", output), "");
 await writeFile(new URL("browser-console.log", output), "");
 await writeFile(new URL("failed-requests.log", output), "");
@@ -31,9 +33,15 @@ const server = spawn(
       DATABASE_URL: fixture.url,
       DIRECT_URL: fixture.url,
       DATABASE_POOL_MAX: "1",
+      CRM_TEST_DIST_DIR: ".cache/ai-live-browser-next",
+      CRM_TEST_TSCONFIG: ".cache/ai-live-browser/tsconfig.json",
       NEXT_TELEMETRY_DISABLED: "1",
       AI_CRM_ENABLED: "true",
       AI_LIVE_PROVIDER: "mock",
+      OPENAI_API_KEY: "",
+      OPENAI_BASE_URL: "http://127.0.0.1:1",
+      SPOTIFY_ENABLED: "false",
+      SPOTIFY_LOCAL_ENABLED: "false",
     },
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
@@ -225,7 +233,7 @@ try {
     await desktop.page.evaluate(() => window.__jarvisLiveTrackStops > 0),
     "ending Live stops local microphone tracks",
   );
-  await desktop.page.getByText("Live-Transkript · lokale Demo").first().waitFor();
+  await desktop.page.getByText("Live-Transkript", { exact: true }).first().waitFor();
   await screenshot(desktop.page, "desktop-live-history.png");
   await desktop.context.close();
 
@@ -270,6 +278,7 @@ try {
       line.includes("net::ERR_ABORTED") &&
       (line.startsWith(`DELETE ${origin}/api/ai-crm/live/session/`) ||
         line.startsWith(`GET ${origin}/heute?_rsc=`) ||
+        line.startsWith(`GET ${origin}/api/ai-crm/live/session net::ERR_ABORTED`) ||
         line.startsWith(`GET ${origin}/api/ai-crm/music/spotify`)),
   );
   assert.deepEqual(

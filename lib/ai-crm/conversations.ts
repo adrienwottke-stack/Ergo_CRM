@@ -121,7 +121,7 @@ export async function persistConversationExchange(
     source: "TEXT" | "VOICE" | "LIVE";
     assistantMessage: string;
     actions: unknown[];
-    presentation?: { requestId: string; results: unknown[] };
+    presentation?: { requestId: string; results: unknown[]; scopeFingerprint?: string; context?: unknown };
     now?: Date;
     completeRequest?: {
       id: string;

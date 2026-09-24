@@ -84,8 +84,8 @@ test("a successful undo is reflected in reloaded action state", async () => {
   assert.equal(await db.contactFollowUp.count({ where: { contactId: s.contact.id } }), 0);
   assert.equal((await actionReceipts(db, s.user.id, s.request.id))[0].undoStatus, "UNDONE");
 });
-test("only explicit single small commands qualify for direct execution", () => {
-  assert.equal(permitsDirectAction("Bitte erstelle eine Wiedervorlage für Jonas.", "create_follow_up", 1), true);
+test("every business write needs visible confirmation including explicit short commands", () => {
+  assert.equal(permitsDirectAction("Bitte erstelle eine Wiedervorlage für Jonas.", "create_follow_up", 1), false);
   assert.equal(permitsDirectAction("Ich habe mit Jonas gesprochen.", "add_activity", 1), false);
   assert.equal(permitsDirectAction("Dokumentiere das Gespräch und erstelle eine Wiedervorlage", "add_activity", 2), false);
   assert.equal(permitsDirectAction("Bitte notiere keine Notiz", "add_note", 1), false);

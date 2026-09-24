@@ -14,6 +14,7 @@ import { openAiClient } from "@/lib/ai-crm/openai";
 import { classifyOpenAiProviderError } from "@/lib/ai-crm/openai-errors";
 import { runUxCrmAgent } from "@/lib/ai-crm/ux-agent";
 import { resolveAssistantContext } from "@/lib/ai-crm/action-plans";
+import { assistantContextSchema } from "@/lib/ai-crm/context-schema";
 import { requestView, conversationView } from "@/lib/ai-crm/presentation";
 import {
   persistConversationExchange,
@@ -33,7 +34,7 @@ const bodySchema = z
     source: z.enum(["text", "voice"]),
     conversationId: z.string().trim().min(8).max(120).optional(),
     clientRequestId: z.uuid(),
-    context: z.object({ contactId: z.string().min(1).max(120), followUpId: z.string().min(1).max(120).optional() }).strict().optional(),
+    context: assistantContextSchema.optional(),
   })
   .strict();
 
@@ -149,7 +150,7 @@ export async function POST(request: Request) {
       source: parsed.data.source === "voice" ? "VOICE" : "TEXT",
       assistantMessage: result.answer,
       actions: result.actions,
-      presentation: { requestId: claimed.request.id, results: result.results },
+      presentation: { requestId: claimed.request.id, results: result.results, scopeFingerprint: result.scopeFingerprint, context: result.context },
       now: new Date(),
       completeRequest: { id: claimed.request.id, response },
     });

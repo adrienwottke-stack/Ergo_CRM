@@ -20,12 +20,19 @@ export type AiCrmConfig = {
   inputMicrosPerMillionTokens: number;
   outputMicrosPerMillionTokens: number;
   audioMicrosPerMinute: number;
-  liveProvider: "disabled" | "mock" | "realtime";
+  liveProvider: "disabled" | "mock" | "realtime" | "live";
   liveModel: string;
   liveMaxSessionSeconds: number;
   liveReconnectLimit: number;
   liveRealtimeApproved: boolean;
   liveSidebandUrl: string | null;
+  liveVoice: string;
+  liveDemoEnabled: boolean;
+  liveGreetingName: string | null;
+  liveInactivitySeconds: number;
+  liveWarningSeconds: number;
+  liveMaxTurns: number;
+  liveSpeechModel: string;
 };
 
 function integer(name: string, fallback: number, minimum = 0): number {
@@ -51,9 +58,9 @@ function liveProvider(): AiCrmConfig["liveProvider"] {
   const raw = (process.env.AI_LIVE_PROVIDER?.trim().toLowerCase() || fallback) as
     | "disabled"
     | "mock"
-    | "realtime";
-  if (!["disabled", "mock", "realtime"].includes(raw)) {
-    throw new Error("AI_LIVE_PROVIDER muss disabled, mock oder realtime sein.");
+    | "realtime" | "live";
+  if (!["disabled", "mock", "realtime", "live"].includes(raw)) {
+    throw new Error("AI_LIVE_PROVIDER muss disabled, mock, realtime oder live sein.");
   }
   // A production deployment must be an explicit integration, never a demo
   // accidentally exposed because NODE_ENV differs between local and Vercel.
@@ -105,14 +112,20 @@ export function aiCrmConfig(): AiCrmConfig {
     ),
     audioMicrosPerMinute: integer("AI_COST_AUDIO_MICROS_PER_MINUTE", 0),
     liveProvider: liveProvider(),
-    // Current official WebRTC examples use the maintained Realtime model.
-    // This value is server-only preparation; the mock never sends it to a
-    // provider and the browser cannot override it.
-    liveModel: process.env.AI_LIVE_MODEL?.trim() || "gpt-realtime-2.1",
+    // The documented GPT-Live model stays server-selected; neither the
+    // browser nor model tool arguments can override it.
+    liveModel: process.env.AI_LIVE_MODEL?.trim() || "gpt-live-1",
     liveMaxSessionSeconds: integer("AI_LIVE_MAX_SESSION_SECONDS", 600, 30),
     liveReconnectLimit: integer("AI_LIVE_RECONNECT_LIMIT", 1),
     liveRealtimeApproved: bool("AI_LIVE_REALTIME_APPROVED", false),
     liveSidebandUrl: process.env.AI_LIVE_SIDEBAND_URL?.trim() || null,
+    liveVoice: process.env.AI_LIVE_VOICE?.trim() || "marin",
+    liveDemoEnabled: bool("JARVIS_DEMO_ENABLED", false),
+    liveGreetingName: process.env.JARVIS_GREETING_NAME?.trim().slice(0, 60) || null,
+    liveInactivitySeconds: integer("AI_LIVE_INACTIVITY_SECONDS", 120, 30),
+    liveWarningSeconds: integer("AI_LIVE_WARNING_SECONDS", 15, 5),
+    liveMaxTurns: integer("AI_LIVE_MAX_TURNS", 30, 1),
+    liveSpeechModel: process.env.AI_LIVE_SPEECH_MODEL?.trim() || "gpt-4o-mini-tts",
   };
 }
 

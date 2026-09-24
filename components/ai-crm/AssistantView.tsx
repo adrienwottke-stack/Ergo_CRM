@@ -53,9 +53,10 @@ export default function AssistantView() {
     {assistant.error && !assistant.deleteTarget && <div className="assistant-error-banner" role="alert"><p>{assistant.error}</p>{!assistant.access && <button onClick={() => void assistant.initialize()}>Erneut versuchen</button>}</div>}
     {assistant.section === "details" ? <Details /> : assistant.section === "conversations" ? <AssistantConversationList /> : !assistant.access ? <p className="assistant-loading" role="status">Assistent wird geöffnet …</p> : !assistant.access.enabled ? <div className="assistant-access"><span aria-hidden>○</span><h3>{assistant.access.reason === "NO_ENTITLEMENT" ? "Der Assistent ist für dein Konto noch nicht freigeschaltet." : assistant.access.reason?.startsWith("MONTHLY") ? "Dein Nutzungslimit ist erreicht." : "Der Assistent ist vorübergehend nicht verfügbar."}</h3><p>Du kannst im CRM normal weiterarbeiten.</p><div className="assistant-button-row"><button className="assistant-primary" onClick={assistant.close}>Zurück zum CRM</button><button onClick={() => assistant.setSection("details")}>Zugang ansehen</button></div></div> : <>
       {!liveOpen && assistant.attachment && <div className="assistant-context"><span>Bezug: <strong>{assistant.attachment.label}</strong>{assistant.attachment.followUpId && " · Wiedervorlage"}</span><button disabled={assistant.working} onClick={() => assistant.setAttachment(null)} aria-label="Bezug entfernen">×</button></div>}
-      {!liveOpen && <AssistantTimeline />}
-      {assistant.access.liveAvailable && <details className="assistant-live-entry"><summary>Live sprechen · lokale Demo</summary><JarvisLive
+      <AssistantTimeline />
+      {assistant.access.liveAvailable && <details className="assistant-live-entry" style={liveOpen ? { maxHeight: "48%", overflowY: "auto", flexShrink: 0 } : undefined}><summary onClick={event => { if (liveOpen) event.preventDefault(); }}>{liveOpen ? "Jarvis aktiv · Mikrofon und Sitzung" : "Mit Jarvis sprechen"}</summary><JarvisLive
         conversationId={assistant.conversationId}
+        context={assistant.attachment}
         disabled={assistant.locked}
         onActiveChange={setLiveOpen}
         onConversationStarted={assistant.acceptLiveConversation}

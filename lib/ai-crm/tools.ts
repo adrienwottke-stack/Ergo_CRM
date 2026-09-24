@@ -17,8 +17,10 @@ import {
 } from "@/lib/followups";
 import { contactCreationFingerprint } from "@/lib/undo";
 import { aiUndoState } from "@/lib/ai-crm/undo-guard";
+import { LEADERSHIP_TOOL_DEFINITIONS, LEADERSHIP_SCHEMAS, LEADERSHIP_WRITE_TOOLS, runLeadershipRead, executeLeadershipWrite } from "@/lib/ai-crm/leadership-tools";
 
 export const CRM_TOOL_DEFINITIONS = [
+  ...LEADERSHIP_TOOL_DEFINITIONS,
   {
     type: "function" as const,
     name: "search_contacts",
@@ -319,6 +321,7 @@ const staleSchema = z.object({
 const recentSchema = z.object({ limit: z.number().int().min(1).max(30) });
 
 const schemas = {
+  ...LEADERSHIP_SCHEMAS,
   search_contacts: searchSchema,
   get_contact: contactIdSchema,
   get_contact_history: historySchema,
@@ -362,6 +365,7 @@ type ToolContext = {
 };
 
 export const WRITE_TOOLS = new Set<CrmToolName>([
+  ...LEADERSHIP_WRITE_TOOLS,
   "create_contact",
   "update_contact",
   "add_activity",
@@ -579,6 +583,12 @@ export async function runCrmTool(
   }
   const name = parsed.name;
   const args = parsed.args;
+
+  if (Object.hasOwn(LEADERSHIP_SCHEMAS, name)) {
+    if (!WRITE_TOOLS.has(name)) return runLeadershipRead(db, context.userId, name, args);
+    if (!context.transaction) throw new AiCrmError("CONFIRMATION_REQUIRED", "Bitte bestätige zuerst die konkrete Vorschau.", 409);
+    return auditedWrite(db, context, tx => executeLeadershipWrite(tx, context.userId, name, args, { requestId: context.aiRequestId ?? context.requestId }));
+  }
 
   if (name === "search_contacts") {
     const query = String(args.query);

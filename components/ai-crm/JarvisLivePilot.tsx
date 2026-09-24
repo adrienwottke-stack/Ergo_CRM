@@ -1,0 +1,459 @@
+"use client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ActionReceipt, AssistantContext, ReadResult } from "@/lib/ai-crm/contracts";
+import type { JarvisLiveConversation, JarvisLiveProps, JarvisLiveSettings } from "@/components/ai-crm/JarvisLive";
+import { LocalAudioController, isSessionStop, musicOfferDecision, splitMusicCommand, type LocalAudioState, type MusicCommand } from "@/lib/ai-crm/local-audio";
+import { inputTranscriptDelta, LiveUtteranceBuffer, monitorAudio, sessionTiming, waitForIceGathering } from "@/lib/ai-crm/live-audio-input";
+
+type Connection = "IDLE" | "MICROPHONE" | "CONNECTING" | "CONNECTED" | "DISCONNECTED" | "ENDED";
+type Intro = "WAITING" | "PLAYING" | "OFFERED" | "DONE";
+type Pending = { clientTurnId: string; transcript: string; sessionId: string; revision: number; delegationId?: string; context?: AssistantContext | null };
+type Session = { id: string; clientId: string; expiresAt: number; reconnects: number; revision: number };
+const emptyMusic: LocalAudioState = { status: "MISSING", volume: .12, ducked: false, title: "Freigegebene Musik", message: "Musikquelle wird nach dem Start geprüft." };
+const jsonHeaders = { "Content-Type": "application/json", "X-AI-CRM-Request": "same-origin" };
+async function readJson(response: Response): Promise<Record<string, unknown>> { return response.json().catch(() => ({})); }
+function errorMessage(data: Record<string, unknown>, fallback: string) { return typeof data.error === "string" ? data.error : fallback; }
+function turnBody(request: Pending) {
+  const context = request.context ? { contactId: request.context.contactId, partnerId: request.context.partnerId, followUpId: request.context.followUpId, entityType: request.context.entityType, entityId: request.context.entityId } : undefined;
+  return JSON.stringify({ clientTurnId: request.clientTurnId, transcript: request.transcript, revision: request.revision, delegationId: request.delegationId, context });
+}
+function micError(error: unknown) {
+  const name = error instanceof Error ? error.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") return "Mikrofonzugriff wurde verweigert. Erlaube das Mikrofon in den Browser-Einstellungen und starte bewusst erneut.";
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") return "Kein Mikrofon gefunden. Schließe ein Mikrofon an und starte erneut.";
+  if (name === "NotReadableError") return "Das Mikrofon ist nicht verfügbar. Prüfe, ob eine andere Anwendung es verwendet.";
+  return error instanceof Error ? error.message : "Die Sprachverbindung konnte nicht gestartet werden.";
+}
+
+export default function JarvisLivePilot(props: JarvisLiveProps & { settings: JarvisLiveSettings }) {
+  const { settings } = props;
+  const propsRef = useRef(props); propsRef.current = props;
+  const [connection, setConnection] = useState<Connection>("IDLE");
+  const [muted, setMuted] = useState(false);
+  const [inputActive, setInputActive] = useState(false);
+  const [outputActive, setOutputActive] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [intro, setIntro] = useState<Intro>(settings.demoEnabled ? "WAITING" : "DONE");
+  const [music, setMusic] = useState<LocalAudioState>(emptyMusic);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [draft, setDraft] = useState("");
+  const [heard, setHeard] = useState("");
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const [introRetry, setIntroRetry] = useState(false);
+  const [idleWarning, setIdleWarning] = useState<number | null>(null);
+  const [recovery, setRecovery] = useState(false);
+  const [retryAvailable, setRetryAvailable] = useState(false);
+  const session = useRef<Session | null>(null);
+  const stream = useRef<MediaStream | null>(null);
+  const peer = useRef<RTCPeerConnection | null>(null);
+  const channel = useRef<RTCDataChannel | null>(null);
+  const voice = useRef<HTMLAudioElement | null>(null);
+  const introAudio = useRef<HTMLAudioElement | null>(null);
+  const introUrl = useRef<string | null>(null);
+  const inputMeter = useRef<ReturnType<typeof monitorAudio> | null>(null);
+  const outputMeter = useRef<ReturnType<typeof monitorAudio> | null>(null);
+  const player = useRef<LocalAudioController | null>(null);
+  const lifecycle = useRef(0);
+  const operation = useRef<AbortController | null>(null);
+  const startRequest = useRef<AbortController | null>(null);
+  const pending = useRef<Pending | null>(null);
+  const introState = useRef<Intro>(intro);
+  const introInFlight = useRef(false);
+  const introEpoch = useRef(0);
+  const introRequest = useRef<AbortController | null>(null);
+  const micMuted = useRef(false);
+  const userSpeaking = useRef(false);
+  const jarvisSpeaking = useRef(false);
+  const lastActivity = useRef(Date.now());
+  const utterance = useRef(new LiveUtteranceBuffer());
+  const initialQuestion = useRef("");
+  const delegation = useRef<string | undefined>(undefined);
+  const processUtteranceRef = useRef<(text: string) => Promise<void>>(async () => undefined);
+  const starting = useRef(false);
+  const selectedContext = JSON.stringify(props.context ? { contactId: props.context.contactId, partnerId: props.context.partnerId, followUpId: props.context.followUpId, entityType: props.context.entityType, entityId: props.context.entityId } : null);
+  const previousContext = useRef(selectedContext);
+
+  const activity = useCallback(() => { lastActivity.current = Date.now(); setIdleWarning(null); }, []);
+  const changeIntro = useCallback((value: Intro) => { introState.current = value; setIntro(value); }, []);
+  const duck = useCallback(() => player.current?.setDucked(userSpeaking.current || jarvisSpeaking.current || introState.current === "PLAYING"), []);
+  const sendControl = useCallback((type: "session.close" | "session.input_audio.mute" | "session.input_audio.unmute") => {
+    if (channel.current?.readyState === "open") channel.current.send(JSON.stringify({ type }));
+  }, []);
+  const releaseTransport = useCallback(() => {
+    channel.current?.close(); channel.current = null;
+    const oldPeer = peer.current; peer.current = null; oldPeer?.close();
+    for (const track of stream.current?.getTracks() ?? []) track.stop(); stream.current = null;
+    inputMeter.current?.close(); inputMeter.current = null;
+    outputMeter.current?.close(); outputMeter.current = null;
+    if (voice.current) { voice.current.pause(); voice.current.srcObject = null; voice.current = null; }
+    userSpeaking.current = false; jarvisSpeaking.current = false;
+    setInputActive(false); setOutputActive(false);
+  }, []);
+  const clearIntroAudio = useCallback(() => {
+    if (introAudio.current) { introAudio.current.onended = null; introAudio.current.pause(); introAudio.current.src = ""; introAudio.current = null; }
+    if (introUrl.current) { URL.revokeObjectURL(introUrl.current); introUrl.current = null; }
+  }, []);
+  const releaseIntro = useCallback(() => {
+    introEpoch.current++; introRequest.current?.abort(); introRequest.current = null; introInFlight.current = false;
+    clearIntroAudio();
+  }, [clearIntroAudio]);
+  const close = useCallback(async (message = "Sprachsitzung beendet. Bestätigte CRM-Änderungen bleiben erhalten.", notify = true) => {
+    const previous = session.current; session.current = null;
+    lifecycle.current++; starting.current = false;
+    introInFlight.current = false;
+    startRequest.current?.abort(); operation.current?.abort();
+    startRequest.current = null; operation.current = null;
+    sendControl("session.close"); releaseTransport(); releaseIntro();
+    player.current?.dispose(); player.current = null;
+    pending.current = null; utterance.current.clear(); initialQuestion.current = ""; delegation.current = undefined;
+    setWorking(false); setRecovery(false); setRetryAvailable(false); setAudioBlocked(false); setIntroRetry(false); setIdleWarning(null); setConnection("ENDED"); setHeard("");
+    if (notify) { propsRef.current.onActiveChange?.(false); setNotice(message); }
+    if (previous) await fetch(`/api/ai-crm/live/session/${previous.id}`, { method: "DELETE", headers: jsonHeaders, keepalive: true }).then(response => { if (!response.ok) throw new Error("End not acknowledged"); }).catch(() => { if (notify) setNotice(`${message} Der Serverabschluss konnte noch nicht bestätigt werden; die Verbindung ist lokal geschlossen.`); });
+  }, [releaseIntro, releaseTransport, sendControl]);
+
+  useEffect(() => {
+    const offline = () => {
+      if (!session.current) return;
+      lifecycle.current++; starting.current = false; startRequest.current?.abort(); operation.current?.abort(); operation.current = null; utterance.current.clear(); setWorking(false);
+      releaseTransport(); player.current?.pause(); releaseIntro();
+      setConnection("DISCONNECTED"); setNotice("Verbindung unterbrochen. Mikrofon und Audio sind aus. Wiederverbinden startet keine Musik.");
+    };
+    const visibility = () => { if (document.visibilityState !== "visible") void close("Sprachsitzung beim Verlassen der Seite beendet."); };
+    const pageHide = () => { void close("", false); };
+    window.addEventListener("offline", offline); window.addEventListener("pagehide", pageHide); document.addEventListener("visibilitychange", visibility);
+    return () => { window.removeEventListener("offline", offline); window.removeEventListener("pagehide", pageHide); document.removeEventListener("visibilitychange", visibility); void close("", false); };
+  }, [close, releaseIntro, releaseTransport]);
+
+  const nextRevision = useCallback((revoke = false) => {
+    const active = session.current;
+    if (!active) return 0;
+    active.revision++;
+    operation.current?.abort(); operation.current = null;
+    if (revoke) void fetch(`/api/ai-crm/live/session/${active.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ revision: active.revision }) }).catch(() => undefined);
+    return active.revision;
+  }, []);
+
+  useEffect(() => {
+    if (previousContext.current === selectedContext) return;
+    previousContext.current = selectedContext;
+    if (!session.current) return;
+    nextRevision(true); utterance.current.clear(); initialQuestion.current = ""; pending.current = null;
+    setWorking(false); setRecovery(false); setRetryAvailable(false); setHeard("");
+    if (voice.current) voice.current.muted = true;
+    setNotice("Der Personenbezug wurde gewechselt. Die nächste Aussage verwendet die neue Auswahl; frühere offene Anfragen wurden angehalten.");
+  }, [nextRevision, selectedContext]);
+
+  const acceptResponse = useCallback((data: Record<string, unknown>, request: Pending) => {
+    if (!session.current || session.current.id !== request.sessionId || session.current.revision !== request.revision || data.stale === true) return;
+    const conversation = data.conversation as JarvisLiveConversation | undefined;
+    if (!conversation?.id || typeof data.answer !== "string") throw new Error(errorMessage(data, "Die CRM-Antwort war unvollständig."));
+    propsRef.current.onTurn({ requestId: typeof data.requestId === "string" ? data.requestId : request.clientTurnId, transcript: request.transcript, answer: data.answer, actions: Array.isArray(data.actions) ? data.actions as ActionReceipt[] : [], results: Array.isArray(data.results) ? data.results as ReadResult[] : [], conversation });
+    pending.current = null; setRecovery(false); setRetryAvailable(false); setWorking(false);
+    setNotice("");
+    if (voice.current && data.audioDelivered === true) voice.current.muted = introState.current !== "DONE";
+    if (data.audioDelivered === false) setNotice("Das CRM-Ergebnis steht im Gespräch. Die Sprachausgabe konnte gerade nicht bestätigt werden.");
+    activity();
+  }, [activity]);
+
+  const submit = useCallback(async (text: string) => {
+    const active = session.current;
+    if (!active || !text.trim()) return;
+    const revision = nextRevision();
+    const request: Pending = { clientTurnId: crypto.randomUUID(), transcript: text.trim(), sessionId: active.id, revision, delegationId: delegation.current, context: propsRef.current.context };
+    delegation.current = undefined; pending.current = request;
+    const controller = new AbortController(); operation.current = controller;
+    setWorking(true); setRecovery(false); setRetryAvailable(false); setError(""); activity();
+    try {
+      const response = await fetch(`/api/ai-crm/live/session/${active.id}/turn`, { method: "POST", headers: jsonHeaders, signal: controller.signal, body: turnBody(request) });
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(errorMessage(data, "Die Anfrage konnte nicht verarbeitet werden."));
+      acceptResponse(data, request);
+    } catch (reason) {
+      if (controller.signal.aborted || session.current?.revision !== revision) return;
+      setWorking(false); setRecovery(true); setError(reason instanceof Error ? reason.message : "Der Ausgang der Anfrage ist noch unklar. Bitte Ergebnis prüfen.");
+    } finally { if (operation.current === controller) operation.current = null; }
+  }, [acceptResponse, activity, nextRevision]);
+
+  const recover = useCallback(async () => {
+    const request = pending.current;
+    if (!request) return;
+    setWorking(true);
+    try {
+      const response = await fetch(`/api/ai-crm/requests/${encodeURIComponent(request.clientTurnId)}`, { cache: "no-store" });
+      const data = await readJson(response);
+      if (response.status === 404) { setNotice("Für diese Operationskennung wurde noch kein Ergebnis gefunden. Du kannst dieselbe Anfrage mit derselben Kennung erneut senden."); setRetryAvailable(true); return; }
+      if (!response.ok) throw new Error(errorMessage(data, "Der Status konnte nicht geprüft werden."));
+      if (data.response && typeof data.response === "object") { acceptResponse(data.response as Record<string, unknown>, request); setError(""); }
+      else setNotice("Die Verarbeitung hat noch kein endgültiges Ergebnis. Bitte erneut prüfen.");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Ergebnis noch unklar."); }
+    finally { setWorking(false); }
+  }, [acceptResponse]);
+
+  const retryPending = useCallback(async () => {
+    const request = pending.current;
+    if (!request || !session.current || session.current.revision !== request.revision) { setRetryAvailable(false); setNotice("Diese Anfrage wurde bereits durch eine neuere ersetzt."); return; }
+    const controller = new AbortController(); operation.current = controller; setWorking(true); setRetryAvailable(false);
+    try {
+      const response = await fetch(`/api/ai-crm/live/session/${request.sessionId}/turn`, { method: "POST", headers: jsonHeaders, body: turnBody(request), signal: controller.signal });
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(errorMessage(data, "Die Anfrage konnte noch nicht abgeschlossen werden."));
+      acceptResponse(data, request); setError("");
+    } catch (reason) { if (!controller.signal.aborted) { setRecovery(true); setError(reason instanceof Error ? reason.message : "Ausgang noch unklar."); } }
+    finally { if (operation.current === controller) { operation.current = null; setWorking(false); } }
+  }, [acceptResponse]);
+
+  const markIntro = useCallback(async (value: "OFFERED" | "DONE") => {
+    const active = session.current; if (!active) return;
+    releaseIntro();
+    const epoch = introEpoch.current;
+    const response = await fetch(`/api/ai-crm/live/session/${active.id}/intro`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ state: value }) });
+    if (epoch !== introEpoch.current || session.current?.id !== active.id) return;
+    if (!response.ok) throw new Error(errorMessage(await readJson(response), "Der Begrüßungsstatus konnte nicht bestätigt werden."));
+    if (session.current?.id !== active.id) return;
+    changeIntro(value);
+    if (voice.current) voice.current.muted = value !== "DONE";
+    duck();
+  }, [changeIntro, duck, releaseIntro]);
+
+  const playIntro = useCallback(async (retry = false) => {
+    const active = session.current;
+    if (!active || introInFlight.current) return;
+    introInFlight.current = true; setIntroRetry(false);
+    const token = lifecycle.current;
+    const epoch = ++introEpoch.current;
+    const controller = new AbortController(); introRequest.current = controller;
+    try {
+      let replay = false;
+      if (retry) {
+        const status = await fetch(`/api/ai-crm/live/session/${active.id}`, { signal: controller.signal, cache: "no-store" });
+        const data = await readJson(status);
+        if (!status.ok) throw new Error(errorMessage(data, "Der Begrüßungsstatus konnte nicht geprüft werden."));
+        const serverState = (data.session as { introState?: Intro } | undefined)?.introState;
+        if (serverState === "OFFERED" || serverState === "DONE") { changeIntro(serverState); return; }
+        if (serverState !== "WAITING" && serverState !== "PLAYING") throw new Error("Der Begrüßungsstatus ist unklar. Bitte Sitzung beenden und bewusst neu starten.");
+        replay = serverState === "PLAYING";
+      }
+      if (token !== lifecycle.current || epoch !== introEpoch.current) return;
+      changeIntro("PLAYING"); duck();
+      const response = await fetch(`/api/ai-crm/live/session/${active.id}/intro`, { method: "POST", headers: jsonHeaders, signal: controller.signal, body: JSON.stringify(replay ? { replay: true } : {}) });
+      if (!response.ok) throw new Error(errorMessage(await readJson(response), "Die Begrüßung konnte nicht geladen werden."));
+      const blob = await response.blob();
+      if (token !== lifecycle.current || epoch !== introEpoch.current || introState.current !== "PLAYING" || session.current?.id !== active.id) return;
+      clearIntroAudio();
+      introUrl.current = URL.createObjectURL(blob);
+      const audio = new Audio(introUrl.current); introAudio.current = audio;
+      audio.onended = () => { if (session.current?.id === active.id) void markIntro("OFFERED").catch(reason => setError(String(reason.message))); };
+      audio.onerror = () => { setIntroRetry(true); setError("Die Begrüßung konnte nicht abgespielt werden. Prüfe die Audioausgabe und starte sie manuell."); };
+      await audio.play();
+      activity();
+    } catch (reason) {
+      if (controller.signal.aborted || token !== lifecycle.current || epoch !== introEpoch.current) return;
+      setIntroRetry(true); setError(reason instanceof Error ? reason.message : "Begrüßung derzeit nicht hörbar.");
+    } finally { if (token === lifecycle.current && epoch === introEpoch.current) introInFlight.current = false; if (introRequest.current === controller) introRequest.current = null; }
+  }, [activity, changeIntro, clearIntroAudio, duck, markIntro]);
+
+  const musicAction = useCallback(async (command: MusicCommand) => { activity(); await player.current?.command(command); }, [activity]);
+  const decideMusic = useCallback(async (yes: boolean) => {
+    activity(); setError("");
+    try {
+      await markIntro("DONE");
+      if (yes) await musicAction("start");
+      const retained = initialQuestion.current; initialQuestion.current = "";
+      if (retained) await submit(retained);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Der Einstieg konnte nicht abgeschlossen werden."); }
+  }, [activity, markIntro, musicAction, submit]);
+
+  const processUtterance = useCallback(async (text: string) => {
+    if (!session.current || !stream.current || !text.trim()) return;
+    activity(); setHeard(text);
+    if (isSessionStop(text)) { await close(); return; }
+    if (/^(?:stumm|mikrofon aus)[.!?]*$/i.test(text.trim())) {
+      micMuted.current = true; setMuted(true); for (const track of stream.current?.getAudioTracks() ?? []) track.enabled = false; sendControl("session.input_audio.mute"); return;
+    }
+    if (introState.current === "WAITING") {
+      initialQuestion.current = /^(?:(?:hallo|hey)\s*)?jarvis[,.!?\s]*$/i.test(text) ? "" : text;
+      await playIntro(); return;
+    }
+    if (introState.current === "PLAYING") { releaseIntro(); await markIntro("OFFERED"); }
+    if (introState.current === "OFFERED") {
+      const decision = musicOfferDecision(text);
+      if (decision) { await decideMusic(decision === "yes"); return; }
+      if (/^(?:mhm|hm|okay|ok|ähm)[.!?]*$/i.test(text)) return;
+      // A clear CRM question moves on; no second music question is asked.
+      await markIntro("DONE");
+    }
+    const media = splitMusicCommand(text);
+    if (media.command) await musicAction(media.command);
+    const remaining = media.remainder;
+    if (!remaining || /^(?:mhm|hm|okay|ok|ja|nein|danke)[.!?]*$/i.test(remaining)) return;
+    const retained = initialQuestion.current; initialQuestion.current = "";
+    await submit(retained && retained !== remaining ? `${retained}\n${remaining}` : remaining);
+  }, [activity, close, decideMusic, markIntro, musicAction, playIntro, releaseIntro, sendControl, submit]);
+  processUtteranceRef.current = processUtterance;
+
+  const connect = useCallback(async (reconnecting = false) => {
+    if (starting.current || (propsRef.current.disabled && !reconnecting)) return;
+    starting.current = true;
+    const token = ++lifecycle.current;
+    const previous = reconnecting ? session.current : null;
+    if (reconnecting && (!previous || previous.reconnects >= settings.reconnectLimit)) { starting.current = false; return; }
+    releaseTransport(); player.current?.pause(); setError(""); setNotice(""); setConnection("MICROPHONE");
+    const controller = new AbortController(); startRequest.current = controller;
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection || !window.AudioContext) throw new Error("Dieser Browser bietet keine sichere Mikrofon-/WebRTC-Verbindung. Verwende HTTPS oder localhost und einen aktuellen Browser.");
+      const microphone = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
+      if (token !== lifecycle.current) { microphone.getTracks().forEach(track => track.stop()); return; }
+      stream.current = microphone; micMuted.current = false; setMuted(false);
+      const pc = new RTCPeerConnection(); peer.current = pc;
+      utterance.current.resetTimeline();
+      let providerStarted = false;
+      const speaker = new Audio(); speaker.autoplay = true; speaker.muted = !reconnecting && settings.demoEnabled || introState.current !== "DONE"; voice.current = speaker;
+      pc.ontrack = event => {
+        if (peer.current !== pc) return;
+        const remote = event.streams[0] ?? new MediaStream([event.track]); speaker.srcObject = remote;
+        outputMeter.current?.close(); outputMeter.current = monitorAudio(remote, active => { jarvisSpeaking.current = active && !speaker.muted; setOutputActive(jarvisSpeaking.current); duck(); if (active) activity(); });
+        void outputMeter.current.resume().catch(() => setAudioBlocked(true));
+        void speaker.play().then(() => setAudioBlocked(inputMeter.current?.state() !== "running" || outputMeter.current?.state() !== "running")).catch(() => setAudioBlocked(true));
+      };
+      pc.onconnectionstatechange = () => {
+        if (peer.current !== pc) return;
+        if (pc.connectionState === "connected" && providerStarted) setConnection("CONNECTED");
+        if (["failed", "disconnected"].includes(pc.connectionState)) {
+          lifecycle.current++; starting.current = false; startRequest.current?.abort(); operation.current?.abort(); operation.current = null; utterance.current.clear(); setWorking(false); releaseIntro();
+          releaseTransport(); player.current?.pause(); setConnection("DISCONNECTED"); setNotice("Die Sprachverbindung ist unterbrochen. Mikrofon und Audio sind aus.");
+        }
+      };
+      const events = pc.createDataChannel("oai-events"); channel.current = events;
+      events.onmessage = event => {
+        if (peer.current !== pc) return;
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "session.started") { providerStarted = true; if (pc.connectionState === "connected") setConnection("CONNECTED"); }
+          if (data.type === "session.closed") { void close("Der Sprachdienst hat die Verbindung beendet. Mikrofon und Audio sind aus."); return; }
+          const delta = inputTranscriptDelta(data);
+          if (delta && !micMuted.current) {
+            const accepted = utterance.current.append(delta);
+            if (accepted === "late") setNotice("Ein verspätetes Sprachfragment wurde verworfen, damit es nicht zur nächsten Aussage gehört. Wiederhole die vorherige Frage, falls ihr Ende fehlt.");
+            else setHeard(utterance.current.preview());
+          }
+          if (data.type === "session.delegation.created" && typeof data.delegation?.id === "string") delegation.current = data.delegation.id;
+          if (data.type === "error" || data.type === "session.error") setError("Der Sprachdienst meldet einen Fehler. Das CRM bleibt bedienbar; beende und starte die Verbindung bei Bedarf neu.");
+        } catch { /* Unknown provider events carry no client authority. */ }
+      };
+      microphone.getTracks().forEach(track => pc.addTrack(track, microphone));
+      inputMeter.current = monitorAudio(microphone, active => {
+        userSpeaking.current = active && !micMuted.current; setInputActive(userSpeaking.current); duck();
+        if (userSpeaking.current) { utterance.current.activity(Date.now()); activity(); }
+        if (userSpeaking.current && session.current && (jarvisSpeaking.current || operation.current || introState.current === "PLAYING")) {
+          if (speaker) speaker.muted = true;
+          nextRevision(true); setWorking(false); jarvisSpeaking.current = false; setOutputActive(false);
+          if (introState.current === "PLAYING" && introAudio.current) { releaseIntro(); void markIntro("OFFERED").catch(() => setIntroRetry(true)); }
+          duck();
+        }
+      });
+      // Some browsers leave resume pending until another user gesture. Do not
+      // strand connection setup behind that promise; expose the manual control.
+      void inputMeter.current.resume().then(() => { if (inputMeter.current?.state() !== "running") setAudioBlocked(true); }).catch(() => setAudioBlocked(true));
+      if (inputMeter.current.state() !== "running") setAudioBlocked(true);
+      setConnection("CONNECTING");
+      const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+      await waitForIceGathering(pc, controller.signal);
+      const clientId = previous?.clientId ?? crypto.randomUUID();
+      const response = await fetch("/api/ai-crm/live/session", { method: "POST", headers: jsonHeaders, signal: controller.signal, body: JSON.stringify({ clientSessionId: clientId, conversationId: propsRef.current.conversationId ?? undefined, sdp: pc.localDescription?.sdp ?? offer.sdp, reconnect: reconnecting || undefined }) });
+      const data = await readJson(response);
+      const info = data.session as Record<string, unknown> | undefined;
+      const transport = data.transport as { sdp?: string } | undefined;
+      if (!response.ok || !info || typeof info.id !== "string" || !transport?.sdp) throw new Error(errorMessage(data, "Die sichere Sprachverbindung wurde nicht hergestellt."));
+      if (token !== lifecycle.current) { await fetch(`/api/ai-crm/live/session/${info.id}`, { method: "DELETE", headers: jsonHeaders, keepalive: true }); return; }
+      session.current = { id: info.id, clientId, expiresAt: typeof info.expiresAt === "string" ? Date.parse(info.expiresAt) : Date.now() + settings.maxSessionSeconds * 1000, reconnects: previous ? previous.reconnects + 1 : 0, revision: Math.max(previous?.revision ?? 0, typeof info.revision === "number" ? info.revision : 0) };
+      const introValue: Intro = ["WAITING", "PLAYING", "OFFERED", "DONE"].includes(String(info.introState)) ? info.introState as Intro : settings.demoEnabled ? "WAITING" : "DONE";
+      changeIntro(introValue); speaker.muted = introValue !== "DONE";
+      if (introValue === "PLAYING") { setIntroRetry(true); setNotice("Die Begrüßung wurde bereits begonnen. Du kannst sie bei Bedarf bewusst erneut abspielen."); }
+      await pc.setRemoteDescription({ type: "answer", sdp: transport.sdp });
+      const connectDeadline = Date.now() + 12_000;
+      while (!(providerStarted && pc.connectionState === "connected")) {
+        if (controller.signal.aborted || token !== lifecycle.current) throw new DOMException("Abgebrochen", "AbortError");
+        if (Date.now() >= connectDeadline) throw new Error("Die Sprachverbindung wurde nicht vollständig bestätigt. Prüfe Netzwerk und Sprachzugang.");
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      setConnection("CONNECTED");
+      if (data.conversation) propsRef.current.onConversationStarted(data.conversation as JarvisLiveConversation);
+      propsRef.current.onActiveChange?.(true); activity();
+      if (!reconnecting) {
+        const source = await fetch(`/api/ai-crm/live/music?sessionId=${encodeURIComponent(info.id)}&status=1`, { signal: controller.signal, cache: "no-store" });
+        const sourceInfo = await readJson(source);
+        if (token !== lifecycle.current) return;
+        player.current?.dispose();
+        player.current = new LocalAudioController(new Audio(), { src: source.ok && sourceInfo.available === true ? `/api/ai-crm/live/music?sessionId=${encodeURIComponent(info.id)}` : undefined, title: typeof sourceInfo.title === "string" ? sourceInfo.title : "Freigegebene Musik", onChange: setMusic });
+        if (!source.ok) setNotice(errorMessage(sourceInfo, "Die konfigurierte Musikquelle ist nicht verfügbar."));
+        duck();
+      }
+    } catch (reason) {
+      if (controller.signal.aborted || token !== lifecycle.current) return;
+      releaseTransport(); setConnection(previous ? "DISCONNECTED" : "ENDED"); setError(micError(reason));
+      if (!previous && session.current) await close("Die unvollständige Sprachverbindung wurde beendet.");
+    } finally { if (startRequest.current === controller) startRequest.current = null; if (token === lifecycle.current) starting.current = false; }
+  }, [activity, changeIntro, close, duck, markIntro, nextRevision, releaseIntro, releaseTransport, settings]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const active = session.current; if (!active) return;
+      const now = Date.now();
+      if (userSpeaking.current) utterance.current.activity(now);
+      const busy = userSpeaking.current || jarvisSpeaking.current || Boolean(operation.current) || introState.current === "PLAYING" && Boolean(introAudio.current && !introAudio.current.paused);
+      if (busy) lastActivity.current = now;
+      if (stream.current && !userSpeaking.current && utterance.current.ready(now)) {
+        const text = utterance.current.take();
+        void processUtteranceRef.current(text).catch(reason => setError(reason instanceof Error ? reason.message : "Die Sprachzeile konnte nicht verarbeitet werden."));
+      }
+      const timing = sessionTiming(now, lastActivity.current, active.expiresAt, settings.inactivitySeconds, settings.warningSeconds, busy);
+      if (timing.expired) void close("Sprachsitzung wegen Inaktivität oder Zeitlimit beendet. Gespeicherte Aktionen bleiben erhalten.");
+      else setIdleWarning(timing.warn ? timing.remaining : null);
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [close, settings.inactivitySeconds, settings.warningSeconds]);
+
+  const toggleMute = () => {
+    micMuted.current = !micMuted.current; setMuted(micMuted.current);
+    for (const track of stream.current?.getAudioTracks() ?? []) track.enabled = !micMuted.current;
+    sendControl(micMuted.current ? "session.input_audio.mute" : "session.input_audio.unmute");
+    if (micMuted.current) { utterance.current.clear(); userSpeaking.current = false; setInputActive(false); duck(); }
+    activity();
+  };
+  const interrupt = () => {
+    nextRevision(true); releaseIntro(); utterance.current.clear();
+    if (introState.current === "PLAYING") void markIntro("DONE").catch(reason => setError(reason instanceof Error ? reason.message : "Der Begrüßungsstatus konnte nicht beendet werden."));
+    if (voice.current) voice.current.muted = true;
+    setWorking(false); jarvisSpeaking.current = false; setOutputActive(false); duck();
+    setNotice("Sprachausgabe unterbrochen. Neue Frage oder Auswahl verwenden; bereits gespeicherte Änderungen bleiben bestehen.");
+  };
+  const enableAudio = async () => {
+    try { await inputMeter.current?.resume(); await outputMeter.current?.resume(); if (voice.current) { voice.current.muted = introState.current !== "DONE"; await voice.current.play(); } setAudioBlocked(false); }
+    catch { setError("Der Browser blockiert die Audioausgabe weiterhin. Prüfe die Audiofreigabe dieser Seite."); }
+  };
+  const active = !["IDLE", "ENDED"].includes(connection);
+  return <section className="jarvis-live" aria-label="Jarvis Sprache" style={{ margin: 0, overflow: active ? "visible" : "hidden" }}>
+    <div className="jarvis-live-header" style={active ? { position: "sticky", top: 0, zIndex: 2, flexWrap: "wrap" } : undefined}><div><p className="jarvis-live-kicker">Jarvis · Sprache</p><h3 className="jarvis-live-title">Mit Jarvis sprechen</h3></div><span className="jarvis-live-badge">{connection === "CONNECTED" ? muted ? "Mikrofon stumm" : "Mikrofon aktiv" : connection === "DISCONNECTED" ? "Unterbrochen" : "Bewusst starten"}</span>{active && <div className="assistant-button-row" style={{ width: "100%", marginTop: 0 }}><button disabled={connection !== "CONNECTED"} onClick={toggleMute}>{muted ? "Mikrofon einschalten" : "Stumm"}</button><button className="jarvis-live-end" onClick={() => void close()}>Sitzung beenden</button></div>}</div>
+    <div className="jarvis-live-body space-y-3">
+      {!active ? <><p className="jarvis-live-intro">Starte eine begrenzte Sprachsitzung. Das Mikrofon wird erst dann geöffnet. Ergebnisse, Quellen und Bestätigungen bleiben im gemeinsamen Gespräch.</p><button className="assistant-primary" disabled={props.disabled} onClick={() => void connect()}>Jarvis starten</button></> : <>
+        <p role="status" className="jarvis-live-status-title">{connection === "MICROPHONE" ? "Mikrofonfreigabe wird angefragt …" : connection === "CONNECTING" ? "Sprachverbindung wird hergestellt …" : connection === "DISCONNECTED" ? "Mikrofon aus · Verbindung unterbrochen" : muted ? "Mikrofon stumm · Verbindung aktiv" : inputActive ? "Jarvis hört deine Aussage" : "Mikrofon aktiv · Jarvis hört zu"}</p>
+        <p className="assistant-caption">{outputActive || intro === "PLAYING" ? "Sprachausgabe aktiv. " : ""}{working ? "Deine CRM-Anfrage wird bearbeitet. " : ""}Schreibaktionen benötigen immer die sichtbare Bestätigung im Gespräch.</p>
+        <div className="assistant-button-row"><button onClick={interrupt}>Sprachausgabe unterbrechen</button></div>
+        {intro === "WAITING" && <p className="assistant-caption">Sprich deine erste Aussage, zum Beispiel „Jarvis?“.</p>}
+        {intro === "OFFERED" && <div><p>{settings.greetingText}</p><div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(true)}>Ja, Musik starten</button><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(false)}>Ohne Musik weiter</button></div></div>}
+        {introRetry && <div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void playIntro(true)}>Begrüßung bewusst abspielen</button><button disabled={connection !== "CONNECTED"} onClick={() => void decideMusic(false)}>Ohne Begrüßung fortsetzen</button></div>}
+        {audioBlocked && <button onClick={() => void enableAudio()}>Audioausgabe freigeben</button>}
+        {idleWarning !== null && <div role="alert"><p>Die Sprachverbindung endet in {idleWarning} Sekunden.</p><button onClick={activity}>Ich bin noch da</button></div>}
+        {connection === "DISCONNECTED" && session.current && session.current.reconnects < settings.reconnectLimit && <button onClick={() => void connect(true)}>Verbindung wiederherstellen</button>}
+        {heard && <p className="assistant-caption" aria-live="polite">Gehört: {heard}</p>}
+        <details><summary>Sprachzeile prüfen oder per Text fortsetzen</summary><form onSubmit={event => { event.preventDefault(); const text = draft.trim(); setDraft(""); void processUtterance(text).catch(reason => setError(String(reason.message))); }}><label className="jarvis-live-label" htmlFor="jarvis-pilot-line">Deine Aussage</label><textarea id="jarvis-pilot-line" rows={2} maxLength={4000} value={draft} onChange={event => { setDraft(event.target.value); activity(); }} className="w-full" /><button disabled={!draft.trim() || connection !== "CONNECTED"}>Aussage verwenden</button></form></details>
+        <details><summary>Musik · {music.status === "PLAYING" ? "läuft" : music.status === "PAUSED" ? "pausiert" : music.status === "MISSING" ? "Quelle fehlt" : music.status === "BLOCKED" ? "Start blockiert" : "aus"}</summary><p role="status" className="jarvis-live-music-note">{music.message}</p><p className="assistant-caption">Lautstärke {Math.round(music.volume * 100)} %{music.ducked ? " · während Sprache abgesenkt" : ""}</p><div className="assistant-button-row"><button disabled={music.status === "MISSING" || connection !== "CONNECTED"} onClick={() => void musicAction("start")}>{music.status === "PAUSED" ? "Musik weiter" : "Musik starten"}</button><button onClick={() => void musicAction("pause")}>Musikpause</button><button onClick={() => void musicAction("stop")}>Musik aus</button><button aria-label="Musik leiser" onClick={() => void musicAction("quieter")}>Leiser</button><button aria-label="Musik lauter" onClick={() => void musicAction("louder")}>Lauter</button></div></details>
+      </>}
+      {notice && <p role="status" className="jarvis-live-notice">{notice}</p>}
+      {error && <p role="alert" className="jarvis-live-error">{error}</p>}
+      {recovery && <button disabled={working} onClick={() => void recover()}>Ergebnis anhand der Operationskennung prüfen</button>}
+      {retryAvailable && <button disabled={working} onClick={() => void retryPending()}>Dieselbe Anfrage erneut senden</button>}
+    </div>
+  </section>;
+}

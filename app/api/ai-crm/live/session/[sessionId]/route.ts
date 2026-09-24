@@ -6,6 +6,7 @@ import { requireAiEntitlement } from "@/lib/ai-crm/entitlement";
 import { AiCrmError } from "@/lib/ai-crm/errors";
 import { aiErrorResponse, sameOrigin } from "@/lib/ai-crm/http";
 import { musicProviderForLive } from "@/lib/ai-crm/live-music";
+import { sendProviderUpdate } from "@/lib/ai-crm/live-provider";
 import {
   endLiveSession,
   heartbeatLiveSession,
@@ -15,16 +16,18 @@ import {
 export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ sessionId: string }> };
-const emptyBody = z.object({}).strict();
+const emptyBody = z.object({ revision: z.number().int().min(1).max(1_000_000).optional() }).strict();
 
 function responseBody(session: Awaited<ReturnType<typeof requireLiveSession>>) {
   return {
-    mode: "simulation" as const,
+    mode: session.provider === "live" ? "live" as const : "simulation" as const,
     session: {
       id: session.id,
       status: session.status,
       expiresAt: session.expiresAt.toISOString(),
       lastHeartbeatAt: session.lastHeartbeatAt?.toISOString() ?? null,
+      introState: session.introState,
+      revision: session.revision,
     },
     conversation: session.conversation
       ? {
@@ -67,6 +70,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     await requireAiEntitlement(prisma, user.id, new Date(), config);
     const { sessionId } = await context.params;
     const session = await heartbeatLiveSession(prisma, { userId: user.id, sessionId });
+    if (parsed.data.revision) {
+      const revised = await prisma.aiLiveSession.updateMany({ where: { id: sessionId, userId: user.id, revision: { lt: parsed.data.revision } }, data: { revision: parsed.data.revision } });
+      if (revised.count && session.providerSessionRef) await sendProviderUpdate(session.providerSessionRef, "Die Person hat den Auftrag unterbrochen oder korrigiert. Beende die bisherige Sprachausgabe. Erwarte das aktualisierte Backendresultat und behaupte keine Rücknahme gespeicherter Änderungen.", { instruction: true }).catch(() => undefined);
+    }
     const active = await requireLiveSession(prisma, { userId: user.id, sessionId });
     const music = await musicProviderForLive(prisma).state({ userId: user.id, sessionId: session.id });
     return Response.json(
@@ -86,13 +93,14 @@ export async function DELETE(request: Request, context: RouteContext) {
     const user = await requireUser();
     const { sessionId } = await context.params;
     const session = await endLiveSession(prisma, { userId: user.id, sessionId });
+    if (session.providerSessionRef) await sendProviderUpdate(session.providerSessionRef, "", { close: true }).catch(() => undefined);
     if (session.usageId) {
       const durationMs = Math.max(0, Date.now() - session.startedAt.getTime());
       await prisma.aiUsage.updateMany({
         where: { id: session.usageId, userId: user.id, status: "STARTED" },
         data: {
           durationMs,
-          audioSeconds: 0,
+          audioSeconds: session.provider === "live" ? Math.ceil(durationMs / 1000) : 0,
           status: "SUCCEEDED",
           errorCode: null,
         },

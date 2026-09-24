@@ -4,16 +4,11 @@ import { AiCrmError } from "@/lib/ai-crm/errors";
 import { reserveAiToolCall } from "@/lib/ai-crm/entitlement";
 import type { MusicProvider, MusicState } from "@/lib/ai-crm/live-music";
 import { requireLiveSession } from "@/lib/ai-crm/live-sessions";
-import { runCrmTool, type CrmToolResult } from "@/lib/ai-crm/tools";
+import { runCrmTool } from "@/lib/ai-crm/tools";
+import { actionReceipts, stageAction } from "@/lib/ai-crm/action-plans";
+import type { ActionReceipt } from "@/lib/ai-crm/contracts";
 
-export type LiveActionReceipt = {
-  summary: string;
-  entityType?: string;
-  entityId?: string;
-  link?: string;
-  undoable: boolean;
-  undoEntryId?: string;
-};
+export type LiveActionReceipt = ActionReceipt;
 
 export type LocalLiveTurnResult = {
   answer: string;
@@ -33,17 +28,6 @@ function commandTranscript(value: string) {
 
 function withoutPunctuation(value: string) {
   return value.replace(/[.!?]+$/, "").trim();
-}
-
-function receipt(result: CrmToolResult): LiveActionReceipt {
-  return {
-    summary: result.summary,
-    entityType: result.entityType,
-    entityId: result.entityId,
-    link: result.link,
-    undoable: result.undoable === true,
-    undoEntryId: result.undoEntryId,
-  };
 }
 
 function playQuery(command: string) {
@@ -136,12 +120,10 @@ async function createReminder(
     idempotencyKey,
     now: params.now,
   });
-  const result = await runCrmTool(params.db, {
+  await stageAction(params.db, {
     userId: params.userId,
     requestId: params.requestId,
-    aiRequestId: params.aiRequestId,
-    idempotencyKey,
-    sessionId: params.sessionId,
+    key: idempotencyKey,
     name: "create_follow_up",
     arguments: {
       contactId: matches[0].id,
@@ -151,8 +133,8 @@ async function createReminder(
     },
   });
   return {
-    answer: `Lokale Demo: ${result.summary}`,
-    actions: [receipt(result)],
+    answer: "Lokale Demo: Die Wiedervorlage ist als Vorschau vorbereitet. Bitte bestätige sie sichtbar im CRM; bisher wurde nichts gespeichert.",
+    actions: await actionReceipts(params.db, params.userId, params.requestId),
   };
 }
 

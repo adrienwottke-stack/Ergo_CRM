@@ -1,9 +1,14 @@
 /** Browser-safe contracts. No provider or database imports. */
 export type AssistantContext = {
-  contactId: string;
+  contactId?: string;
+  partnerId?: string;
   label: string;
   followUpId?: string;
+  entityType?: "note" | "task" | "agreement" | "appointment";
+  entityId?: string;
 };
+
+export type PlanField = { name: string; label: string; value: string; type: "text" | "datetime" | "select"; options?: Array<{ value: string; label: string }> };
 
 export type ActionState = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELED" | "EXPIRED";
 export type ActionReceipt = {
@@ -15,6 +20,8 @@ export type ActionReceipt = {
   details?: string[];
   changes?: Array<{ label: string; before: string; after: string }>;
   confirmLabel?: string;
+  revision?: string;
+  fields?: PlanField[];
   error?: string;
   entityType?: string;
   entityId?: string;
@@ -31,6 +38,9 @@ export type ReadResult = {
   readAt: string;
   items: Array<{ id: string; title: string; detail?: string; link?: string; context?: AssistantContext }>;
   ambiguous?: boolean;
+  leadership?: boolean;
+  gaps?: string[];
+  coverage?: string;
 };
 
 export type Entry = {

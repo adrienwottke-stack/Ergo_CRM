@@ -128,6 +128,9 @@ try {
   await desktop.route("**/api/ai-crm/chat", async route => { await route.fetch(); await route.abort("failed"); });
   await send(page, "Dokumentiere das Gespräch mit Jonas."); await panel(page).getByRole("button", { name: "Ergebnis prüfen", exact: true }).click();
   await panel(page).getByText("Abschluss prüfen", { exact: true }).waitFor({ state: "hidden" });
+  assert.equal(await db.activity.count({ where: { contactId: contact.id } }), 1);
+  await panel(page).getByRole("button", { name: "Gespräch speichern", exact: true }).click();
+  await panel(page).getByText("Gespeichert", { exact: true }).first().waitFor();
   assert.equal(await db.activity.count({ where: { contactId: contact.id } }), 2);
   await desktop.unroute("**/api/ai-crm/chat"); checks.push("lost response recovers existing result without duplicates");
   await panel(page).getByRole("textbox").fill("Langsam bearbeiten"); await panel(page).getByRole("button", { name: "Senden", exact: true }).click();

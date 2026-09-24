@@ -56,6 +56,11 @@ Bestandsaufnahme.
   Eine bewusst gestartete „Jarvis Live“-Runde ist lokal als klar markierte
   Simulation testbar; sie speichert weder Audio noch unvollständige Transkripte
   und startet ohne explizite Freigabe keinen echten OpenAI- oder Spotify-Provider.
+  Die integrierte Führungserweiterung ergänzt private 1:1-Notizen, belegte
+  Vorbereitung, Tages-/Führungsrunden, bearbeitbare Vorschläge sowie GPT-Live
+  und einen lokalen Musikplayer. Jede fachliche Änderung benötigt einen
+  sichtbaren Bestätigungsklick. Konfiguration, additive Migration, sichere
+  Prüfpfade und noch offene Live-Nachweise: [Jarvis-Pilot](docs/jarvis-pilot.md).
 
 ## Stack
 
@@ -119,10 +124,10 @@ In Vercel für **Production** setzen:
 | `AI_CONVERSATION_RETENTION_DAYS` | Feste Aufbewahrung ab Gesprächsbeginn; Standard 7 Tage |
 | `AI_CONVERSATION_MAX_MESSAGES` | Nachrichten je Unterhaltung; Standard 20 |
 | `AI_PROVIDER_TIMEOUT_MS` / `AI_PROVIDER_MAX_RETRIES` | OpenAI-Timeout und begrenzte SDK-Retries |
-| `AI_LIVE_PROVIDER` | Live-Modus: `disabled`, lokale `mock`-Simulation oder später explizit `realtime`; in Production wird `mock` sicher deaktiviert |
-| `AI_LIVE_MODEL` | vorbereitete serverseitige Realtime-Modellwahl; Standard `gpt-realtime-2.1` |
+| `AI_LIVE_PROVIDER` | Live-Modus: `disabled`, lokale `mock`-Simulation oder `live` für GPT-Live; in Production wird `mock` sicher deaktiviert |
+| `AI_LIVE_MODEL` | serverseitige GPT-Live-Modellwahl; Standard `gpt-live-1` |
 | `AI_LIVE_MAX_SESSION_SECONDS` / `AI_LIVE_RECONNECT_LIMIT` | serverseitige Sessionschranke und begrenzte Wiederherstellung |
-| `AI_LIVE_REALTIME_APPROVED` / `AI_LIVE_SIDEBAND_URL` | beide sind für einen späteren echten Realtime-Pfad erforderlich; ohne sie fail-closed |
+| `AI_LIVE_REALTIME_APPROVED` / `AI_LIVE_SIDEBAND_URL` | nur für den alten, weiterhin gesperrten Realtime-Adapter; GPT-Live braucht diese Variablen nicht |
 | `SPOTIFY_LOCAL_ENABLED` | ausschließlich lokalen Spotify-Smoke aktivieren; in Vercel immer weglassen oder `false` setzen |
 | `SPOTIFY_ENABLED` | nur in der Vercel-**Production** nach vollständiger Einrichtung `true`; Preview bleibt immer aus |
 | `SPOTIFY_APP_URL` | kanonische HTTPS-Origin der Production, derzeit `https://ergo-crm.vercel.app` |

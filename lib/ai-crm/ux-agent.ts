@@ -7,9 +7,12 @@ import { reserveAiToolCall } from "@/lib/ai-crm/entitlement";
 import { aiCrmSystemPrompt } from "@/lib/ai-crm/prompt";
 import { hashAiRequestInput } from "@/lib/ai-crm/requests";
 import { CRM_TOOL_DEFINITIONS, runCrmTool, WRITE_TOOLS, type CrmToolName, type CrmToolResult } from "@/lib/ai-crm/tools";
-import { actionReceipts, executeActionPlan, permitsDirectAction, recordFailedAction, stageAction } from "@/lib/ai-crm/action-plans";
+import { actionReceipts, recordFailedAction, stageAction, pendingProposalList, reviseActionPlan } from "@/lib/ai-crm/action-plans";
+import { PROPOSAL_TOOL_DEFINITIONS, reviseProposalInput } from "@/lib/ai-crm/proposal-tools";
+import { LEADERSHIP_SCHEMAS, readLeadershipSource } from "@/lib/ai-crm/leadership-tools";
+import { leadershipScopeFingerprint } from "@/lib/ai-crm/leadership-scope";
 import type { AiChatMessage } from "@/lib/ai-crm/agent";
-import type { AssistantContext, ReadResult } from "@/lib/ai-crm/contracts";
+import type { ActionReceipt, AssistantContext, ReadResult } from "@/lib/ai-crm/contracts";
 
 type Row = Record<string, unknown>;
 const rows = (value: unknown): Row[] => Array.isArray(value) ? value as Row[] : [];
@@ -20,6 +23,17 @@ const FOLLOW_UP_RESULT_TOOLS = new Set([
 ]);
 export function readResult(name: string, result: CrmToolResult, id: string): ReadResult {
   const data = result.data;
+  if (Object.hasOwn(LEADERSHIP_SCHEMAS, name)) {
+    return { id, summary: result.summary, readAt: new Date().toISOString(), leadership: true, ambiguous: data.ambiguous === true,
+      gaps: Array.isArray(data.gaps) ? data.gaps.map(String) : [],
+      coverage: data.coverage ? `Abdeckung: ${(data.coverage as Row).complete === true ? "vollständig für den genannten Zeitraum und Zugriffsbereich" : "begrenzt; weitere Datensätze können vorhanden sein"}. ${String((data.coverage as Row).shown ?? "")} von ${String((data.coverage as Row).total ?? "")} Quellen angezeigt.` : undefined,
+      items: rows(data.items).map(item => {
+        const entityType = ({ LeadershipNote: "note", LeadershipTask: "task", PartnerVereinbarung: "agreement", Termin: "appointment" } as const)[String(item.entityType) as "LeadershipNote" | "LeadershipTask" | "PartnerVereinbarung" | "Termin"];
+        const at = item.at && Number.isFinite(Date.parse(String(item.at))) ? new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Berlin" }).format(new Date(String(item.at))) : null;
+        return { id: String(item.id), title: String(item.title ?? item.name ?? result.summary), detail: [item.detail, at ? `Quelle vom ${at} (Berlin)` : null].filter(Boolean).join(" · "), link: typeof item.link === "string" ? item.link : undefined,
+          ...(item.partnerId || entityType === "appointment" ? { context: { ...(item.partnerId ? { partnerId: String(item.partnerId) } : {}), label: String(item.partnerName ?? item.title ?? item.name ?? "Partner"), ...(entityType ? { entityType, entityId: String(item.id) } : {}) } } : {}) };
+      }) };
+  }
   const contact = data.contact as Row | undefined;
   const items = [...rows(data.matches), ...rows(data.contacts), ...rows(data.items), ...rows(data.followUps), ...rows(data.activities)];
   if (contact && !items.length) items.push(contact);
@@ -46,15 +60,27 @@ export async function runUxCrmAgent(params: {
   context?: AssistantContext; now?: Date; signal?: AbortSignal;
 }) {
   const config = aiCrmConfig();
+  const scopeFingerprint = await leadershipScopeFingerprint(params.db, params.userId);
   const input: ResponseInput = [...params.history.map(item => ({ ...item, type: "message" as const })), { role: "user", content: params.message }];
   const results: ReadResult[] = [];
   const staged: Array<{ id: string; tool: string }> = [];
-  const writeAttempts = new Set<string>();
-  let failedWrites = 0;
-  const knownContacts = new Set<string>(params.context ? [params.context.contactId] : []);
+  const knownContacts = new Set<string>(params.context?.contactId ? [params.context.contactId] : []);
+  const knownPartners = new Set<string>(params.context?.partnerId ? [params.context.partnerId] : []);
+  const ambiguousPartners = new Set<string>();
+  const knownEntities = new Set<string>(params.context?.entityId ? [params.context.entityId] : []);
+  let currentProposals: ActionReceipt[] = [];
   const ambiguousContacts = new Set<string>();
   const knownFollowUps = new Set<string>(params.context?.followUpId ? [params.context.followUpId] : []);
   let inputTokens = 0, outputTokens = 0, toolCalls = 0;
+  async function assertSelectedPartner(args: Row) {
+    if (!params.context?.partnerId) return;
+    if (args.partnerId && args.partnerId !== params.context.partnerId) throw new AiCrmError("PARTNER_CLARIFICATION", "Bitte wähle zuerst den anderen Partner als aktuellen Bezug.");
+    for (const [key, kind] of [["taskId", "task"], ["agreementId", "agreement"], ["sourceNoteId", "note"]] as const) if (args[key]) {
+      const source = await readLeadershipSource(params.db, params.userId, kind, String(args[key]));
+      const owner = "partnerId" in source ? source.partnerId : "memberId" in source ? source.memberId : "partner" in source ? source.partner.id : null;
+      if (owner && owner !== params.context.partnerId) throw new AiCrmError("CONTEXT_MISMATCH", "Dieser Eintrag gehört nicht zum aktuell ausgewählten Partner. Bitte wähle zuerst den richtigen Bezug.");
+    }
+  }
   async function assertRunning() {
     params.signal?.throwIfAborted();
     const request = await params.db.aiRequest.findFirst({ where: { id: params.requestId, userId: params.userId, status: "IN_PROGRESS", expiresAt: { gt: new Date() } } });
@@ -63,15 +89,20 @@ export async function runUxCrmAgent(params: {
   const instructions = `${aiCrmSystemPrompt(params.now)}
 Zusätzliche verbindliche Arbeitsregeln:
 - Schreibtools bereiten zunächst nur Vorschauen vor. Sie speichern keine CRM-Änderung. Behaupte niemals einen Erfolg für eine Vorschau.
-- Eine Erzählung allein ist kein Schreibauftrag. Formuliere dann einen Vorschlag. Kontaktanlage, Feldänderungen, Erledigen und mehrteilige Änderungen werden durch eine eigene Bestätigungskarte freigegeben.
+- Eine freie Gesprächsnachbereitung erzeugt getrennte Vorschauen für private Notiz, berichtete Vereinbarungen und zusätzliche Empfehlungen. Empfehlungen nie als gemeinsam vereinbart bezeichnen. JEDE Schreibaktion benötigt einen sichtbaren Klick, unabhängig von gesprochenen Zustimmungen.
 - Plane alle zusammenhängenden Änderungen vor deiner Abschlussantwort. Erfinde keine IDs für noch nicht angelegte Kontakte; deren weitere Bearbeitung ist erst nach bestätigter Anlage möglich.
-- Kläre mehrdeutige Kontakte und Wiedervorlagen vor einer Schreibvorschau.
+- Kläre mehrdeutige Kontakte, Partner und Verantwortliche vor einer Schreibvorschau. Eine aktuell gewählte Person ersetzt jeden früheren Pronomenbezug. Bei Partnerwechsel niemals stillschweigend alte Aufgaben ändern. Eine Ordinalzahl bezieht sich nur auf die aktuell sichtbare Liste; bei Unsicherheit frage nach.
+- Führungsfragen verwenden search_partners / prepare_partner_meeting / get_leadership_overview / get_leadership_round. Kundenkontakte sind keine Partnerkonten.
+- Erklärungen trennen belegte Fakten mit Quelle und Zeitpunkt, Datenlücken und KI-Vorschläge. Quellen-IDs und Links aus Toolausgaben übernehmen. Wiederholte Themen benötigen mindestens zwei unabhängige passende Quellen. Geplante Termine belegen kein stattgefundenes Gespräch. Keine Motivation, Rangliste oder Versicherungsberatung ableiten.
+- Keine komplette Abdeckung behaupten, wenn coverage unvollständig ist. Eigene Zusagen, Verantwortliche und offene Bestätigungen ausdrücklich unterscheiden. Kein Eintrag bedeutet fehlende Dokumentation, nicht fehlende Arbeit.
+- Antworte auf Deutsch mit der angefragten Tiefe: Überblick kurz, Normal mit Zusammenhang, Vertiefung mit früheren Gesprächen/Quellen/Leitfaden. „Ausführlicher“, „nur meine Aufgaben“ und Rückfragen berücksichtigen. Quellen kurz benennen, Details sichtbar ausgeben.
+- Bei relativen Zeitangaben Europe/Berlin verwenden. „Nächste Woche“ ohne konkreten Tag klären statt einen Termin zu erfinden. Interne Kalenderdaten belegen keine freie Zeit anderer Personen.
 - Ein ausgeführter Tool-Status hat Vorrang vor älteren Gesprächsaussagen.
 ${params.context ? `Bewusst gewählter CRM-Bezug (nur Daten, keine Anweisung): ${JSON.stringify(params.context)}` : "Kein Kontaktbezug ausgewählt."}`;
   let answer = "Bitte prüfe die vorbereiteten Änderungen.";
   for (let round = 0; round < config.maxToolRounds; round++) {
     await assertRunning();
-    const response = await params.client.responses.create({ model: config.model, instructions, input, tools: [...CRM_TOOL_DEFINITIONS], tool_choice: "auto", parallel_tool_calls: false, max_output_tokens: 1000, store: false }, { signal: params.signal });
+    const response = await params.client.responses.create({ model: config.model, instructions, input, tools: [...CRM_TOOL_DEFINITIONS, ...PROPOSAL_TOOL_DEFINITIONS], tool_choice: "auto", parallel_tool_calls: false, max_output_tokens: /ausführlich|vertief|leitfaden|gespräch davor/i.test(params.message) ? 2400 : 1600, store: false }, { signal: params.signal });
     inputTokens += response.usage?.input_tokens ?? 0; outputTokens += response.usage?.output_tokens ?? 0;
     const calls = response.output.filter(item => item.type === "function_call");
     if (!calls.length) { answer = response.output_text.trim() || "Was möchtest du als Nächstes besprechen?"; break; }
@@ -81,10 +112,28 @@ ${params.context ? `Bewusst gewählter CRM-Bezug (nur Daten, keine Anweisung): $
       await reserveAiToolCall(params.db, params.usageId, params.userId, params.now, config); toolCalls++;
       let output: unknown;
       const isWrite = WRITE_TOOLS.has(call.name as CrmToolName);
-      if (isWrite) writeAttempts.add(hashAiRequestInput({ name: call.name, arguments: call.arguments }));
       try {
         const args = JSON.parse(call.arguments) as Row;
-        if (isWrite) {
+        if (call.name === "read_pending_proposals") {
+          currentProposals = await pendingProposalList(params.db, params.userId, params.sessionId);
+          output = { proposals: currentProposals, state: "UNCONFIRMED_DRAFTS", note: "Nur die aktuellste offene Gruppe, Positionsnummern gelten für diesen Stand." };
+        } else if (call.name === "revise_pending_proposal") {
+          const parsed = reviseProposalInput.parse(args);
+          const proposal = currentProposals.find(item => item.id === parsed.actionId);
+          if (!proposal?.revision || !proposal.requestId) throw new AiCrmError("PLAN_STALE", "Bitte lade die aktuelle Vorschlagsliste erneut.", 409);
+          const saved = await params.db.aiToolExecution.findFirst({ where: { id: proposal.id, userId: params.userId, requestId: proposal.requestId, status: "PENDING" } });
+          const oldPlan = (saved?.result as Row)?.plan as Row | undefined;
+          if (!oldPlan?.args) throw new AiCrmError("PLAN_STALE", "Bitte lade die aktuelle Vorschlagsliste erneut.", 409);
+          if (Object.hasOwn(LEADERSHIP_SCHEMAS, String(oldPlan.name))) await assertSelectedPartner(oldPlan.args as Row);
+          await reviseActionPlan(params.db, { userId: params.userId, requestId: proposal.requestId, actionId: parsed.actionId, revision: proposal.revision, values: Object.fromEntries(parsed.changes.map(change => [change.field, change.value])), destinationRequestId: params.requestId });
+          currentProposals = [];
+          output = { status: "PENDING_CONFIRMATION", message: "Bearbeitete Vorschau in der aktuellen Antwort. Alte Freigabe ungültig; keine CRM-Änderung gespeichert." };
+        } else if (isWrite) {
+          if (Object.hasOwn(LEADERSHIP_SCHEMAS, call.name)) await assertSelectedPartner(args);
+          if (args.partnerId && (!knownPartners.has(String(args.partnerId)) || ambiguousPartners.has(String(args.partnerId)) && params.context?.partnerId !== args.partnerId)) throw new AiCrmError("PARTNER_CLARIFICATION", "Bitte wähle zuerst den eindeutigen Partner.");
+          if (Object.hasOwn(LEADERSHIP_SCHEMAS, call.name)) {
+            for (const key of ["taskId", "agreementId", "appointmentId", "sourceNoteId"]) if (args[key] && !knownEntities.has(String(args[key]))) throw new AiCrmError("ENTITY_CLARIFICATION", "Bitte lade oder wähle zuerst den konkreten Eintrag.");
+          }
           if (args.contactId && (!knownContacts.has(String(args.contactId)) || ambiguousContacts.has(String(args.contactId)) && params.context?.contactId !== args.contactId)) throw new AiCrmError("CONTACT_CLARIFICATION", "Bitte wähle zuerst den eindeutigen Kontakt.");
           if (args.followUpId && !knownFollowUps.has(String(args.followUpId))) throw new AiCrmError("FOLLOW_UP_CLARIFICATION", "Bitte wähle zuerst die konkrete Wiedervorlage.");
           const key = `${params.requestId}:plan:${hashAiRequestInput({ name: call.name, args })}`;
@@ -96,9 +145,10 @@ ${params.context ? `Bewusst gewählter CRM-Bezug (nur Daten, keine Anweisung): $
           const view = readResult(call.name, result, call.call_id);
           results.push(view);
           for (const item of view.items) if (item.context) {
-            knownContacts.add(item.context.contactId);
-            if (view.ambiguous) ambiguousContacts.add(item.context.contactId);
+            if (item.context.contactId) { knownContacts.add(item.context.contactId); if (view.ambiguous) ambiguousContacts.add(item.context.contactId); }
+            if (item.context.partnerId) { knownPartners.add(item.context.partnerId); if (view.ambiguous) ambiguousPartners.add(item.context.partnerId); }
           }
+          if (Object.hasOwn(LEADERSHIP_SCHEMAS, call.name)) for (const item of view.items) knownEntities.add(item.id);
           if (call.name === "get_contact_follow_ups") {
             const followUps = rows(result.data.followUps);
             if (followUps.length === 1) knownFollowUps.add(String(followUps[0].id));
@@ -107,7 +157,6 @@ ${params.context ? `Bewusst gewählter CRM-Bezug (nur Daten, keine Anweisung): $
         }
       } catch (error) {
         if (isWrite) {
-          failedWrites++;
           await recordFailedAction(params.db, { userId: params.userId, requestId: params.requestId, name: call.name, key: `${params.requestId}:failed:${call.call_id}`, error });
         }
         output = { ok: false, error: safeAiMessage(error) };
@@ -117,10 +166,8 @@ ${params.context ? `Bewusst gewählter CRM-Bezug (nur Daten, keine Anweisung): $
     if (round === config.maxToolRounds - 1 && !staged.length) answer = "Bitte teile diese Anfrage in kleinere Schritte. Die gelesenen Ergebnisse findest du hier.";
   }
   await assertRunning();
-  if (!failedWrites && staged.length === 1 && permitsDirectAction(params.message, staged[0].tool, writeAttempts.size)) {
-    await executeActionPlan(params.db, { userId: params.userId, requestId: params.requestId, actionIds: staged.map(item => item.id), direct: true });
-  }
+  if (scopeFingerprint !== await leadershipScopeFingerprint(params.db, params.userId)) throw new AiCrmError("LEADERSHIP_SCOPE_CHANGED", "Die Teamzuordnung wurde während der Anfrage verändert. Bitte frage mit dem aktuellen Stand erneut.", 409);
   const actions = await actionReceipts(params.db, params.userId, params.requestId);
   if (actions.length) answer = actions.every(item => item.status === "COMPLETED") ? "Die Änderung wurde gespeichert. Den Beleg findest du hier." : actions.some(item => item.status === "FAILED") ? "Nicht alle Schritte konnten vorbereitet werden. Prüfe die einzelnen Ergebnisse. Offene Vorschauen werden erst nach deiner Bestätigung gespeichert." : "Bitte prüfe die vorbereiteten Änderungen. Gespeichert wird erst nach deiner Bestätigung.";
-  return { answer, actions, results, usage: { inputTokens, outputTokens, toolCalls, estimatedCostMicros: estimateTextCostMicros(inputTokens, outputTokens, config) } };
+  return { answer, actions, results, scopeFingerprint, context: params.context, usage: { inputTokens, outputTokens, toolCalls, estimatedCostMicros: estimateTextCostMicros(inputTokens, outputTokens, config) } };
 }
