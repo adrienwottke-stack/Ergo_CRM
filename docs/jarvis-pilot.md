@@ -19,7 +19,7 @@ Die lesenden Teilanalysen Sprache/KI, CRM/Rechte und Oberfläche/Audio/Betrieb w
 | Sichtbare Freigaben | teilweise | `action-plans.ts`, `AssistantTimeline.tsx` | jede Aktion, Einzelauswahl, Bearbeitung, revisionsgebundene Freigabe | kein Schreiben vor Klick, veralteter Stand |
 | Tier-3-Runde | fehlend in Jarvis | `get_leadership_round` | eigene Beteiligungen mit direkten Führungskontakten | keine privaten Unterteamnotizen |
 | Exaktes Intro | fehlend | Live-Session/Intro-Route/Player | kontrollierter TTS-Clip, persistenter einmaliger Zustand | Once-/Reconnect-/Fehlertests |
-| Musik/Audiokoordination | Spotify teilweise vorhanden | `local-audio.ts`, lokale Musikroute | freigegebene lokale Quelle, echte Playerzustände, Ducking | Mock-Audioengine; tatsächliche Datei fehlt |
+| Musik/Audiokoordination | Spotify teilweise vorhanden | `local-audio.ts`, geschützte Musikroute, `private-music.ts` | lokale Datei oder privater Blob, echte Playerzustände, Ducking | Player-/Rechtetests und echte MP3-Decodierung; siehe Musikbereitstellung unten |
 
 Abhängigkeiten: zentrale Verträge und additive Tabellen zuerst; danach Fachadapter und Sprach-/Playerpakete; gemeinsame Vorschauoberfläche; Integration, unabhängige Prüfung und Betriebshandoff. Baseline: `npm run test:ai` bestand vor den Änderungen mit 57/57 Tests.
 
@@ -68,12 +68,14 @@ Vorhandene Gates bleiben erforderlich: `AI_CRM_ENABLED=true`, Feature `aiCrm` ve
 | `JARVIS_GREETING_NAME` | im Vorführmodus `Meister Emil`; kein Rechtebezug |
 | `AI_LIVE_MUSIC_FILE` | absoluter Pfad einer vorhandenen, freigegebenen AC/DC-Datei auf dem Server des lokalen Piloten |
 | `AI_LIVE_MUSIC_TITLE` | sichtbarer Titel der tatsächlich konfigurierten Datei |
+| `AI_LIVE_MUSIC_BLOB_PATH` | Produktionsquelle im privaten Vercel Blob Store, z. B. `jarvis/acdc-highway-to-hell.mp3`; keine öffentliche URL. Ein gesetzter lokaler Dateipfad hat Vorrang. |
+| `BLOB_STORE_ID` | verbundener privater Store; Vercel verwaltet das kurzlebige `VERCEL_OIDC_TOKEN` automatisch |
 | `AI_LIVE_MAX_SESSION_SECONDS` | maximale Dauer |
 | `AI_LIVE_INACTIVITY_SECONDS` / `AI_LIVE_WARNING_SECONDS` | Inaktivität und Vorwarnung |
 | `AI_LIVE_MAX_TURNS` / `AI_LIVE_RECONNECT_LIMIT` | persistente Sitzungsgrenzen |
 | `AI_MAX_TOOL_ROUNDS`, `AI_MAX_MONTHLY_REQUESTS`, `AI_MAX_MONTHLY_AUDIO_SECONDS`, `AI_MAX_MONTHLY_TOOL_CALLS` | bestehende Verbrauchsgrenzen |
 
-Die lokale Audiodatei bleibt außerhalb des Repositorys. Sie wird nur über authentifizierte aktive Sitzungen ausgeliefert. Ein lokaler Serverpfad ist auf Vercel nicht automatisch vorhanden. Eine passende dort erlaubte Quelle müsste beim freigegebenen Deployment ausdrücklich bereitgestellt werden; kein Download und kein neues Streamingabo werden vorausgesetzt.
+Die Audiodatei bleibt außerhalb des öffentlichen Repositorys. Lokal kann ein absoluter Serverpfad verwendet werden; in Produktion liegt die vom Nutzer gelieferte Datei im privaten Vercel Blob Store. Die Musikroute prüft Login, KI-Berechtigung und eigene aktive Sitzung, bevor sie den Speicher anspricht. Sie liefert Status oder Audiobytes mit `private, no-store`, ohne Speicher-URL oder Token an den Browser weiterzugeben. Byte-Ranges und ETag-Prüfung sichern konsistente Teilabrufe. Kein Streamingabo ist erforderlich.
 
 ## Test- und Live-Nachweis
 
@@ -111,7 +113,15 @@ Am 24.09.2026 wurde `OPENAI_API_KEY` in Vercel als **Sensitive Secret für Previ
 
 Lokal sind Sprache und Musikquelle nicht konfiguriert. Ein echter GPT-Live-/TTS-Aufruf wurde deshalb nicht durchgeführt. Das Vorhandensein des Secrets beweist weder Freischaltung von `gpt-live-1` noch funktionierende Audioausgabe. Der nächste echte Test braucht eine geschützte Preview mit ausdrücklich geeignetem Datenbankziel, der additiven Migration, `AI_LIVE_PROVIDER=live` und einem bereits berechtigten Vorführkonto. Wegen des bestehenden Build-Schritts `prisma migrate deploy` wurde keine Preview gegen ein ungeklärtes Datenbankziel veröffentlicht.
 
-Die freigegebene AC/DC-Datei und `AI_LIVE_MUSIC_FILE` / `AI_LIVE_MUSIC_TITLE` fehlen weiterhin. Ein auf dem Vorführrechner vorhandener Dateipfad steht einem Vercel-Server nicht automatisch zur Verfügung. Die Datei muss in der tatsächlich gewählten Serverlaufzeit erreichbar sein. Es wurde keine Musik beschafft und keine reale Wiedergabe behauptet.
+Zum ursprünglichen Pilotabschluss fehlte die Musikdatei. Die anschließende Bereitstellung der vom Nutzer gelieferten Datei ist im folgenden Abschnitt dokumentiert.
+
+### Musikbereitstellung am 24.09.2026
+
+Der Nutzer lieferte `ACDC Highway to Hell Audio.mp3`: 3.459.626 Bytes, MPEG-1 Layer 3, Stereo, 44,1 kHz, 128 kbit/s, rund 3:28 Minuten. Die unveränderte Datei wurde in den privaten Store `ergo-crm-jarvis-music` (Frankfurt, nur Production verbunden) unter `jarvis/acdc-highway-to-hell.mp3` geladen. Der sichtbare Titel lautet `AC/DC – Highway to Hell`. Die Datei und Zugangsdaten werden nicht eingecheckt.
+
+Die echte Speicheranbindung wurde geprüft: unangemeldeter Direktzugriff HTTP 403; vollständiger Abruf bytegenau identisch; Anfangs- und Endbereich korrekt per HTTP 206; Chromium decodiert 208,24 Sekunden Stereo mit vorhandenem Audiosignal. SHA-256 der Originaldatei: `e321cf62b978841f114f7b00cb9dd7dcedf5e77fa3cdf9acb256243beafd3263`. Der lokale Nachweis liegt in `.cache/jarvis-real-music-report.json`. Zusätzliche API-Tests prüfen eigene/fremde/beendete Sitzungen, Berechtigungen, private Speicherpflicht, manipulierte Pfade, ungültige Ranges und fehlende Dateien.
+
+Musik startet weiterhin ausschließlich nach ausdrücklicher Zustimmung, mit 12 Prozent Lautstärke. Absenken bei Sprache sowie Pause, Stopp und Sitzungsende bleiben im bestehenden Player. Die Decodierung ist kein Hörtest am physischen Mikrofon-/Lautsprecheraufbau. Technische Grundlage: [Vercel Private Blob](https://vercel.com/docs/vercel-blob/private-storage) und [Blob SDK](https://vercel.com/docs/vercel-blob/using-blob-sdk).
 
 ### Betriebsgrenzen vor einer unbeaufsichtigten Freigabe
 

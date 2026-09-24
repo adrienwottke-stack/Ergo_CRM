@@ -7,6 +7,7 @@ import { requireAiEntitlement } from "@/lib/ai-crm/entitlement";
 import { requireLiveSession } from "@/lib/ai-crm/live-sessions";
 import { AiCrmError } from "@/lib/ai-crm/errors";
 import { aiErrorResponse } from "@/lib/ai-crm/http";
+import { privateMusicResponse } from "@/lib/ai-crm/private-music";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,6 +24,8 @@ export async function GET(request: Request) {
     if (!sessionId || sessionId.length > 120) throw new AiCrmError("LIVE_SESSION_REQUIRED", "Starte zuerst Jarvis.", 400);
     await requireLiveSession(prisma, { userId: user.id, sessionId });
     const file = process.env.AI_LIVE_MUSIC_FILE?.trim();
+    const blobPath = process.env.AI_LIVE_MUSIC_BLOB_PATH?.trim();
+    if (!file && blobPath) return await privateMusicResponse(request, blobPath);
     if (!file || !isAbsolute(file) || !mime[extname(file).toLowerCase()]) {
       if (url.searchParams.get("status") === "1") return Response.json({ available: false, message: "Keine freigegebene Audiodatei eingerichtet. AI_LIVE_MUSIC_FILE muss auf eine vorhandene MP3-, M4A-, OGG-, WAV- oder WebM-Datei auf dem App-Rechner zeigen." }, { headers });
       throw new AiCrmError("LIVE_MUSIC_NOT_CONFIGURED", "Die freigegebene Musikdatei fehlt (AI_LIVE_MUSIC_FILE).", 404);
