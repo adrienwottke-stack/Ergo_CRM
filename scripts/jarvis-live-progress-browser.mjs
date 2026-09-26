@@ -83,7 +83,10 @@ try {
   await page.getByText("Die Antwort dauert gerade länger. Deine Anfrage läuft noch.", { exact: true }).waitFor();
   for (const width of [320, 390, 768, 1440]) { await page.setViewportSize({ width, height: 900 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)); }
   await page.evaluate(() => window.__streams[0].result({ answer: "Du kannst Kontakte organisieren und deinen Tag planen." }));
-  await page.getByLabel("Gesprächsverlauf").getByText("Du kannst Kontakte organisieren und deinen Tag planen.", { exact: true }).waitFor();
+  await page.locator(".assistant-live-result > summary").first().waitFor();
+  assert.equal(await page.getByLabel("Gesprächsverlauf").getByText("Du kannst Kontakte organisieren und deinen Tag planen.", { exact: true }).isVisible(), false);
+  await page.evaluate(() => window.__channel.onmessage({ data: JSON.stringify({ type: "session.output_transcript.delta", event_id: "actual-spoken-result", delta: "Lass uns deinen Tag anpacken!", start_ms: 11000, end_ms: 12000 }) }));
+  await page.getByLabel("Gesprächsverlauf").getByText("Lass uns deinen Tag anpacken!", { exact: true }).waitFor();
   await page.getByText("Die Antwort dauert gerade länger. Deine Anfrage läuft noch.", { exact: true }).waitFor({ state: "hidden" });
   // Late delegation of the completed question must not attach to the next one.
   await page.evaluate(() => { window.__delegate("late-one"); window.__say("Was steht heute an?"); });
@@ -108,6 +111,7 @@ try {
   await page.waitForFunction(() => window.__turns.length === 6);
   assert.equal(await page.evaluate(() => window.__turns[5].transcript), "Alles gut, suche stattdessen Anna");
   await page.evaluate(() => { window.__streams[4].result({ answer: "VERALTETER AUFTRAG" }); window.__streams[5].result({ answer: "NEUER AUFTRAG" }); });
+  await page.locator(".assistant-live-result > summary").last().click();
   await page.getByLabel("Gesprächsverlauf").getByText("NEUER AUFTRAG", { exact: true }).waitFor();
   assert.equal(await page.getByText("VERALTETER AUFTRAG").count(), 0);
   await page.evaluate(() => window.__say("Prüfe meine nächsten Termine"));

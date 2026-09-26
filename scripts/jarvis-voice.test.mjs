@@ -181,6 +181,7 @@ test("Live delegates to existing backend, persists sourced results, never replay
   assert.equal(await db.aiConversationMessage.count({ where: { conversationId: data.conversation.id } }), 2);
   const stored = await db.aiConversationMessage.findFirst({ where: { conversationId: data.conversation.id, role: "assistant" } });
   assert.ok(stored);
+  assert.equal(stored.actions.kind, "live-result", "saved backend prose is labelled as a summary, never a spoken transcript");
   await lifecycle.DELETE(req({}, "DELETE"), context);
 });
 

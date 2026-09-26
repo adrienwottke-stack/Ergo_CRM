@@ -5,6 +5,7 @@ import { LiveUtteranceBuffer, inputTranscriptDelta, sessionTiming, waitForIceGat
 import { liveTranscriptEvent } from "./fixtures/live-transcript.ts";
 import { isLiveSmallTalk } from "../lib/ai-crm/voice-style.ts";
 import { LiveCaptions } from "../lib/ai-crm/live-captions.ts";
+import { mergeLiveSpeech } from "../lib/ai-crm/live-timeline.ts";
 
 class AudioFixture {
   src = ""; volume = 1; currentTime = 0; paused = true; listeners = new Map(); calls = 0;
@@ -141,6 +142,41 @@ test("read-along captions join fragments, distinguish speakers, deduplicate and 
   for (let i = 0; i < 100; i++) captions.append(liveTranscriptEvent("A".repeat(1000), `large${i}`, i * 3000 + 3000, i * 3000 + 4000));
   const bounded = captions.append(liveTranscriptEvent("Letzter Satz", "last", 400000, 400100));
   assert.ok(bounded.length <= 50); assert.ok(bounded.reduce((sum, line) => sum + line.text.length, 0) <= 16000);
+});
+
+test("the primary chat follows actual speech fragments without replacing CRM facts or repeating a bubble", () => {
+  const captions = new LiveCaptions();
+  const event = { type: "session.output_transcript.delta", event_id: "speech-one", delta: "Yo, ich bin dran!", start_ms: 0, end_ms: 500 };
+  const summary = { id: "result-one", role: "assistant", kind: "live-result", content: "An entirely different written backend answer", actions: [{ id: "proposal-one", status: "PENDING" }] };
+  let entries = mergeLiveSpeech([summary], captions.append(event));
+  assert.equal(entries[1].content, "Yo, ich bin dran!");
+  assert.equal(entries[1].kind, "speech");
+  entries = mergeLiveSpeech(entries, captions.append({ ...event, event_id: "speech-two", delta: " Wie läuft dein Tag?", start_ms: 500, end_ms: 1100 }));
+  assert.equal(entries.length, 2);
+  assert.equal(entries[1].content, "Yo, ich bin dran! Wie läuft dein Tag?");
+  assert.equal(entries[0], summary, "no spoken text may rewrite a CRM result or authorize an action");
+  assert.equal(captions.append(event), null, "event replays cannot repeat speech");
+  captions.boundary();
+  entries = mergeLiveSpeech(entries, captions.append({ ...event, event_id: "speech-three", delta: "Hier ist die Antwort.", start_ms: 1100, end_ms: 1500 }));
+  assert.equal(entries.length, 3, "the answer must not join the waiting message across a result boundary");
+  assert.equal(entries.at(-1).content, "Hier ist die Antwort.");
+});
+
+test("new calls and reconnects preserve earlier speech without ID collisions; buffers stay bounded", () => {
+  let entries = [];
+  const event = { type: "session.output_transcript.delta", event_id: "same-provider-id", delta: "Hallo", start_ms: 0, end_ms: 500 };
+  const first = new LiveCaptions();
+  entries = mergeLiveSpeech(entries, first.append(event));
+  first.reconnect(); entries = mergeLiveSpeech(entries, first.append(event));
+  const second = new LiveCaptions(); entries = mergeLiveSpeech(entries, second.append(event));
+  assert.equal(entries.length, 3);
+  assert.equal(new Set(entries.map(entry => entry.id)).size, 3);
+  assert.equal(mergeLiveSpeech(entries, []), entries, "starting another call does not erase earlier speech");
+  entries.push({ id: "kept", role: "assistant", content: "Saved CRM summary", kind: "live-result" });
+  for (let i = 0; i < 100; i++) entries = mergeLiveSpeech(entries, second.append({ ...event, event_id: `bounded-${i}`, delta: "A".repeat(1000), start_ms: 3000 * (i + 1), end_ms: 3000 * (i + 1) + 500 }));
+  assert.ok(entries.filter(entry => entry.kind === "speech").length <= 100);
+  assert.ok(entries.filter(entry => entry.kind === "speech").reduce((sum, entry) => sum + entry.content.length, 0) <= 32000);
+  assert.equal(entries.find(entry => entry.id === "kept").content, "Saved CRM summary");
 });
 
 test("noise cannot interrupt speech; recognized words interrupt once and reset for the next utterance", () => {

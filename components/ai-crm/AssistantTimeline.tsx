@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useAssistant } from "@/components/ai-crm/AssistantProvider";
 import type { ActionReceipt, Entry } from "@/lib/ai-crm/contracts";
-import type { LiveCaption } from "@/lib/ai-crm/live-captions";
 import AssistantMessage from "./AssistantMessage";
 
 function Receipt({ action, now, onEditing }: { action: ActionReceipt; now: number; onEditing: (id: string, editing: boolean) => void }) {
@@ -64,20 +63,14 @@ function MessageActions({ entry, now }: { entry: Entry; now: number }) {
   </div>;
 }
 
-export default function AssistantTimeline({ liveCaptions = [], liveActive = false }: { liveCaptions?: LiveCaption[]; liveActive?: boolean }) {
+export default function AssistantTimeline({ liveActive = false }: { liveActive?: boolean }) {
   const assistant = useAssistant();
   const container = useRef<HTMLDivElement>(null);
   const following = useRef(true);
   const [newResponse, setNewResponse] = useState(false);
-  const [showCaptions, setShowCaptions] = useState(false);
-  const captionContainer = useRef<HTMLDivElement>(null);
-  const followCaptions = useRef(true);
-  const pendingActions = assistant.entries.some(entry => entry.actions?.some(action => action.status === "PENDING"));
   const [now, setNow] = useState(Date.now());
   const previousLast = useRef<string | undefined>(undefined);
   const previousConversation = useRef(assistant.conversationId);
-  useEffect(() => { if (!liveActive && !liveCaptions.length) setShowCaptions(false); }, [liveActive, liveCaptions.length]);
-  useEffect(() => { if (showCaptions && followCaptions.current && captionContainer.current) captionContainer.current.scrollTop = captionContainer.current.scrollHeight; }, [liveCaptions, showCaptions]);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
@@ -90,11 +83,13 @@ export default function AssistantTimeline({ liveCaptions = [], liveActive = fals
   }, []);
   useEffect(() => {
     const element = container.current;
-    const last = assistant.entries.at(-1)?.id;
+    const lastEntry = assistant.entries.at(-1);
+    // A growing spoken bubble is an update, too. Follow it only while reading the end.
+    const last = lastEntry?.kind === "speech" ? `${lastEntry.id}:${lastEntry.content.length}` : lastEntry?.id;
     const revealLatest = () => {
       if (!element) return;
       const latest = element.querySelector<HTMLElement>(".assistant-messages > li:last-child");
-      element.scrollTop = latest && assistant.entries.at(-1)?.role === "assistant" ? element.scrollTop + latest.getBoundingClientRect().top - element.getBoundingClientRect().top - 20 : element.scrollHeight;
+      element.scrollTop = latest && lastEntry?.role === "assistant" && lastEntry.kind !== "speech" ? element.scrollTop + latest.getBoundingClientRect().top - element.getBoundingClientRect().top - 20 : element.scrollHeight;
     };
     if (element && (!assistant.entries.length || previousConversation.current !== assistant.conversationId)) {
       if (assistant.entries.length) revealLatest(); else element.scrollTop = 0;
@@ -112,29 +107,23 @@ export default function AssistantTimeline({ liveCaptions = [], liveActive = fals
     }
   }, [assistant.entries, assistant.conversationId]);
   return <div className="assistant-timeline-wrap">
-    {(liveActive || liveCaptions.length > 0) && <div className="assistant-reading-tabs" role="group" aria-label="Gesprächsansicht"><button aria-pressed={!showCaptions} onClick={() => setShowCaptions(false)}>Gespräch{pendingActions ? " · Vorschläge prüfen" : ""}</button><button aria-pressed={showCaptions} onClick={() => { followCaptions.current = true; setShowCaptions(true); }}>Live-Mitschrift</button></div>}
-    <div className="assistant-live-captions" hidden={!showCaptions} ref={captionContainer} onScroll={event => { const element = event.currentTarget; followCaptions.current = element.scrollHeight - element.scrollTop - element.clientHeight < 70; }}>
-      <p className="assistant-caption">Aktuelle Mitschrift · nach Neuladen weg. CRM-Fragen und Ergebnisse bleiben im Gespräch.</p>
-      {!liveCaptions.length && <p className="assistant-caption">Sobald jemand spricht, kannst du hier mitlesen.</p>}
-      <ol aria-label="Live-Mitschrift">{liveCaptions.map(line => <li key={line.id} className={`assistant-caption-line assistant-caption-line-${line.role}`}><strong>{line.role === "user" ? "Du" : "Jarvis"}</strong><p>{line.text}</p></li>)}</ol>
-      {pendingActions && <button className="assistant-primary" onClick={() => setShowCaptions(false)}>Vorbereitete Änderungen prüfen</button>}
-    </div>
-    <div className="assistant-timeline" hidden={showCaptions} ref={container} onScroll={event => { const element = event.currentTarget; following.current = element.scrollHeight - element.scrollTop - element.clientHeight < 70; assistant.setScrollTop(element.scrollTop); if (following.current) setNewResponse(false); }}>
+    <div className="assistant-timeline" ref={container} onScroll={event => { const element = event.currentTarget; following.current = element.scrollHeight - element.scrollTop - element.clientHeight < 70; assistant.setScrollTop(element.scrollTop); if (following.current) setNewResponse(false); }}>
+      {liveActive && <p className="assistant-caption assistant-speech-note">Du liest hier mit, was gesprochen wird. Die aktuelle Mitschrift bleibt bis zum Wechsel oder Neuladen dieses Gesprächs sichtbar.</p>}
       {assistant.notice && <p className="assistant-notice" role="status">{assistant.notice}</p>}
       {assistant.loading && <p role="status">Unterhaltung wird geladen …</p>}
-      <ol className="assistant-messages" aria-label="Gesprächsverlauf">{assistant.entries.map(entry => <li className={`assistant-message assistant-message-${entry.role}`} key={entry.id}>
-        <p className="assistant-speaker">{entry.role === "user" ? "Du" : "Jarvis"}{entry.source === "live" && <span> · Sprachgespräch</span>}{entry.source === "voice" && <span> · Diktiert</span>}</p>
-        {entry.role === "assistant" ? <AssistantMessage text={entry.content} /> : <p className="assistant-message-text">{entry.content}</p>}
+      <ol className="assistant-messages" aria-label="Gesprächsverlauf">{assistant.entries.map(entry => <li className={`assistant-message assistant-message-${entry.role}`} data-kind={entry.kind} key={entry.id}>
+        {entry.kind !== "live-result" && <p className="assistant-speaker">{entry.role === "user" ? "Du" : "Jarvis"}{entry.source === "live" && <span> · Sprachgespräch</span>}{entry.source === "voice" && <span> · Diktiert</span>}</p>}
+        {entry.kind === "live-result" ? <details className="assistant-live-result"><summary>CRM-Zusammenfassung</summary><p className="assistant-caption">Gespeicherte fachliche Zusammenfassung aus dem Sprachgespräch.</p><AssistantMessage text={entry.content} /></details> : entry.role === "assistant" && entry.kind !== "speech" ? <AssistantMessage text={entry.content} /> : <p className="assistant-message-text">{entry.content}</p>}
         {entry.role === "user" && entry.delivery && <span className="assistant-delivery">{entry.delivery === "sending" ? "Wird gesendet …" : entry.delivery === "unknown" ? "Abschluss noch unklar" : "Gesendet"}</span>}
         {entry.results?.map(result => <section className="assistant-read-result" key={result.id} aria-label="Aus deinen CRM-Daten"><p className="assistant-caption">Aus deinen CRM-Daten · {new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(new Date(result.readAt))}</p><p>{result.summary}</p>{result.coverage && <p className="assistant-caption">{result.coverage}</p>}{result.gaps?.length ? <details><summary>Datenlücken und Grenzen</summary>{result.gaps.map((gap, index) => <p className="assistant-caption" key={index}>{gap}</p>)}</details> : null}{result.items.slice(0, 5).map(item => <div key={item.id} className="assistant-result-row"><strong>{item.title}</strong>{item.detail && <p className="assistant-caption">{item.detail}</p>}<div className="assistant-button-row">{item.link && <Link href={item.link}>Quelle öffnen ↗</Link>}{item.context && <button disabled={assistant.locked} onClick={() => { assistant.setAttachment(item.context!); assistant.setDraft(result.ambiguous ? "Diesen Bezug meine ich." : ""); }}>{result.ambiguous ? "Diesen Bezug wählen" : "Als Bezug verwenden"}</button>}</div></div>)}{result.items.length > 5 && <details><summary>Weitere {result.items.length - 5} Ergebnisse</summary>{result.items.slice(5).map(item => <div key={item.id} className="assistant-result-row"><strong>{item.title}</strong><p>{item.detail}</p>{item.link && <Link href={item.link}>Quelle öffnen ↗</Link>}{item.context && <button onClick={() => assistant.setAttachment(item.context!)}>Als Bezug verwenden</button>}</div>)}</details>}</section>)}
         {!!entry.actions?.length && <MessageActions entry={entry} now={now} />}
       </li>)}</ol>
       {assistant.working && <p className="assistant-working" role="status">Deine Anfrage wird bearbeitet …</p>}
-      <div className="sr-only" aria-live="polite">{!assistant.working && assistant.entries.at(-1)?.role === "assistant" ? assistant.entries.at(-1)?.content : ""}</div>
+      <div className="sr-only" aria-live="polite">{!liveActive && !assistant.working && assistant.entries.at(-1)?.role === "assistant" && !assistant.entries.at(-1)?.kind ? assistant.entries.at(-1)?.content : ""}</div>
       {assistant.active?.messageCount === 18 && <p className="assistant-notice">Nach der nächsten Antwort ist dieses Gespräch voll. Danach geht es in einer neuen Unterhaltung weiter.</p>}
       {assistant.active && assistant.active.messageCount >= 20 && <p className="assistant-notice">Diese Unterhaltung hat 20 Nachrichten erreicht. Deine nächste Nachricht beginnt ein neues Gespräch.</p>}
       {assistant.recovery && <div className="assistant-recovery" role="alert"><strong>Abschluss prüfen</strong><p>Ich konnte den Abschluss nicht abrufen. Eine Änderung könnte bereits gespeichert sein.</p>{assistant.recovery.error && <p className="assistant-caption">{assistant.recovery.error}</p>}<div className="assistant-button-row"><button className="assistant-primary" disabled={Boolean(assistant.actionBusy)} onClick={() => void assistant.recover()}>Ergebnis prüfen</button>{assistant.recovery.status === "NOT_FOUND" ? <button disabled={assistant.working} onClick={() => void assistant.retryOriginal()}>Senden erneut versuchen</button> : <button disabled={Boolean(assistant.actionBusy)} onClick={() => void assistant.stop()}>Verarbeitung beenden</button>}</div></div>}
     </div>
-    {newResponse && !showCaptions && <button className="assistant-new-response" onClick={() => { const element = container.current; const last = element?.querySelector<HTMLElement>(".assistant-messages > li:last-child"); if (element && last) element.scrollTop += last.getBoundingClientRect().top - element.getBoundingClientRect().top - 20; following.current = true; setNewResponse(false); }}>Neue Antwort ↓</button>}
+    {newResponse && <button className="assistant-new-response" onClick={() => { const element = container.current; const last = element?.querySelector<HTMLElement>(".assistant-messages > li:last-child"); if (element && last) element.scrollTop += last.getBoundingClientRect().top - element.getBoundingClientRect().top - 20; following.current = true; setNewResponse(false); }}>Neue Antwort ↓</button>}
   </div>;
 }

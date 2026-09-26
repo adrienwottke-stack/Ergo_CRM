@@ -5,12 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { useVorfuehren } from "@/components/VorfuehrProvider";
 import type { ActionReceipt, AssistantAccess, AssistantContext, ConversationSummary, Entry, ReadResult } from "@/lib/ai-crm/contracts";
 import { assistantRecoveryFailureMessage } from "@/lib/ai-crm/errors";
+import type { LiveCaption } from "@/lib/ai-crm/live-captions";
+import { mergeLiveSpeech } from "@/lib/ai-crm/live-timeline";
 
 type SendBody = { message: string; source: "text" | "voice"; conversationId?: string; clientRequestId: string; context?: Omit<AssistantContext, "label"> };
 type Reply = { answer: string; requestId: string; actions: ActionReceipt[]; results?: ReadResult[]; conversation: ConversationSummary & { restartReason?: string | null } };
 type Recovery = { body: SendBody; status: string; error?: string };
 type LiveConversation = ConversationSummary & { restarted?: boolean; restartReason?: "expired" | "limit" | null };
-type LiveTurn = { requestId: string; transcript: string; answer: string; actions: ActionReceipt[]; results?: ReadResult[]; conversation: LiveConversation };
+type LiveTurn = { requestId: string; transcript: string; answer: string; actions: ActionReceipt[]; results?: ReadResult[]; conversation: LiveConversation; nativeSpeech?: boolean; inputInTranscript?: boolean };
 export class AssistantHttpError extends Error { constructor(message: string, public code: string, public status: number, public requestId?: string) { super(message); } }
 export async function assistantFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: "no-store", ...init });
@@ -220,6 +222,10 @@ function useController() {
     }
   }, [conversationId]);
 
+  const acceptLiveTranscript = useCallback((lines: LiveCaption[]) => {
+    setEntries(current => mergeLiveSpeech(current, lines));
+  }, []);
+
   const acceptLiveTurn = useCallback((turn: LiveTurn) => {
     const userEntry: Entry = {
       id: `live-${turn.requestId}`,
@@ -234,6 +240,7 @@ function useController() {
       id: `live-response-${turn.requestId}`,
       role: "assistant",
       content: turn.answer,
+      kind: turn.nativeSpeech ? "live-result" : undefined,
       actions: turn.actions,
       results: turn.results,
       requestId: turn.requestId,
@@ -241,9 +248,9 @@ function useController() {
     };
     setEntries(current => [
       ...(turn.conversation.restarted
-        ? []
+        ? current.filter(entry => entry.kind === "speech")
         : current.filter(entry => entry.id !== userEntry.id && entry.id !== responseEntry.id)),
-      userEntry,
+      ...(!turn.inputInTranscript ? [userEntry] : []),
       responseEntry,
     ]);
     setConversationId(turn.conversation.id);
@@ -406,7 +413,7 @@ function useController() {
     catch (reason) { setError(reason instanceof Error ? reason.message : "Der Zugang konnte nicht geöffnet werden."); setBilling(false); }
   }, []);
 
-  return { mode, setMode, expand, asPanel, showWorkspace, visible, presenting, section, setSection, access, conversations, nextCursor, conversationId, active, entries, draft, setDraft, source, setSource, attachment, setAttachment, loading, working, locked, recovery, error, setError, notice, actionBusy, actionErrors, deleteTarget, setDeleteTarget, billing, captureEpoch, scrollTop, setScrollTop, register, open, close, initialize, loadList, selectConversation, startNew, send, recover, retryOriginal, stop, changePlan, revisePlan, refreshActions, undo, removeConversation, openBilling, acceptLiveConversation, acceptLiveTurn };
+  return { mode, setMode, expand, asPanel, showWorkspace, visible, presenting, section, setSection, access, conversations, nextCursor, conversationId, active, entries, draft, setDraft, source, setSource, attachment, setAttachment, loading, working, locked, recovery, error, setError, notice, actionBusy, actionErrors, deleteTarget, setDeleteTarget, billing, captureEpoch, scrollTop, setScrollTop, register, open, close, initialize, loadList, selectConversation, startNew, send, recover, retryOriginal, stop, changePlan, revisePlan, refreshActions, undo, removeConversation, openBilling, acceptLiveConversation, acceptLiveTranscript, acceptLiveTurn };
 }
 
 type Controller = ReturnType<typeof useController>;

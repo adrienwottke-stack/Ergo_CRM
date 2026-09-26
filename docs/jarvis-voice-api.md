@@ -195,13 +195,23 @@ Listen, Hervorhebungen und Tabellen dargestellt. Roh-HTML, Bilder und aktive
 URL-Protokolle werden nicht ausgeführt. Neue lange Antworten öffnen am
 Textanfang; wer ältere Beiträge liest, wird nicht automatisch weggezogen.
 
-Die Ansicht „Live-Mitschrift“ zeigt echte Input-/Output-Transkriptfragmente mit
-Sprecherzuordnung, einschließlich Begrüßung und kurzen Zwischenmeldungen.
-Sie ist nur im aktuellen geöffneten Gespräch vorhanden, auf 50 Zeilen und
-16000 Zeichen begrenzt und nach Neuladen weg. Sie wird nicht in Modellprompts,
-Werkzeuge oder CRM-Notizen übernommen. Persistierte CRM-Fragen, Ergebnisse
-und Freigabekarten bleiben in der Ansicht „Gespräch“. Bei offenen Vorschlägen
-führt eine sichtbare Schaltfläche dorthin zurück.
+Der normale Gesprächsverlauf zeigt die echten Input-/Output-Transkriptfragmente
+mit Sprecherzuordnung, einschließlich Begrüßung, Humor und Zwischenmeldungen.
+Es gibt keinen zweiten Mitschrift-Reiter. Die schriftliche Backendantwort steht
+als aufklappbare „CRM-Zusammenfassung“ im selben Verlauf; Quellen und
+Freigabekarten bleiben direkt sichtbar. Die Anfrage erscheint beim Eintreffen
+des Backendergebnisses nicht noch einmal als doppelte Nutzerzeile.
+
+Die Mitschrift ist nur im aktuell geöffneten Gespräch vorhanden, pro
+Sprachsitzung auf 50 Zeilen und 16000 Zeichen begrenzt, über mehrere Sitzungen
+auf 100 Zeilen und 32000 Zeichen. Nach Gesprächswechsel oder Neuladen ist sie
+weg. Sie wird nicht in Modellprompts, Werkzeuge oder CRM-Notizen übernommen.
+Gespeicherte fachliche Antworten bleiben ausdrücklich CRM-Zusammenfassungen,
+auch nach Neuladen und für ältere Sprachgespräche. Neue Sitzungen haben eigene
+Transkriptkennungen; Reconnects oder wiederholte Events überschreiben keine
+früheren Sprachzeilen. Ein Fachresultat trennt die Zwischenmeldung von der
+anschließenden gesprochenen Antwort. Der Provider liefert Textfragmente seiner
+Sprachausgabe, keinen Nachweis der exakten Wiedergabeposition am Lautsprecher.
 
 ## Fortschritte und begrenzte Wartezeit
 
@@ -216,11 +226,16 @@ Für die Stimme gibt es eigene natürliche Sprechtexte. Echte Phasen werden
 über `session.commentary.append` hörbar angeboten, wie im
 [Live-Prompting-Leitfaden](https://developers.openai.com/api/docs/guides/live-prompting#delegation)
 beschrieben. Der erste Impuls folgt frühestens nach 1,2 Sekunden, weitere
-frühestens sieben Sekunden auseinander; maximal vier pro Auftrag. Nur die
+frühestens sechs Sekunden auseinander; maximal sechs pro Auftrag. Nur die
 aktuellste Phase zählt. Schnelle Antworten brauchen keine Wartefloskel.
-Nach längerer Wartezeit kann einmal eine beiläufige Frage zum Tag passen.
-Die Live-Regeln unterdrücken sie bei Eile, Frust, einem bereits besprochenen
-Tagesverlauf oder dem Wunsch nach weniger Smalltalk. Das Ergebnis hat Vorrang.
+Die erste Gesprächsanregung wird ab 6,5 Sekunden angeboten, im normalen
+Timerablauf bei 7,2 Sekunden, sofern keine neue Arbeitsphase Vorrang hat und
+keine Übertragung läuft. Das ist der Versandzeitpunkt, kein gemessener
+Sprechbeginn. Die Live-Regeln passen die Frage an den Gesprächsverlauf an;
+bei einem bereits besprochenen Tag passt eine Anschlussfrage statt Wiederholung.
+Bei Eile, Frust und weniger-Smalltalk-Wunsch bleibt es bei kurzen Sachmeldungen.
+Das Ergebnis hat Vorrang. Statusformulierungen wechseln; der Humor kommt
+aus dem Live-Gespräch und erfindet keine Arbeitsschritte.
 
 Die Sideband-Übertragung bekommt bis zu sechs statt zwei Sekunden für die
 Bestätigung. Ein Übertragungsfehler bleibt im Chat erkennbar. Die Meldungen

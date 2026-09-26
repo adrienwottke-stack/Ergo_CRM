@@ -4,7 +4,7 @@ Stand: 26.09.2026. Umsetzung der Rückmeldung zu zu starrer Ansprache und fehlen
 
 ## Gesprächsstil
 
-Die gemeinsame Persona in `lib/ai-crm/voice-style.ts` gilt für den CRM-Agenten und GPT-Live. Hohe Energie ist der Standard: kurze kräftige Sätze, eigene passende Gesprächsimpulse, konkrete nächste Schritte und lockere Reaktionen. Bei Motivation und gemeinsamem Loslegen sind drei bis sechs kurze Sätze erlaubt. Fachfragen beginnen weiterhin mit dem belegten Ergebnis. „Bruder“ passt, wenn die Person diese Ansprache selbst verwendet oder wünscht. „Geil“, „bam“ und „zack“ sind mögliche Akzente, kein ständig wiederholtes Skript.
+Die gemeinsame Persona in `lib/ai-crm/voice-style.ts` gilt für den CRM-Agenten und GPT-Live. Nach dem ersten Hörfeedback ist Energielevel 9 von 10 das Gestaltungsziel: kurze kräftige Sätze, eigene passende Gesprächsimpulse, konkrete nächste Schritte und lockere Reaktionen. Neugierige Rückfragen, hörbare Begeisterung und trockene Pointen sollen sich abwechseln. Humor ist regelmäßig erwünscht, wenn die Situation passt. Bei Motivation und gemeinsamem Loslegen sind drei bis sechs kurze Sätze erlaubt. Fachfragen beginnen weiterhin mit dem belegten Ergebnis. „Bruder“ passt, wenn die Person diese Ansprache selbst verwendet oder wünscht. „Geil“, „bam“ und „zack“ sind mögliche Akzente, kein ständig wiederholtes Skript.
 
 Der native Einstieg lautet mit der Demoanrede: „Hey, Meister Emil! Ich bin da. Los geht's — was packen wir zuerst an?“ Er wird weiterhin nur einmal angestoßen und entfällt, wenn die Person schon spricht. Gespräch, Begrüßung und CRM-Ergebnisse verwenden denselben Stil. Während einer Fachabfrage haben die vorhandenen kurzen Zwischenmeldungen Vorrang vor längeren Motivationspassagen.
 
@@ -36,7 +36,17 @@ Jede Stimme in einer neuen Sitzung mit denselben Aussagen vergleichen:
 
 Bewertung: Energie, deutsche Verständlichkeit, technische Klangfarbe und angenehmes Zuhören. Automatisierte Prüfungen können Auswahl, Übergabe, Sitzungsablauf und Darstellung absichern. Sie beweisen keine hörbare Stimmqualität oder erfolgreiche Befolgung der Persona durch den echten Provider.
 
-## Lokale Prüfung
+## Gemeinsamer Chat und frühere Rückfragen
+
+Die tatsächlichen Worte des Sprachproviders erscheinen direkt im normalen Chat. Eine schriftliche Backendantwort ersetzt diese Worte nicht mehr; sie bleibt als „CRM-Zusammenfassung“ aufklappbar. Quellen und Bestätigungskarten bleiben im selben Verlauf zugänglich. Die Mitschrift ist weiterhin lokal und vorübergehend: Nach Gesprächswechsel oder Neuladen bleibt die gespeicherte fachliche Zusammenfassung. Sie fließt nicht als zusätzliche Anweisung in CRM-Aufträge ein.
+
+Bei weiterhin laufenden Anfragen wird die Gesprächsanregung früher angeboten: üblicherweise nach etwa sieben Sekunden statt frühestens 18 Sekunden. Neue Arbeitsphasen haben Vorrang. Folgeimpulse halten mindestens sechs Sekunden Abstand und enden bei Abschluss oder Abbruch. Die echte hörbare Verzögerung hängt weiterhin vom Sprachprovider ab.
+
+Beim Start wird die Unterhaltung vor Öffnen des Audiostreams zugeordnet. Dadurch bleibt auch eine unmittelbar mit `session.started` eintreffende Begrüßung im Verlauf. Der kontrollierte Browsercheck reproduziert diesen frühen Eingang gezielt und prüft zusätzlich doppelte Ereignisse, Quellen, getrennte Zusammenfassungen, Unterbrechungen und den verzögerten Start mit erreichbarer Enden-Funktion bei 390 und 1440 Pixeln.
+
+Validierung dieser Erweiterung: 221/221 Tests der vollständigen Suite, davon 85 Jarvis-Tests; kontrollierte Pilot-, Fortschritts- und allgemeine Assistant-UX-Browserprüfungen bestanden. Pilot-Darstellung bei 320/390/768/1440/1920 Pixeln in beiden Farbschemata geprüft. ESLint für die geänderten Quelldateien und der isolierte Produktionsbuild ohne Migration gegen die produktive Datenbank sind ebenfalls erfolgreich. Ein echter Provider-Hörtest bleibt offen.
+
+## Lokale Prüfung der ersten Stimmenerweiterung
 
 Nach der Änderung bestanden: 82 Jarvis-Tests, TypeScript ohne Fehler und der kontrollierte Pilot-Browsercheck bei 320, 390, 768, 1440 und 1920 Pixeln in beiden Farbschemata. Der Stimmenwähler enthält die neuen Optionen, übergibt Meridian beim Start und ist während der Sitzung gesperrt. Die API-Prüfung bestätigt die Übergabe beider neuen Namen an den kontrollierten Provider. Begrüßung, Wiederverbindung und Abbruch bleiben abgedeckt. Ein echter Provider-Hörtest wurde nicht durchgeführt.
 

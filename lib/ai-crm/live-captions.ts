@@ -1,8 +1,9 @@
 import type { InputTranscriptDeltaEvent, OutputTranscriptDeltaEvent } from "openai/resources/live/live";
 
-export type LiveCaption = { id: string; role: "user" | "assistant"; text: string; endMs: number };
+export type LiveCaption = { id: string; sessionId: string; role: "user" | "assistant"; text: string; endMs: number; createdAt: string };
 /** Display-only recent captions. They never enter CRM tools, storage or model instructions. */
 export class LiveCaptions {
+  private readonly sessionId = crypto.randomUUID();
   private seen = new Set<string>();
   private lines: LiveCaption[] = [];
   private sequence = 0;
@@ -18,10 +19,12 @@ export class LiveCaptions {
     const last = this.lines.at(-1);
     if (last && this.lastRole === role && event.start_ms >= last.endMs - 1000 && event.start_ms - last.endMs < 1500) {
       this.lines[this.lines.length - 1] = { ...last, text: (last.text + event.delta).slice(-6000), endMs: Math.max(last.endMs, event.end_ms) };
-    } else this.lines.push({ id: `${this.generation}-${++this.sequence}`, role, text: event.delta.slice(-6000), endMs: event.end_ms });
+    } else this.lines.push({ id: `${this.sessionId}-${this.generation}-${++this.sequence}`, sessionId: this.sessionId, role, text: event.delta.slice(-6000), endMs: event.end_ms, createdAt: new Date().toISOString() });
     this.lastRole = role;
     while (this.lines.length > 50 || (this.lines.length > 1 && this.lines.reduce((sum, line) => sum + line.text.length, 0) > 16000)) this.lines.shift();
     return [...this.lines];
   }
   reconnect() { this.generation++; this.seen.clear(); this.lastRole = null; }
+  /** A CRM result separates the acknowledgement from the answer, even without a pause. */
+  boundary() { this.lastRole = null; }
 }

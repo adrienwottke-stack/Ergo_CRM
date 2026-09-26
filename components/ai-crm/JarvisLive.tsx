@@ -15,7 +15,7 @@ export type JarvisLiveProps = {
   onActiveChange?: (active: boolean) => void;
   onTranscript?: (lines: LiveCaption[]) => void;
   onConversationStarted: (conversation: JarvisLiveConversation) => void;
-  onTurn: (turn: { requestId: string; transcript: string; answer: string; actions: ActionReceipt[]; results?: ReadResult[]; conversation: JarvisLiveConversation }) => void;
+  onTurn: (turn: { requestId: string; transcript: string; answer: string; actions: ActionReceipt[]; results?: ReadResult[]; conversation: JarvisLiveConversation; nativeSpeech?: boolean; inputInTranscript?: boolean }) => void;
 };
 export type JarvisLiveSettings = {
   demoEnabled: boolean;

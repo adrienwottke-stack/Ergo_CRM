@@ -57,7 +57,13 @@ try {
       addTrack() {} async createOffer() { return { type: "offer", sdp: "v=0\r\ncontrolled-ui-test-only-sdp\r\n" }; }
       async setLocalDescription(value) { this.localDescription = value; this.iceGatheringState = "gathering"; setTimeout(() => { this.iceGatheringState = "complete"; this.dispatchEvent(new Event("icegatheringstatechange")); }, 15); }
       createDataChannel() { this.channel = { readyState: "open", send(value) { window.__controls.push(JSON.parse(value)); }, close() {} }; return this.channel; }
-      async setRemoteDescription() { this.connectionState = "connected"; this.onconnectionstatechange?.(); this.ontrack?.({ streams: [{ kind: "output" }] }); setTimeout(() => { window.__providerStarted = true; this.channel.onmessage?.({ data: JSON.stringify({ type: "session.started" }) }); }, 10); }
+      async setRemoteDescription() { this.connectionState = "connected"; this.onconnectionstatechange?.(); this.ontrack?.({ streams: [{ kind: "output" }] }); setTimeout(() => {
+        window.__providerStarted = true; this.channel.onmessage?.({ data: JSON.stringify({ type: "session.started" }) });
+        if (!window.__earlyGreetingSent) {
+          window.__earlyGreetingSent = true;
+          this.channel.onmessage?.({ data: JSON.stringify({ type: "session.output_transcript.delta", delta: "Hallo, Meister Emil.", event_id: "greeting-caption", start_ms: 0, end_ms: 1000 }) });
+        }
+      }, 10); }
       close() { this.connectionState = "closed"; }
     };
     window.__say = async text => {
@@ -139,8 +145,12 @@ try {
   assert.equal(await page.getByLabel("Jarvis-Stimme", { exact: true }).inputValue(), "vesper");
   await page.getByLabel("Jarvis-Stimme", { exact: true }).selectOption("cinder");
   await page.getByLabel("Jarvis-Stimme", { exact: true }).selectOption("meridian");
+  const firstIntroResponse = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/intro"));
   await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
+  await firstIntroResponse;
+  await page.getByLabel("Gesprächsverlauf").getByText("Hallo, Meister Emil.", { exact: true }).waitFor();
+  assert.equal(await page.locator('.assistant-message[data-kind="speech"]').count(), 1, "a transcript arriving immediately with session.started survives conversation startup");
   const micBeforeLayout = await page.evaluate(() => window.__micRequests);
   assert.equal(selectedVoices.at(-1), "meridian");
   assert.equal(await page.getByLabel("Jarvis-Stimme", { exact: true }).isDisabled(), true, "voice changes require a new session");
@@ -149,11 +159,10 @@ try {
     window.__peer.channel.onmessage({ data: JSON.stringify(event) });
     window.__peer.channel.onmessage({ data: JSON.stringify(event) });
   });
-  await page.getByRole("button", { name: "Live-Mitschrift", exact: true }).click();
-  await page.locator(".assistant-live-captions").getByText("Hallo, Meister Emil.", { exact: true }).waitFor();
-  assert.equal(await page.locator(".assistant-caption-line").count(), 1);
+  await page.getByLabel("Gesprächsverlauf").getByText("Hallo, Meister Emil.", { exact: true }).waitFor();
+  assert.equal(await page.locator('.assistant-message[data-kind="speech"]').count(), 1);
+  assert.equal(await page.getByRole("button", { name: "Live-Mitschrift", exact: true }).count(), 0, "speech belongs to the main chat without a second tab");
   await page.screenshot({ path: fileURLToPath(new URL("hype-live-captions.png", output)) });
-  await page.getByRole("button", { name: "Gespräch", exact: true }).click();
   await page.getByRole("button", { name: "Groß öffnen", exact: true }).click();
   await page.waitForURL("**/assistent");
   await page.getByRole("button", { name: "Als Panel öffnen", exact: true }).click();
@@ -173,10 +182,18 @@ try {
   assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), false, "Live backchannels stay audible while CRM work is pending");
   await page.getByText("Kontrolliertes Testresultat", { exact: true }).waitFor();
   turnDelay = 0;
-  await page.getByRole("button", { name: "Live-Mitschrift", exact: true }).click();
-  await page.locator(".assistant-live-captions").getByText("Was ist heute für mich offen?", { exact: true }).waitFor();
-  assert.equal(await page.locator(".assistant-caption-line-user > strong").last().innerText(), "Du");
-  await page.getByRole("button", { name: "Gespräch", exact: true }).click();
+  await page.getByLabel("Gesprächsverlauf").getByText("Was ist heute für mich offen?", { exact: true }).waitFor();
+  assert.equal(await page.getByLabel("Gesprächsverlauf").getByText("Was ist heute für mich offen?", { exact: true }).count(), 1, "a backend reply must not repeat the transcribed user question");
+  assert.equal(await page.getByLabel("Gesprächsverlauf").getByText("Dies ist eine gekennzeichnete kontrollierte UI-Testantwort.", { exact: true }).isVisible(), false, "unspoken backend prose is collapsed as a CRM summary");
+  await page.evaluate(() => {
+    window.__peer.channel.onmessage({ data: JSON.stringify({ type: "session.output_transcript.delta", event_id: "actual-answer-one", delta: "Ey, jetzt packen wir's an!", start_ms: 6000, end_ms: 6500 }) });
+    window.__peer.channel.onmessage({ data: JSON.stringify({ type: "session.output_transcript.delta", event_id: "actual-answer-two", delta: " Hier ist dein nächster Schritt.", start_ms: 6500, end_ms: 7200 }) });
+  });
+  await page.getByLabel("Gesprächsverlauf").getByText("Ey, jetzt packen wir's an! Hier ist dein nächster Schritt.", { exact: true }).waitFor();
+  await page.locator(".assistant-live-result > summary").first().click();
+  await page.getByLabel("Gesprächsverlauf").getByText("Dies ist eine gekennzeichnete kontrollierte UI-Testantwort.", { exact: true }).waitFor();
+  await page.locator(".assistant-live-result > summary").first().click();
+  await page.screenshot({ path: fileURLToPath(new URL("spoken-main-chat.png", output)) });
   assert.equal(turnCalls[0].transcript, "Was ist heute für mich offen?"); assert.equal(introCalls, 1);
   assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.volume), .8, "greeting and ongoing speech share a reduced output level");
   await page.getByRole("button", { name: "Sprachausgabe unterbrechen", exact: true }).click();
@@ -304,6 +321,16 @@ try {
   const endsBeforeCancel = ends;
   await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await entered;
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await page.getByRole("status", { name: "Jarvis startet", exact: true }).waitFor();
+    assert.equal(await page.getByText("Jarvis macht sich bereit.", { exact: true }).isVisible(), true);
+    assert.equal(await page.getByRole("button", { name: "Sitzung beenden", exact: true }).isVisible(), true);
+    assert.equal(await page.locator(".assistant-voice-notices .assistant-error:visible").count(), 0);
+    assert.equal(await page.getByText(/Sprachverbindung wird hergestellt|Mikrofonfreigabe wird angefragt/).count(), 0);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.screenshot({ path: fileURLToPath(new URL(`redesign-connecting-${width}.png`, output)) });
+  }
   await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
   await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).waitFor();
   releaseStart(); delayedStart = null; startEntered = null;

@@ -11,7 +11,7 @@ import { LIVE_CLIENT_TIMEOUT_MS, LIVE_PROGRESS, LIVE_STREAM_TYPE, readLiveTurn }
 
 type Connection = "IDLE" | "MICROPHONE" | "CONNECTING" | "CONNECTED" | "DISCONNECTED" | "ENDED";
 type Intro = "WAITING" | "PLAYING" | "OFFERED" | "DONE";
-type Pending = { clientTurnId: string; transcript: string; sessionId: string; revision: number; delegationId?: string; context?: AssistantContext | null };
+type Pending = { clientTurnId: string; transcript: string; sessionId: string; revision: number; delegationId?: string; context?: AssistantContext | null; inputInTranscript: boolean };
 type Session = { id: string; clientId: string; expiresAt: number; reconnects: number; revision: number };
 const emptyMusic: LocalAudioState = { status: "MISSING", volume: .12, ducked: false, title: "Freigegebene Musik", message: "Musikquelle wird nach dem Start geprüft." };
 const jsonHeaders = { "Content-Type": "application/json", "X-AI-CRM-Request": "same-origin" };
@@ -48,6 +48,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const [heard, setHeard] = useState("");
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [introRetry, setIntroRetry] = useState(false);
+  const [introIssue, setIntroIssue] = useState("");
   const [idleWarning, setIdleWarning] = useState<number | null>(null);
   const [recovery, setRecovery] = useState(false);
   const [retryAvailable, setRetryAvailable] = useState(false);
@@ -165,19 +166,20 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     }
     const conversation = data.conversation as JarvisLiveConversation | undefined;
     if (!conversation?.id || typeof data.answer !== "string") throw new Error(errorMessage(data, "Die CRM-Antwort war unvollständig."));
-    propsRef.current.onTurn({ requestId: typeof data.requestId === "string" ? data.requestId : request.clientTurnId, transcript: request.transcript, answer: data.answer, actions: Array.isArray(data.actions) ? data.actions as ActionReceipt[] : [], results: Array.isArray(data.results) ? data.results as ReadResult[] : [], conversation });
+    captions.current.boundary();
+    propsRef.current.onTurn({ requestId: typeof data.requestId === "string" ? data.requestId : request.clientTurnId, transcript: request.transcript, answer: data.answer, actions: Array.isArray(data.actions) ? data.actions as ActionReceipt[] : [], results: Array.isArray(data.results) ? data.results as ReadResult[] : [], conversation, nativeSpeech: true, inputInTranscript: request.inputInTranscript });
     pending.current = null; setRecovery(false); setRetryAvailable(false); setWorking(false);
     setNotice("");
     if (voice.current && data.audioDelivered === true) voice.current.muted = false;
-    if (data.audioDelivered === false) setNotice("Das CRM-Ergebnis steht im Gespräch. Die Sprachausgabe konnte gerade nicht bestätigt werden.");
+    if (data.audioDelivered === false) setNotice("Die Sprachausgabe konnte gerade nicht bestätigt werden. Die CRM-Zusammenfassung kannst du im Gespräch öffnen.");
     activity();
   }, [activity]);
 
-  const submit = useCallback(async (text: string) => {
+  const submit = useCallback(async (text: string, inputInTranscript: boolean) => {
     const active = session.current;
     if (!active || !text.trim()) return;
     const revision = nextRevision();
-    const request: Pending = { clientTurnId: crypto.randomUUID(), transcript: text.trim(), sessionId: active.id, revision, delegationId: delegation.current, context: propsRef.current.context };
+    const request: Pending = { clientTurnId: crypto.randomUUID(), transcript: text.trim(), sessionId: active.id, revision, delegationId: delegation.current, context: propsRef.current.context, inputInTranscript };
     delegation.current = undefined; pending.current = request;
     const controller = new AbortController(); operation.current = controller;
     setWorking(true); setProgress(LIVE_PROGRESS.accepted); setNotice(""); setRecovery(false); setRetryAvailable(false); setError(""); activity();
@@ -238,7 +240,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const playIntro = useCallback(async (replay = false) => {
     const active = session.current;
     if (!active || introInFlight.current || (!replay && introState.current !== "WAITING")) return;
-    introInFlight.current = true; setIntroRetry(false); setError("");
+    introInFlight.current = true; setIntroRetry(false); setIntroIssue("");
     const token = lifecycle.current, epoch = ++introEpoch.current;
     const controller = new AbortController(); introRequest.current = controller;
     changeIntro("PLAYING");
@@ -248,9 +250,10 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       if (token !== lifecycle.current || epoch !== introEpoch.current || session.current?.id !== active.id) return;
       if (!response.ok) throw new Error(errorMessage(data, "Die Begrüßung konnte nicht bestätigt werden."));
       changeIntro("DONE"); // Instruction acknowledged; no claim of finished audio playback.
+      setIntroIssue("");
     } catch (reason) {
       if (controller.signal.aborted || token !== lifecycle.current || epoch !== introEpoch.current) return;
-      changeIntro("DONE"); setIntroRetry(true); setError(reason instanceof Error ? reason.message : "Begrüßung derzeit nicht bestätigt.");
+      changeIntro("DONE"); setIntroRetry(true); setIntroIssue(reason instanceof Error ? reason.message : "Begrüßung derzeit nicht bestätigt.");
     } finally {
       if (token === lifecycle.current && epoch === introEpoch.current) introInFlight.current = false;
       if (introRequest.current === controller) introRequest.current = null;
@@ -259,7 +262,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
 
   const musicAction = useCallback(async (command: MusicCommand) => { activity(); await player.current?.command(command); }, [activity]);
 
-  const processUtterance = useCallback(async (text: string) => {
+  const processUtterance = useCallback(async (text: string, inputInTranscript = true) => {
     if (!session.current || !stream.current || !text.trim()) return;
     const duringWork = waitingConversation.current || Boolean(operation.current && pending.current);
     waitingConversation.current = false;
@@ -278,7 +281,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     if (media.command) await musicAction(media.command);
     const remaining = media.remainder;
     if (!remaining || isLiveSmallTalk(remaining) || duringWork && isLiveWaitingReply(remaining)) { delegation.current = undefined; return; }
-    await submit(remaining);
+    await submit(remaining, inputInTranscript);
   }, [activity, close, markIntro, musicAction, nextRevision, sendControl, submit]);
   processUtteranceRef.current = processUtterance;
 
@@ -288,7 +291,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     const token = ++lifecycle.current;
     const previous = reconnecting ? session.current : null;
     if (reconnecting && (!previous || previous.reconnects >= settings.reconnectLimit)) { starting.current = false; return; }
-    releaseTransport(); player.current?.pause(); setError(""); setNotice(""); setIntroRetry(false); setConnection("MICROPHONE");
+    releaseTransport(); player.current?.pause(); setError(""); setNotice(""); setIntroRetry(false); setIntroIssue(""); setConnection("MICROPHONE");
     if (reconnecting) captions.current.reconnect();
     else { captions.current = new LiveCaptions(); propsRef.current.onTranscript?.([]); }
     const controller = new AbortController(); startRequest.current = controller;
@@ -378,7 +381,10 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       session.current = { id: info.id, clientId, expiresAt: typeof info.expiresAt === "string" ? Date.parse(info.expiresAt) : Date.now() + settings.maxSessionSeconds * 1000, reconnects: previous ? previous.reconnects + 1 : 0, revision: Math.max(previous?.revision ?? 0, typeof info.revision === "number" ? info.revision : 0) };
       const introValue: Intro = ["WAITING", "PLAYING", "OFFERED", "DONE"].includes(String(info.introState)) ? info.introState as Intro : "WAITING";
       changeIntro(introValue); speaker.muted = false;
-      if (introValue === "PLAYING") { changeIntro("DONE"); setIntroRetry(true); setNotice("Der Einstieg wurde bereits angefragt. Du kannst direkt weitersprechen."); }
+      if (introValue === "PLAYING") { changeIntro("DONE"); setIntroRetry(true); setIntroIssue("Die Begrüßung wurde bereits angefragt. Falls du sie nicht gehört hast, kannst du sie erneut anfordern."); }
+      // Bind the conversation before opening the remote stream: transcript
+      // events can arrive immediately and must not be cleared after startup.
+      if (data.conversation) propsRef.current.onConversationStarted(data.conversation as JarvisLiveConversation);
       await pc.setRemoteDescription({ type: "answer", sdp: transport.sdp });
       const connectDeadline = Date.now() + 12_000;
       while (!(providerStarted && pc.connectionState === "connected")) {
@@ -387,7 +393,6 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
         await new Promise(resolve => setTimeout(resolve, 50));
       }
       setConnection("CONNECTED");
-      if (data.conversation) propsRef.current.onConversationStarted(data.conversation as JarvisLiveConversation);
       propsRef.current.onActiveChange?.(true); activity();
       if (introValue === "WAITING" && !utterance.current.preview()) void playIntro();
       if (!reconnecting) {
@@ -454,19 +459,19 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   };
   const active = !["IDLE", "ENDED"].includes(connection);
   useEffect(() => { propsRef.current.onActiveChange?.(active); }, [active]);
-  const status = connection === "MICROPHONE" ? "Mikrofonfreigabe wird angefragt …" : connection === "CONNECTING" ? "Sprachverbindung wird hergestellt …" : connection === "DISCONNECTED" ? "Mikrofon aus · Verbindung unterbrochen" : muted ? "Mikrofon stumm · Verbindung aktiv" : outputActive ? "Jarvis spricht" : working ? "Jarvis schaut für dich nach" : inputActive ? "Jarvis hört deine Aussage" : "Mikrofon aktiv · Jarvis hört zu";
+  const status = connection === "MICROPHONE" ? "Gib Jarvis kurz dein Mikrofon frei …" : connection === "CONNECTING" ? "Jarvis ist gleich für dich da …" : connection === "DISCONNECTED" ? "Mikrofon aus · Verbindung unterbrochen" : muted ? "Mikrofon stumm · Verbindung aktiv" : outputActive ? "Jarvis spricht" : working ? "Jarvis schaut für dich nach" : inputActive ? "Jarvis hört deine Aussage" : "Mikrofon aktiv · Jarvis hört zu";
   return <AssistantVoiceSurface
-    active={active} status={status} muted={muted} canMute={connection === "CONNECTED"}
+    active={active} status={status} starting={connection === "MICROPHONE" || connection === "CONNECTING"} muted={muted} canMute={connection === "CONNECTED"}
     onMute={toggleMute} onInterrupt={interrupt} onEnd={() => void close()}
     composer={<><div className="assistant-voice-preferences"><span>Jarvis · Hype-Modus</span><label>Stimme <select aria-label="Jarvis-Stimme" disabled={active} value={selectedVoice} onChange={event => setSelectedVoice(event.target.value as JarvisVoice)}>{JARVIS_VOICES.map(voice => <option key={voice} value={voice}>{JARVIS_VOICE_LABELS[voice]}</option>)}</select></label></div>{props.children?.({ active, disabled: Boolean(props.disabled || blockedSessionId), start: () => void connect() }) ?? <button disabled={props.disabled || Boolean(blockedSessionId)} onClick={() => void connect()}>Jarvis starten</button>}</>}
     options={<>
       <p className="assistant-caption">Schreibaktionen benötigen die sichtbare Bestätigung im Gespräch.</p>
-      {introRetry && <div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void playIntro(true)}>Begrüßung erneut anfordern</button><button disabled={connection !== "CONNECTED"} onClick={() => void markIntro().catch(reason => setError(String(reason.message)))}>Ohne Begrüßung fortsetzen</button></div>}
       {heard && <p className="assistant-caption" aria-live="polite">Gehört: {heard}</p>}
-      <details><summary>Sprachzeile prüfen oder per Text fortsetzen</summary><form onSubmit={event => { event.preventDefault(); const text = draft.trim(); setDraft(""); void processUtterance(text).catch(reason => setError(String(reason.message))); }}><label className="jarvis-live-label" htmlFor="jarvis-pilot-line">Deine Aussage</label><textarea id="jarvis-pilot-line" rows={2} maxLength={4000} value={draft} onChange={event => { setDraft(event.target.value); activity(); }} /><button disabled={!draft.trim() || connection !== "CONNECTED"}>Aussage verwenden</button></form></details>
+      <details><summary>Sprachzeile prüfen oder per Text fortsetzen</summary><form onSubmit={event => { event.preventDefault(); const text = draft.trim(); setDraft(""); void processUtterance(text, false).catch(reason => setError(String(reason.message))); }}><label className="jarvis-live-label" htmlFor="jarvis-pilot-line">Deine Aussage</label><textarea id="jarvis-pilot-line" rows={2} maxLength={4000} value={draft} onChange={event => { setDraft(event.target.value); activity(); }} /><button disabled={!draft.trim() || connection !== "CONNECTED"}>Aussage verwenden</button></form></details>
       <details><summary>Musik · {music.status === "PLAYING" ? "läuft" : music.status === "PAUSED" ? "pausiert" : music.status === "MISSING" ? "Quelle fehlt" : music.status === "BLOCKED" ? "Start blockiert" : "aus"}</summary><p role="status" className="jarvis-live-music-note">{music.message}</p><p className="assistant-caption">Lautstärke {Math.round(music.volume * 100)} %{music.ducked ? " · während Sprache abgesenkt" : ""}</p><div className="assistant-button-row"><button disabled={music.status === "MISSING" || connection !== "CONNECTED"} onClick={() => void musicAction("start")}>{music.status === "PAUSED" ? "Musik weiter" : "Musik starten"}</button><button onClick={() => void musicAction("pause")}>Musikpause</button><button onClick={() => void musicAction("stop")}>Musik aus</button><button aria-label="Musik leiser" onClick={() => void musicAction("quieter")}>Leiser</button><button aria-label="Musik lauter" onClick={() => void musicAction("louder")}>Lauter</button></div></details>
     </>}
     notices={<>
+      {introRetry && <div className="assistant-voice-callout" role="status"><p>{introIssue || "Falls du die Begrüßung nicht gehört hast, kannst du sie erneut anfordern."}</p><div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void playIntro(true)}>Begrüßung erneut anfordern</button><button disabled={connection !== "CONNECTED"} onClick={() => { setIntroIssue(""); setIntroRetry(false); void markIntro().catch(reason => setError(String(reason.message))); }}>Ohne Begrüßung fortsetzen</button></div></div>}
       {active && working && <p role="status" className="jarvis-live-notice">{progress || LIVE_PROGRESS.accepted}</p>}
       {!active && blockedSessionId && <div role="status"><p>Es ist noch eine Sprachsitzung geöffnet. Wenn du sie hier beendest, endet auch eine laufende Runde in einem anderen Tab.</p><button disabled={endingBlockedSession} onClick={() => void endBlockedSession()}>{endingBlockedSession ? "Vorherige Sitzung wird beendet …" : "Vorherige Sitzung beenden"}</button></div>}
       {active && audioBlocked && <button onClick={() => void enableAudio()}>Audioausgabe freigeben</button>}

@@ -113,9 +113,9 @@ test("a long request emits one honest slow update to UI and the matching voice d
   globalThis.progressModel = async () => { await hold; return { output_text: "Jetzt ist die Antwort da.", output: [], usage: {} }; };
   const phases = [];
   const result = readLiveTurn(await turn.POST(req({ clientTurnId: randomUUID(), transcript: "Bereite meinen Tag vor", revision: 1, delegationId: "slow-delegation" }, true), ctx(id)), message => phases.push(message));
-  await waitUntil(() => phases.some(message => /dauert gerade länger/.test(message)) && globalThis.progressEvents.some(event => event.delegation_id === "slow-delegation" && /(?:noch dran|noch einen Moment)/.test(event.content ?? "")));
+  await waitUntil(() => phases.some(message => /dauert gerade länger/.test(message)) && globalThis.progressEvents.some(event => event.delegation_id === "slow-delegation" && /(?:noch dran|noch einen Moment|Anfrage läuft weiter|noch kein fertiges Ergebnis)/.test(event.content ?? "")), 20000);
   assert.equal(phases.filter(message => /dauert gerade länger/.test(message)).length, 1);
-  const slowEvents = globalThis.progressEvents.filter(event => event.delegation_id === "slow-delegation" && /(?:noch dran|noch einen Moment)/.test(event.content ?? ""));
+  const slowEvents = globalThis.progressEvents.filter(event => event.delegation_id === "slow-delegation" && /(?:noch dran|noch einen Moment|Anfrage läuft weiter|noch kein fertiges Ergebnis)/.test(event.content ?? ""));
   assert.equal(slowEvents.length, 1);
   assert.equal(slowEvents[0].type, "session.commentary.append", "updates go to the actual Live speech channel");
   assert.doesNotMatch(slowEvents[0].content, /Status zur laufenden|Fachresultat|Backend/);
@@ -132,11 +132,11 @@ test("real tool phases reach the voice channel before the final backend answer",
   };
   const phases = [];
   const result = readLiveTurn(await turn.POST(req({ clientTurnId: randomUUID(), transcript: "Was steht heute an?", revision: 1, delegationId: "phase-delegation" }, true), ctx(id)), message => phases.push(message));
-  await waitUntil(() => globalThis.progressEvents.some(event => event.delegation_id === "phase-delegation" && /Abfrage ist zurück/.test(event.content ?? "")));
+  await waitUntil(() => globalThis.progressEvents.some(event => event.delegation_id === "phase-delegation" && /Abfrage ist zurück|Rückmeldung ist da/.test(event.content ?? "")));
   assert.ok(phases.some(message => /CRM-Einträge/.test(message)));
   assert.ok(phases.some(message => /Abfrage ist zurück/.test(message)));
   const voice = globalThis.progressEvents.filter(event => event.delegation_id === "phase-delegation");
-  assert.ok(voice.some(event => event.type === "session.commentary.append" && /Abfrage ist zurück/.test(event.content)), "a real phase is spoken while the final answer is still pending");
+  assert.ok(voice.some(event => event.type === "session.commentary.append" && /Abfrage ist zurück|Rückmeldung ist da/.test(event.content)), "a real phase is spoken while the final answer is still pending");
   release(); assert.equal((await result).answer, "Der Überblick ist fertig.");
   await stop.DELETE(req({}, false, "DELETE"), ctx(id));
 });

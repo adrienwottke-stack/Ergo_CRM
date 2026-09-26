@@ -4,9 +4,10 @@ import { useEffect, useRef, type ReactNode } from "react";
 import AssistantIcon from "./AssistantIcon";
 
 /** Presentation only: the mounted live controller continues to own media and requests. */
-export default function AssistantVoiceSurface({ active, status, muted, canMute, onMute, onInterrupt, onEnd, composer, options, notices, simulation = false }: {
+export default function AssistantVoiceSurface({ active, status, starting = false, muted, canMute, onMute, onInterrupt, onEnd, composer, options, notices, simulation = false }: {
   active: boolean;
   status: string;
+  starting?: boolean;
   muted: boolean;
   canMute: boolean;
   onMute: () => void;
@@ -22,7 +23,7 @@ export default function AssistantVoiceSurface({ active, status, muted, canMute, 
   const previousActive = useRef(active);
   useEffect(() => {
     if (active !== previousActive.current) {
-      if (active) surface.current?.querySelector<HTMLButtonElement>(".assistant-voice-controls button:not(:disabled)")?.focus();
+      if (active) surface.current?.querySelector<HTMLButtonElement>(".assistant-voice-end")?.focus();
       else {
         if (details.current) details.current.open = false;
         surface.current?.querySelector<HTMLTextAreaElement>("#assistant-message")?.focus({ preventScroll: true });
@@ -45,11 +46,18 @@ export default function AssistantVoiceSurface({ active, status, muted, canMute, 
   }, []);
   return <section ref={surface} className="assistant-voice-surface" aria-label="Chat und Sprache">
     <div hidden={active}>{composer}</div>
+    {starting && <div className="assistant-voice-launch" role="status" aria-label="Jarvis startet">
+      <div className="assistant-voice-orb" aria-hidden="true"><span /><span /><span /><span /></div>
+      <p className="assistant-voice-launch-kicker">JARVIS LIVE</p>
+      <h3>Jarvis macht sich bereit.</h3>
+      <p>{status}</p>
+      <small>Gleich kann eure Unterhaltung beginnen.</small>
+    </div>}
     {active && <div className="assistant-voice-bar" aria-label="Jarvis Sprache">
       <div className="assistant-voice-status" role="status"><AssistantIcon name="voice" /><span><span>{status}</span>{simulation && <small>Lokale Simulation · kein Audiostream</small>}</span></div>
       <div className="assistant-voice-controls">
         <button type="button" className="assistant-icon-button" disabled={!canMute} onClick={onMute} aria-label={muted ? "Mikrofon einschalten" : "Stumm"} title={muted ? "Mikrofon einschalten" : "Stumm"} aria-pressed={muted}><AssistantIcon name={muted ? "muted" : "mic"} /></button>
-        <button type="button" className="assistant-icon-button" onClick={onInterrupt} aria-label="Sprachausgabe unterbrechen" title="Sprachausgabe unterbrechen"><AssistantIcon name="stop" /></button>
+        <button type="button" className="assistant-icon-button" disabled={!canMute} onClick={onInterrupt} aria-label="Sprachausgabe unterbrechen" title="Sprachausgabe unterbrechen"><AssistantIcon name="stop" /></button>
         <details ref={details} className="assistant-voice-options" onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); event.preventDefault(); if (details.current) { details.current.open = false; details.current.querySelector("summary")?.focus(); } } }}>
           <summary aria-label="Sprachoptionen" title="Sprachoptionen"><AssistantIcon name="more" /></summary>
           <div className="assistant-voice-popover"><h3>Sprachoptionen</h3>{options}</div>

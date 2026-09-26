@@ -4,7 +4,6 @@ import { useAssistant } from "@/components/ai-crm/AssistantProvider";
 import AssistantComposer from "@/components/ai-crm/AssistantComposer";
 import AssistantTimeline from "@/components/ai-crm/AssistantTimeline";
 import JarvisLive from "@/components/ai-crm/JarvisLive";
-import type { LiveCaption } from "@/lib/ai-crm/live-captions";
 import AssistantIcon from "./AssistantIcon";
 
 export function AssistantConversationList({ disabled = false, onSelect }: { disabled?: boolean; onSelect?: () => void }) {
@@ -25,7 +24,7 @@ export function AssistantConversationList({ disabled = false, onSelect }: { disa
       <button disabled={locked} aria-current={assistant.conversationId === item.id ? "true" : undefined} title={item.title} onClick={() => { void assistant.selectConversation(item.id); onSelect?.(); }}><strong>{item.title}</strong></button>
       <details className="assistant-conversation-menu" onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
         <summary aria-label={"Optionen für " + item.title}><AssistantIcon name="more" /></summary>
-        <div><p>Verfügbar bis {new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(item.expiresAt))}</p><button disabled={locked} onClick={() => assistant.setDeleteTarget(item)} aria-label={"Unterhaltung löschen: " + item.title}><AssistantIcon name="trash" />Löschen</button></div>
+        <div className="assistant-conversation-popover"><p>Verfügbar bis {new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(item.expiresAt))}</p><button disabled={locked} onClick={event => { event.currentTarget.closest("details")!.open = false; assistant.setDeleteTarget(item); }} aria-label={"Unterhaltung löschen: " + item.title}><AssistantIcon name="trash" />Unterhaltung löschen</button></div>
       </details>
     </div>)}</section>)}
     {assistant.nextCursor && <button disabled={loading} onClick={async () => { setLoading(true); try { await assistant.loadList(assistant.nextCursor!); } catch { assistant.setError("Weitere Unterhaltungen konnten nicht geladen werden."); } finally { setLoading(false); } }}>{loading ? "Wird geladen …" : "Weitere laden"}</button>}
@@ -65,15 +64,6 @@ export default function AssistantView() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [wideDesktop, setWideDesktop] = useState(false);
   const [liveOpen, setLiveOpen] = useState(false);
-  const [liveCaptions, setLiveCaptions] = useState<LiveCaption[]>([]);
-  const captionConversation = useRef(assistant.conversationId);
-  useEffect(() => {
-    if (captionConversation.current !== assistant.conversationId) {
-      // Live can create or roll over its stored conversation without ending the call.
-      if (!liveOpen) setLiveCaptions([]);
-      captionConversation.current = assistant.conversationId;
-    }
-  }, [assistant.conversationId, liveOpen]);
   const empty = !assistant.entries.length && !assistant.loading;
   useEffect(() => { header.current?.focus({ preventScroll: true }); }, []);
   useEffect(() => {
@@ -109,7 +99,7 @@ export default function AssistantView() {
       <header className="assistant-header">
         <button className="assistant-mobile-back assistant-icon-button" onClick={assistant.close} aria-label="Zurück zum CRM" title="Zurück zum CRM"><AssistantIcon name="back" /></button>
         <button ref={navToggle} className="assistant-icon-button assistant-nav-toggle" onClick={toggleNavigation} aria-label="Unterhaltungen öffnen" title="Unterhaltungen" aria-expanded={drawerOpen || (wideDesktop && assistant.mode === "workspace" && sidebarOpen)}><AssistantIcon name="sidebar" /></button>
-        <h2 ref={header} tabIndex={-1}>Assistent</h2>
+        <h2 ref={header} tabIndex={-1} title={assistant.active?.title || "Jarvis"}>{assistant.active?.title || "Jarvis"}</h2>
         <div className="assistant-header-actions">
           <button className="assistant-icon-button" disabled={liveOpen || assistant.locked || assistant.loading} onClick={assistant.startNew} aria-label="Neue Unterhaltung" title="Neuer Chat"><AssistantIcon name="compose" /></button>
           <button className="assistant-expand assistant-icon-button" onClick={() => assistant.mode === "workspace" ? assistant.asPanel() : assistant.expand()} aria-label={assistant.mode === "workspace" ? "Als Panel öffnen" : "Groß öffnen"} title={assistant.mode === "workspace" ? "Als Panel öffnen" : "Groß öffnen"}><AssistantIcon name={assistant.mode === "workspace" ? "collapse" : "expand"} /></button>
@@ -124,9 +114,9 @@ export default function AssistantView() {
         {!assistant.access ? <p className="assistant-loading" role="status">Assistent wird geöffnet …</p> : !assistant.access.enabled ? <div className="assistant-access"><h3>{assistant.access.reason === "NO_ENTITLEMENT" ? "Der Assistent ist für dein Konto noch nicht freigeschaltet." : assistant.access.reason?.startsWith("MONTHLY") ? "Dein Nutzungslimit ist erreicht." : "Der Assistent ist vorübergehend nicht verfügbar."}</h3><p>Du kannst im CRM normal weiterarbeiten.</p><div className="assistant-button-row"><button className="assistant-primary" onClick={assistant.close}>Zurück zum CRM</button><button onClick={() => assistant.setSection("details")}>Zugang ansehen</button></div></div> : <>
           {assistant.attachment && <div className="assistant-context"><span>Bezug: <strong>{assistant.attachment.label}</strong>{assistant.attachment.followUpId && " · Wiedervorlage"}</span><button disabled={assistant.working || liveOpen} onClick={() => assistant.setAttachment(null)} aria-label="Bezug entfernen"><AssistantIcon name="close" /></button></div>}
           <div className="assistant-empty" hidden={!empty || liveOpen}><h2>Was möchtest du heute erledigen?</h2></div>
-        <AssistantTimeline liveCaptions={liveCaptions} liveActive={liveOpen} />
+        <AssistantTimeline liveActive={liveOpen} />
           <div className="assistant-composer-dock">
-            {assistant.access.liveAvailable ? <JarvisLive conversationId={assistant.conversationId} context={assistant.attachment} disabled={assistant.locked || assistant.loading} onActiveChange={setLiveOpen} onTranscript={setLiveCaptions} onConversationStarted={assistant.acceptLiveConversation} onTurn={assistant.acceptLiveTurn}>
+            {assistant.access.liveAvailable ? <JarvisLive conversationId={assistant.conversationId} context={assistant.attachment} disabled={assistant.locked || assistant.loading} onActiveChange={setLiveOpen} onTranscript={assistant.acceptLiveTranscript} onConversationStarted={assistant.acceptLiveConversation} onTurn={assistant.acceptLiveTurn}>
               {controls => <AssistantComposer suspended={controls.active} onStartLive={controls.start} liveDisabled={controls.disabled} />}
             </JarvisLive> : <AssistantComposer />}
             <div className="assistant-starters" hidden={!empty || liveOpen}>{starters.map(([label, text]) => <button key={label} disabled={assistant.locked} onClick={() => { assistant.setDraft(text); document.getElementById("assistant-message")?.focus(); }}>{label}</button>)}</div>

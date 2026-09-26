@@ -48,6 +48,9 @@ export type Entry = {
   role: "user" | "assistant";
   content: string;
   source?: "voice" | "text" | "live";
+  /** Speech is display-only provider transcription; live-result is a CRM summary. */
+  kind?: "speech" | "live-result";
+  speechSessionId?: string;
   actions?: ActionReceipt[];
   results?: ReadResult[];
   createdAt?: string;

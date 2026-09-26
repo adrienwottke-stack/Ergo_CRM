@@ -215,7 +215,7 @@ async function runTurn(request: Request, context: RouteContext, progress: (phase
       source: "LIVE",
       assistantMessage: result.answer,
       actions,
-      presentation: { requestId: claimed.request.id, results, scopeFingerprint, context: resolvedContext },
+      presentation: { requestId: claimed.request.id, results, scopeFingerprint, context: resolvedContext, kind: currentSession.provider === "live" ? "live-result" : undefined },
       now,
       completeRequest: { id: claimed.request.id, response },
     });
