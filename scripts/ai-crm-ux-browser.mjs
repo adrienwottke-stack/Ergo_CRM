@@ -46,7 +46,7 @@ const provider = createServer(async (request, response) => {
     const sequence = /Telefonnummer/.test(userMessage) ? [search, update] : /Mehrteilig/.test(userMessage) ? [search, activity, follow] : /Dokumentiere/.test(userMessage) ? [search, activity] : /Wiedervorlage/.test(userMessage) ? [search, follow] : /Kontakt/.test(userMessage) ? [search] : [];
     if (/Langsam/.test(userMessage)) await new Promise(resolve => setTimeout(resolve, 2500));
     const call = sequence[round];
-    const answer = /Langer Text/.test(userMessage) ? ("Das ist ein längerer Antworttext mit einer verständlichen nächsten Handlung. ").repeat(45) + "\n" + "https://beispiel.test/" + "sehrlang".repeat(45) : "Hier findest du die Ergebnisse aus deinen eigenen CRM-Daten.";
+    const answer = /Lesbarkeit/.test(userMessage) ? "## Bereit, Meister Emil.\n\n**Hype-Modus:** an. Ein Schritt nach dem anderen.\n\n- **Fokus:** die nächste Aufgabe.\n- **Tempo:** zügig und klar.\n\n1. Überblick holen.\n2. Bewusst entscheiden.\n\n| Thema | Nächster Schritt |\n| --- | --- |\n| Heute | Überblick prüfen |\n\n<script>window.__unsafeMarkdown=true</script>\n[Unsicher](javascript:alert(1))\n![Tracking](https://tracking.example.test/pixel.png)\n\n" + "Ein gut lesbarer Absatz mit etwas Kontext.\n\n".repeat(12) : /Langer Text/.test(userMessage) ? ("Das ist ein längerer Antworttext mit einer verständlichen nächsten Handlung. ").repeat(45) + "\n" + "https://beispiel.test/" + "sehrlang".repeat(45) : "Hier findest du die Ergebnisse aus deinen eigenen CRM-Daten.";
     response.setHeader("Content-Type", "application/json");
     response.end(JSON.stringify({ id: `resp_${randomUUID()}`, object: "response", created_at: Math.floor(Date.now()/1000), status: "completed", model: data.model, output: call ? [{ type: "function_call", id: randomUUID(), call_id: randomUUID(), name: call.name, arguments: JSON.stringify(call.args), status: "completed" }] : [{ type: "message", id: randomUUID(), role: "assistant", status: "completed", content: [{ type: "output_text", text: answer, annotations: [] }] }], usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 } }));
   } catch (error) { response.writeHead(500); response.end(String(error)); }
@@ -247,6 +247,24 @@ try {
   const expiredResponse = await secondContext.request.get(`${origin}/api/ai-crm/conversations/${latest.id}`); assert.equal(expiredResponse.status(), 410);
   await second.evaluate(() => { document.documentElement.style.fontSize = "32px"; }); await noOverflow(second); await shot(second, "desktop-200-percent-text");
   checks.push("expired content disappears without CRM loss; 200 percent text stays within viewport");
+  await second.evaluate(() => { document.documentElement.style.fontSize = ""; });
+  await send(second, "Lesbarkeit prüfen");
+  const formatted = panel(second).locator(".assistant-message-assistant").last();
+  assert.equal(await formatted.locator("h2").innerText(), "Bereit, Meister Emil.");
+  assert.ok(await formatted.locator("strong").count() >= 3);
+  assert.equal(await formatted.locator("ul > li").count(), 2);
+  assert.equal(await formatted.locator("ol > li").count(), 2);
+  assert.equal(await formatted.locator("table").count(), 1);
+  assert.equal(await formatted.locator("script,img,a[href^='javascript:']").count(), 0);
+  assert.equal(await second.evaluate(() => window.__unsafeMarkdown), undefined);
+  const readingPosition = await second.evaluate(() => { const timeline = document.querySelector(".assistant-timeline").getBoundingClientRect(); const heading = document.querySelector(".assistant-message-assistant:last-child h2").getBoundingClientRect(); return { top: heading.top, viewportTop: timeline.top, bottom: timeline.bottom }; });
+  assert.ok(readingPosition.top >= readingPosition.viewportTop && readingPosition.top < readingPosition.bottom, "a long answer begins at its readable start");
+  for (const width of [320, 390, 768, 1440]) { await second.setViewportSize({ width, height: 900 }); await noOverflow(second); await shot(second, `hype-formatted-${width}`); }
+  await panel(second).locator(".assistant-timeline").evaluate(element => { element.scrollTop = 0; element.dispatchEvent(new Event("scroll", { bubbles: true })); });
+  await send(second, "Noch eine kurze Frage");
+  assert.equal(await panel(second).locator(".assistant-timeline").evaluate(element => element.scrollTop), 0);
+  await panel(second).getByRole("button", { name: "Neue Antwort ↓", exact: true }).waitFor();
+  checks.push("formatted replies, safe markdown, long-answer reading position and scroll preservation");
   await secondContext.close();
   const { page: restricted, context: restrictedContext } = await context(locked.id, { width: 375, height: 812 }, true);
   await restricted.goto(`${origin}/heute`); await restricted.getByRole("button", { name: "Assistent", exact: true }).click(); await panel(restricted).getByText("Der Assistent ist für dein Konto noch nicht freigeschaltet.", { exact: true }).waitFor(); assert.equal(await panel(restricted).getByRole("textbox").count(), 0); await shot(restricted, "mobile-locked"); await restrictedContext.close();

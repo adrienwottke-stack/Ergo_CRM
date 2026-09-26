@@ -8,6 +8,7 @@ import { musicProviderForLive } from "@/lib/ai-crm/live-music";
 import { endLiveSession, startLiveSession } from "@/lib/ai-crm/live-sessions";
 import { assertLiveAvailable, createProviderSession, livePublicConfig, sendProviderUpdate } from "@/lib/ai-crm/live-provider";
 import { classifyOpenAiProviderError } from "@/lib/ai-crm/openai-errors";
+import { JARVIS_VOICES } from "@/lib/ai-crm/voice-style";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ const bodySchema = z
     conversationId: z.string().trim().min(8).max(120).optional(),
     sdp: z.string().min(20).max(64_000).optional(),
     reconnect: z.boolean().optional(),
+    voice: z.enum(JARVIS_VOICES).optional(),
   })
   .strict();
 
@@ -131,7 +133,7 @@ export async function POST(request: Request) {
       try {
         assertNotCancelled();
         if (started.reused && session.providerSessionRef) await sendProviderUpdate(session.providerSessionRef, "", { close: true });
-        const created = await createProviderSession({ sdp: parsed.data.sdp!, greetingPending: session.introState === "WAITING", profileName: user.name, config });
+        const created = await createProviderSession({ sdp: parsed.data.sdp!, greetingPending: session.introState === "WAITING", profileName: user.name, config: { ...config, liveVoice: parsed.data.voice ?? config.liveVoice } });
         cleanup!.providerRef = created.session.id;
         assertNotCancelled();
         transport = created.transport;

@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { aiCrmConfig } from "@/lib/ai-crm/config";
 import { claimAiUsage, completeAiUsage, requireAiEntitlement } from "@/lib/ai-crm/entitlement";
-import { AiCrmError } from "@/lib/ai-crm/errors";
+import { AiCrmError, safeAiMessage } from "@/lib/ai-crm/errors";
 import { aiErrorResponse, sameOrigin } from "@/lib/ai-crm/http";
 import { musicProviderForLive } from "@/lib/ai-crm/live-music";
 import {
@@ -22,8 +22,11 @@ import { sendProviderUpdate } from "@/lib/ai-crm/live-provider";
 import { classifyOpenAiProviderError } from "@/lib/ai-crm/openai-errors";
 import type { AssistantContext, ReadResult } from "@/lib/ai-crm/contracts";
 import { assistantContextSchema } from "@/lib/ai-crm/context-schema";
+import { withinAiDeadline } from "@/lib/ai-crm/deadline";
+import { LIVE_PROGRESS, LIVE_STREAM_TYPE, liveTurnStream, type LiveProgress } from "@/lib/ai-crm/live-progress";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type RouteContext = { params: Promise<{ sessionId: string }> };
 const bodySchema = z
@@ -37,10 +40,17 @@ const bodySchema = z
   .strict();
 
 export async function POST(request: Request, context: RouteContext) {
+  if (request.headers.get("accept")?.includes(LIVE_STREAM_TYPE)) return liveTurnStream(progress => runTurn(request, context, progress));
+  return runTurn(request, context);
+}
+
+async function runTurn(request: Request, context: RouteContext, progress: (phase: LiveProgress) => void = () => undefined) {
   const startedAt = Date.now();
   let aiRequestId: string | null = null;
   let userId: string | null = null;
   let usageId: string | null = null;
+  let stopProgress = () => undefined as void;
+  let failureSpeech: ((message: string) => Promise<void>) | undefined;
   try {
     if (!sameOrigin(request)) {
       throw new AiCrmError("ORIGIN_DENIED", "Nicht erlaubt.", 403);
@@ -103,6 +113,22 @@ export async function POST(request: Request, context: RouteContext) {
     const revision = parsed.data.revision ?? currentSession.revision + 1;
     const reserved = await prisma.aiLiveSession.updateMany({ where: { id: routeSessionId, userId: user.id, activeKey: user.id, revision: { lt: revision }, turnCount: { lt: config.liveMaxTurns } }, data: { revision, turnCount: { increment: 1 }, lastHeartbeatAt: now } });
     if (!reserved.count) throw new AiCrmError(currentSession.turnCount >= config.liveMaxTurns ? "LIVE_TURN_LIMIT" : "LIVE_REVISION_STALE", currentSession.turnCount >= config.liveMaxTurns ? "Diese Sprachrunde hat ihr Anfragelimit erreicht. Bitte beende sie." : "Die Anfrage wurde durch einen neueren Auftrag ersetzt.", 409);
+    const progressAudio = new AbortController();
+    const audioSignal = AbortSignal.any([request.signal, progressAudio.signal]);
+    const speakIfCurrent = async (content: string, signal: AbortSignal) => {
+      if (!currentSession.providerSessionRef || signal.aborted) return;
+      const fresh = await prisma.aiLiveSession.findFirst({ where: { id: routeSessionId, userId: user.id, revision, activeKey: user.id } });
+      if (fresh && !signal.aborted) await sendProviderUpdate(currentSession.providerSessionRef, content, { delegationId: parsed.data.delegationId, signal, timeoutMs: 2_000 }).catch(() => undefined);
+    };
+    progress("accepted");
+    void speakIfCurrent(`Status zur laufenden Nutzerfrage: ${LIVE_PROGRESS.accepted} Noch kein Fachresultat.`, audioSignal).catch(() => undefined);
+    const slowTimer = setTimeout(() => {
+      if (audioSignal.aborted) return;
+      progress("slow");
+      void speakIfCurrent(`Status zur laufenden Nutzerfrage: ${LIVE_PROGRESS.slow} Keine erneute Konkretisierung anfordern.`, audioSignal).catch(() => undefined);
+    }, 8_000);
+    stopProgress = () => { clearTimeout(slowTimer); progressAudio.abort(); };
+    failureSpeech = message => speakIfCurrent(`Die Bearbeitung der Nutzerfrage ist beendet: ${message} Es gibt noch keine vollständige Antwort.`, request.signal);
     // Reserve both final-message slots only for a new turn. If the existing
     // short-term conversation just reached its boundary, the active Live
     // session is rebound to a fresh one instead of being ended.
@@ -136,7 +162,7 @@ export async function POST(request: Request, context: RouteContext) {
       const history = await conversationView(prisma, user.id, conversation.id);
       const usage = await claimAiUsage(prisma, user.id, "CHAT", now, config, claimed.request.id);
       usageId = usage.id;
-      const agent = await runUxCrmAgent({ client: openAiClient(), db: prisma, userId: user.id, usageId: usage.id, requestId: claimed.request.id, sessionId: conversation.id, message: parsed.data.transcript, history: history.messages.map(message => ({ role: message.role, content: message.content + (message.actions?.length ? `\nAktueller Aktionsstatus: ${JSON.stringify(message.actions.map(action => ({ summary: action.summary, status: action.status })))}` : "") })), context: attachment?.attachment, now, signal: request.signal });
+      const agent = await withinAiDeadline(signal => runUxCrmAgent({ client: openAiClient(), db: prisma, userId: user.id, usageId: usage.id, requestId: claimed.request.id, sessionId: conversation.id, message: parsed.data.transcript, history: history.messages.map(message => ({ role: message.role, content: message.content + (message.actions?.length ? `\nAktueller Aktionsstatus: ${JSON.stringify(message.actions.map(action => ({ summary: action.summary, status: action.status })))}` : "") })), context: attachment?.attachment, now, signal, onProgress: phase => { if (!signal.aborted) progress(phase); } }), Math.min(config.providerTimeoutMs, 40_000), request.signal);
       results = agent.results;
       scopeFingerprint = agent.scopeFingerprint;
       resolvedContext = agent.context;
@@ -152,6 +178,8 @@ export async function POST(request: Request, context: RouteContext) {
       now,
       music: musicProviderForLive(prisma),
     });
+    stopProgress();
+    request.signal.throwIfAborted();
     const fresh = await requireLiveSession(prisma, { userId: user.id, sessionId: routeSessionId });
     if (fresh.revision !== revision) {
       await cancelActionPlans(prisma, user.id, claimed.request.id);
@@ -199,7 +227,8 @@ export async function POST(request: Request, context: RouteContext) {
     if (currentSession.providerSessionRef) {
       const audioCurrent = await prisma.aiLiveSession.findFirst({ where: { id: routeSessionId, userId: user.id, revision, activeKey: user.id } });
       if (audioCurrent) {
-        try { await sendProviderUpdate(currentSession.providerSessionRef, result.answer, { delegationId: parsed.data.delegationId }); response.audioDelivered = true; }
+        progress("speaking");
+        try { await sendProviderUpdate(currentSession.providerSessionRef, result.answer, { delegationId: parsed.data.delegationId, signal: request.signal }); response.audioDelivered = true; }
         catch { /* The durable result remains visible; never repeat a write. */ }
       }
     }
@@ -213,14 +242,17 @@ export async function POST(request: Request, context: RouteContext) {
     }
     return Response.json(response, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    stopProgress();
     const normalized = classifyOpenAiProviderError(error) ?? error;
     const errorCode = normalized instanceof AiCrmError ? normalized.code : "INTERNAL_ERROR";
     if (aiRequestId && userId) {
       await failAiRequest(prisma, aiRequestId, userId, errorCode, "FAILED").catch(
         () => undefined,
       );
+      await cancelActionPlans(prisma, userId, aiRequestId).catch(() => undefined);
     }
     if (usageId && userId) await prisma.aiUsage.updateMany({ where: { id: usageId, userId, status: "STARTED" }, data: { status: "FAILED", errorCode, durationMs: Date.now() - startedAt } }).catch(() => undefined);
+    if (!request.signal.aborted) await failureSpeech?.(safeAiMessage(normalized)).catch(() => undefined);
     return aiErrorResponse(normalized, aiRequestId ?? undefined);
-  }
+  } finally { stopProgress(); }
 }

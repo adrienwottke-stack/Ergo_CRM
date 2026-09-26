@@ -54,6 +54,9 @@ test("Live uses actual SDK session configuration with browser instruction/tool e
   assert.match(config.instructions, /Warte dafür nicht auf das Fachresultat/);
   assert.match(config.instructions, /keine erfundenen Fortschritte/);
   assert.match(config.instructions, /Hallo, Meister Emil/);
+  assert.match(config.instructions, /Hype-Modus ist standardmäßig an/);
+  assert.match(config.instructions, /abwechslungsreiche Satzmelodie/);
+  assert.match(config.instructions, /trockener, situativer Witz/);
   assert.deepEqual(liveSpeechChunks("Ein Ergebnis. Ein nächster Schritt."), ["Ein Ergebnis. Ein nächster Schritt."]);
   const speech = "Das ist eine längere belegte Vorbereitung. ".repeat(60);
   const chunks = liveSpeechChunks(speech);
@@ -91,7 +94,7 @@ test("native greeting needs no user turn or TTS; claim, manual replay and reconn
   assert.equal(globalThis.jarvisVoiceSent.delegation_id, null);
   assert.match(globalThis.jarvisVoiceSent.content, /Hallo, Meister Emil/);
   assert.doesNotMatch(globalThis.jarvisVoiceSent.content, /Musik/);
-  assert.equal(globalThis.jarvisVoiceCreated.session.audio.output.voice, "cedar");
+  assert.equal(globalThis.jarvisVoiceCreated.session.audio.output.voice, "vesper");
   assert.match(globalThis.jarvisVoiceCreated.session.instructions, /dezent synthetische/);
   const delivered = globalThis.jarvisVoiceEvents.length;
   assert.deepEqual(await (await intro.POST(req(), session)).json(), { introState: "DONE", accepted: false });
@@ -147,7 +150,9 @@ test("skip and concurrent startup requests cannot produce an automatic duplicate
 });
 
 test("Live delegates to existing backend, persists sourced results, never replays speech or stale revision", async () => {
-  const started = await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=test-session-offer\r\n" }));
+  assert.equal((await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=test-session-offer\r\n", voice: "unapproved-custom-voice" }))).status, 400);
+  const started = await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=test-session-offer\r\n", voice: "cedar" }));
+  assert.equal(globalThis.jarvisVoiceCreated.session.audio.output.voice, "cedar", "only approved alternatives override the default");
   const { session } = await started.json();
   const context = ctx(session.id);
   const body = { clientTurnId: randomUUID(), transcript: "Was ist heute offen?", revision: 1 };

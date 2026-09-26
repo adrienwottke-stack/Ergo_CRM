@@ -1,12 +1,31 @@
 # Jarvis V1 – Führungspilot
 
-Stand: 25.09.2026. Erweiterung des bestehenden Cockpits, kein zweites CRM.
+Stand: 26.09.2026. Erweiterung des bestehenden Cockpits, kein zweites CRM.
 
 Aktueller Spracheinstieg: Jarvis begrüßt unmittelbar nach bestätigtem Start
 über GPT-Live mit dem angeforderten „Hallo, Meister Emil.“. Keine erste
 Nutzeraussage, separate TTS-Erzeugung oder Musikentscheidung erforderlich.
 Kurze natürliche Rückmeldungen sind im Prompt vorgesehen und bleiben während
-CRM-Abfragen hörbar. Die Sprechpausenfrist beträgt jetzt 900 statt 1400 ms.
+CRM-Abfragen hörbar. Die Sprechpausenfrist beträgt jetzt 750 ms.
+Vesper ist die neue Standardstimme; vor Sitzungsbeginn sind auch Cedar und
+Ash auswählbar. Jarvis startet mit einer extrovertierten, motivierenden
+Hype-Persona, abwechslungsreicher Betonung und sparsamem trockenem Humor.
+Der normale Verlauf stellt Markdown lesbar dar und hält die Leseposition.
+„Live-Mitschrift“ zeigt zusätzlich die flüchtigen gesprochenen Beiträge mit
+Sprecherzuordnung; persistierte Ergebnisse und Freigaben stehen im Gespräch.
+
+Die allgemeine CM-/CRM-Einstiegsfrage erhält eine direkte Orientierung ohne
+Kontaktsuche oder Modellaufruf. Fortschritte werden während Fachaufträgen
+angezeigt; lange und leere Antworten enden mit einem verständlichen Fehler
+und der Möglichkeit, das gespeicherte Ergebnis zu prüfen.
+
+Die gemeinsame automatische Suite vom 26.09. umfasst **212 bestandene Tests**,
+darunter 12 neue Fälle für Fortschritte, Zeitgrenzen und Delegationszuordnung.
+Die UX-Browserprüfung besteht mit formatierten Antworten, sicherem Markdown,
+Leseposition sowie 320/390/768/1440 Pixeln. Der zusätzliche Fortschrittslauf
+prüft leises Mikrofon, Zwischenmeldungen, Timeout, terminale Ergebnisprüfung
+und Unterbrechungen. Diese kontrollierten Provider-/WebRTC-Fixtures belegen
+keinen tatsächlichen Klang der neuen Stimme oder eine echte Gesamtlatenz.
 Die folgenden historischen Abnahmeangaben vom 24.09. bleiben als Verlauf
 erhalten; aktueller Sprachvertrag und Nachweisgrenzen stehen in
 [jarvis-voice-api.md](jarvis-voice-api.md).

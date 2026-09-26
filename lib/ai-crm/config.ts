@@ -119,7 +119,7 @@ export function aiCrmConfig(): AiCrmConfig {
     liveReconnectLimit: integer("AI_LIVE_RECONNECT_LIMIT", 1),
     liveRealtimeApproved: bool("AI_LIVE_REALTIME_APPROVED", false),
     liveSidebandUrl: process.env.AI_LIVE_SIDEBAND_URL?.trim() || null,
-    liveVoice: process.env.AI_LIVE_VOICE?.trim() || "cedar",
+    liveVoice: process.env.AI_LIVE_VOICE?.trim() || "vesper",
     liveDemoEnabled: bool("JARVIS_DEMO_ENABLED", false),
     liveGreetingName: process.env.JARVIS_GREETING_NAME?.trim().slice(0, 60) || null,
     liveInactivitySeconds: integer("AI_LIVE_INACTIVITY_SECONDS", 120, 30),

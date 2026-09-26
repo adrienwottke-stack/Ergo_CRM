@@ -1,6 +1,6 @@
 # Jarvis V1 – Sprachprotokoll und Nachweisgrenzen
 
-Stand: 25.09.2026. Untersuchung und Umsetzung im vorhandenen Next.js-CRM;
+Stand: 26.09.2026. Untersuchung und Umsetzung im vorhandenen Next.js-CRM;
 keine Bestandsdaten geändert, keine Providerverbindung durch die Tests erzeugt.
 
 ## Verifizierter Bestand
@@ -50,7 +50,7 @@ aus älteren Realtime-Beispielen übernommenen Fantasieevents.
 - `GET /api/ai-crm/live/session`: authentifizierte, berechtigungsgeprüfte
   Transport-/Pilotkonfiguration ohne Schlüssel.
 - `POST` derselben Route: `clientSessionId`, optional `conversationId`,
-  für Live `sdp`; bewusster Reconnect mit `reconnect:true`. Ein Reconnect
+  für Live `sdp`, optional `voice` aus `vesper`, `cedar`, `ash`; bewusster Reconnect mit `reconnect:true`. Ein Reconnect
   behält die logische CRM-Sitzung und Introphase, schließt die bisherige
   Providerverbindung und zählt gegen das Wiederverbindungslimit.
 - `POST /api/ai-crm/live/session/:id/turn`: `clientTurnId`, `transcript`,
@@ -58,6 +58,9 @@ aus älteren Realtime-Beispielen übernommenen Fantasieevents.
   aus der Serversitzung ermittelt. Modell-/Tool-/Promptfelder werden verworfen
   durch strikte Eingabevalidierung. Ergebnis enthält echte `results`,
   Bestätigungskarten, `requestId`, `revision` und `audioDelivered`.
+  Mit `Accept: application/x-ndjson` kommen flüchtige Fortschrittsereignisse
+  und abschließend ein Ergebnis mit eigenem HTTP-Statusfeld im Stream;
+  ältere Clients erhalten weiter JSON. Der Stream startet keine zweite Anfrage.
 - `PATCH /api/ai-crm/live/session/:id`: `{}` als Heartbeat oder
   `{revision:n}` zum Verwerfen veralteter laufender Antworten. Bei bereits
   nativ erkannter Sprachunterbrechung verhindert `interruptAudio:false` einen
@@ -109,7 +112,7 @@ und den anschließenden erfolgreichen Neustart.
 ## Konfiguration
 
 Serverseitig: `OPENAI_API_KEY`, `AI_LIVE_PROVIDER=live`,
-`AI_LIVE_MODEL=gpt-live-1`, `AI_LIVE_VOICE=cedar`,
+`AI_LIVE_MODEL=gpt-live-1`, `AI_LIVE_VOICE=vesper`,
 `JARVIS_DEMO_ENABLED=true`,
 `JARVIS_GREETING_NAME=Meister Emil`, `AI_LIVE_MAX_SESSION_SECONDS`,
 `AI_LIVE_INACTIVITY_SECONDS`, `AI_LIVE_WARNING_SECONDS`,
@@ -120,14 +123,12 @@ konfiguriert; dazu die Pilotanleitung beachten.
 
 ## Stimme und störungsarme Wiedergabe
 
-Die Rückmeldung zur bisherigen Stimme führte zum Wechsel von `marin` auf
-`cedar`. `voice-style.ts` definiert eine ruhige, tiefere und dezent synthetische
-deutsche Sprechweise. Begrüßung und Gespräch laufen über dieselbe Live-Stimme und verwenden
+Die frühere Rückmeldung führte zunächst zum Wechsel von `marin` auf `cedar`.
+Seit 26.09. ist Vesper der Standard; Details zur Persona und Auswahl stehen
+im folgenden Abschnitt. Begrüßung und Gespräch laufen über dieselbe Live-Stimme und verwenden
 denselben Wiedergabepegel von 0,8; Musik behält ihre separate Steuerung.
 Die Auswahl beschreibt ein eigenes technisches Assistentenprofil; ein
 identischer Filmklang oder ein bereits bestandener Hörtest wird nicht behauptet.
-OpenAI empfiehlt `cedar` und `marin` für die TTS-Qualität:
-[Text to speech](https://developers.openai.com/api/docs/guides/text-to-speech).
 Eine andere Live-Stimme gilt erst in einer neu gestarteten Sitzung:
 [Live-Konfiguration](https://developers.openai.com/api/docs/guides/live-conversations).
 
@@ -158,14 +159,71 @@ das Backend arbeitet; keine erfundenen Fortschritte oder Zeitversprechen.
 Live darf diese kurzen Rückmeldungen sofort sprechen, der Browser lässt die
 Ausgabe während der Abfrage offen. Fakten benötigen weiterhin Backendbelege.
 
-Die lokale Sprechpausenfrist sinkt von 1400 auf 900 ms. Fortlaufende
-Mikrofonaktivität und ein noch instabiles Transkript verhindern weiterhin
-frühes Absenden. Kurze eigenständige Begrüßungen/Dankesworte bleiben bei Live;
+Die lokale Sprechpausenfrist beträgt jetzt 750 ms (zuvor 900 ms). Ein noch
+instabiles Transkript verhindert weiterhin frühes Absenden. Eine passende
+Provider-Delegation kann den abgeschlossenen Satz auch bei Restgeräusch
+freigeben. Fehlt ein brauchbarer Mikrofonpegel, greift nach 1800 ms stabiler
+Mitschrift eine Rückfallebene. Der Schutz gegen alte Fragmente beträgt 500 ms,
+damit eine nach der verkürzten Pause gesprochene neue Frage akzeptiert wird.
+Kurze eigenständige Begrüßungen/Dankesworte bleiben bei Live;
 kontextabhängige Antworten wie „Ja“ sowie Grüße mit einer CRM-Frage gehen
 weiterhin an das Backend. Zusammengehörige kurze Sätze werden in einem
 Sideband-Append gepackt, statt jede Satzgrenze als neue Anweisung zu senden.
 Diese Änderungen belegen keine konkrete reale Gesamtlatenz; Netz, Modell
 und benötigte CRM-Werkzeuge sind separat zu messen.
+
+## Stimme, Persona und lesbarer Verlauf am 26.09.2026
+
+`JARVIS_PERSONA` gilt für Sprache und CRM-Antworten: standardmäßig Hype-Modus,
+extrovertiert, motivierend, konkrete nächste Schritte und gelegentlich trockener
+Humor. Energie entsteht durch wechselnde Betonung und Rhythmus, nicht durch
+höhere Lautstärke. Ein gewünschter ruhigerer Ton wird berücksichtigt. Die
+Persona verändert weder Quellenpflicht noch die sichtbare Schreibfreigabe.
+
+Vesper ist die neue Standardwahl. Die [offizielle Stimmenbeschreibung](https://developers.openai.com/api/docs/guides/live-conversations)
+führt sie als männlich und britisch geprägt; die Eignung für den gewünschten
+Jarvis-Charakter ist eine daraus abgeleitete Gestaltungsentscheidung. Die
+konkrete deutsche Stimme wurde lokal nicht hörbar abgenommen. Vor Beginn
+kann der Nutzer zu Cedar (bisherige Stimme) oder Ash wechseln. Der Server
+akzeptiert ausschließlich diese drei Werte. Ein Stimmenwechsel benötigt eine
+neue Live-Sitzung. Die Wiedergabe bleibt direkt, ohne zusätzliche Hall-,
+Verzerrungs- oder Roboterfilter, um die frühere Rauschproblematik nicht durch
+eine neue Effektkette zu verschärfen.
+
+Assistentenantworten werden als eingeschränktes Markdown mit Absätzen,
+Listen, Hervorhebungen und Tabellen dargestellt. Roh-HTML, Bilder und aktive
+URL-Protokolle werden nicht ausgeführt. Neue lange Antworten öffnen am
+Textanfang; wer ältere Beiträge liest, wird nicht automatisch weggezogen.
+
+Die Ansicht „Live-Mitschrift“ zeigt echte Input-/Output-Transkriptfragmente mit
+Sprecherzuordnung, einschließlich Begrüßung und kurzen Zwischenmeldungen.
+Sie ist nur im aktuellen geöffneten Gespräch vorhanden, auf 50 Zeilen und
+16000 Zeichen begrenzt und nach Neuladen weg. Sie wird nicht in Modellprompts,
+Werkzeuge oder CRM-Notizen übernommen. Persistierte CRM-Fragen, Ergebnisse
+und Freigabekarten bleiben in der Ansicht „Gespräch“. Bei offenen Vorschlägen
+führt eine sichtbare Schaltfläche dorthin zurück.
+
+## Fortschritte und begrenzte Wartezeit
+
+Der gemeinsame Fix für „Was kann ich mit CM/CRM machen?“ beantwortet eng
+erkannte Orientierungsfragen direkt aus einer festen Funktionsbeschreibung.
+Konkrete Nachfragen, Namen und Schreibwünsche werden dadurch nicht geschluckt.
+Für diesen Einstieg entfallen Modellaufruf und Kontaktsuche.
+
+Der Live-Auftrag streamt tatsächliche Phasen: angenommen, Datensuche,
+Vorschauvorbereitung, Zusammenfassung, längere Wartezeit und Sprachübergabe.
+Eine kurze serverseitige Sprachmeldung kann beim Start und einmal nach acht
+Sekunden ausbleibender Antwort erfolgen. Sie ist an Session und Revision
+gebunden; beim Abschluss werden ausstehende Statusmeldungen abgebrochen.
+Die Meldungen erfinden weder fachliche Fortschritte noch eine fertige Antwort.
+
+Die komplette Agentenschleife teilt ein Zeitbudget von höchstens 40 Sekunden
+(oder dem kleineren konfigurierten Providerlimit). Der Browser begrenzt seine
+Wartezeit auf 65 Sekunden und bietet danach Ergebnisprüfung mit der originalen
+Operationskennung an. Leere Modellantworten werden als Fehler gemeldet.
+`FAILED`/`ABORTED` beendet die Ergebnisprüfung; nur nach 404 darf dieselbe
+Kennung erneut gesendet werden. Neue Sprache und manuelles Unterbrechen
+verhindern, dass alte Ergebnisse eine neue Frage verdrängen.
 
 ## Prüfungen und Grenzen
 

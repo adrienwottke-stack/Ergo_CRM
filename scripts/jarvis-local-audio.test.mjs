@@ -4,6 +4,7 @@ import { LocalAudioController, splitMusicCommand, musicOfferDecision, isSessionS
 import { LiveUtteranceBuffer, inputTranscriptDelta, sessionTiming, waitForIceGathering } from "../lib/ai-crm/live-audio-input.ts";
 import { liveTranscriptEvent } from "./fixtures/live-transcript.ts";
 import { isLiveSmallTalk } from "../lib/ai-crm/voice-style.ts";
+import { LiveCaptions } from "../lib/ai-crm/live-captions.ts";
 
 class AudioFixture {
   src = ""; volume = 1; currentTime = 0; paused = true; listeners = new Map(); calls = 0;
@@ -78,11 +79,11 @@ test("media prefixes retain CRM question and weak acknowledgements do not author
   for (const text of ["mhm", "okay", "ja die Aufgabe ist fertig", "In der Notiz steht ja"]) assert.equal(musicOfferDecision(text), null);
   assert.equal(isSessionStop("Sitzung beenden"), true); assert.equal(isSessionStop("Musik aus"), false);
 });
-test("a transcript gap alone is not a speech completion; event retries deduplicate", () => {
+test("quiet-microphone fallback waits for a stable transcript; event retries deduplicate", () => {
   const buffer = new LiveUtteranceBuffer(); const delta = inputTranscriptDelta(liveTranscriptEvent("Jarvis?", "one"));
   assert.ok(delta, "the real SDK transcript shape must reach the utterance buffer");
-  buffer.append(delta, 1000); buffer.append(delta, 1000); assert.equal(buffer.preview(), "Jarvis?"); assert.equal(buffer.ready(50_000), false);
-  buffer.activity(1000); assert.equal(buffer.ready(1800), false); assert.equal(buffer.ready(1900), true);
+  buffer.append(delta, 1000); buffer.append(delta, 1000); assert.equal(buffer.preview(), "Jarvis?"); assert.equal(buffer.ready(2799), false); assert.equal(buffer.ready(2800), true);
+  buffer.activity(1000); assert.equal(buffer.ready(1749), false); assert.equal(buffer.ready(1750), true);
   assert.equal(buffer.take(), "Jarvis?"); assert.equal(buffer.ready(10_000), false);
 });
 
@@ -111,10 +112,35 @@ test("short social replies stay in Live while greetings followed by CRM requests
 test("shorter turn hold still waits for continuing speech and a stable final transcript", () => {
   const buffer = new LiveUtteranceBuffer();
   buffer.activity(1000); buffer.append({ eventId: "start", content: "Welche", startMs: 0, endMs: 300 }, 1000);
-  buffer.activity(1800); assert.equal(buffer.ready(2600), false);
+  buffer.activity(1800); assert.equal(buffer.ready(2500), false);
   buffer.append({ eventId: "end", content: " Aufgaben?", startMs: 300, endMs: 1100 }, 2600);
   assert.equal(buffer.ready(2900), false); assert.equal(buffer.ready(3100), true);
   assert.equal(buffer.take(), "Welche Aufgaben?");
+});
+
+test("a new question after a short pause is not discarded as an old fragment", () => {
+  const buffer = new LiveUtteranceBuffer();
+  buffer.activity(1000); buffer.append({ eventId: "one", content: "Danke", startMs: 0, endMs: 1000 }, 1000);
+  assert.equal(buffer.ready(1750), true); buffer.take();
+  assert.equal(buffer.append({ eventId: "old", content: "!", startMs: 1050, endMs: 1100 }, 1800), "late");
+  buffer.activity(1800);
+  assert.equal(buffer.append({ eventId: "new", content: "Was ist morgen?", startMs: 1800, endMs: 2600 }, 1900), "added");
+});
+
+test("read-along captions join fragments, distinguish speakers, deduplicate and keep reconnect timelines separate", () => {
+  const captions = new LiveCaptions();
+  const first = { ...liveTranscriptEvent("Hallo,", "out1", 0, 300), type: "session.output_transcript.delta" };
+  assert.equal(captions.append(first)[0].text, "Hallo,");
+  assert.equal(captions.append(first), null);
+  assert.equal(captions.append({ ...first, delta: " Meister Emil.", event_id: "out2", start_ms: 300, end_ms: 900 })[0].text, "Hallo, Meister Emil.");
+  const lines = captions.append(liveTranscriptEvent("Los geht’s.", "in1", 1100, 1600));
+  assert.equal(lines.length, 2); assert.equal(lines[1].role, "user");
+  captions.reconnect();
+  assert.equal(captions.append(liveTranscriptEvent("Weiter", "in1", 0, 300)).length, 3);
+  assert.equal(captions.append({ ...first, delta: 42 }), null);
+  for (let i = 0; i < 100; i++) captions.append(liveTranscriptEvent("A".repeat(1000), `large${i}`, i * 3000 + 3000, i * 3000 + 4000));
+  const bounded = captions.append(liveTranscriptEvent("Letzter Satz", "last", 400000, 400100));
+  assert.ok(bounded.length <= 50); assert.ok(bounded.reduce((sum, line) => sum + line.text.length, 0) <= 16000);
 });
 
 test("noise cannot interrupt speech; recognized words interrupt once and reset for the next utterance", () => {

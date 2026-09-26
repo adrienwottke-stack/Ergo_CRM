@@ -75,6 +75,7 @@ try {
   let introState = "WAITING", introCalls = 0, turnCalls = [], revision = 0, ends = 0, failNextTurn = false, lastTurn = null, introDelay = 0, failIntro = false;
   let activeSessionId = "fixture-blocked", failEnd = true, failStart = false, delayedStart = null, startEntered = null;
   const introBodies = [];
+  const selectedVoices = [];
   const greetingAcceptances = [];
   let turnDelay = 0;
   await page.route("**/api/ai-crm/live/**", async route => {
@@ -106,6 +107,7 @@ try {
       else {
         if (activeSessionId && !body.reconnect) return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ code: "LIVE_SESSION_ALREADY_ACTIVE", error: "Eine Sprachsitzung ist noch geöffnet." }) });
         activeSessionId = "fixture-session";
+        selectedVoices.push(body.voice);
         if (!body.reconnect) introState = "WAITING";
         startEntered?.();
         if (delayedStart) await delayedStart;
@@ -134,9 +136,22 @@ try {
   assert.equal(await page.evaluate(() => window.__micRequests), 0, "ending another session does not implicitly start audio");
   await page.getByRole("textbox", { name: "Nachricht an den Assistenten" }).fill("Mein Entwurf bleibt erhalten");
   await page.evaluate(() => { window.__redesignComposer = document.getElementById("assistant-message"); });
+  assert.equal(await page.getByLabel("Jarvis-Stimme", { exact: true }).inputValue(), "vesper");
+  await page.getByLabel("Jarvis-Stimme", { exact: true }).selectOption("cedar");
   await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
   const micBeforeLayout = await page.evaluate(() => window.__micRequests);
+  assert.equal(selectedVoices.at(-1), "cedar");
+  await page.evaluate(() => {
+    const event = { type: "session.output_transcript.delta", delta: "Hallo, Meister Emil.", event_id: "greeting-caption", start_ms: 0, end_ms: 1000 };
+    window.__peer.channel.onmessage({ data: JSON.stringify(event) });
+    window.__peer.channel.onmessage({ data: JSON.stringify(event) });
+  });
+  await page.getByRole("button", { name: "Live-Mitschrift", exact: true }).click();
+  await page.locator(".assistant-live-captions").getByText("Hallo, Meister Emil.", { exact: true }).waitFor();
+  assert.equal(await page.locator(".assistant-caption-line").count(), 1);
+  await page.screenshot({ path: fileURLToPath(new URL("hype-live-captions.png", output)) });
+  await page.getByRole("button", { name: "Gespräch", exact: true }).click();
   await page.getByRole("button", { name: "Groß öffnen", exact: true }).click();
   await page.waitForURL("**/assistent");
   await page.getByRole("button", { name: "Als Panel öffnen", exact: true }).click();
@@ -156,6 +171,10 @@ try {
   assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), false, "Live backchannels stay audible while CRM work is pending");
   await page.getByText("Kontrolliertes Testresultat", { exact: true }).waitFor();
   turnDelay = 0;
+  await page.getByRole("button", { name: "Live-Mitschrift", exact: true }).click();
+  await page.locator(".assistant-live-captions").getByText("Was ist heute für mich offen?", { exact: true }).waitFor();
+  assert.equal(await page.locator(".assistant-caption-line-user > strong").last().innerText(), "Du");
+  await page.getByRole("button", { name: "Gespräch", exact: true }).click();
   assert.equal(turnCalls[0].transcript, "Was ist heute für mich offen?"); assert.equal(introCalls, 1);
   assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.volume), .8, "greeting and ongoing speech share a reduced output level");
   await page.getByRole("button", { name: "Sprachausgabe unterbrechen", exact: true }).click();

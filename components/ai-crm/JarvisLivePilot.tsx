@@ -5,7 +5,9 @@ import type { ActionReceipt, AssistantContext, ReadResult } from "@/lib/ai-crm/c
 import type { JarvisLiveConversation, JarvisLiveProps, JarvisLiveSettings } from "@/components/ai-crm/JarvisLive";
 import { LocalAudioController, isSessionStop, splitMusicCommand, type LocalAudioState, type MusicCommand } from "@/lib/ai-crm/local-audio";
 import { inputTranscriptDelta, LiveUtteranceBuffer, monitorAudio, sessionTiming, waitForIceGathering } from "@/lib/ai-crm/live-audio-input";
-import { JARVIS_VOICE_VOLUME, isLiveSmallTalk } from "@/lib/ai-crm/voice-style";
+import { JARVIS_VOICE_VOLUME, JARVIS_VOICES, isLiveSmallTalk, type JarvisVoice } from "@/lib/ai-crm/voice-style";
+import { LiveCaptions } from "@/lib/ai-crm/live-captions";
+import { LIVE_CLIENT_TIMEOUT_MS, LIVE_PROGRESS, LIVE_STREAM_TYPE, readLiveTurn } from "@/lib/ai-crm/live-progress";
 
 type Connection = "IDLE" | "MICROPHONE" | "CONNECTING" | "CONNECTED" | "DISCONNECTED" | "ENDED";
 type Intro = "WAITING" | "PLAYING" | "OFFERED" | "DONE";
@@ -31,10 +33,13 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const { settings } = props;
   const propsRef = useRef(props); propsRef.current = props;
   const [connection, setConnection] = useState<Connection>("IDLE");
+  const [selectedVoice, setSelectedVoice] = useState<JarvisVoice>(JARVIS_VOICES.includes(settings.voice as JarvisVoice) ? settings.voice as JarvisVoice : "vesper");
+  const captions = useRef(new LiveCaptions());
   const [muted, setMuted] = useState(false);
   const [inputActive, setInputActive] = useState(false);
   const [outputActive, setOutputActive] = useState(false);
   const [working, setWorking] = useState(false);
+  const [progress, setProgress] = useState("");
   const [intro, setIntro] = useState<Intro>("WAITING");
   const [music, setMusic] = useState<LocalAudioState>(emptyMusic);
   const [notice, setNotice] = useState("");
@@ -94,7 +99,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const releaseIntro = useCallback(() => {
     introEpoch.current++; introRequest.current?.abort(); introRequest.current = null; introInFlight.current = false;
   }, []);
-  const close = useCallback(async (message = "Sprachsitzung beendet. Bestätigte CRM-Änderungen bleiben erhalten.", notify = true) => {
+  const close = useCallback(async (message = "Sprachsitzung beendet.", notify = true) => {
     const previous = session.current; session.current = null;
     lifecycle.current++; starting.current = false;
     introInFlight.current = false;
@@ -152,7 +157,11 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   }, [nextRevision, selectedContext]);
 
   const acceptResponse = useCallback((data: Record<string, unknown>, request: Pending) => {
-    if (!session.current || session.current.id !== request.sessionId || session.current.revision !== request.revision || data.stale === true) return;
+    if (!session.current || session.current.id !== request.sessionId || session.current.revision !== request.revision) return;
+    if (data.stale === true) {
+      pending.current = null; setWorking(false); setRecovery(false); setRetryAvailable(false);
+      setNotice("Diese Frage wurde durch einen neueren Auftrag ersetzt. Du kannst jetzt weiterfragen."); return;
+    }
     const conversation = data.conversation as JarvisLiveConversation | undefined;
     if (!conversation?.id || typeof data.answer !== "string") throw new Error(errorMessage(data, "Die CRM-Antwort war unvollständig."));
     propsRef.current.onTurn({ requestId: typeof data.requestId === "string" ? data.requestId : request.clientTurnId, transcript: request.transcript, answer: data.answer, actions: Array.isArray(data.actions) ? data.actions as ActionReceipt[] : [], results: Array.isArray(data.results) ? data.results as ReadResult[] : [], conversation });
@@ -170,42 +179,49 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     const request: Pending = { clientTurnId: crypto.randomUUID(), transcript: text.trim(), sessionId: active.id, revision, delegationId: delegation.current, context: propsRef.current.context };
     delegation.current = undefined; pending.current = request;
     const controller = new AbortController(); operation.current = controller;
-    setWorking(true); setRecovery(false); setRetryAvailable(false); setError(""); activity();
+    setWorking(true); setProgress(LIVE_PROGRESS.accepted); setNotice(""); setRecovery(false); setRetryAvailable(false); setError(""); activity();
     if (voice.current) voice.current.muted = false; // Keep immediate Live acknowledgments audible during backend work.
     try {
-      const response = await fetch(`/api/ai-crm/live/session/${active.id}/turn`, { method: "POST", headers: jsonHeaders, signal: controller.signal, body: turnBody(request) });
-      const data = await readJson(response);
-      if (!response.ok) throw new Error(errorMessage(data, "Die Anfrage konnte nicht verarbeitet werden."));
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(LIVE_CLIENT_TIMEOUT_MS)]);
+      const response = await fetch(`/api/ai-crm/live/session/${active.id}/turn`, { method: "POST", headers: { ...jsonHeaders, Accept: LIVE_STREAM_TYPE }, signal, body: turnBody(request) });
+      const data = await readLiveTurn(response, message => { if (pending.current === request && !signal.aborted) setProgress(message); });
       acceptResponse(data, request);
     } catch (reason) {
       if (controller.signal.aborted || session.current?.revision !== revision) return;
-      setWorking(false); setRecovery(true); setError(reason instanceof Error ? reason.message : "Der Ausgang der Anfrage ist noch unklar. Bitte Ergebnis prüfen.");
+      setWorking(false); setRecovery(true); setError(reason instanceof Error && reason.name === "TimeoutError" ? "Die Antwort dauert zu lange. Prüfe das Ergebnis, bevor du dieselbe Anfrage erneut sendest." : reason instanceof Error ? reason.message : "Der Ausgang der Anfrage ist noch unklar. Bitte Ergebnis prüfen.");
     } finally { if (operation.current === controller) operation.current = null; }
   }, [acceptResponse, activity, nextRevision]);
 
   const recover = useCallback(async () => {
     const request = pending.current;
     if (!request) return;
-    setWorking(true);
+    setWorking(true); setProgress("Ich prüfe, ob deine Antwort bereits vorliegt.");
+    const controller = new AbortController(); operation.current = controller;
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]);
     try {
-      const response = await fetch(`/api/ai-crm/requests/${encodeURIComponent(request.clientTurnId)}`, { cache: "no-store" });
+      const response = await fetch(`/api/ai-crm/requests/${encodeURIComponent(request.clientTurnId)}`, { cache: "no-store", signal });
       const data = await readJson(response);
+      if (pending.current !== request || session.current?.revision !== request.revision) return;
       if (response.status === 404) { setNotice("Für diese Operationskennung wurde noch kein Ergebnis gefunden. Du kannst dieselbe Anfrage mit derselben Kennung erneut senden."); setRetryAvailable(true); return; }
       if (!response.ok) throw new Error(errorMessage(data, "Der Status konnte nicht geprüft werden."));
       if (data.response && typeof data.response === "object") { acceptResponse(data.response as Record<string, unknown>, request); setError(""); }
+      else if (data.status === "FAILED" || data.status === "ABORTED") {
+        pending.current = null; setRecovery(false); setRetryAvailable(false); setError("");
+        setNotice("Die Anfrage wurde ohne vollständige Antwort beendet. Du kannst die Frage jetzt erneut stellen.");
+      }
       else setNotice("Die Verarbeitung hat noch kein endgültiges Ergebnis. Bitte erneut prüfen.");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Ergebnis noch unklar."); }
-    finally { setWorking(false); }
+    } catch (reason) { if (!controller.signal.aborted && pending.current === request) setError(reason instanceof Error ? reason.message : "Ergebnis noch unklar."); }
+    finally { if (operation.current === controller) { operation.current = null; setWorking(false); } }
   }, [acceptResponse]);
 
   const retryPending = useCallback(async () => {
     const request = pending.current;
     if (!request || !session.current || session.current.revision !== request.revision) { setRetryAvailable(false); setNotice("Diese Anfrage wurde bereits durch eine neuere ersetzt."); return; }
-    const controller = new AbortController(); operation.current = controller; setWorking(true); setRetryAvailable(false);
+    const controller = new AbortController(); operation.current = controller; setWorking(true); setProgress(LIVE_PROGRESS.accepted); setRetryAvailable(false);
     try {
-      const response = await fetch(`/api/ai-crm/live/session/${request.sessionId}/turn`, { method: "POST", headers: jsonHeaders, body: turnBody(request), signal: controller.signal });
-      const data = await readJson(response);
-      if (!response.ok) throw new Error(errorMessage(data, "Die Anfrage konnte noch nicht abgeschlossen werden."));
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(LIVE_CLIENT_TIMEOUT_MS)]);
+      const response = await fetch(`/api/ai-crm/live/session/${request.sessionId}/turn`, { method: "POST", headers: { ...jsonHeaders, Accept: LIVE_STREAM_TYPE }, body: turnBody(request), signal });
+      const data = await readLiveTurn(response, message => { if (pending.current === request && !signal.aborted) setProgress(message); });
       acceptResponse(data, request); setError("");
     } catch (reason) { if (!controller.signal.aborted) { setRecovery(true); setError(reason instanceof Error ? reason.message : "Ausgang noch unklar."); } }
     finally { if (operation.current === controller) { operation.current = null; setWorking(false); } }
@@ -265,6 +281,8 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     const previous = reconnecting ? session.current : null;
     if (reconnecting && (!previous || previous.reconnects >= settings.reconnectLimit)) { starting.current = false; return; }
     releaseTransport(); player.current?.pause(); setError(""); setNotice(""); setIntroRetry(false); setConnection("MICROPHONE");
+    if (reconnecting) captions.current.reconnect();
+    else { captions.current = new LiveCaptions(); propsRef.current.onTranscript?.([]); }
     const controller = new AbortController(); startRequest.current = controller;
     try {
       if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection || !window.AudioContext) throw new Error("Dieser Browser bietet keine sichere Mikrofon-/WebRTC-Verbindung. Verwende HTTPS oder localhost und einen aktuellen Browser.");
@@ -295,6 +313,8 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
         if (peer.current !== pc) return;
         try {
           const data = JSON.parse(event.data);
+          const transcript = captions.current.append(data);
+          if (transcript) propsRef.current.onTranscript?.(transcript);
           if (data.type === "session.started") { providerStarted = true; if (pc.connectionState === "connected") setConnection("CONNECTED"); }
           if (data.type === "session.closed") { void close("Der Sprachdienst hat die Verbindung beendet. Mikrofon und Audio sind aus."); return; }
           const delta = inputTranscriptDelta(data);
@@ -314,7 +334,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
               duck();
             }
           }
-          if (data.type === "session.delegation.created" && typeof data.delegation?.id === "string") delegation.current = data.delegation.id;
+          if (data.type === "session.delegation.created" && data.delegation?.target === "client" && typeof data.delegation?.id === "string") utterance.current.delegate(data.delegation.id, data.offset_ms);
           if (data.type === "error" || data.type === "session.error") setError("Der Sprachdienst meldet einen Fehler. Das CRM bleibt bedienbar; beende und starte die Verbindung bei Bedarf neu.");
         } catch { /* Unknown provider events carry no client authority. */ }
       };
@@ -333,7 +353,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       const clientId = previous?.clientId ?? crypto.randomUUID();
       // Receive the session id even if local setup is cancelled in the meantime:
       // aborting this fetch loses the only handle needed to close a late start.
-      const response = await fetch("/api/ai-crm/live/session", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ clientSessionId: clientId, conversationId: propsRef.current.conversationId ?? undefined, sdp: pc.localDescription?.sdp ?? offer.sdp, reconnect: reconnecting || undefined }) });
+      const response = await fetch("/api/ai-crm/live/session", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ clientSessionId: clientId, conversationId: propsRef.current.conversationId ?? undefined, sdp: pc.localDescription?.sdp ?? offer.sdp, reconnect: reconnecting || undefined, voice: selectedVoice }) });
       const data = await readJson(response);
       const info = data.session as Record<string, unknown> | undefined;
       const transport = data.transport as { sdp?: string } | undefined;
@@ -379,7 +399,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
         if (token === lifecycle.current && typeof blocked?.id === "string") setBlockedSessionId(blocked.id);
       }
     } finally { if (startRequest.current === controller) startRequest.current = null; if (token === lifecycle.current) starting.current = false; }
-  }, [activity, changeIntro, close, duck, markIntro, nextRevision, playIntro, releaseIntro, releaseTransport, settings]);
+  }, [activity, changeIntro, close, duck, markIntro, nextRevision, playIntro, releaseIntro, releaseTransport, selectedVoice, settings]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -388,7 +408,8 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       if (userSpeaking.current) utterance.current.activity(now);
       const busy = userSpeaking.current || jarvisSpeaking.current || Boolean(operation.current);
       if (busy) lastActivity.current = now;
-      if (stream.current && !userSpeaking.current && utterance.current.ready(now)) {
+      if (stream.current && utterance.current.ready(now)) {
+        delegation.current = utterance.current.delegationId();
         const text = utterance.current.take();
         void processUtteranceRef.current(text).catch(reason => setError(reason instanceof Error ? reason.message : "Die Sprachzeile konnte nicht verarbeitet werden."));
       }
@@ -408,6 +429,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   };
   const interrupt = () => {
     nextRevision(true); releaseIntro(); utterance.current.clear();
+    pending.current = null; delegation.current = undefined; setRecovery(false); setRetryAvailable(false);
     if (introState.current === "PLAYING") void markIntro().catch(reason => setError(reason instanceof Error ? reason.message : "Der Begrüßungsstatus konnte nicht beendet werden."));
     if (voice.current) voice.current.muted = true;
     setWorking(false); jarvisSpeaking.current = false; setOutputActive(false); duck();
@@ -423,7 +445,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   return <AssistantVoiceSurface
     active={active} status={status} muted={muted} canMute={connection === "CONNECTED"}
     onMute={toggleMute} onInterrupt={interrupt} onEnd={() => void close()}
-    composer={props.children?.({ active, disabled: Boolean(props.disabled || blockedSessionId), start: () => void connect() }) ?? <button disabled={props.disabled || Boolean(blockedSessionId)} onClick={() => void connect()}>Jarvis starten</button>}
+    composer={<><div className="assistant-voice-preferences"><span>Jarvis · Hype-Modus</span><label>Stimme <select aria-label="Jarvis-Stimme" disabled={active} value={selectedVoice} onChange={event => setSelectedVoice(event.target.value as JarvisVoice)}><option value="vesper">Vesper · britisch</option><option value="cedar">Cedar · bisherige Stimme</option><option value="ash">Ash · Alternative</option></select></label></div>{props.children?.({ active, disabled: Boolean(props.disabled || blockedSessionId), start: () => void connect() }) ?? <button disabled={props.disabled || Boolean(blockedSessionId)} onClick={() => void connect()}>Jarvis starten</button>}</>}
     options={<>
       <p className="assistant-caption">Schreibaktionen benötigen die sichtbare Bestätigung im Gespräch.</p>
       {introRetry && <div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void playIntro(true)}>Begrüßung erneut anfordern</button><button disabled={connection !== "CONNECTED"} onClick={() => void markIntro().catch(reason => setError(String(reason.message)))}>Ohne Begrüßung fortsetzen</button></div>}
@@ -432,6 +454,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       <details><summary>Musik · {music.status === "PLAYING" ? "läuft" : music.status === "PAUSED" ? "pausiert" : music.status === "MISSING" ? "Quelle fehlt" : music.status === "BLOCKED" ? "Start blockiert" : "aus"}</summary><p role="status" className="jarvis-live-music-note">{music.message}</p><p className="assistant-caption">Lautstärke {Math.round(music.volume * 100)} %{music.ducked ? " · während Sprache abgesenkt" : ""}</p><div className="assistant-button-row"><button disabled={music.status === "MISSING" || connection !== "CONNECTED"} onClick={() => void musicAction("start")}>{music.status === "PAUSED" ? "Musik weiter" : "Musik starten"}</button><button onClick={() => void musicAction("pause")}>Musikpause</button><button onClick={() => void musicAction("stop")}>Musik aus</button><button aria-label="Musik leiser" onClick={() => void musicAction("quieter")}>Leiser</button><button aria-label="Musik lauter" onClick={() => void musicAction("louder")}>Lauter</button></div></details>
     </>}
     notices={<>
+      {active && working && <p role="status" className="jarvis-live-notice">{progress || LIVE_PROGRESS.accepted}</p>}
       {!active && blockedSessionId && <div role="status"><p>Es ist noch eine Sprachsitzung geöffnet. Wenn du sie hier beendest, endet auch eine laufende Runde in einem anderen Tab.</p><button disabled={endingBlockedSession} onClick={() => void endBlockedSession()}>{endingBlockedSession ? "Vorherige Sitzung wird beendet …" : "Vorherige Sitzung beenden"}</button></div>}
       {active && audioBlocked && <button onClick={() => void enableAudio()}>Audioausgabe freigeben</button>}
       {active && idleWarning !== null && <div role="alert"><p>Die Sprachverbindung endet in {idleWarning} Sekunden.</p><button onClick={activity}>Ich bin noch da</button></div>}

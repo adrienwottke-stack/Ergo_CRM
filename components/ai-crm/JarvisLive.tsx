@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { ActionReceipt, AssistantContext, ConversationSummary, ReadResult } from "@/lib/ai-crm/contracts";
 import JarvisLiveMock from "@/components/ai-crm/JarvisLiveMock";
 import JarvisLivePilot from "@/components/ai-crm/JarvisLivePilot";
+import type { LiveCaption } from "@/lib/ai-crm/live-captions";
 
 export type JarvisLiveActionReceipt = ActionReceipt;
 export type JarvisLiveConversation = ConversationSummary & { restarted?: boolean; restartReason?: "expired" | "limit" | null };
@@ -12,11 +13,13 @@ export type JarvisLiveProps = {
   context?: AssistantContext | null;
   disabled?: boolean;
   onActiveChange?: (active: boolean) => void;
+  onTranscript?: (lines: LiveCaption[]) => void;
   onConversationStarted: (conversation: JarvisLiveConversation) => void;
   onTurn: (turn: { requestId: string; transcript: string; answer: string; actions: ActionReceipt[]; results?: ReadResult[]; conversation: JarvisLiveConversation }) => void;
 };
 export type JarvisLiveSettings = {
   demoEnabled: boolean;
+  voice?: string;
   greetingText: string;
   inactivitySeconds: number;
   warningSeconds: number;

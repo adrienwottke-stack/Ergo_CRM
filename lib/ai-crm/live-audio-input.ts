@@ -35,11 +35,11 @@ export function inputTranscriptDelta(value: unknown): LiveTranscriptDelta | null
   if (!value || typeof value !== "object") return null;
   const item = value as Partial<InputTranscriptDeltaEvent>;
   if (item.type !== "session.input_transcript.delta" || typeof item.delta !== "string" || typeof item.event_id !== "string") return null;
-  if (typeof item.start_ms !== "number" || typeof item.end_ms !== "number" || item.start_ms < 0 || item.end_ms < item.start_ms) return null;
+  if (typeof item.start_ms !== "number" || typeof item.end_ms !== "number" || !Number.isFinite(item.start_ms) || !Number.isFinite(item.end_ms) || item.start_ms < 0 || item.end_ms < item.start_ms) return null;
   return { content: item.delta, eventId: item.event_id, startMs: item.start_ms, endMs: item.end_ms };
 }
 
-/** Deduplicates retries; finalization is driven by audio activity, never text gaps alone. */
+/** Deduplicates retries and correlates provider delegation with recognized speech. */
 export class LiveUtteranceBuffer {
   private events = new Set<string>();
   private text = "";
@@ -49,12 +49,15 @@ export class LiveUtteranceBuffer {
   private maximumEndMs = -1;
   private finalizedBeforeMs = -1;
   private interruptionClaimed = false;
+  private startMs = -1;
+  private delegated: { id: string; offsetMs: number } | null = null;
   append(delta: LiveTranscriptDelta, now = Date.now()): "added" | "duplicate" | "late" {
     if (this.events.has(delta.eventId)) return "duplicate";
     this.events.add(delta.eventId); if (this.events.size > 1000) this.events.delete(this.events.values().next().value!);
     // Timeline timestamps survive network lag. A fragment belonging before the
     // last completed audio boundary must never prefix a newly selected person.
     if (delta.startMs <= this.finalizedBeforeMs) return "late";
+    if (!this.text) this.startMs = delta.startMs;
     this.maximumEndMs = Math.max(this.maximumEndMs, delta.endMs);
     this.lastDeltaAt = now; this.text += delta.content; return "added";
   }
@@ -65,10 +68,23 @@ export class LiveUtteranceBuffer {
     this.interruptionClaimed = true;
     return true;
   }
-  ready(now: number, pauseMs = 900) { return this.observedSpeech && this.text.trim().length > 0 && now - this.lastAudioAt >= pauseMs && now - this.lastDeltaAt >= 500; }
-  take() { const result = this.text.trim(); this.finalizedBeforeMs = Math.max(this.finalizedBeforeMs, this.maximumEndMs + 1000); this.text = ""; this.observedSpeech = false; this.interruptionClaimed = false; return result; }
-  clear() { if (this.maximumEndMs >= 0) this.finalizedBeforeMs = Math.max(this.finalizedBeforeMs, this.maximumEndMs + 1000); this.text = ""; this.observedSpeech = false; this.interruptionClaimed = false; }
-  resetTimeline() { this.events.clear(); this.text = ""; this.observedSpeech = false; this.interruptionClaimed = false; this.lastAudioAt = 0; this.lastDeltaAt = 0; this.maximumEndMs = -1; this.finalizedBeforeMs = -1; }
+  /** An old or late delegation must not become the next question's ID. */
+  delegate(id: string, offsetMs: number) {
+    if (!id || !Number.isFinite(offsetMs) || !this.text.trim() || offsetMs < this.startMs || offsetMs > this.maximumEndMs + 5000) return false;
+    this.delegated = { id, offsetMs }; return true;
+  }
+  delegationId() { return this.delegated?.id; }
+  ready(now: number, pauseMs = 750) {
+    if (!this.text.trim() || now - this.lastDeltaAt < 500) return false;
+    if (this.delegated && this.delegated.offsetMs >= this.maximumEndMs) return true;
+    // A quiet or suspended local meter must not strand recognized provider text.
+    return this.observedSpeech ? now - this.lastAudioAt >= pauseMs : now - this.lastDeltaAt >= 1800;
+  }
+  // Keep a late-fragment guard shorter than the 750 ms turn pause, so the
+  // next legitimate fast utterance is not mistaken for the old sentence.
+  take() { const result = this.text.trim(); this.clear(); return result; }
+  clear() { if (this.maximumEndMs >= 0) this.finalizedBeforeMs = Math.max(this.finalizedBeforeMs, this.maximumEndMs + 500); this.text = ""; this.observedSpeech = false; this.interruptionClaimed = false; this.delegated = null; this.startMs = -1; }
+  resetTimeline() { this.clear(); this.events.clear(); this.lastAudioAt = 0; this.lastDeltaAt = 0; this.maximumEndMs = -1; this.finalizedBeforeMs = -1; }
   preview() { return this.text.trim(); }
 }
 
