@@ -32,6 +32,13 @@ globalThis.progressUser = await db.user.create({ data: { name: "Progress Test", 
 await db.feature.upsert({ where: { key: "aiCrm" }, create: { key: "aiCrm", titel: "AI", state: "TEST" }, update: { state: "TEST" } });
 const req = (body, stream = false, method = "POST") => new Request("https://crm.example.test/api/ai-crm/live/session", { method, headers: { origin: "https://crm.example.test", "Content-Type": "application/json", ...(stream ? { Accept: LIVE_STREAM_TYPE } : {}) }, body: JSON.stringify(body) });
 const ctx = sessionId => ({ params: Promise.resolve({ sessionId }) });
+async function waitUntil(check, timeoutMs = 15000) {
+  const end = Date.now() + timeoutMs;
+  while (!check()) {
+    if (Date.now() >= end) throw new Error("Expected live speech event did not arrive.");
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+}
 async function session() { return (await (await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\nprogress-fixture" }))).json()).session.id; }
 after(async () => { delete process.env.AI_CRM_ENABLED; delete process.env.AI_LIVE_PROVIDER; delete process.env.AI_PROVIDER_TIMEOUT_MS; await fixture.close(); });
 
@@ -106,10 +113,30 @@ test("a long request emits one honest slow update to UI and the matching voice d
   globalThis.progressModel = async () => { await hold; return { output_text: "Jetzt ist die Antwort da.", output: [], usage: {} }; };
   const phases = [];
   const result = readLiveTurn(await turn.POST(req({ clientTurnId: randomUUID(), transcript: "Bereite meinen Tag vor", revision: 1, delegationId: "slow-delegation" }, true), ctx(id)), message => phases.push(message));
-  await new Promise(resolve => setTimeout(resolve, 8300));
+  await waitUntil(() => phases.some(message => /dauert gerade länger/.test(message)) && globalThis.progressEvents.some(event => event.delegation_id === "slow-delegation" && /(?:noch dran|noch einen Moment)/.test(event.content ?? "")));
   assert.equal(phases.filter(message => /dauert gerade länger/.test(message)).length, 1);
-  const slowEvents = globalThis.progressEvents.filter(event => event.delegation_id === "slow-delegation" && /dauert gerade länger/.test(event.content ?? ""));
+  const slowEvents = globalThis.progressEvents.filter(event => event.delegation_id === "slow-delegation" && /(?:noch dran|noch einen Moment)/.test(event.content ?? ""));
   assert.equal(slowEvents.length, 1);
+  assert.equal(slowEvents[0].type, "session.commentary.append", "updates go to the actual Live speech channel");
+  assert.doesNotMatch(slowEvents[0].content, /Status zur laufenden|Fachresultat|Backend/);
   release(); assert.match((await result).answer, /Jetzt/);
+  await stop.DELETE(req({}, false, "DELETE"), ctx(id));
+});
+
+test("real tool phases reach the voice channel before the final backend answer", async () => {
+  const id = await session(); let release, modelCalls = 0;
+  const hold = new Promise(resolve => { release = resolve; });
+  globalThis.progressModel = async () => {
+    if (++modelCalls === 1) return { output_text: "", output: [{ type: "function_call", call_id: randomUUID(), name: "get_daily_overview", arguments: JSON.stringify({ day: "2026-09-26" }) }], usage: {} };
+    await hold; return { output_text: "Der Überblick ist fertig.", output: [], usage: {} };
+  };
+  const phases = [];
+  const result = readLiveTurn(await turn.POST(req({ clientTurnId: randomUUID(), transcript: "Was steht heute an?", revision: 1, delegationId: "phase-delegation" }, true), ctx(id)), message => phases.push(message));
+  await waitUntil(() => globalThis.progressEvents.some(event => event.delegation_id === "phase-delegation" && /Abfrage ist zurück/.test(event.content ?? "")));
+  assert.ok(phases.some(message => /CRM-Einträge/.test(message)));
+  assert.ok(phases.some(message => /Abfrage ist zurück/.test(message)));
+  const voice = globalThis.progressEvents.filter(event => event.delegation_id === "phase-delegation");
+  assert.ok(voice.some(event => event.type === "session.commentary.append" && /Abfrage ist zurück/.test(event.content)), "a real phase is spoken while the final answer is still pending");
+  release(); assert.equal((await result).answer, "Der Überblick ist fertig.");
   await stop.DELETE(req({}, false, "DELETE"), ctx(id));
 });

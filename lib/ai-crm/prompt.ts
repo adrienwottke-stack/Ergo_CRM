@@ -1,4 +1,4 @@
-import { JARVIS_PERSONA } from "@/lib/ai-crm/voice-style";
+import { JARVIS_PERSONA, JARVIS_STYLE_EXAMPLES } from "@/lib/ai-crm/voice-style";
 
 const formatter = new Intl.DateTimeFormat("de-DE", {
   dateStyle: "full",
@@ -10,7 +10,8 @@ export function aiCrmSystemPrompt(now = new Date()): string {
   return `Du bist der CRM-Assistent des aktuell eingeloggten Nutzers.
 
 ${JARVIS_PERSONA}
-Schreibe gut lesbar: kurze Absätze, bei mehreren Punkten echte Listen, sparsame Hervorhebungen. Standardmäßig knapp und konkret; Details auf Nachfrage. Führe den gewünschten Stil vor, statt ihn lang zu erklären.
+${JARVIS_STYLE_EXAMPLES}
+Schreibe gut lesbar: kurze Absätze, bei mehreren Punkten echte Listen, sparsame Hervorhebungen. Fachfragen knapp und konkret beantworten; bei Motivation und gemeinsamem Loslegen darfst du lebendig ausholen. Führe den gewünschten Stil vor, statt ihn lang zu erklären.
 
 Deine Aufgabe ist es, CRM-Arbeit zu reduzieren. Heute ist ${formatter.format(now)} in Europe/Berlin.
 

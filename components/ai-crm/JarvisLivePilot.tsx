@@ -5,7 +5,7 @@ import type { ActionReceipt, AssistantContext, ReadResult } from "@/lib/ai-crm/c
 import type { JarvisLiveConversation, JarvisLiveProps, JarvisLiveSettings } from "@/components/ai-crm/JarvisLive";
 import { LocalAudioController, isSessionStop, splitMusicCommand, type LocalAudioState, type MusicCommand } from "@/lib/ai-crm/local-audio";
 import { inputTranscriptDelta, LiveUtteranceBuffer, monitorAudio, sessionTiming, waitForIceGathering } from "@/lib/ai-crm/live-audio-input";
-import { JARVIS_VOICE_VOLUME, JARVIS_VOICES, isLiveSmallTalk, type JarvisVoice } from "@/lib/ai-crm/voice-style";
+import { JARVIS_DEFAULT_VOICE, JARVIS_VOICE_LABELS, JARVIS_VOICE_VOLUME, JARVIS_VOICES, isLiveSmallTalk, isLiveTaskCancel, isLiveWaitingReply, type JarvisVoice } from "@/lib/ai-crm/voice-style";
 import { LiveCaptions } from "@/lib/ai-crm/live-captions";
 import { LIVE_CLIENT_TIMEOUT_MS, LIVE_PROGRESS, LIVE_STREAM_TYPE, readLiveTurn } from "@/lib/ai-crm/live-progress";
 
@@ -33,7 +33,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const { settings } = props;
   const propsRef = useRef(props); propsRef.current = props;
   const [connection, setConnection] = useState<Connection>("IDLE");
-  const [selectedVoice, setSelectedVoice] = useState<JarvisVoice>(JARVIS_VOICES.includes(settings.voice as JarvisVoice) ? settings.voice as JarvisVoice : "vesper");
+  const [selectedVoice, setSelectedVoice] = useState<JarvisVoice>(JARVIS_VOICES.includes(settings.voice as JarvisVoice) ? settings.voice as JarvisVoice : JARVIS_DEFAULT_VOICE);
   const captions = useRef(new LiveCaptions());
   const [muted, setMuted] = useState(false);
   const [inputActive, setInputActive] = useState(false);
@@ -75,6 +75,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const lastActivity = useRef(Date.now());
   const utterance = useRef(new LiveUtteranceBuffer());
   const delegation = useRef<string | undefined>(undefined);
+  const waitingConversation = useRef(false);
   const processUtteranceRef = useRef<(text: string) => Promise<void>>(async () => undefined);
   const starting = useRef(false);
   const selectedContext = JSON.stringify(props.context ? { contactId: props.context.contactId, partnerId: props.context.partnerId, followUpId: props.context.followUpId, entityType: props.context.entityType, entityId: props.context.entityId } : null);
@@ -107,7 +108,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     startRequest.current = null; operation.current = null;
     sendControl("session.close"); releaseTransport(); releaseIntro();
     player.current?.dispose(); player.current = null;
-    pending.current = null; utterance.current.clear(); delegation.current = undefined;
+    pending.current = null; utterance.current.clear(); delegation.current = undefined; waitingConversation.current = false;
     setWorking(false); setRecovery(false); setRetryAvailable(false); setAudioBlocked(false); setIntroRetry(false); setIdleWarning(null); setConnection("ENDED"); setHeard("");
     if (notify) { propsRef.current.onActiveChange?.(false); setNotice(message); }
     if (previous) await fetch(`/api/ai-crm/live/session/${previous.id}`, { method: "DELETE", headers: jsonHeaders, keepalive: true }).then(response => { if (!response.ok) throw new Error("End not acknowledged"); }).catch(() => { if (notify) { setBlockedSessionId(previous.id); setNotice(`${message} Der Serverabschluss konnte noch nicht bestätigt werden; die Verbindung ist lokal geschlossen.`); } });
@@ -260,7 +261,14 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
 
   const processUtterance = useCallback(async (text: string) => {
     if (!session.current || !stream.current || !text.trim()) return;
+    const duringWork = waitingConversation.current || Boolean(operation.current && pending.current);
+    waitingConversation.current = false;
     activity(); setHeard(text);
+    if (duringWork && isLiveTaskCancel(text)) {
+      nextRevision(true); pending.current = null; delegation.current = undefined;
+      setWorking(false); setRecovery(false); setRetryAvailable(false);
+      setNotice("Anfrage abgebrochen. Du kannst jetzt etwas Neues fragen."); return;
+    }
     if (isSessionStop(text)) { await close(); return; }
     if (/^(?:stumm|mikrofon aus)[.!?]*$/i.test(text.trim())) {
       micMuted.current = true; setMuted(true); for (const track of stream.current?.getAudioTracks() ?? []) track.enabled = false; sendControl("session.input_audio.mute"); return;
@@ -269,9 +277,9 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     const media = splitMusicCommand(text);
     if (media.command) await musicAction(media.command);
     const remaining = media.remainder;
-    if (!remaining || isLiveSmallTalk(remaining)) return;
+    if (!remaining || isLiveSmallTalk(remaining) || duringWork && isLiveWaitingReply(remaining)) { delegation.current = undefined; return; }
     await submit(remaining);
-  }, [activity, close, markIntro, musicAction, sendControl, submit]);
+  }, [activity, close, markIntro, musicAction, nextRevision, sendControl, submit]);
   processUtteranceRef.current = processUtterance;
 
   const connect = useCallback(async (reconnecting = false) => {
@@ -319,7 +327,9 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
           if (data.type === "session.closed") { void close("Der Sprachdienst hat die Verbindung beendet. Mikrofon und Audio sind aus."); return; }
           const delta = inputTranscriptDelta(data);
           if (delta && !micMuted.current) {
+            const beginning = !utterance.current.preview();
             const accepted = utterance.current.append(delta);
+            if (beginning && accepted === "added") waitingConversation.current = Boolean(operation.current && pending.current);
             if (accepted === "late") setNotice("Ein verspätetes Sprachfragment wurde verworfen, damit es nicht zur nächsten Aussage gehört. Wiederhole die vorherige Frage, falls ihr Ende fehlt.");
             else setHeard(utterance.current.preview());
             // A new spoken turn resumes Live even when it is just a greeting
@@ -329,7 +339,10 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
             // Only new recognized speech may cancel an answer, once per utterance.
             if (accepted === "added" && session.current && (jarvisSpeaking.current || operation.current || introState.current === "PLAYING") && utterance.current.claimInterruption()) {
               // GPT-Live handles audible interruption; do not mute its next acknowledgment.
-              nextRevision(true, false); setWorking(false); jarvisSpeaking.current = false; setOutputActive(false);
+              // Live yields the microphone immediately. Do not cancel backend
+              // work on a partial "Mir geht ..." before knowing the full reply.
+              if (!operation.current) { nextRevision(true, false); setWorking(false); }
+              jarvisSpeaking.current = false; setOutputActive(false);
               if (introState.current !== "DONE") void markIntro().catch(() => setIntroRetry(true));
               duck();
             }
@@ -445,7 +458,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   return <AssistantVoiceSurface
     active={active} status={status} muted={muted} canMute={connection === "CONNECTED"}
     onMute={toggleMute} onInterrupt={interrupt} onEnd={() => void close()}
-    composer={<><div className="assistant-voice-preferences"><span>Jarvis · Hype-Modus</span><label>Stimme <select aria-label="Jarvis-Stimme" disabled={active} value={selectedVoice} onChange={event => setSelectedVoice(event.target.value as JarvisVoice)}><option value="vesper">Vesper · britisch</option><option value="cedar">Cedar · bisherige Stimme</option><option value="ash">Ash · Alternative</option></select></label></div>{props.children?.({ active, disabled: Boolean(props.disabled || blockedSessionId), start: () => void connect() }) ?? <button disabled={props.disabled || Boolean(blockedSessionId)} onClick={() => void connect()}>Jarvis starten</button>}</>}
+    composer={<><div className="assistant-voice-preferences"><span>Jarvis · Hype-Modus</span><label>Stimme <select aria-label="Jarvis-Stimme" disabled={active} value={selectedVoice} onChange={event => setSelectedVoice(event.target.value as JarvisVoice)}>{JARVIS_VOICES.map(voice => <option key={voice} value={voice}>{JARVIS_VOICE_LABELS[voice]}</option>)}</select></label></div>{props.children?.({ active, disabled: Boolean(props.disabled || blockedSessionId), start: () => void connect() }) ?? <button disabled={props.disabled || Boolean(blockedSessionId)} onClick={() => void connect()}>Jarvis starten</button>}</>}
     options={<>
       <p className="assistant-caption">Schreibaktionen benötigen die sichtbare Bestätigung im Gespräch.</p>
       {introRetry && <div className="assistant-button-row"><button disabled={connection !== "CONNECTED"} onClick={() => void playIntro(true)}>Begrüßung erneut anfordern</button><button disabled={connection !== "CONNECTED"} onClick={() => void markIntro().catch(reason => setError(String(reason.message)))}>Ohne Begrüßung fortsetzen</button></div>}

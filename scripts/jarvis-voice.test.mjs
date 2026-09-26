@@ -53,7 +53,7 @@ test("Live uses actual SDK session configuration with browser instruction/tool e
   assert.match(config.instructions, /sichtbare Bestätigung/);
   assert.match(config.instructions, /Warte dafür nicht auf das Fachresultat/);
   assert.match(config.instructions, /keine erfundenen Fortschritte/);
-  assert.match(config.instructions, /Hallo, Meister Emil/);
+  assert.match(config.instructions, /Hey, Meister Emil/);
   assert.match(config.instructions, /Hype-Modus ist standardmäßig an/);
   assert.match(config.instructions, /abwechslungsreiche Satzmelodie/);
   assert.match(config.instructions, /trockener, situativer Witz/);
@@ -79,7 +79,7 @@ test("native greeting needs no user turn or TTS; claim, manual replay and reconn
   assert.equal(started.status, 200);
   const payload = await started.json();
   assert.equal(payload.mode, "live");
-  assert.equal(payload.config.greetingText, "Hallo, Meister Emil.");
+  assert.equal(payload.config.greetingText, "Hey, Meister Emil! Ich bin da. Los geht's — was packen wir zuerst an?");
   assert.equal(payload.session.introState, "WAITING");
   assert.equal(creates, 1);
   assert.equal(globalThis.jarvisVoiceCreated.session.store, false);
@@ -92,7 +92,7 @@ test("native greeting needs no user turn or TTS; claim, manual replay and reconn
   assert.deepEqual(await first.json(), { introState: "DONE", accepted: true });
   assert.equal(globalThis.jarvisVoiceSent.type, "session.instructions.append");
   assert.equal(globalThis.jarvisVoiceSent.delegation_id, null);
-  assert.match(globalThis.jarvisVoiceSent.content, /Hallo, Meister Emil/);
+  assert.match(globalThis.jarvisVoiceSent.content, /Hey, Meister Emil/);
   assert.doesNotMatch(globalThis.jarvisVoiceSent.content, /Musik/);
   assert.equal(globalThis.jarvisVoiceCreated.session.audio.output.voice, "vesper");
   assert.match(globalThis.jarvisVoiceCreated.session.instructions, /dezent synthetische/);
@@ -147,6 +147,16 @@ test("skip and concurrent startup requests cannot produce an automatic duplicate
   assert.equal((await db.aiLiveSession.findUniqueOrThrow({ where: { id: next.session.id } })).revision, 1);
   assert.equal(globalThis.jarvisVoiceEvents.length, skipped, "native interruption must not send a second stop that clips the new backchannel");
   await lifecycle.DELETE(req({}, "DELETE"), nextContext);
+});
+
+test("the new comparison voices reach the provider through the approved session route", async () => {
+  for (const voice of ["meridian", "cinder"]) {
+    const response = await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=voice-comparison\r\n", voice }));
+    assert.equal(response.status, 200);
+    const { session } = await response.json();
+    assert.equal(globalThis.jarvisVoiceCreated.session.audio.output.voice, voice);
+    await lifecycle.DELETE(req({}, "DELETE"), ctx(session.id));
+  }
 });
 
 test("Live delegates to existing backend, persists sourced results, never replays speech or stale revision", async () => {

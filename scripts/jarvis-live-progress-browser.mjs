@@ -77,6 +77,10 @@ try {
   assert.equal(await page.evaluate(() => window.__turns[0].delegationId), "question-one");
   await page.evaluate(() => window.__streams[0].progress("Die Antwort dauert gerade länger. Deine Anfrage läuft noch."));
   await page.getByText("Die Antwort dauert gerade länger. Deine Anfrage läuft noch.", { exact: true }).waitFor();
+  await page.evaluate(() => window.__say("Alles gut, und dir?"));
+  await page.waitForTimeout(2300); // Finalize the social utterance with a quiet microphone.
+  assert.equal(await page.evaluate(() => window.__turns.length), 1, "smalltalk does not start a new backend job");
+  await page.getByText("Die Antwort dauert gerade länger. Deine Anfrage läuft noch.", { exact: true }).waitFor();
   for (const width of [320, 390, 768, 1440]) { await page.setViewportSize({ width, height: 900 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)); }
   await page.evaluate(() => window.__streams[0].result({ answer: "Du kannst Kontakte organisieren und deinen Tag planen." }));
   await page.getByLabel("Gesprächsverlauf").getByText("Du kannst Kontakte organisieren und deinen Tag planen.", { exact: true }).waitFor();
@@ -98,9 +102,24 @@ try {
   await page.evaluate(() => window.__streams[3].result({ answer: "ALTE ANTWORT DARF NICHT ERSCHEINEN" }));
   await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
   assert.equal(await page.getByText("ALTE ANTWORT DARF NICHT ERSCHEINEN").count(), 0);
+  await page.evaluate(() => window.__say("Lies meine offenen Aufgaben"));
+  await page.waitForFunction(() => window.__turns.length === 5);
+  await page.evaluate(() => window.__say("Alles gut, suche stattdessen Anna"));
+  await page.waitForFunction(() => window.__turns.length === 6);
+  assert.equal(await page.evaluate(() => window.__turns[5].transcript), "Alles gut, suche stattdessen Anna");
+  await page.evaluate(() => { window.__streams[4].result({ answer: "VERALTETER AUFTRAG" }); window.__streams[5].result({ answer: "NEUER AUFTRAG" }); });
+  await page.getByLabel("Gesprächsverlauf").getByText("NEUER AUFTRAG", { exact: true }).waitFor();
+  assert.equal(await page.getByText("VERALTETER AUFTRAG").count(), 0);
+  await page.evaluate(() => window.__say("Prüfe meine nächsten Termine"));
+  await page.waitForFunction(() => window.__turns.length === 7);
+  await page.evaluate(() => window.__say("Abbrechen"));
+  await page.getByText("Anfrage abgebrochen. Du kannst jetzt etwas Neues fragen.", { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.__turns.length), 7, "cancel is a control, never a replacement CRM query");
+  await page.evaluate(() => window.__streams[6].result({ answer: "ABGEBROCHENER AUFTRAG" }));
+  assert.equal(await page.getByText("ABGEBROCHENER AUFTRAG").count(), 0);
   await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
   assert.deepEqual(errors, []);
-  await writeFile(new URL("report.json", output), JSON.stringify({ passed: true, simulated: true, checks: ["quiet microphone transcript", "delegation correlation", "progress before result", "320/390/768/1440 overflow", "late delegation cannot leak", "stale result exits spinner", "timeout exits spinner", "failed recovery is terminal", "interrupted result stays hidden"], realProvider: false }, null, 2));
+  await writeFile(new URL("report.json", output), JSON.stringify({ passed: true, simulated: true, checks: ["quiet microphone transcript", "delegation correlation", "progress before result", "smalltalk preserves pending request and result", "mixed reply starts new request", "spoken cancel prevents old result", "320/390/768/1440 overflow", "late delegation cannot leak", "stale result exits spinner", "timeout exits spinner", "failed recovery is terminal", "interrupted result stays hidden"], realProvider: false }, null, 2));
   console.log("Jarvis progress browser regression passed.");
 } finally {
   await writeFile(new URL("server.log", output), logs);

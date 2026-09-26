@@ -7,6 +7,7 @@ export const LIVE_PROGRESS = {
   composing: "Die Abfrage ist zurück. Ich fasse das Ergebnis für dich zusammen.",
   slow: "Die Antwort dauert gerade länger. Deine Anfrage läuft noch.",
   speaking: "Die Antwort ist fertig. Ich übergebe sie an die Sprachausgabe.",
+  voiceUnavailable: "Die gesprochenen Zwischenmeldungen konnten gerade nicht bestätigt werden. Dein Auftrag läuft weiter.",
 } as const;
 export type LiveProgress = keyof typeof LIVE_PROGRESS;
 

@@ -137,11 +137,13 @@ try {
   await page.getByRole("textbox", { name: "Nachricht an den Assistenten" }).fill("Mein Entwurf bleibt erhalten");
   await page.evaluate(() => { window.__redesignComposer = document.getElementById("assistant-message"); });
   assert.equal(await page.getByLabel("Jarvis-Stimme", { exact: true }).inputValue(), "vesper");
-  await page.getByLabel("Jarvis-Stimme", { exact: true }).selectOption("cedar");
+  await page.getByLabel("Jarvis-Stimme", { exact: true }).selectOption("cinder");
+  await page.getByLabel("Jarvis-Stimme", { exact: true }).selectOption("meridian");
   await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
   await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
   const micBeforeLayout = await page.evaluate(() => window.__micRequests);
-  assert.equal(selectedVoices.at(-1), "cedar");
+  assert.equal(selectedVoices.at(-1), "meridian");
+  assert.equal(await page.getByLabel("Jarvis-Stimme", { exact: true }).isDisabled(), true, "voice changes require a new session");
   await page.evaluate(() => {
     const event = { type: "session.output_transcript.delta", delta: "Hallo, Meister Emil.", event_id: "greeting-caption", start_ms: 0, end_ms: 1000 };
     window.__peer.channel.onmessage({ data: JSON.stringify(event) });

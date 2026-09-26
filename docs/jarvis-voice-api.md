@@ -50,7 +50,7 @@ aus älteren Realtime-Beispielen übernommenen Fantasieevents.
 - `GET /api/ai-crm/live/session`: authentifizierte, berechtigungsgeprüfte
   Transport-/Pilotkonfiguration ohne Schlüssel.
 - `POST` derselben Route: `clientSessionId`, optional `conversationId`,
-  für Live `sdp`, optional `voice` aus `vesper`, `cedar`, `ash`; bewusster Reconnect mit `reconnect:true`. Ein Reconnect
+  für Live `sdp`, optional `voice` aus `vesper`, `meridian`, `cinder`, `cedar`, `ash`; bewusster Reconnect mit `reconnect:true`. Ein Reconnect
   behält die logische CRM-Sitzung und Introphase, schließt die bisherige
   Providerverbindung und zählt gegen das Wiederverbindungslimit.
 - `POST /api/ai-crm/live/session/:id/turn`: `clientTurnId`, `transcript`,
@@ -69,7 +69,7 @@ aus älteren Realtime-Beispielen übernommenen Fantasieevents.
   Ergebnisse überschreiben keine aktuelle Vorschau und werden nicht vorgelesen.
 - `DELETE`: Session beenden und Provider über Sideband schließen.
 - `POST /api/ai-crm/live/session/:id/intro`: direkt nach `session.started` `{}`;
-  serverseitiger Sprachauftrag „Hallo, Meister Emil.“ per Sideband. Antwort
+  serverseitiger persönlicher Einstieg mit „Hey“, einem kurzen Startimpuls und einer offenen Frage per Sideband. Antwort
   ist JSON `{introState:"DONE",accepted:true}` nach passendem Instruction-Ack.
   CAS-Status `WAITING -> PLAYING` verhindert parallele automatische Starts;
   `DONE` bedeutet Annahme des Auftrags, keine gemessene Audiofertigstellung.
@@ -184,8 +184,8 @@ Vesper ist die neue Standardwahl. Die [offizielle Stimmenbeschreibung](https://d
 führt sie als männlich und britisch geprägt; die Eignung für den gewünschten
 Jarvis-Charakter ist eine daraus abgeleitete Gestaltungsentscheidung. Die
 konkrete deutsche Stimme wurde lokal nicht hörbar abgenommen. Vor Beginn
-kann der Nutzer zu Cedar (bisherige Stimme) oder Ash wechseln. Der Server
-akzeptiert ausschließlich diese drei Werte. Ein Stimmenwechsel benötigt eine
+kann der Nutzer außerdem Meridian, Cinder, Cedar oder Ash wählen. Der Server
+akzeptiert ausschließlich diese fünf Werte. Ein Stimmenwechsel benötigt eine
 neue Live-Sitzung. Die Wiedergabe bleibt direkt, ohne zusätzliche Hall-,
 Verzerrungs- oder Roboterfilter, um die frühere Rauschproblematik nicht durch
 eine neue Effektkette zu verschärfen.
@@ -212,18 +212,37 @@ Für diesen Einstieg entfallen Modellaufruf und Kontaktsuche.
 
 Der Live-Auftrag streamt tatsächliche Phasen: angenommen, Datensuche,
 Vorschauvorbereitung, Zusammenfassung, längere Wartezeit und Sprachübergabe.
-Eine kurze serverseitige Sprachmeldung kann beim Start und einmal nach acht
-Sekunden ausbleibender Antwort erfolgen. Sie ist an Session und Revision
-gebunden; beim Abschluss werden ausstehende Statusmeldungen abgebrochen.
-Die Meldungen erfinden weder fachliche Fortschritte noch eine fertige Antwort.
+Für die Stimme gibt es eigene natürliche Sprechtexte. Echte Phasen werden
+über `session.commentary.append` hörbar angeboten, wie im
+[Live-Prompting-Leitfaden](https://developers.openai.com/api/docs/guides/live-prompting#delegation)
+beschrieben. Der erste Impuls folgt frühestens nach 1,2 Sekunden, weitere
+frühestens sieben Sekunden auseinander; maximal vier pro Auftrag. Nur die
+aktuellste Phase zählt. Schnelle Antworten brauchen keine Wartefloskel.
+Nach längerer Wartezeit kann einmal eine beiläufige Frage zum Tag passen.
+Die Live-Regeln unterdrücken sie bei Eile, Frust, einem bereits besprochenen
+Tagesverlauf oder dem Wunsch nach weniger Smalltalk. Das Ergebnis hat Vorrang.
+
+Die Sideband-Übertragung bekommt bis zu sechs statt zwei Sekunden für die
+Bestätigung. Ein Übertragungsfehler bleibt im Chat erkennbar. Die Meldungen
+sind an Session und Revision gebunden; Abschluss und Abbruch stoppen ihre
+Timer und noch laufenden Übertragungen. Das SDK-Acknowledgment belegt die
+Annahme, weiterhin nicht das tatsächliche Hören auf dem Endgerät.
+
+Beim Beginn einer weiteren Äußerung unterbricht Live seine Sprache, aber die
+Anwendung wartet auf deren vollständigen Text, bevor sie Backendarbeit
+ersetzt. Erkannte soziale Antworten wie „Alles gut, und dir?“ oder „Mein Tag
+war stressig“ erhalten den Auftrag; gemischte Aussagen wie „Alles gut, suche
+stattdessen Anna“ erzeugen einen neuen. „Abbrechen“ stoppt explizit. Diese
+Zuordnung ist bewusst konservativ und behandelt keine gesprochenen
+Bestätigungen als Schreibfreigabe.
 
 Die komplette Agentenschleife teilt ein Zeitbudget von höchstens 40 Sekunden
 (oder dem kleineren konfigurierten Providerlimit). Der Browser begrenzt seine
 Wartezeit auf 65 Sekunden und bietet danach Ergebnisprüfung mit der originalen
 Operationskennung an. Leere Modellantworten werden als Fehler gemeldet.
 `FAILED`/`ABORTED` beendet die Ergebnisprüfung; nur nach 404 darf dieselbe
-Kennung erneut gesendet werden. Neue Sprache und manuelles Unterbrechen
-verhindern, dass alte Ergebnisse eine neue Frage verdrängen.
+Kennung erneut gesendet werden. Neue fachliche Aufträge und manuelles
+Unterbrechen verhindern, dass alte Ergebnisse eine neue Frage verdrängen.
 
 ## Prüfungen und Grenzen
 
