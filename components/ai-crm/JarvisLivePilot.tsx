@@ -513,7 +513,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   useEffect(() => { propsRef.current.onActiveChange?.(active); }, [active]);
   const status = connection === "MICROPHONE" ? "Gib Jarvis kurz dein Mikrofon frei …" : connection === "CONNECTING" ? "Jarvis ist gleich für dich da …" : connection === "DISCONNECTED" ? "Mikrofon aus · Verbindung unterbrochen" : muted ? "Mikrofon stumm · Verbindung aktiv" : outputActive ? "Jarvis spricht" : working ? "Jarvis schaut für dich nach" : inputActive ? "Jarvis hört deine Aussage" : "Mikrofon aktiv · Jarvis hört zu";
   return <AssistantVoiceSurface
-    active={active} status={status} starting={connection === "MICROPHONE" || connection === "CONNECTING"} muted={muted} canMute={connection === "CONNECTED"}
+    active={active} status={status} starting={connection === "MICROPHONE" || connection === "CONNECTING"} muted={muted} canMute={connection === "CONNECTED"} onStart={() => void connect(false)}
     onMute={toggleMute} onInterrupt={interrupt} onEnd={() => void close()}
     composer={<><div className="assistant-voice-preferences"><span>Jarvis · Hype-Modus</span><label>Stimme <select aria-label="Jarvis-Stimme" disabled={active} value={selectedVoice} onChange={event => setSelectedVoice(event.target.value as JarvisVoice)}>{JARVIS_VOICES.map(voice => <option key={voice} value={voice}>{JARVIS_VOICE_LABELS[voice]}</option>)}</select></label></div>{props.children?.({ active, disabled: Boolean(props.disabled || blockedSessionId), start: () => void connect() }) ?? <button disabled={props.disabled || Boolean(blockedSessionId)} onClick={() => void connect()}>Jarvis starten</button>}</>}
     options={<>

@@ -176,6 +176,7 @@ export default function JarvisLiveMock({
   const sessionRef = useRef<string | null>(null);
   const clientSessionRef = useRef<string | null>(null);
   const startAbortRef = useRef<AbortController | null>(null);
+  const startPendingRef = useRef(false);
   const turnAbortRef = useRef<AbortController | null>(null);
   const lifecycleRef = useRef(0);
   const pendingTurnRef = useRef<PendingTurn | null>(null);
@@ -282,7 +283,8 @@ export default function JarvisLiveMock({
   }, [closeSession]);
 
   const start = useCallback(async () => {
-    if (disabled || !["IDLE", "ENDED", "ERROR"].includes(state.phase)) return;
+    if (startPendingRef.current || disabled || !["IDLE", "ENDED", "ERROR"].includes(state.phase)) return;
+    startPendingRef.current = true;
     const lifecycle = ++lifecycleRef.current;
     setNotice(null); setMuted(false);
     dispatch({ type: "START" });
@@ -299,6 +301,7 @@ export default function JarvisLiveMock({
         },
       });
     } catch {
+      startPendingRef.current = false;
       if (lifecycleRef.current !== lifecycle) return;
       dispatch({
         type: "MICROPHONE_DENIED",
@@ -308,6 +311,7 @@ export default function JarvisLiveMock({
     }
     if (lifecycleRef.current !== lifecycle) {
       for (const track of stream.getTracks()) track.stop();
+      startPendingRef.current = false;
       return;
     }
     streamRef.current = stream;
@@ -367,6 +371,7 @@ export default function JarvisLiveMock({
       });
     } finally {
       if (startAbortRef.current === controller) startAbortRef.current = null;
+      startPendingRef.current = false;
     }
   }, [conversationId, disabled, onActiveChange, onConversationStarted, releaseLocalMedia, state.phase]);
 
@@ -670,8 +675,9 @@ export default function JarvisLiveMock({
   );
 
   return <AssistantVoiceSurface
-    active={isOpen} status={muted ? "Mikrofon stumm · Simulation" : phaseCopy[state.phase]} muted={muted}
+    active={isOpen} status={muted ? "Mikrofon stumm · Simulation" : phaseCopy[state.phase]} starting={state.phase === "REQUESTING_MICROPHONE" || state.phase === "CONNECTING"} muted={muted}
     canMute={Boolean(sessionId) && state.phase !== "ERROR" && state.phase !== "RECONNECTING"}
+    onStart={() => void start()}
     onMute={() => { const next = !muted; setMuted(next); for (const track of streamRef.current?.getTracks() ?? []) track.enabled = !next; }}
     onInterrupt={bargeIn} onEnd={() => void closeSession(true)} simulation
     composer={children?.({ active: isOpen, disabled, start: () => void start() }) ?? <button disabled={disabled} onClick={() => void start()}>Live mit Jarvis starten</button>}

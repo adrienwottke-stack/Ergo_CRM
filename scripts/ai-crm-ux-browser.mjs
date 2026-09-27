@@ -89,7 +89,7 @@ try {
   assert.equal(await page.getByRole("textbox", { name: "Nachricht an den Assistenten" }).count(), 0);
   assert.equal(requests.length, 0); assert.equal(await db.aiConversation.count({ where: { userId: owner.id } }), 0);
   await shot(page, "desktop-closed");
-  await page.getByRole("button", { name: "Assistent", exact: true }).click();
+  await page.getByRole("button", { name: "Jarvis", exact: true }).click();
   await panel(page).getByRole("textbox").waitFor();
   await panel(page).getByRole("heading", { name: "Was möchtest du heute erledigen?" }).waitFor();
   assert.equal(requests.length, 0); assert.equal(await db.aiConversation.count({ where: { userId: owner.id } }), 0);
@@ -148,7 +148,7 @@ try {
   await panel(page).getByRole("button", { name: /^Rückgängig/ }).click();
   await panel(page).getByText("Rückgängig gemacht", { exact: true }).waitFor();
   assert.equal((await db.contact.findUnique({ where: { id: contact.id } })).phone, "+49 170 1234567"); checks.push("real HTTP confirmation and undo update CRM exactly once");
-  await page.reload(); await page.getByRole("button", { name: "Assistent", exact: true }).click(); await panel(page).getByText("Rückgängig gemacht", { exact: true }).waitFor(); checks.push("reload restores current receipt state");
+  await page.reload(); await page.getByRole("button", { name: "Jarvis", exact: true }).click(); await panel(page).getByText("Rückgängig gemacht", { exact: true }).waitFor(); checks.push("reload restores current receipt state");
   await send(page, "Mehrteilig: Gespräch dokumentieren und Wiedervorlage anlegen.");
   const multiResponse = page.waitForResponse(response => response.url().includes("/api/ai-crm/requests/") && response.request().method() === "POST");
   await panel(page).getByRole("button", { name: "2 Änderungen speichern", exact: true }).click();
@@ -173,11 +173,11 @@ try {
   await shot(page, "desktop-stopped");
   await page.getByRole("button", { name: "Assistent schließen", exact: true }).click();
   await page.goto(`${origin}/mannschaft`); await page.getByRole("button", { name: /Vorführ|Vorführmodus|Vorführen/ }).first().click();
-  assert.equal(await page.getByRole("button", { name: "Assistent", exact: true }).isDisabled(), true); checks.push("global presentation mode protects assistant");
+  assert.equal(await page.getByRole("button", { name: "Jarvis", exact: true }).isDisabled(), true); checks.push("global presentation mode protects assistant");
   await desktop.close();
 
   const { page: mobile, context: mobileContext } = await context(owner.id, { width: 375, height: 812 }, true);
-  await mobile.goto(`${origin}/heute`); await mobile.getByRole("button", { name: "Assistent", exact: true }).click(); await panel(mobile).getByRole("textbox").waitFor();
+  await mobile.goto(`${origin}/heute`); await mobile.getByRole("button", { name: "Jarvis", exact: true }).click(); await panel(mobile).getByRole("textbox").waitFor();
   await panel(mobile).getByRole("button", { name: "Neue Unterhaltung", exact: true }).click();
   await noOverflow(mobile);
   const nav = mobile.getByRole("navigation", { name: "Hauptnavigation" }); assert.equal(await nav.getByRole("link").count(), 5);
@@ -201,7 +201,7 @@ try {
   await panel(mobile).getByRole("button", { name: "Nachricht diktieren", exact: true }).click(); await panel(mobile).getByText("Aufnahme läuft", { exact: true }).waitFor();
   await panel(mobile).getByRole("button", { name: "Zurück zum CRM", exact: true }).click();
   await panel(mobile).waitFor({ state: "hidden" }); assert.ok(await mobile.evaluate(() => window.__uxStopped) > stoppedBeforeClose);
-  await mobile.getByRole("button", { name: "Assistent", exact: true }).click();
+  await mobile.getByRole("button", { name: "Jarvis", exact: true }).click();
   assert.equal(await panel(mobile).getByRole("textbox").inputValue(), editedDraft); assert.equal(requests.length, beforeVoice);
   checks.push("discarding and closing a recording release media tracks and retain the unsent draft");
   // A shorter visible viewport exercises keyboard geometry, not an actual phone keyboard.
@@ -220,11 +220,11 @@ try {
   await mobileContext.close();
   // An independent authenticated browser restores the server history.
   const { page: second, context: secondContext } = await context(owner.id, { width: 1280, height: 800 });
-  await second.goto(`${origin}/heute`); await second.getByRole("button", { name: "Assistent", exact: true }).click();
+  await second.goto(`${origin}/heute`); await second.getByRole("button", { name: "Jarvis", exact: true }).click();
   await panel(second).getByText("Dokumentiere das Gespräch mit Jonas.", { exact: true }).waitFor();
   checks.push("second authenticated browser restores sent history from the server");
   for (let index = 0; index < 12; index++) await db.aiConversation.create({ data: { userId: owner.id, title: `Weiteres Gespräch ${index}: ${"Langer Titel ".repeat(6)}`, startedAt: new Date(Date.now() - 86400000), updatedAt: new Date(Date.now() - 86400000 + index), expiresAt: new Date(Date.now() + 86400000) } });
-  await second.reload(); await second.getByRole("button", { name: "Assistent", exact: true }).click(); await panel(second).getByRole("textbox").waitFor();
+  await second.reload(); await second.getByRole("button", { name: "Jarvis", exact: true }).click(); await panel(second).getByRole("textbox").waitFor();
   await panel(second).getByRole("button", { name: "Unterhaltungen öffnen", exact: true }).click();
   await panel(second).getByRole("button", { name: "Weitere laden", exact: true }).click();
   const expectedConversations = await db.aiConversation.count({ where: { userId: owner.id } });
@@ -232,7 +232,7 @@ try {
   assert.equal(await panel(second).locator(".assistant-conversation-row").count(), expectedConversations);
   await shot(second, "desktop-conversations"); checks.push("conversation pagination exposes every valid conversation including long titles");
   const full = await db.aiConversation.create({ data: { userId: owner.id, title: "Vollständiges Gespräch", expiresAt: new Date(Date.now() + 86400000), messages: { create: Array.from({ length: 20 }, (_, index) => ({ role: index % 2 ? "assistant" : "user", content: `Alte Nachricht ${index}`, createdAt: new Date(Date.now() - 10000 + index) })) } } });
-  await second.reload(); await second.getByRole("button", { name: "Assistent", exact: true }).click();
+  await second.reload(); await second.getByRole("button", { name: "Jarvis", exact: true }).click();
   await panel(second).getByText("Diese Unterhaltung hat 20 Nachrichten erreicht. Deine nächste Nachricht beginnt ein neues Gespräch.", { exact: true }).waitFor();
   await send(second, "Neue Frage nach vollem Gespräch");
   await panel(second).getByText("Hier beginnt eine neue Unterhaltung. Das vorherige Gespräch hat 20 Nachrichten erreicht.", { exact: true }).waitFor();
@@ -242,7 +242,7 @@ try {
   assert.notEqual(latest.id, full.id); checks.push("20-message boundary starts a separate conversation without old visible context");
   // Verify immediate expiry both in the open browser and the HTTP route.
   await db.aiConversation.update({ where: { id: latest.id }, data: { expiresAt: new Date(Date.now() + 5000) } });
-  await second.reload(); await second.getByRole("button", { name: "Assistent", exact: true }).click();
+  await second.reload(); await second.getByRole("button", { name: "Jarvis", exact: true }).click();
   await panel(second).getByText("Das vorherige Gespräch ist abgelaufen. Hier beginnt ein neues. Deine CRM-Einträge bleiben erhalten.", { exact: true }).waitFor();
   const expiredResponse = await secondContext.request.get(`${origin}/api/ai-crm/conversations/${latest.id}`); assert.equal(expiredResponse.status(), 410);
   await second.evaluate(() => { document.documentElement.style.fontSize = "32px"; }); await noOverflow(second); await shot(second, "desktop-200-percent-text");
@@ -267,7 +267,7 @@ try {
   checks.push("formatted replies, safe markdown, long-answer reading position and scroll preservation");
   await secondContext.close();
   const { page: restricted, context: restrictedContext } = await context(locked.id, { width: 375, height: 812 }, true);
-  await restricted.goto(`${origin}/heute`); await restricted.getByRole("button", { name: "Assistent", exact: true }).click(); await panel(restricted).getByText("Der Assistent ist für dein Konto noch nicht freigeschaltet.", { exact: true }).waitFor(); assert.equal(await panel(restricted).getByRole("textbox").count(), 0); await shot(restricted, "mobile-locked"); await restrictedContext.close();
+  await restricted.goto(`${origin}/heute`); await restricted.getByRole("button", { name: "Jarvis", exact: true }).click(); await panel(restricted).getByText("Der Assistent ist für dein Konto noch nicht freigeschaltet.", { exact: true }).waitFor(); assert.equal(await panel(restricted).getByRole("textbox").count(), 0); await shot(restricted, "mobile-locked"); await restrictedContext.close();
   checks.push("locked access, microphone denial, delete focus and 320px overflow checked");
   assert.deepEqual(errors, []);
   for (const name of ["failure.png", "failure.html"]) await rm(new URL(name, output), { force: true });
