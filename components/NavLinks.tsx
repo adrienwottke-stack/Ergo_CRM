@@ -45,10 +45,11 @@ function Symbol({ name }: { name?: NavSymbol }) {
     </svg>
   );
 }
-export default function NavLinks({ links }: { links: NavLink[] }) {
+export default function NavLinks({ links, calculatorEnabled = false }: { links: NavLink[]; calculatorEnabled?: boolean }) {
   const pathname = usePathname();
   return (
     <div className="crm-dock">
+      <p className="crm-nav-caption">Arbeitsbereich</p>
       <NamenSammelnLink className="crm-collection-mobile" />
       <nav aria-label="Hauptnavigation" className="crm-navigation">
         {links.map((link) => (
@@ -62,6 +63,12 @@ export default function NavLinks({ links }: { links: NavLink[] }) {
             <span>{link.label}</span>
           </Link>
         ))}
+      </nav>
+      <nav aria-label="Werkzeuge und Hilfe" className="crm-tools-navigation">
+        <p className="crm-nav-caption">Werkzeuge</p>
+        {calculatorEnabled && <Link href="/zinsrechner" aria-current={pathname === "/zinsrechner" ? "page" : undefined}>Zinsrechner</Link>}
+        <Link href="/hilfe" aria-current={pathname === "/hilfe" ? "page" : undefined}>Hilfe und Support</Link>
+        <Link href="/profil" aria-current={pathname === "/profil" ? "page" : undefined}>Profil und Einstellungen</Link>
       </nav>
     </div>
   );

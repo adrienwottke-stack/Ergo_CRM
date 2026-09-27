@@ -1,4 +1,10 @@
 /** Browser-safe contracts. No provider or database imports. */
+export type AiExecutionMode = "READ_ONLY" | "CONFIRM" | "AUTONOMOUS";
+export const EXECUTION_MODES: Record<AiExecutionMode, { label: string; description: string }> = {
+  READ_ONLY: { label: "Nur lesen", description: "Daten lesen und erklären. Keine Änderungen oder Nachrichten." },
+  CONFIRM: { label: "Änderungen bestätigen", description: "Änderungen zuerst prüfen und gemeinsam freigeben." },
+  AUTONOMOUS: { label: "Selbstständig arbeiten", description: "Eindeutige Aufträge direkt ausführen – auch Löschen, Versand und Verwaltung. Gilt für diesen Chat." },
+};
 export type AssistantContext = {
   contactId?: string;
   partnerId?: string;
@@ -59,6 +65,8 @@ export type Entry = {
 };
 
 export type ConversationSummary = {
+  executionMode?: AiExecutionMode;
+  executionVersion?: number;
   id: string;
   title: string;
   expiresAt: string;
@@ -67,6 +75,7 @@ export type ConversationSummary = {
 };
 
 export type AssistantAccess = {
+  executionModesEnabled?: boolean;
   userId: string;
   enabled: boolean;
   liveAvailable?: boolean;

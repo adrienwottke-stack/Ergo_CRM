@@ -135,6 +135,8 @@ export async function POST(request: Request) {
       requestId: claimed.request.id,
       conversation: {
         id: resolved.conversation.id,
+        executionMode: resolved.conversation.executionMode,
+        executionVersion: resolved.conversation.executionVersion,
         title: resolved.conversation.title,
         expiresAt: resolved.conversation.expiresAt.toISOString(),
         restarted: resolved.restarted,

@@ -138,10 +138,10 @@ async function runTurn(request: Request, context: RouteContext, progress: (phase
       maxMessages: config.conversationMaxMessages,
     });
     const conversation = prepared.conversation;
-    if (prepared.restarted) {
+    {
       const updated = await prisma.aiRequest.updateMany({
         where: { id: claimed.request.id, userId: user.id, status: "IN_PROGRESS" },
-        data: { expiresAt: conversation.expiresAt },
+        data: { conversationId: conversation.id, expiresAt: conversation.expiresAt },
       });
       if (updated.count !== 1) {
         throw new AiCrmError(
@@ -199,7 +199,7 @@ async function runTurn(request: Request, context: RouteContext, progress: (phase
       answer: string;
       actions: typeof actions;
       music: typeof result.music;
-      conversation: { id: string; title: string; expiresAt: string; updatedAt: string; messageCount: number; restarted: boolean; restartReason: "expired" | "limit" | null };
+      conversation: { executionMode?: import("@/lib/ai-crm/contracts").AiExecutionMode; executionVersion?: number; id: string; title: string; expiresAt: string; updatedAt: string; messageCount: number; restarted: boolean; restartReason: "expired" | "limit" | null };
       fallbackAudio?: string;
     } = {
       mode: currentSession.provider === "live" ? "live" as const : "simulation" as const,
@@ -213,7 +213,7 @@ async function runTurn(request: Request, context: RouteContext, progress: (phase
       actions,
       music: result.music,
       conversation: {
-        id: conversation.id,
+        id: conversation.id, executionMode: conversation.executionMode, executionVersion: conversation.executionVersion,
         title: conversation.title,
         expiresAt: conversation.expiresAt.toISOString(),
         updatedAt: now.toISOString(),

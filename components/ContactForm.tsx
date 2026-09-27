@@ -14,10 +14,14 @@ export default async function ContactForm({
   action,
   contact,
   submitLabel,
+  returnTo,
+  listKind,
 }: {
   action: (formData: FormData) => Promise<void>;
   contact?: Contact;
   submitLabel: string;
+  returnTo?: string;
+  listKind?: "VERKAUF" | "RECRUITING";
 }) {
   // Schluessel gegen doppelt angelegte Kontakte: ein Wert je gerendertem
   // Formular, egal wie oft abgeschickt wird. connection() haelt die Seite
@@ -32,6 +36,8 @@ export default async function ContactForm({
   return (
     <form action={action} className={`${card} space-y-5 p-6 sm:p-8`}>
       {contact && <input type="hidden" name="contactId" value={contact.id} />}
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
+      {listKind && <input type="hidden" name="listKind" value={listKind} />}
       {formToken && <input type="hidden" name="formToken" value={formToken} />}
 
       <div className="grid gap-5 sm:grid-cols-2">

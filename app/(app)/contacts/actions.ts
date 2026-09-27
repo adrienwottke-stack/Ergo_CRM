@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { contactHref, contactListReturn } from "@/lib/contact-navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireUserPerson } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
@@ -94,7 +95,7 @@ export async function createContact(formData: FormData) {
   let formToken = optional(formData, "formToken");
   if (formToken) {
     const twin = await contactFromSameForm(formToken, data.name, user.id);
-    if (twin?.id) redirect(`/contacts/${twin.id}`);
+    if (twin?.id) redirect(contactHref(twin.id, contactListReturn(formData.get("returnTo"))));
     // Schluessel schon vergeben, aber fuer jemand anderen: dieser Kontakt
     // laeuft ohne – sonst wuerde der eindeutige Index ihn abweisen.
     if (twin) formToken = null;
@@ -109,6 +110,7 @@ export async function createContact(formData: FormData) {
           formToken,
           ownerId: user.id,
           stage: "NEU",
+          ...(formData.get("listKind") === "VERKAUF" || formData.get("listKind") === "RECRUITING" ? { listKinds: [formData.get("listKind") as "VERKAUF" | "RECRUITING"] } : {}),
         },
       });
       await tx.stageEvent.create({
@@ -133,11 +135,11 @@ export async function createContact(formData: FormData) {
     if (!isDuplicate(error) || !formToken) throw error;
     const winner = await contactFromSameForm(formToken, data.name, user.id);
     if (!winner?.id) throw error;
-    redirect(`/contacts/${winner.id}`);
+    redirect(contactHref(winner.id, contactListReturn(formData.get("returnTo"))));
   }
 
   refreshContactViews(contact.id);
-  redirect(`/contacts/${contact.id}`);
+  redirect(contactHref(contact.id, contactListReturn(formData.get("returnTo"))));
 }
 
 export async function updateContact(formData: FormData) {
@@ -155,7 +157,7 @@ export async function updateContact(formData: FormData) {
   if (count === 0) throw new Error("Kontakt nicht gefunden.");
 
   refreshContactViews(contactId);
-  redirect(`/contacts/${contactId}`);
+  redirect(contactHref(contactId, contactListReturn(formData.get("returnTo"))));
 }
 
 /**

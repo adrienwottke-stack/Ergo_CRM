@@ -11,5 +11,6 @@ export function crmOrientationAnswer(message: string): string | null {
     + "- **Kontakte finden und nachfassen:** Zum Beispiel: „Suche meinen Kontakt Anna“ oder „Bereite eine Wiedervorlage für morgen vor“.\n"
     + "- **Gespräche festhalten:** Erzähl mir, was besprochen wurde; ich bereite daraus einen Eintrag vor.\n"
     + "- **Partnergespräche vorbereiten:** Soweit du Zugriff hast, kann ich dokumentierte Notizen, Aufgaben und Vereinbarungen zusammenstellen.\n\n"
+    + "Außerdem kann ich mit deinen bestehenden Rechten Listen und Pipeline bearbeiten, Termine verwalten, Ziele und Einheiten erfassen, interne Nachrichten senden, Einladungen und Strukturpersonen verwalten sowie Zinsrechner-Szenarien bearbeiten. Mit Verwaltungsrechten kommen Werkstatt und Kontoverwaltung hinzu. Ich prüfe dafür die verfügbaren Funktionen und echten Daten.\n\n"
     + "Änderungen zeige ich dir zuerst als Vorschau. Gespeichert wird erst nach deinem Klick auf die Bestätigung. Wollen wir mit deinem heutigen Tag anfangen?";
 }

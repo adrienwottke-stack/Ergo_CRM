@@ -8,7 +8,7 @@ import { musicProviderForLive } from "@/lib/ai-crm/live-music";
 import { endLiveSession, startLiveSession } from "@/lib/ai-crm/live-sessions";
 import { assertLiveAvailable, createProviderSession, livePublicConfig, sendProviderUpdate } from "@/lib/ai-crm/live-provider";
 import { classifyOpenAiProviderError } from "@/lib/ai-crm/openai-errors";
-import { JARVIS_VOICES } from "@/lib/ai-crm/voice-style";
+import { JARVIS_ENERGY_LEVELS, JARVIS_VOICES } from "@/lib/ai-crm/voice-style";
 
 export const dynamic = "force-dynamic";
 
@@ -19,17 +19,18 @@ const bodySchema = z
     sdp: z.string().min(20).max(64_000).optional(),
     reconnect: z.boolean().optional(),
     voice: z.enum(JARVIS_VOICES).optional(),
+    energy: z.enum(JARVIS_ENERGY_LEVELS).optional(),
   })
   .strict();
 
 function publicConversation(
-  conversation: { id: string; title: string; expiresAt: Date; updatedAt: Date },
+  conversation: { executionMode?: import("@/lib/ai-crm/contracts").AiExecutionMode; executionVersion?: number; id: string; title: string; expiresAt: Date; updatedAt: Date },
   restarted: boolean,
   restartReason: "expired" | "limit" | null,
   messageCount: number,
 ) {
   return {
-    id: conversation.id,
+    id: conversation.id, executionMode: conversation.executionMode, executionVersion: conversation.executionVersion,
     title: conversation.title,
     expiresAt: conversation.expiresAt.toISOString(),
     updatedAt: conversation.updatedAt.toISOString(),
@@ -133,7 +134,7 @@ export async function POST(request: Request) {
       try {
         assertNotCancelled();
         if (started.reused && session.providerSessionRef) await sendProviderUpdate(session.providerSessionRef, "", { close: true });
-        const created = await createProviderSession({ sdp: parsed.data.sdp!, greetingPending: session.introState === "WAITING", profileName: user.name, config: { ...config, liveVoice: parsed.data.voice ?? config.liveVoice } });
+        const created = await createProviderSession({ sdp: parsed.data.sdp!, greetingPending: session.introState === "WAITING", profileName: user.name, energy: parsed.data.energy, config: { ...config, liveVoice: parsed.data.voice ?? config.liveVoice } });
         cleanup!.providerRef = created.session.id;
         assertNotCancelled();
         transport = created.transport;

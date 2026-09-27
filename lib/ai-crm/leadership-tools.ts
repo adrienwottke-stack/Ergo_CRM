@@ -62,11 +62,11 @@ const descriptions: Record<LeadershipToolName, string> = {
   update_leadership_task: "Bereitet Änderung eines eindeutig gewählten eigenen offenen Führungsschritts mit bekannter Version vor. Sichtbare Bestätigung erforderlich.",
   complete_leadership_task: "Bereitet Erledigen eines eindeutig gewählten eigenen Führungsschritts mit bekannter Version vor. Sichtbare Bestätigung erforderlich.",
   create_appointment: "Bereitet eigenen internen Kalendereintrag vor. Versendet keine Einladungen. Beginn und Ende samt Zeitzone müssen bekannt sein; keine freie Zeit anderer behaupten. Sichtbare Bestätigung erforderlich.",
-  update_appointment: "Bereitet Verschieben oder Bearbeiten eines eindeutig gewählten eigenen internen Termins vor. Keine Einladung; sichtbare Bestätigung erforderlich.",
+  update_appointment: "Bereitet Verschieben oder Bearbeiten eines eindeutig gewählten eigenen internen Termins vor. Keine Einladung; Ausführung gemäß Chatmodus.",
   propose_agreement: "Bereitet geteilten Absprachevorschlag mit einem direkt geführten Partner oder dem eigenen Führungskontakt vor. Verantwortlicher muss einer der beiden Beteiligten sein. Speicherung nach Nutzerklick als VORGESCHLAGEN; gemeinsam bestätigt erst nach Gegenbestätigung. Empfehlungen niemals als berichtete Vereinbarung darstellen.",
   update_agreement: "Bereitet Inhaltsänderung einer eigenen berechtigten Absprache mit bekannter Version vor. Ändern setzt sie zur erneuten Gegenbestätigung auf VORGESCHLAGEN. Sichtbare Bestätigung erforderlich.",
   respond_agreement: "Bereitet Bestätigen, Ablehnen, Erledigen oder Absagen einer eigenen Absprache vor. Die vorschlagende Person darf nicht selbst die gemeinsame Zustimmung bestätigen. Sichtbare Bestätigung erforderlich.",
-  link_agreement_appointment: "Verbindet nach sichtbarer Bestätigung eine eigene berechtigte Absprache mit einem eigenen bestehenden internen Termin. Private Termindetails und private Quellnotizen werden nicht geteilt.",
+  link_agreement_appointment: "Verbindet gemäß Chatmodus eine eigene berechtigte Absprache mit einem eigenen bestehenden internen Termin. Private Termindetails und private Quellnotizen werden nicht geteilt.",
 };
 
 const providerKeys = new Set(["type", "properties", "required", "additionalProperties", "enum", "anyOf", "items"]);

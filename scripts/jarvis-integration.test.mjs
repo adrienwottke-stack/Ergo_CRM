@@ -5,6 +5,8 @@ import { registerHooks } from "node:module";
 import { testDatabase } from "./test-db.mjs";
 const fixture = await testDatabase();
 const db = fixture.client;
+process.env.AI_CRM_ENABLED = "true";
+await db.feature.upsert({ where: { key: "aiCrm" }, create: { key: "aiCrm", titel: "AI", state: "TEST" }, update: { state: "TEST" } });
 globalThis.jarvisIntegrationDb = db;
 registerHooks({ resolve(specifier, context, next) { return specifier === "@/lib/prisma" ? { url: "data:text/javascript,export const prisma=globalThis.jarvisIntegrationDb", shortCircuit: true } : next(specifier, context); } });
 const { stageAction, executeActionPlan, actionReceipts, reviseActionPlan, cancelActionPlans, resolveAssistantContext, pendingProposalList } = await import("../lib/ai-crm/action-plans.ts");

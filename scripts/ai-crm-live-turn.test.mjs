@@ -5,6 +5,8 @@ import { testDatabase } from "./test-db.mjs";
 
 const fixture = await testDatabase();
 const db = fixture.client;
+process.env.AI_CRM_ENABLED = "true";
+await db.feature.upsert({ where: { key: "aiCrm" }, create: { key: "aiCrm", titel: "AI", state: "TEST" }, update: { state: "TEST" } });
 after(async () => fixture.close());
 
 const { startLiveSession } = await import("../lib/ai-crm/live-sessions.ts");
@@ -15,6 +17,7 @@ async function account(name) {
   return db.user.create({
     data: {
       name,
+      aiBetaEnabled: true,
       onboardingDoneAt: new Date(),
       person: { create: { name } },
     },

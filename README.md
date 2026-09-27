@@ -18,6 +18,12 @@ Der aktuelle Produktmaßstab und die Umsetzung stehen in
 [Audit des Kernmodells](docs/audit-kernmodell.md) bleibt eine historische
 Bestandsaufnahme.
 
+Für Navigation, Seitenmuster und die Einbindung von Jarvis gilt seit dem
+27. September 2026 die [verbindliche HubSpot-Ausrichtung](docs/produkt-design-hubspot.md).
+Sie hat Vorrang vor älteren allgemeinen ChatGPT-/Claude-Designreferenzen.
+Die [lokale Abnahme mit Ansichten](docs/hubspot-workspace-abnahme-2026-09-27.md)
+dokumentiert Umsetzung, Prüfungen und noch offene echte Sprach-/Gerätetests.
+
 ## Funktionen
 
 - **Kontakte:** Namen aufnehmen, Nummern ergänzen, Gesprächshilfe beim ersten

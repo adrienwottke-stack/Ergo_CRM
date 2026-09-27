@@ -22,7 +22,7 @@ export default function SeitenKopf({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-start justify-between gap-4", className)}>
+    <div className={cn("crm-page-heading flex flex-wrap items-start justify-between gap-4", className)}>
       <div className="min-w-0">
         {kicker && <p className={cn(kickerStil, "mb-1")}>{kicker}</p>}
         <h1 className={pageTitle}>{titel}</h1>
@@ -30,7 +30,7 @@ export default function SeitenKopf({
           <p className="mt-1.5 text-sm text-ink-muted">{unterzeile}</p>
         )}
       </div>
-      {aktion && <div className="shrink-0">{aktion}</div>}
+      {aktion && <div className="crm-page-actions">{aktion}</div>}
     </div>
   );
 }

@@ -33,7 +33,7 @@ export default function AssistantSurface({ userId }: { userId: string }) {
       if (event.key === "F6" && window.innerWidth >= 1100 && mode === "panel") {
         event.preventDefault(); const inAssistant = document.activeElement?.closest("#crm-assistant-surface");
         if (inAssistant) { main?.setAttribute("tabindex", "-1"); main?.focus(); }
-        else document.querySelector<HTMLButtonElement>(".assistant-header button")?.focus();
+        else document.querySelector<HTMLButtonElement>(".assistant-header .assistant-nav-toggle")?.focus();
       }
     };
     sync(); window.addEventListener("resize", sync); window.visualViewport?.addEventListener("resize", sync); window.visualViewport?.addEventListener("scroll", sync); window.addEventListener("keydown", keyboard);

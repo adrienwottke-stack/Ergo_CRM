@@ -1,11 +1,23 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { listConversations } from "@/lib/ai-crm/conversations";
-import { aiErrorResponse } from "@/lib/ai-crm/http";
+import { listConversations, resolveConversation } from "@/lib/ai-crm/conversations";
+import { aiErrorResponse, sameOrigin } from "@/lib/ai-crm/http";
+import { AiCrmError } from "@/lib/ai-crm/errors";
 import { requireAiEntitlement } from "@/lib/ai-crm/entitlement";
 import { aiCrmConfig } from "@/lib/ai-crm/config";
 
 export const dynamic = "force-dynamic";
+
+export async function POST(request: Request) {
+  try {
+    if (!sameOrigin(request)) throw new AiCrmError("ORIGIN_DENIED", "Nicht erlaubt.", 403);
+    const user = await requireUser();
+    const config = aiCrmConfig();
+    await requireAiEntitlement(prisma, user.id, new Date(), config);
+    const { conversation } = await resolveConversation(prisma, { userId: user.id, message: "Neuer Chat", retentionDays: config.conversationRetentionDays, maxMessages: config.conversationMaxMessages });
+    return Response.json({ ...conversation, messageCount: 0 }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) { return aiErrorResponse(error); }
+}
 
 export async function GET(request: Request) {
   try {

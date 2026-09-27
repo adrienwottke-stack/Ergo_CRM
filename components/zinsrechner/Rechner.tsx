@@ -22,6 +22,7 @@ import {
 import Verlauf from "./Verlauf";
 import Historie from "./Historie";
 import styles from "./zinsrechner.module.css";
+import { AssistantContextEntry } from "@/components/ai-crm/AssistantEntry";
 
 type Props = {
   berater: RechnerBerater;
@@ -29,6 +30,7 @@ type Props = {
   initial: GespeichertesSzenario | null;
   saved: GespeichertesSzenario[];
   storageError?: boolean;
+  draftValues?: RechnerWerte;
 };
 type Wechsel =
   { kind: "new" } | { kind: "open"; scenario: GespeichertesSzenario };
@@ -174,8 +176,9 @@ export default function Rechner({
   initial,
   saved: initialSaved,
   storageError = false,
+  draftValues,
 }: Props) {
-  const initialValues = initial?.values ?? {
+  const initialValues = initial?.values ?? draftValues ?? {
     ...standardWerte(),
     customerName: initialContact?.name ?? "",
   };
@@ -551,6 +554,7 @@ export default function Rechner({
           Verändere Sparrate, Zeit und Renditeannahme. Die Berechnung passt sich
           direkt an.
         </p>
+        {!presentation && <AssistantContextEntry appendPrompt label="Aktuelle Berechnung mit Jarvis besprechen" context={contact ? { contactId: contact.id, label: contact.name } : undefined} prompt={`Erläutere meine aktuelle Modellrechnung mit der CRM-Rechenlogik: ${values.start} Euro Startkapital, ${values.monthly} Euro monatlich, ${values.years} Jahre, ${rendite(values)} Prozent angenommene Rendite. Diese manuell eingestellten Werte sind der aktuelle Stand.`} />}
       </header>
       <div
         className={`${styles.dock} ${presentation ? styles.presentationDock : ""}`}

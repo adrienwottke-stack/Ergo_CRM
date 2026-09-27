@@ -1,3 +1,4 @@
+import { describeWorkOperation, parseOperation, workActor } from "@/lib/ai-crm/work-registry";
 import { Prisma, type PrismaClient } from "@/lib/generated/prisma/client";
 import { AiCrmError, safeAiMessage } from "@/lib/ai-crm/errors";
 import { hashAiRequestInput } from "@/lib/ai-crm/requests";
@@ -8,6 +9,7 @@ import { aiUndoState, sameAiUndoState, type AiUndoGuard } from "@/lib/ai-crm/und
 import { LEADERSHIP_SCHEMAS, describeLeadershipPlan, lockLeadershipPlan, resolveLeadershipPartner, readLeadershipSource } from "@/lib/ai-crm/leadership-tools";
 import { leadershipScopeFingerprint } from "@/lib/ai-crm/leadership-scope";
 import { berlinLocalToUtc, utcToBerlinLocalInput } from "@/lib/dates";
+import { assertExecutionAllowed } from "@/lib/ai-crm/execution-policy";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 type Plan = {
@@ -16,6 +18,7 @@ type Plan = {
   args: Record<string, unknown>;
   expected: Record<string, unknown>;
   receipt: ActionReceipt;
+  dependsOn?: string;
 };
 type Stored = CrmToolResult & { plan?: Plan; error?: string };
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
@@ -46,7 +49,8 @@ export async function resolveAssistantContext(db: Db, userId: string, context: O
   return { contact, followUp, attachment: { contactId: contact.id, label: contact.name, ...(followUp ? { followUpId: followUp.id } : {}) } satisfies AssistantContext };
 }
 
-async function describePlan(db: Db, userId: string, name: string, args: Record<string, unknown>): Promise<Plan> {
+async function describePlan(db: Db, userId: string, name: string, args: Record<string, unknown>, proposedContact?: Record<string, unknown>): Promise<Plan> {
+  if (name === "execute_crm_operation") return { version: 1, name, args, ...await describeWorkOperation(db, userId, args) };
   if (Object.hasOwn(LEADERSHIP_SCHEMAS, name)) {
     const described = await describeLeadershipPlan(db, userId, name, args);
     return { version: 1, name, args, ...described };
@@ -55,10 +59,10 @@ async function describePlan(db: Db, userId: string, name: string, args: Record<s
   const followUp = name === "complete_follow_up" ? await db.contactFollowUp.findFirst({ where: { id: String(args.followUpId), ownerId: userId, contact: { ownerId: userId } } }) : null;
   if (name === "complete_follow_up" && (!followUp || followUp.status !== "OPEN")) throw new AiCrmError("FOLLOW_UP_NOT_FOUND", "Diese offene Wiedervorlage ist nicht verfügbar.", 404);
   if (followUp) contactId = followUp.contactId;
-  const contact = contactId ? await db.contact.findFirst({ where: { id: contactId, ownerId: userId } }) : null;
+  const contact = proposedContact ?? (contactId ? await db.contact.findFirst({ where: { id: contactId, ownerId: userId } }) : null);
   if (name !== "create_contact" && !contact) throw new AiCrmError("CONTACT_NOT_FOUND", "Diesen Kontakt kann ich in deinen eigenen CRM-Daten nicht öffnen.", 404);
   const expected: Record<string, unknown> = {};
-  const receipt: ActionReceipt = { summary: "Änderung prüfen", contactName: contact?.name ?? String(args.name), status: "PENDING", undoable: false, link: contact ? `/contacts/${contact.id}` : undefined, details: [] };
+  const receipt: ActionReceipt = { summary: "Änderung prüfen", contactName: String(contact?.name ?? args.name), status: "PENDING", undoable: false, link: contact && !proposedContact ? `/contacts/${contact.id}` : undefined, details: [] };
   if (contact) { expected.contactId = contact.id; expected.name = contact.name; }
   switch (name) {
     case "create_contact":
@@ -98,7 +102,9 @@ export function permitsDirectAction(_message: string, _tool: string, _actionCoun
 const editableLabels: Record<string, string> = { text: "Gesprächsnotiz", title: "Inhalt", titel: "Inhalt", note: "Notiz / Herkunft", at: "Fällig am (Berliner Zeit)", dueAt: "Fällig am (Berliner Zeit)", occurredAt: "Gespräch am (Berliner Zeit)", faelligAm: "Fällig am (Berliner Zeit)", endetAm: "Ende (Berliner Zeit)", start: "Beginn (Berliner Zeit)", end: "Ende (Berliner Zeit)", startAt: "Beginn (Berliner Zeit)", endAt: "Ende (Berliner Zeit)", von: "Beginn (Berliner Zeit)", bis: "Ende (Berliner Zeit)", location: "Ort", ort: "Ort" };
 const editableDates = new Set(["at", "dueAt", "occurredAt", "faelligAm", "endetAm", "start", "end", "startAt", "endAt", "von", "bis"]);
 function editableFields(plan: Plan): PlanField[] {
-  const fields: PlanField[] = Object.entries(plan.args).filter(([key, value]) => editableLabels[key] && (typeof value === "string" || value === null)).map(([name, value]) => ({ name, value: value == null ? "" : editableDates.has(name) ? utcToBerlinLocalInput(new Date(String(value))) : String(value), label: editableLabels[name], type: editableDates.has(name) ? "datetime" : "text" }));
+  if (plan.name === "execute_crm_operation") return (plan.args.fields as Array<{ name: string; value: string }>).filter(field => !/Id$|^ids$|^id$|^name$/.test(field.name)).map(field => ({ ...field, label: editableLabels[field.name] ?? field.name, type: "text" as const }));
+  const fieldLabels = plan.name === "create_contact" || plan.name === "update_contact" ? { ...editableLabels, ...labels } : editableLabels;
+  const fields: PlanField[] = Object.entries(plan.args).filter(([key, value]) => fieldLabels[key] && (typeof value === "string" || value === null) && (plan.name !== "update_contact" || (plan.args.changeFields as string[]).includes(key))).map(([name, value]) => ({ name, value: value == null ? "" : editableDates.has(name) ? utcToBerlinLocalInput(new Date(String(value))) : String(value), label: fieldLabels[name], type: editableDates.has(name) ? "datetime" : "text" }));
   if (typeof plan.args.responsibleId === "string") {
     const scope = plan.expected.scope as { userId?: string; partnerId?: string; initiator?: { userId: string }; receiver?: { userId: string } };
     const ids = [scope?.userId, scope?.partnerId, scope?.initiator?.userId, scope?.receiver?.userId].filter((id): id is string => Boolean(id));
@@ -118,15 +124,35 @@ function editedValue(plan: Plan, key: string, value: string) {
   return instant.toISOString();
 }
 const planRevision = (plan: Plan) => hashAiRequestInput({ name: plan.name, args: plan.args, expected: plan.expected });
+async function cancelDependents(db: Db, userId: string, requestId: string, parentIds: string[]) {
+  const pending = await db.aiToolExecution.findMany({ where: { userId, requestId, status: "PENDING" }, select: { id: true, result: true } });
+  const canceled = new Set(parentIds);
+  for (let pass = 0; pass < pending.length; pass++) for (const row of pending) {
+    const dependency = (row.result as unknown as Stored | null)?.plan?.dependsOn;
+    if (dependency && canceled.has(dependency)) canceled.add(row.id);
+  }
+  await db.aiToolExecution.updateMany({ where: { userId, requestId, id: { in: [...canceled] }, status: "PENDING" }, data: { status: "CANCELED" } });
+}
 
 export async function stageAction(db: PrismaClient, params: { userId: string; requestId: string; name: string; arguments: unknown; key: string }) {
   const parsed = parseTool(params.name, params.arguments);
   if (!WRITE_TOOLS.has(parsed.name)) throw new AiCrmError("INVALID_TOOL", "Diese Aktion verändert keine CRM-Daten.");
   return db.$transaction(async tx => {
+    await assertExecutionAllowed(tx, params.userId, params.requestId, false);
     await tx.$queryRaw`SELECT "id" FROM "AiRequest" WHERE "id" = ${params.requestId} AND "userId" = ${params.userId} FOR UPDATE`;
     const request = await tx.aiRequest.findFirst({ where: { id: params.requestId, userId: params.userId, status: "IN_PROGRESS", expiresAt: { gt: new Date() } } });
     if (!request) throw new AiCrmError("REQUEST_ABORTED", "Die Anfrage wurde beendet.", 409);
-    const plan = await describePlan(tx, params.userId, parsed.name, parsed.args);
+    let plan: Plan;
+    const reference = typeof parsed.args.contactId === "string" && parsed.args.contactId.startsWith("pending:") ? parsed.args.contactId.slice(8) : null;
+    if (reference) {
+      if (!["add_note", "add_activity", "create_follow_up", "update_contact"].includes(parsed.name)) throw new AiCrmError("INVALID_DEPENDENCY", "Diese Folgeaktion braucht einen bestehenden Kontakt.");
+      const parent = await tx.aiToolExecution.findFirst({ where: { id: reference, userId: params.userId, requestId: params.requestId, status: "PENDING" } });
+      const parentPlan = (parent?.result as unknown as Stored)?.plan;
+      if (!parentPlan || parentPlan.name !== "create_contact") throw new AiCrmError("INVALID_DEPENDENCY", "Die vorgeschaltete Kontaktanlage ist nicht verfügbar.");
+      plan = await describePlan(tx, params.userId, parsed.name, parsed.args, { ...parentPlan.args, id: parsed.args.contactId });
+      plan.dependsOn = reference;
+      plan.receipt.details = [...(plan.receipt.details ?? []), "Wird nach der oben vorgeschlagenen Kontaktanlage ausgeführt."];
+    } else plan = await describePlan(tx, params.userId, parsed.name, parsed.args);
     return tx.aiToolExecution.upsert({
       where: { userId_idempotencyKey: { userId: params.userId, idempotencyKey: params.key } },
       create: { userId: params.userId, requestId: params.requestId, tool: params.name, idempotencyKey: params.key, status: "PENDING", result: json({ plan }) },
@@ -150,10 +176,22 @@ export async function actionReceipts(db: Db, userId: string, requestId: string):
 /** Failed/canceled requests can have private preview details even without a
  * persisted response. Check source access separately from mutable versions. */
 export async function actionPlansAccessible(db: Db, userId: string, requestId: string) {
-  const executions = await db.aiToolExecution.findMany({ where: { userId, requestId }, select: { result: true } });
+  const executions = await db.aiToolExecution.findMany({ where: { userId, requestId }, select: { result: true, status: true } });
   for (const execution of executions) {
     const plan = (execution.result as unknown as Stored | null)?.plan;
-    if (!plan || !Object.hasOwn(LEADERSHIP_SCHEMAS, plan.name)) continue;
+    if (!plan) continue;
+    if (plan.name === "execute_crm_operation") {
+      try {
+        const actor = await workActor(db, userId);
+        const { definition, operation } = parseOperation(plan.args);
+        if (definition.admin && actor.role !== "ADMIN") return false;
+        const subject = plan.expected.subject as { ownerId?: string; userId?: string; inhaberId?: string } | undefined;
+        const deletedOwnRecord = execution.status === "COMPLETED" && operation.startsWith("delete_") && [subject?.ownerId, subject?.userId, subject?.inhaberId].includes(userId);
+        if (!deletedOwnRecord) await describeWorkOperation(db, userId, plan.args);
+      } catch { return false; }
+      continue;
+    }
+    if (!Object.hasOwn(LEADERSHIP_SCHEMAS, plan.name)) continue;
     try {
       if (plan.args.partnerId) await resolveLeadershipPartner(db, userId, String(plan.args.partnerId));
       for (const [key, kind] of [["taskId", "task"], ["agreementId", "agreement"], ["sourceNoteId", "note"], ["appointmentId", "appointment"]] as const) {
@@ -189,10 +227,14 @@ export async function hydrateUndo(db: Db, userId: string, receipts: ActionReceip
 }
 
 export async function executeActionPlan(db: PrismaClient, params: { userId: string; requestId: string; actionIds: string[]; revisions?: Record<string, string>; direct?: boolean }) {
-  if (params.direct) throw new AiCrmError("CONFIRMATION_REQUIRED", "Bitte bestätige die konkrete Vorschau sichtbar.", 409);
+  // Rebase only changes made by earlier actions in this exact confirmation batch.
+  // The next transaction must still match the recorded post-write state.
+  const changedSubjects = new Map<string, unknown>();
   for (const id of params.actionIds) {
+    const afterCommit: Array<() => Promise<unknown>> = [];
     try {
       await db.$transaction(async tx => {
+        await assertExecutionAllowed(tx, params.userId, params.requestId, params.direct === true);
         // Same lock order for confirmation, cancellation and deletion.
         await tx.$queryRaw`SELECT "id" FROM "AiRequest" WHERE "id" = ${params.requestId} AND "userId" = ${params.userId} FOR UPDATE`;
         const request = await tx.aiRequest.findFirst({ where: { id: params.requestId, userId: params.userId, expiresAt: { gt: new Date() }, status: params.direct ? "IN_PROGRESS" : "COMPLETED", conversation: { expiresAt: { gt: new Date() } } } });
@@ -204,19 +246,36 @@ export async function executeActionPlan(db: PrismaClient, params: { userId: stri
         const plan = stored.plan;
         if (!plan || plan.version !== 1) throw new AiCrmError("PLAN_UNAVAILABLE", "Bitte bereite diese Änderung erneut vor.", 409);
         if (params.revisions && params.revisions[id] !== planRevision(plan)) throw new AiCrmError("PLAN_STALE", "Die Vorschau wurde bearbeitet. Bitte prüfe den aktuellen Stand.", 409);
-        if (Object.hasOwn(LEADERSHIP_SCHEMAS, plan.name)) await lockLeadershipPlan(tx, params.userId, plan.name, plan.args);
+        let resolvedArgs = plan.args;
+        if (plan.dependsOn) {
+          const parent = await tx.aiToolExecution.findFirst({ where: { id: plan.dependsOn, requestId: params.requestId, userId: params.userId, status: "COMPLETED" } });
+          const result = parent?.result as unknown as Stored | null;
+          if (!result?.entityId || result.entityType !== "Contact") throw new AiCrmError("DEPENDENCY_PENDING", "Bestätige zuerst die dazugehörige Kontaktanlage. Diese Folgeaktion bleibt offen.", 409);
+          resolvedArgs = { ...plan.args, contactId: result.entityId };
+        }
+        if (Object.hasOwn(LEADERSHIP_SCHEMAS, plan.name)) await lockLeadershipPlan(tx, params.userId, plan.name, resolvedArgs);
         if (plan.expected.contactId) await tx.$queryRaw`SELECT "id" FROM "Contact" WHERE "id" = ${String(plan.expected.contactId)} AND "ownerId" = ${params.userId} FOR UPDATE`;
         if (plan.name === "complete_follow_up") await tx.$queryRaw`SELECT "id" FROM "ContactFollowUp" WHERE "id" = ${String(plan.args.followUpId)} AND "ownerId" = ${params.userId} FOR UPDATE`;
-        const current = await describePlan(tx, params.userId, plan.name, plan.args);
-        if (hashAiRequestInput(current.expected) !== hashAiRequestInput(plan.expected)) throw new AiCrmError("PLAN_STALE", "Der Eintrag wurde inzwischen verändert. Bitte bereite die Änderung erneut vor.", 409);
-        const result = await runCrmTool(db, { userId: params.userId, requestId: request.id, aiRequestId: request.id, sessionId: request.conversationId ?? undefined, name: plan.name, arguments: plan.args, transaction: tx });
+        const current = await describePlan(tx, params.userId, plan.name, resolvedArgs);
+        const subjectKey = plan.name === "execute_crm_operation" && plan.expected.subject ? hashAiRequestInput(plan.expected.subject) : null;
+        const expected = subjectKey && changedSubjects.has(subjectKey) ? { ...plan.expected, subject: changedSubjects.get(subjectKey) } : plan.expected;
+        if (!plan.dependsOn && hashAiRequestInput(current.expected) !== hashAiRequestInput(expected)) throw new AiCrmError("PLAN_STALE", "Der Eintrag wurde inzwischen verändert. Bitte bereite die Änderung erneut vor.", 409);
+        const result = await runCrmTool(db, { userId: params.userId, requestId: request.id, aiRequestId: request.id, sessionId: request.conversationId ?? undefined, name: plan.name, arguments: resolvedArgs, transaction: tx, afterCommit });
+        if (result.privateResult) result.link = `/api/ai-crm/action-results/${id}`;
         await tx.aiToolExecution.update({ where: { id }, data: { status: "COMPLETED", result: json({ ...result, plan }) } });
-      });
+        if (subjectKey) {
+          try {
+            const after = await describeWorkOperation(tx, params.userId, plan.args);
+            changedSubjects.set(subjectKey, after.expected.subject);
+          } catch (error) { if (!(error instanceof AiCrmError) || error.code !== "NOT_FOUND") throw error; }
+        }
+      }, { isolationLevel: "Serializable", timeout: 20000 });
+      await Promise.allSettled(afterCommit.map(work => work()));
     } catch (error) {
       const code = error instanceof AiCrmError ? error.code : "INTERNAL_ERROR";
       // A transient/unknown outcome is recovered by reading the row, never by
       // starting a new model run. Domain failures leave an individual receipt.
-      if (["PLAN_STALE", "CONTACT_NOT_FOUND", "FOLLOW_UP_NOT_FOUND", "LEADERSHIP_NOT_FOUND", "PARTNER_NOT_FOUND", "LEADERSHIP_FORBIDDEN", "FORBIDDEN"].includes(code)) {
+      if (["PLAN_STALE", "NOT_FOUND", "DOMAIN_REJECTED", "FEATURE_DISABLED", "CONTACT_NOT_FOUND", "FOLLOW_UP_NOT_FOUND", "LEADERSHIP_NOT_FOUND", "PARTNER_NOT_FOUND", "LEADERSHIP_FORBIDDEN", "FORBIDDEN"].includes(code)) {
         const execution = await db.aiToolExecution.findFirst({ where: { id, userId: params.userId, requestId: params.requestId, status: "PENDING" } });
         if (execution) await db.aiToolExecution.updateMany({ where: { id, status: "PENDING" }, data: { status: "FAILED", result: json({ ...(execution.result as object), error: safeAiMessage(error) }) } });
       } else throw error;
@@ -228,6 +287,7 @@ export async function executeActionPlan(db: PrismaClient, params: { userId: stri
 /** Editing replaces an immutable proposal. An old click cannot approve the new text. */
 export async function reviseActionPlan(db: PrismaClient, params: { userId: string; requestId: string; actionId: string; revision: string; values: Record<string, string>; destinationRequestId?: string }) {
   await db.$transaction(async tx => {
+    await assertExecutionAllowed(tx, params.userId, params.destinationRequestId ?? params.requestId, false);
     const requestIds = [params.requestId, ...(params.destinationRequestId ? [params.destinationRequestId] : [])].sort();
     await tx.$queryRaw`SELECT "id" FROM "AiRequest" WHERE "id" IN (${Prisma.join(requestIds)}) AND "userId" = ${params.userId} ORDER BY "id" FOR UPDATE`;
     const request = await tx.aiRequest.findFirst({ where: { id: params.requestId, userId: params.userId, status: "COMPLETED", expiresAt: { gt: new Date() }, conversation: { expiresAt: { gt: new Date() } } } });
@@ -238,13 +298,19 @@ export async function reviseActionPlan(db: PrismaClient, params: { userId: strin
     const execution = await tx.aiToolExecution.findFirst({ where: { id: params.actionId, userId: params.userId, requestId: params.requestId, status: "PENDING" } });
     const plan = (execution?.result as unknown as Stored)?.plan;
     if (!request || !execution || !plan || planRevision(plan) !== params.revision) throw new AiCrmError("PLAN_STALE", "Bitte lade die aktuelle Vorschau erneut.", 409);
+    if (plan.dependsOn && params.destinationRequestId && params.destinationRequestId !== params.requestId) throw new AiCrmError("DEPENDENCY_PENDING", "Bitte bearbeite diese Folgeaktion in ihrer ursprünglichen Vorschau, solange die Kontaktanlage noch offen ist.", 409);
     const fields = editableFields(plan);
     if (!Object.keys(params.values).length || Object.keys(params.values).some(key => !fields.some(field => field.name === key))) throw new AiCrmError("INVALID_EDIT", "Dieses Feld kann hier nicht verändert werden.");
-    const nextArgs = { ...plan.args, ...Object.fromEntries(Object.entries(params.values).map(([key, value]) => [key, editedValue(plan, key, value)])) };
+    const nextArgs = plan.name === "execute_crm_operation" ? { ...plan.args, fields: (plan.args.fields as Array<{ name: string; value: string }>).map(field => ({ ...field, value: params.values[field.name] ?? field.value })) } : { ...plan.args, ...Object.fromEntries(Object.entries(params.values).map(([key, value]) => [key, editedValue(plan, key, value)])) };
     for (const field of fields) if (field.options && params.values[field.name] && !field.options.some(option => option.value === params.values[field.name])) throw new AiCrmError("INVALID_EDIT", "Wähle eine berechtigte beteiligte Person.");
     const parsed = parseTool(plan.name, nextArgs);
-    const updated = await describePlan(tx, params.userId, plan.name, parsed.args);
+    const parent = plan.dependsOn ? await tx.aiToolExecution.findFirst({ where: { id: plan.dependsOn, userId: params.userId, requestId: params.requestId, status: "PENDING" } }) : null;
+    const parentPlan = (parent?.result as unknown as Stored | null)?.plan;
+    if (plan.dependsOn && !parentPlan) throw new AiCrmError("PLAN_STALE", "Die dazugehörige Kontaktanlage hat sich geändert. Bitte bereite die Folgeaktion erneut vor.", 409);
+    const updated = await describePlan(tx, params.userId, plan.name, parsed.args, parentPlan ? { ...parentPlan.args, id: parsed.args.contactId } : undefined);
+    if (plan.dependsOn) updated.dependsOn = plan.dependsOn;
     await tx.aiToolExecution.update({ where: { id: execution.id }, data: { status: "CANCELED" } });
+    await cancelDependents(tx, params.userId, params.requestId, [execution.id]);
     await tx.aiToolExecution.create({ data: { userId: params.userId, requestId: params.destinationRequestId ?? params.requestId, tool: plan.name, idempotencyKey: `${execution.id}:revision:${planRevision(updated)}`, status: "PENDING", result: json({ plan: updated }) } });
   });
   return actionReceipts(db, params.userId, params.destinationRequestId ?? params.requestId);
@@ -260,7 +326,11 @@ export async function pendingProposalList(db: PrismaClient, userId: string, conv
   for (const execution of executions) {
     const plan = (execution.result as unknown as Stored)?.plan;
     if (!plan) return [];
-    try { await describePlan(db, userId, plan.name, plan.args); } catch { return []; }
+    try {
+      const parent = plan.dependsOn ? executions.find(item => item.id === plan.dependsOn) : null;
+      const parentPlan = (parent?.result as unknown as Stored | null)?.plan;
+      await describePlan(db, userId, plan.name, plan.args, parentPlan ? { ...parentPlan.args, id: plan.args.contactId } : undefined);
+    } catch { return []; }
   }
   return (await actionReceipts(db, userId, request.id)).filter(action => action.status === "PENDING").map((action, index) => ({ ...action, position: index + 1 }));
 }
@@ -270,7 +340,8 @@ export async function cancelActionPlans(db: PrismaClient, userId: string, reques
     await tx.$queryRaw`SELECT "id" FROM "AiRequest" WHERE "id" = ${requestId} AND "userId" = ${userId} FOR UPDATE`;
     const request = await tx.aiRequest.findFirst({ where: { id: requestId, userId, expiresAt: { gt: new Date() } } });
     if (!request || request.status === "TOMBSTONED") throw new AiCrmError("REQUEST_NOT_FOUND", "Diese Anfrage ist nicht mehr verfügbar.", 404);
-    await tx.aiToolExecution.updateMany({ where: { userId, requestId, status: "PENDING", ...(actionIds ? { id: { in: actionIds } } : {}) }, data: { status: "CANCELED" } });
+    if (actionIds) await cancelDependents(tx, userId, requestId, actionIds);
+    else await tx.aiToolExecution.updateMany({ where: { userId, requestId, status: "PENDING" }, data: { status: "CANCELED" } });
     if (!actionIds) await tx.aiRequest.updateMany({ where: { id: requestId, userId, status: "IN_PROGRESS" }, data: { status: "ABORTED", finishedAt: new Date(), errorCode: "REQUEST_ABORTED" } });
   });
 }

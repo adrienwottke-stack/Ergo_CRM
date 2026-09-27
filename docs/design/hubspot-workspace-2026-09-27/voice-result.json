@@ -1,0 +1,23 @@
+{
+  "passed": true,
+  "viewports": [
+    "1280x800",
+    "375x812"
+  ],
+  "checks": [
+    "global assistant entry and focused Live mode",
+    "local-only microphone, simulated assistant preview and AC/DC/pause responses",
+    "barge-in, final response, session end and microphone cleanup",
+    "shared conversation history, desktop/mobile overflow and mobile dock",
+    "mobile Spotify setup control above the fixed CRM dock",
+    "console and failed network requests"
+  ],
+  "screenshots": [
+    "desktop-dashboard.png",
+    "desktop-live-listening.png",
+    "desktop-live-result.png",
+    "desktop-live-history.png",
+    "mobile-live-listening.png",
+    "mobile-live-spotify.png"
+  ]
+}

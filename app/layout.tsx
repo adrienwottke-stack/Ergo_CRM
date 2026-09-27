@@ -3,6 +3,7 @@ import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./emil.css";
 import "./assistant.css";
+import "./workspace.css";
 import AssistantProvider from "@/components/ai-crm/AssistantProvider";
 import VorfuehrProvider from "@/components/VorfuehrProvider";
 import ServiceWorkerRegistrierung from "@/components/ServiceWorkerRegistrierung";

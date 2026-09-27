@@ -574,7 +574,15 @@ model AiUsage {
 
 // Sieben Tage gueltiger Arbeitskontext. Das Ablaufdatum bleibt ab dem ersten
 // Satz fest und wird durch spaetere Nachrichten nicht verlaengert.
+enum AiExecutionMode {
+  READ_ONLY
+  CONFIRM
+  AUTONOMOUS
+}
+
 model AiConversation {
+  executionMode AiExecutionMode @default(CONFIRM)
+  executionVersion Int @default(0)
   id        String                  @id @default(cuid())
   userId    String
   user      User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -673,6 +681,7 @@ model AiConversationMessage {
 // Nutzerseitige Wiederholungen werden ueber clientRequestId dedupliziert. Die
 // Antwort ist nur solange wie der zugehoerige Kurzzeitkontext abrufbar.
 model AiRequest {
+  executionMode AiExecutionMode?
   id               String            @id @default(cuid())
   userId           String
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)

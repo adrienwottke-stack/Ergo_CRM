@@ -11,7 +11,7 @@ import {
 } from "@/lib/ziele-modell";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
-const zielInclude = {
+export const zielInclude = {
   inhaber: {
     select: { id: true, name: true, path: true, deactivatedAt: true },
   },

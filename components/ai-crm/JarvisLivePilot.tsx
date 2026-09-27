@@ -5,7 +5,7 @@ import type { ActionReceipt, AssistantContext, ReadResult } from "@/lib/ai-crm/c
 import type { JarvisLiveConversation, JarvisLiveProps, JarvisLiveSettings } from "@/components/ai-crm/JarvisLive";
 import { LocalAudioController, isSessionStop, splitMusicCommand, type LocalAudioState, type MusicCommand } from "@/lib/ai-crm/local-audio";
 import { inputTranscriptDelta, LiveUtteranceBuffer, monitorAudio, sessionTiming, waitForIceGathering } from "@/lib/ai-crm/live-audio-input";
-import { JARVIS_DEFAULT_VOICE, JARVIS_VOICE_LABELS, JARVIS_VOICE_VOLUME, JARVIS_VOICES, isLiveSmallTalk, isLiveTaskCancel, isLiveWaitingReply, type JarvisVoice } from "@/lib/ai-crm/voice-style";
+import { JARVIS_DEFAULT_ENERGY, JARVIS_DEFAULT_VOICE, JARVIS_ENERGY_LABELS, JARVIS_ENERGY_LEVELS, JARVIS_VOICE_LABELS, JARVIS_VOICE_VOLUME, JARVIS_VOICES, isLiveSmallTalk, isLiveStyleRequest, isLiveTaskCancel, isLiveWaitingReply, type JarvisEnergy, type JarvisVoice } from "@/lib/ai-crm/voice-style";
 import { LiveCaptions } from "@/lib/ai-crm/live-captions";
 import { LIVE_CLIENT_TIMEOUT_MS, LIVE_PROGRESS, LIVE_STREAM_TYPE, readLiveTurn } from "@/lib/ai-crm/live-progress";
 
@@ -34,6 +34,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const propsRef = useRef(props); propsRef.current = props;
   const [connection, setConnection] = useState<Connection>("IDLE");
   const [selectedVoice, setSelectedVoice] = useState<JarvisVoice>(JARVIS_VOICES.includes(settings.voice as JarvisVoice) ? settings.voice as JarvisVoice : JARVIS_DEFAULT_VOICE);
+  const [selectedEnergy, setSelectedEnergy] = useState<JarvisEnergy>(JARVIS_DEFAULT_ENERGY);
   const captions = useRef(new LiveCaptions());
   const [muted, setMuted] = useState(false);
   const [inputActive, setInputActive] = useState(false);
@@ -324,7 +325,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     const media = splitMusicCommand(text);
     if (media.command) await musicAction(media.command);
     const remaining = media.remainder;
-    if (!remaining || isLiveSmallTalk(remaining) || duringWork && isLiveWaitingReply(remaining)) { delegation.current = undefined; return; }
+    if (!remaining || isLiveSmallTalk(remaining) || isLiveStyleRequest(remaining) || duringWork && isLiveWaitingReply(remaining)) { delegation.current = undefined; return; }
     await submit(remaining, inputInTranscript);
   }, [activity, close, markIntro, musicAction, nextRevision, sendControl, submit]);
   processUtteranceRef.current = processUtterance;
@@ -415,7 +416,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       const clientId = previous?.clientId ?? crypto.randomUUID();
       // Receive the session id even if local setup is cancelled in the meantime:
       // aborting this fetch loses the only handle needed to close a late start.
-      const response = await fetch("/api/ai-crm/live/session", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ clientSessionId: clientId, conversationId: propsRef.current.conversationId ?? undefined, sdp: pc.localDescription?.sdp ?? offer.sdp, reconnect: reconnecting || undefined, voice: selectedVoice }) });
+      const response = await fetch("/api/ai-crm/live/session", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ clientSessionId: clientId, conversationId: propsRef.current.conversationId ?? undefined, sdp: pc.localDescription?.sdp ?? offer.sdp, reconnect: reconnecting || undefined, voice: selectedVoice, energy: selectedEnergy }) });
       const data = await readJson(response);
       const info = data.session as Record<string, unknown> | undefined;
       const transport = data.transport as { sdp?: string } | undefined;
@@ -463,7 +464,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
         if (token === lifecycle.current && typeof blocked?.id === "string") setBlockedSessionId(blocked.id);
       }
     } finally { if (startRequest.current === controller) startRequest.current = null; if (token === lifecycle.current) starting.current = false; }
-  }, [activity, changeIntro, close, duck, markIntro, nextRevision, playIntro, releaseIntro, releaseTransport, selectedVoice, settings, stopFallback]);
+  }, [activity, changeIntro, close, duck, markIntro, nextRevision, playIntro, releaseIntro, releaseTransport, selectedEnergy, selectedVoice, settings, stopFallback]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -511,12 +512,13 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   };
   const active = !["IDLE", "ENDED"].includes(connection);
   useEffect(() => { propsRef.current.onActiveChange?.(active); }, [active]);
-  const status = connection === "MICROPHONE" ? "Gib Jarvis kurz dein Mikrofon frei …" : connection === "CONNECTING" ? "Jarvis ist gleich für dich da …" : connection === "DISCONNECTED" ? "Mikrofon aus · Verbindung unterbrochen" : muted ? "Mikrofon stumm · Verbindung aktiv" : outputActive ? "Jarvis spricht" : working ? "Jarvis schaut für dich nach" : inputActive ? "Jarvis hört deine Aussage" : "Mikrofon aktiv · Jarvis hört zu";
+  const status = connection === "IDLE" || connection === "ENDED" ? "Mikrofon aus · bereit zum Start" : connection === "MICROPHONE" ? "Gib Jarvis kurz dein Mikrofon frei …" : connection === "CONNECTING" ? "Jarvis ist gleich für dich da …" : connection === "DISCONNECTED" ? "Mikrofon aus · Verbindung unterbrochen" : muted ? "Mikrofon stumm · Verbindung aktiv" : outputActive ? "Jarvis spricht" : working ? "Jarvis schaut für dich nach" : inputActive ? "Jarvis hört deine Aussage" : "Mikrofon aktiv · Jarvis hört zu";
   return <AssistantVoiceSurface
-    active={active} status={status} starting={connection === "MICROPHONE" || connection === "CONNECTING"} muted={muted} canMute={connection === "CONNECTED"} onStart={() => void connect(false)}
+    active={active} status={status} starting={connection === "MICROPHONE" || connection === "CONNECTING"} startDisabled={Boolean(props.disabled || blockedSessionId)} muted={muted} canMute={connection === "CONNECTED"} onStart={() => void connect(false)}
     onMute={toggleMute} onInterrupt={interrupt} onEnd={() => void close()}
-    composer={<><div className="assistant-voice-preferences"><span>Jarvis · Hype-Modus</span><label>Stimme <select aria-label="Jarvis-Stimme" disabled={active} value={selectedVoice} onChange={event => setSelectedVoice(event.target.value as JarvisVoice)}>{JARVIS_VOICES.map(voice => <option key={voice} value={voice}>{JARVIS_VOICE_LABELS[voice]}</option>)}</select></label></div>{props.children?.({ active, disabled: Boolean(props.disabled || blockedSessionId), start: () => void connect() }) ?? <button disabled={props.disabled || Boolean(blockedSessionId)} onClick={() => void connect()}>Jarvis starten</button>}</>}
+    composer={<><div className="assistant-voice-preferences"><span>Jarvis · klar und wach</span><div className="assistant-voice-preference-controls"><label>Gesprächsstil <select aria-label="Jarvis-Gesprächsstil" disabled={active} value={selectedEnergy} onChange={event => setSelectedEnergy(event.target.value as JarvisEnergy)}>{JARVIS_ENERGY_LEVELS.map(level => <option key={level} value={level}>{JARVIS_ENERGY_LABELS[level]}</option>)}</select></label><label>Stimme <select aria-label="Jarvis-Stimme" disabled={active} value={selectedVoice} onChange={event => setSelectedVoice(event.target.value as JarvisVoice)}>{JARVIS_VOICES.map(voice => <option key={voice} value={voice}>{JARVIS_VOICE_LABELS[voice]}</option>)}</select></label></div></div>{props.children?.({ active, disabled: Boolean(props.disabled || blockedSessionId), start: () => void connect() }) ?? <button disabled={props.disabled || Boolean(blockedSessionId)} onClick={() => void connect()}>Jarvis starten</button>}</>}
     options={<>
+      <p className="assistant-caption">Im Gespräch kannst du „mehr Energie“ oder „ruhiger“ sagen.</p>
       <p className="assistant-caption">Schreibaktionen benötigen die sichtbare Bestätigung im Gespräch.</p>
       {heard && <p className="assistant-caption" aria-live="polite">Gehört: {heard}</p>}
       <details><summary>Sprachzeile prüfen oder per Text fortsetzen</summary><form onSubmit={event => { event.preventDefault(); const text = draft.trim(); setDraft(""); void processUtterance(text, false).catch(reason => setError(String(reason.message))); }}><label className="jarvis-live-label" htmlFor="jarvis-pilot-line">Deine Aussage</label><textarea id="jarvis-pilot-line" rows={2} maxLength={4000} value={draft} onChange={event => { setDraft(event.target.value); activity(); }} /><button disabled={!draft.trim() || connection !== "CONNECTED"}>Aussage verwenden</button></form></details>

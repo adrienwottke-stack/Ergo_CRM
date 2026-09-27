@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spokenProgress, startLiveBackchannel } from "../lib/ai-crm/live-backchannel.ts";
-import { isLiveWaitingReply, isLiveTaskCancel } from "../lib/ai-crm/voice-style.ts";
+import { isLiveStyleRequest, isLiveWaitingReply, isLiveTaskCancel } from "../lib/ai-crm/voice-style.ts";
 const flush = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
 
 test("actual phases become speakable updates, with gaps, one check-in and a strict limit", async t => {
@@ -56,6 +56,8 @@ test("delivery failures are visible and parent cancellation clears later speech"
 });
 
 test("social replies and style preferences keep the job, mixed requests and cancellations do not", () => {
+  for (const text of ["Mehr Energie", "Jarvis, bitte ruhiger", "Ab jetzt nur das Ergebnis", "Sei bitte sachlicher"]) assert.equal(isLiveStyleRequest(text), true, text);
+  for (const text of ["Mehr Energie und suche Anna", "Bitte ruhiger. Was steht heute an?"]) assert.equal(isLiveStyleRequest(text), false, text);
   for (const text of ["Alles gut, und dir?", "Mir geht's ganz gut, danke.", "Mein Tag war ziemlich stressig.", "Ich bin heute müde.", "Ja, passt.", "Lass dir Zeit", "Was machst du gerade?", "Nur das Ergebnis", "Bitte kein Smalltalk", "Viel los heute", "Bruder, mehr Energie!", "Erzähl mir einen Witz"]) assert.equal(isLiveWaitingReply(text), true, text);
   for (const text of ["Alles gut, such Anna", "Danke, lege die Aufgabe an", "Mir geht es gut. Was steht heute an?", "Nein, nimm den anderen Partner", "Speichere das", "Abbrechen"]) assert.equal(isLiveWaitingReply(text), false, text);
   for (const text of ["Stopp", "Abbrechen!", "Brich die Suche ab", "Lass das bitte"]) assert.equal(isLiveTaskCancel(text), true, text);

@@ -675,7 +675,7 @@ export default function JarvisLiveMock({
   );
 
   return <AssistantVoiceSurface
-    active={isOpen} status={muted ? "Mikrofon stumm · Simulation" : phaseCopy[state.phase]} starting={state.phase === "REQUESTING_MICROPHONE" || state.phase === "CONNECTING"} muted={muted}
+    active={isOpen} status={muted ? "Mikrofon stumm · Simulation" : phaseCopy[state.phase]} starting={state.phase === "REQUESTING_MICROPHONE" || state.phase === "CONNECTING"} startDisabled={disabled} muted={muted}
     canMute={Boolean(sessionId) && state.phase !== "ERROR" && state.phase !== "RECONNECTING"}
     onStart={() => void start()}
     onMute={() => { const next = !muted; setMuted(next); for (const track of streamRef.current?.getTracks() ?? []) track.enabled = !next; }}

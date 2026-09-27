@@ -16,6 +16,7 @@
 
 import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
+import { deferUntilCommit } from "@/lib/database-context";
 
 const OEFFENTLICH = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const GEHEIM = process.env.VAPID_PRIVATE_KEY;
@@ -113,5 +114,6 @@ export async function sendeMeldung(
  * nicht auf den Push-Dienst warten. Fehler landen nirgends - siehe Regel 2.
  */
 export function meldeNebenbei(userIds: string[], meldung: Meldung): void {
+  if (deferUntilCommit(() => sendeMeldung(userIds, meldung))) return;
   void sendeMeldung(userIds, meldung).catch(() => undefined);
 }

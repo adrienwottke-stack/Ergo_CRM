@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import AssistantIcon from "./AssistantIcon";
+import AssistantPermissions from "./AssistantPermissions";
 import { assistantFetch, useAssistant } from "@/components/ai-crm/AssistantProvider";
 
 export default function AssistantComposer({ suspended = false, onStartLive, liveDisabled = false }: { suspended?: boolean; onStartLive?: () => void; liveDisabled?: boolean }) {
@@ -114,5 +115,6 @@ export default function AssistantComposer({ suspended = false, onStartLive, live
       {onStartLive && <button type="button" className="assistant-icon-button" disabled={suspended || liveDisabled || assistant.locked || assistant.loading} onClick={onStartLive} aria-label="Mit Jarvis sprechen" title="Mit Jarvis sprechen"><AssistantIcon name="voice" /></button>}</span>
       {assistant.working ? <button type="button" className="assistant-send assistant-icon-button" aria-label="Stoppen" title="Stoppen" onClick={() => void assistant.stop()} disabled={Boolean(assistant.actionBusy)}><AssistantIcon name="stop" /></button> : <button type="submit" className="assistant-send assistant-icon-button" aria-label="Senden" title="Senden" disabled={suspended || !assistant.draft.trim() || assistant.locked || assistant.loading}><AssistantIcon name="send" /></button>}
     </div>
+    <AssistantPermissions />
   </form>;
 }

@@ -10,7 +10,6 @@ import {
   setRating,
 } from "@/app/(app)/namen/actions";
 import {
-  NACHFUELL_SCHWELLE,
   NAME_TARGET,
   andereListe,
   listKindLabels,
@@ -20,7 +19,8 @@ import {
   targetPercent,
 } from "@/lib/namelist";
 import { UNDO_WINDOW_SECONDS } from "@/lib/undo-window";
-import type { ContactRating, ListKind } from "@/lib/generated/prisma/enums";
+import type { ContactRating, ListKind, ContactStage, Outcome } from "@/lib/generated/prisma/enums";
+import StageBadge from "@/components/StageBadge";
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -32,10 +32,13 @@ import {
 } from "@/components/icons";
 import { card, input } from "@/components/ui";
 import { liegtLabel } from "@/lib/liegenbleiber";
+import { contactHref } from "@/lib/contact-navigation";
 
 export type NameEntry = {
   id: string;
   name: string;
+  stage: ContactStage;
+  outcome: Outcome;
   phone: string | null;
   rating: ContactRating | null;
   listKinds: ListKind[];
@@ -63,6 +66,8 @@ function applyPatch(entries: NameEntry[], patch: Patch): NameEntry[] {
       {
         id: `neu-${entries.length}-${patch.name}`,
         name: patch.name,
+        stage: "NEU",
+        outcome: "OFFEN",
         phone: patch.phone,
         rating: null,
         listKinds: [],
@@ -104,15 +109,21 @@ type Rueckgaengig = {
 export default function NameList({
   entries,
   kind,
+  query = "",
+  statusFilter = "alle",
+  phoneFilter = "alle",
 }: {
   entries: NameEntry[];
   kind: ListKind;
+  query?: string;
+  statusFilter?: string;
+  phoneFilter?: string;
 }) {
   const [optimistic, applyOptimistic] = useOptimistic(entries, applyPatch);
   const [, startTransition] = useTransition();
   const [hint, setHint] = useState<string | null>(null);
-  const [showDone, setShowDone] = useState(false);
-  const [showLost, setShowLost] = useState(false);
+  const [showDone, setShowDone] = useState(statusFilter === "geschafft" || Boolean(query));
+  const [showLost, setShowLost] = useState(statusFilter === "raus" || Boolean(query));
   const [showAdd, setShowAdd] = useState(false);
   // Auswahlmodus: null = aus. Eine (auch leere) Menge = an.
   const [auswahl, setAuswahl] = useState<Set<string> | null>(null);
@@ -131,6 +142,12 @@ export default function NameList({
   const open = optimistic.filter((entry) => entry.section === "offen");
   const done = optimistic.filter((entry) => entry.section === "geschafft");
   const lost = optimistic.filter((entry) => entry.section === "raus");
+  const matches = (entry: NameEntry) => (!query || `${entry.name} ${entry.phone ?? ""}`.toLocaleLowerCase("de").includes(query.toLocaleLowerCase("de")))
+    && (statusFilter === "alle" || entry.section === statusFilter)
+    && (phoneFilter === "alle" || (phoneFilter === "mit" ? Boolean(entry.phone) : !entry.phone));
+  const visibleOpen = open.filter(matches), visibleDone = done.filter(matches), visibleLost = lost.filter(matches);
+  const visibleCount = visibleOpen.length + visibleDone.length + visibleLost.length;
+  const returnTo = `/namen?${new URLSearchParams({ liste: kind, ...(query ? { q: query } : {}), ...(statusFilter !== "alle" ? { status: statusFilter } : {}), ...(phoneFilter !== "alle" ? { telefon: phoneFilter } : {}) })}`;
 
   const total = optimistic.length;
   const percent = targetPercent(total);
@@ -140,7 +157,7 @@ export default function NameList({
   // arbeitet ohnehin alle ab.
   const ohneNummer = open.filter((entry) => !entry.phone).length;
 
-  const auswaehlbar = open.filter((entry) => istEcht(entry.id));
+  const auswaehlbar = visibleOpen.filter((entry) => istEcht(entry.id));
   const gewaehlt = auswahl?.size ?? 0;
   const alleGewaehlt = auswaehlbar.length > 0 && gewaehlt === auswaehlbar.length;
   const auswaehlend = auswahl !== null;
@@ -257,12 +274,19 @@ export default function NameList({
   // Nachfuell-Alarm: nicht die Gesamtzahl zaehlt, sondern was noch zu
   // arbeiten ist. Zwanzig Namen, von denen achtzehn erledigt sind, sind ein
   // leerer Trichter.
-  const nachfuellen = total > 0 && open.length < NACHFUELL_SCHWELLE;
 
   return (
     <div className={`space-y-6 ${auswaehlend ? "pb-32" : ""}`}>
+      <form action="/namen" className="crm-list-toolbar" role="search" aria-label="Kontakte filtern">
+        <input type="hidden" name="liste" value={kind} />
+        <label>Kontakte suchen<input name="q" type="search" defaultValue={query} placeholder="Name oder Telefonnummer" maxLength={160} /></label>
+        <label>Status<select name="status" defaultValue={statusFilter}><option value="alle">Alle</option><option value="offen">Offen</option><option value="geschafft">Geschafft</option><option value="raus">Nicht weiterverfolgt</option></select></label>
+        <label>Telefon<select name="telefon" defaultValue={phoneFilter}><option value="alle">Alle</option><option value="mit">Vorhanden</option><option value="ohne">Fehlt</option></select></label>
+        <button type="submit">Anwenden</button>
+        {(query || statusFilter !== "alle" || phoneFilter !== "alle") && <Link href={`/namen?liste=${kind}`}>Zurücksetzen</Link>}
+      </form>
       {!auswaehlend && (
-        <section aria-label="Nächster Schritt" className="space-y-4">
+        <section aria-label="Nächster Schritt" className="crm-list-next space-y-4">
           {open.length === 0 ? (
             <>
               <div>
@@ -284,12 +308,12 @@ export default function NameList({
             <p className="text-base text-ink-muted">Ergänze eine Nummer, dann kannst du mit dem ersten Anruf starten.</p>
           )}
 
-          <Link href={`/namen/sammeln?liste=${kind}`} prefetch={false} className="crm-primary-action">
+          {total === 0 && <Link href={`/namen/sammeln?liste=${kind}`} prefetch={false} className="crm-primary-action">
             <SparkIcon className="h-5 w-5" />
             Namen sammeln
-          </Link>
+          </Link>}
 
-          <div className={`grid gap-2 ${callable > 0 || ohneNummer > 0 ? "sm:grid-cols-2" : ""}`}>
+          <div className={`crm-list-next-actions grid gap-2 ${callable > 0 || ohneNummer > 0 ? "grid-cols-2" : ""}`}>
             <button
               type="button"
               onClick={() => setShowAdd((value) => !value)}
@@ -298,11 +322,11 @@ export default function NameList({
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-3 text-base font-medium text-ink"
             >
               {showAdd ? <XIcon className="h-5 w-5" /> : <PlusIcon className="h-5 w-5" />}
-              {showAdd ? "Eingabe schließen" : "Einzeln eintragen"}
+              <span className="sm:hidden">{showAdd ? "Schließen" : "Eintragen"}</span><span className="hidden sm:inline">{showAdd ? "Eingabe schließen" : "Einzeln eintragen"}</span>
             </button>
             {callable > 0 ? (
               <Link href={`/namen/anrufen?liste=${kind}`} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-3 text-base font-medium text-ink">
-                <PhoneIcon className="h-5 w-5" /> Anrufe starten · {callable}
+                <PhoneIcon className="h-5 w-5" /> <span className="sm:hidden">Anrufe · {callable}</span><span className="hidden sm:inline">Anrufe starten · {callable}</span>
               </Link>
             ) : ohneNummer > 0 ? (
               <Link href={`/namen/nummern?liste=${kind}`} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-3 text-base font-medium text-ink">
@@ -332,11 +356,6 @@ export default function NameList({
             </form>
           )}
           {hint && <p role="status" className="text-sm text-ink-muted">{hint}</p>}
-          {nachfuellen && open.length > 0 && (
-            <p className="text-sm leading-relaxed text-ink-muted">
-              Noch {open.length} {open.length === 1 ? "offener Name" : "offene Namen"}. Fülle deine Liste regelmäßig mit neuen Menschen auf.
-            </p>
-          )}
         </section>
       )}
 
@@ -349,10 +368,12 @@ export default function NameList({
         </div>
       )}
 
-      {open.length > 0 && (
+      <p role="status" className="text-sm text-ink-muted">{visibleCount} von {total} Kontakten in dieser Ansicht</p>
+      {visibleCount === 0 && total > 0 && <p className="rounded-lg border border-line p-5 text-sm text-ink-muted">Keine Kontakte passen zu diesen Filtern. Passe deine Suche an oder setze die Filter zurück.</p>}
+      {visibleOpen.length > 0 && (
         <section aria-label="Offene Kontakte" className="space-y-3">
           <div className="flex min-h-11 items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-ink">{auswaehlend ? `${gewaehlt} ausgewählt` : `Offene Kontakte · ${open.length}`}</h2>
+            <h2 className="text-lg font-semibold text-ink">{auswaehlend ? `${gewaehlt} ausgewählt` : `Offene Kontakte · ${visibleOpen.length}`}</h2>
             {auswaehlend && <button type="button" onClick={() => setAuswahl(alleGewaehlt ? new Set() : new Set(auswaehlbar.map((entry) => entry.id)))} className="min-h-11 shrink-0 px-2 text-sm font-semibold text-navy-700">
               {alleGewaehlt ? "Keine auswählen" : "Alle auswählen"}
             </button>}
@@ -361,10 +382,11 @@ export default function NameList({
             <p className="text-sm text-ink-muted">In der Kandidatur hältst du Gespräche fest. Bei einer Zusage entsteht die Einladung direkt dort.</p>
           )}
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
-            {open.map((entry) => (
+            {visibleOpen.map((entry) => (
               <NameRow
                 key={entry.id}
                 entry={entry}
+                returnTo={returnTo}
                 ziel={ziel}
                 auswaehlend={auswaehlend}
                 gewaehlt={auswahl?.has(entry.id) ?? false}
@@ -378,15 +400,15 @@ export default function NameList({
         </section>
       )}
 
-      {done.length > 0 && !auswaehlend && (
+      {visibleDone.length > 0 && !auswaehlend && (
         <section className={`${card} overflow-hidden`}>
           <button type="button" onClick={() => setShowDone((value) => !value)} aria-expanded={showDone} aria-controls="namen-geschafft" className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left">
-            <span className="inline-flex items-center gap-2 text-base font-semibold text-ink"><CheckIcon className="h-5 w-5 text-navy-700" /> Geschafft · {done.length}</span>
+            <span className="inline-flex items-center gap-2 text-base font-semibold text-ink"><CheckIcon className="h-5 w-5 text-navy-700" /> Geschafft · {visibleDone.length}</span>
             <span className="text-sm text-ink-muted">{showDone ? "Schließen" : "Anzeigen"}</span>
           </button>
           {showDone && <ul id="namen-geschafft" className="divide-y divide-line border-t border-line">
-            {done.map((entry) => <li key={entry.id}>
-              <Link href={`/contacts/${entry.id}`} className="flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 hover:bg-sunken">
+            {visibleDone.map((entry) => <li key={entry.id}>
+              <Link href={contactHref(entry.id, returnTo)} className="flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 hover:bg-sunken">
                 <span className="text-base font-medium text-ink">{entry.name}</span>
                 <span className="text-sm text-ink-muted">{entry.appointmentLabel ?? "Kontakt öffnen"}</span>
               </Link>
@@ -395,15 +417,15 @@ export default function NameList({
         </section>
       )}
 
-      {lost.length > 0 && !auswaehlend && (
+      {visibleLost.length > 0 && !auswaehlend && (
         <section className={`${card} overflow-hidden`}>
           <button type="button" onClick={() => setShowLost((value) => !value)} aria-expanded={showLost} aria-controls="namen-raus" className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left">
-            <span className="text-base font-medium text-ink-muted">Nicht weiterverfolgt · {lost.length}</span>
+            <span className="text-base font-medium text-ink-muted">Nicht weiterverfolgt · {visibleLost.length}</span>
             <span className="text-sm text-ink-muted">{showLost ? "Schließen" : "Anzeigen"}</span>
           </button>
           {showLost && <ul id="namen-raus" className="divide-y divide-line border-t border-line">
-            {lost.map((entry) => <li key={entry.id} className="flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3">
-              <span className="text-base text-ink-muted">{entry.name}</span><span className="text-sm text-ink-muted">{entry.lostLabel ?? "–"}</span>
+            {visibleLost.map((entry) => <li key={entry.id} className="flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3">
+              <Link href={contactHref(entry.id, returnTo)} className="inline-flex min-h-11 items-center text-base text-link">{entry.name}</Link><span className="text-sm text-ink-muted">{entry.lostLabel ?? "–"}</span>
             </li>)}
           </ul>}
         </section>
@@ -445,8 +467,9 @@ export default function NameList({
   );
 }
 
-function NameRow({ entry, ziel, auswaehlend, gewaehlt, onCycleRating, onToggle, onMove, onDrop }: {
+function NameRow({ entry, returnTo, ziel, auswaehlend, gewaehlt, onCycleRating, onToggle, onMove, onDrop }: {
   entry: NameEntry;
+  returnTo: string;
   ziel: ListKind;
   auswaehlend: boolean;
   gewaehlt: boolean;
@@ -480,9 +503,9 @@ function NameRow({ entry, ziel, auswaehlend, gewaehlt, onCycleRating, onToggle, 
 
   return (
     <li>
-      <div className="flex min-h-20 items-start gap-3 px-4 py-3">
-        <div className="min-w-0 flex-1">
-          {istEcht(entry.id) ? <Link href={`/contacts/${entry.id}`} className="flex min-h-11 max-w-full items-center text-base font-semibold text-ink"><span className="truncate">{entry.name}</span></Link> : <p className="flex min-h-11 items-center text-base font-semibold text-ink">{entry.name}</p>}
+      <div className="crm-contact-row flex min-h-20 items-start gap-3 px-4 py-3">
+        <div className="crm-contact-cell min-w-0 flex-1">
+          {istEcht(entry.id) ? <Link href={contactHref(entry.id, returnTo)} className="flex min-h-11 max-w-full items-center text-base font-semibold text-link"><span className="truncate">{entry.name}</span></Link> : <p className="flex min-h-11 items-center text-base font-semibold text-ink">{entry.name}</p>}
           {editingPhone ? (
             <input type="tel" aria-label={`Telefonnummer für ${entry.name}`} autoFocus defaultValue={entry.phone ?? ""} placeholder="Telefonnummer" enterKeyHint="done" onBlur={(event) => savePhone(event.currentTarget.value)} onKeyDown={(event) => {
               if (event.key === "Enter") { event.preventDefault(); savePhone(event.currentTarget.value); }
@@ -491,8 +514,9 @@ function NameRow({ entry, ziel, auswaehlend, gewaehlt, onCycleRating, onToggle, 
           ) : entry.phone ? <p className="mt-1 truncate text-sm text-ink-muted">{entry.phone}</p> : (
             <button type="button" disabled={!istEcht(entry.id)} onClick={() => setEditingPhone(true)} className="inline-flex min-h-11 items-center text-sm font-medium text-navy-700 disabled:opacity-50">Nummer ergänzen</button>
           )}
-          {entry.liegtTage !== null && <p className="mt-1 text-xs text-ink-muted">{liegtLabel(entry.liegtTage)} · Nächsten Schritt festlegen</p>}
-          {ziel === "VERKAUF" && istEcht(entry.id) && <Link href={`/contacts/${entry.id}#kandidatur`} className="inline-flex min-h-11 items-center text-sm font-medium text-navy-700">Kandidatur öffnen</Link>}
+          <div className="crm-contact-stage"><StageBadge stage={entry.stage} outcome={entry.outcome} /></div>
+          {entry.liegtTage !== null && <p className="crm-contact-extra mt-1 text-xs text-ink-muted">{liegtLabel(entry.liegtTage)} · Nächsten Schritt festlegen</p>}
+          {ziel === "VERKAUF" && istEcht(entry.id) && <Link href={`${contactHref(entry.id, returnTo)}#kandidatur`} className="crm-contact-extra inline-flex min-h-11 items-center text-sm font-medium text-navy-700">Kandidatur öffnen</Link>}
         </div>
         <button type="button" disabled={!istEcht(entry.id)} onClick={() => setShowMore((value) => !value)} aria-label={`Mehr zu ${entry.name}`} aria-expanded={showMore} aria-controls={`name-mehr-${entry.id}`} className="min-h-11 shrink-0 rounded-lg px-2 text-sm font-medium text-ink-muted disabled:opacity-50">{showMore ? "Schließen" : "Mehr"}</button>
       </div>

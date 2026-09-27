@@ -1,0 +1,131 @@
+
+> ergo-crm@0.1.0 build:ai:ux:check
+> node --import ./scripts/alias-hook.mjs scripts/ai-crm-ux-build.mjs
+
+(node:38656) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/adrie/Desktop/Business/Ergo_CRM/lib/generated/prisma/client.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\adrie\Desktop\Business\Ergo_CRM\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+   ▲ Next.js 15.5.25
+   - Environments: .env.local, .env
+   - Experiments (use with caution):
+     · serverActions
+
+   Creating an optimized production build ...
+   Using tsconfig file: .cache/ai-ux-build/tsconfig.json
+   Using tsconfig file: .cache/ai-ux-build/tsconfig.json
+   Using tsconfig file: .cache/ai-ux-build/tsconfig.json
+ ✓ Compiled successfully in 43s
+   Linting and checking validity of types ...
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you. Strict-mode is set to false by default.
+   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+     - include was set to ['../../next-env.d.ts', '../../**/*.ts', '../../**/*.tsx', '../../.next/types/**/*.ts', '.cache/ai-ux-build-next/types/**/*.ts']
+
+   Collecting page data ...
+   Generating static pages (0/20) ...
+   Generating static pages (5/20)
+   Generating static pages (10/20)
+   Generating static pages (15/20)
+ ✓ Generating static pages (20/20)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                        Size  First Load JS
+┌ ƒ /                                             232 B         103 kB
+├ ○ /_not-found                                   997 B         104 kB
+├ ƒ /anfrage                                    2.69 kB         109 kB
+├ ƒ /api/ai-crm/access                            232 B         103 kB
+├ ƒ /api/ai-crm/action-results/[id]               232 B         103 kB
+├ ƒ /api/ai-crm/billing/checkout                  232 B         103 kB
+├ ƒ /api/ai-crm/billing/portal                    232 B         103 kB
+├ ƒ /api/ai-crm/chat                              232 B         103 kB
+├ ƒ /api/ai-crm/conversations                     232 B         103 kB
+├ ƒ /api/ai-crm/conversations/[id]                232 B         103 kB
+├ ƒ /api/ai-crm/live/music                        232 B         103 kB
+├ ƒ /api/ai-crm/live/session                      232 B         103 kB
+├ ƒ /api/ai-crm/live/session/[sessionId]          232 B         103 kB
+├ ƒ /api/ai-crm/live/session/[sessionId]/intro    232 B         103 kB
+├ ƒ /api/ai-crm/live/session/[sessionId]/turn     232 B         103 kB
+├ ƒ /api/ai-crm/music/spotify                     232 B         103 kB
+├ ƒ /api/ai-crm/music/spotify/callback            232 B         103 kB
+├ ƒ /api/ai-crm/requests/[id]                     232 B         103 kB
+├ ƒ /api/ai-crm/transcribe                        232 B         103 kB
+├ ƒ /api/ai-crm/undo                              232 B         103 kB
+├ ƒ /api/cron/ai-crm-retention                    232 B         103 kB
+├ ƒ /api/cron/kalender                            232 B         103 kB
+├ ƒ /api/cron/meldungen                           232 B         103 kB
+├ ƒ /api/emil                                     232 B         103 kB
+├ ƒ /api/webhooks/stripe                          232 B         103 kB
+├ ƒ /api/zinsrechner                              232 B         103 kB
+├ ƒ /arena                                      2.66 kB         112 kB
+├ ƒ /assistent                                    232 B         103 kB
+├ ƒ /avv                                        1.17 kB         104 kB
+├ ƒ /bericht/[token]                              164 B         107 kB
+├ ƒ /contacts/[id]                              3.75 kB         139 kB
+├ ƒ /contacts/[id]/edit                         2.04 kB         111 kB
+├ ƒ /contacts/new                               1.74 kB         108 kB
+├ ƒ /einheiten                                  3.73 kB         110 kB
+├ ƒ /einladen                                   2.12 kB         105 kB
+├ ƒ /einladung/[code]                           3.17 kB         106 kB
+├ ƒ /einladung/[code]/manifest.webmanifest        232 B         103 kB
+├ ƒ /einladung/[code]/opengraph-image             232 B         103 kB
+├ ƒ /fortschritt                                  172 B         106 kB
+├ ƒ /fortschritt/[id]                           2.57 kB         109 kB
+├ ƒ /fortschritt/einheiten-offen                1.12 kB         114 kB
+├ ƒ /fortschritt/neu                            2.57 kB         109 kB
+├ ƒ /fortschritt/warum                            199 B         106 kB
+├ ƒ /heute                                      5.81 kB         141 kB
+├ ƒ /hilfe                                      1.32 kB         120 kB
+├ ƒ /kalender                                     172 B         106 kB
+├ ƒ /kalender/[datei]                             232 B         103 kB
+├ ƒ /kalender/abo                                 199 B         106 kB
+├ ƒ /kalender/feed/[token]                        232 B         103 kB
+├ ƒ /kalender/neu                                 199 B         106 kB
+├ ƒ /kalender/quellen                             199 B         106 kB
+├ ƒ /konto/export                                 232 B         103 kB
+├ ƒ /konto/export/[datei]                         232 B         103 kB
+├ ƒ /leaderboard                                1.44 kB         107 kB
+├ ƒ /log                                        3.78 kB         110 kB
+├ ƒ /login                                        232 B         103 kB
+├ ○ /manifest.webmanifest                         232 B         103 kB
+├ ƒ /mannschaft                                 3.64 kB         121 kB
+├ ƒ /mannschaft/[id]                            3.08 kB         120 kB
+├ ƒ /mannschaft/auswertung                        172 B         106 kB
+├ ƒ /mannschaft/bericht                         1.24 kB         104 kB
+├ ƒ /mannschaft/notizen/[id]                      199 B         106 kB
+├ ƒ /mannschaft/vereinbarungen                   2.7 kB         109 kB
+├ ƒ /mannschaft/verwalten                         232 B         103 kB
+├ ƒ /mannschaft/ziele                           1.49 kB         108 kB
+├ ƒ /namen                                      10.3 kB         122 kB
+├ ƒ /namen/anrufen                              4.13 kB         123 kB
+├ ƒ /namen/nummern                               3.4 kB         109 kB
+├ ƒ /namen/sammeln                              6.86 kB         120 kB
+├ ƒ /namen/startklar                            2.63 kB         109 kB
+├ ƒ /neues-passwort/[code]                        199 B         106 kB
+├ ○ /offline                                      232 B         103 kB
+├ ƒ /profil                                     5.24 kB         118 kB
+├ ƒ /spiel                                      1.43 kB         107 kB
+├ ƒ /start                                        232 B         103 kB
+├ ƒ /suche                                        199 B         106 kB
+├ ƒ /team                                       2.06 kB         108 kB
+├ ƒ /teamabend                                    164 B         107 kB
+├ ƒ /trichter                                   2.47 kB         109 kB
+├ ƒ /werkstatt                                    199 B         106 kB
+├ ƒ /werkstatt/ai                                 199 B         106 kB
+├ ƒ /werkstatt/anfragen                           199 B         106 kB
+├ ƒ /werkstatt/rueckmeldungen                     199 B         106 kB
+├ ƒ /werkstatt/rueckmeldungen/[id]/audio          232 B         103 kB
+├ ƒ /willkommen                                 19.6 kB         122 kB
+└ ƒ /zinsrechner                                12.3 kB         125 kB
++ First Load JS shared by all                    103 kB
+  ├ chunks/1255-7316b50163a428e6.js             46.4 kB
+  ├ chunks/4bd1b696-f785427dddbba9fb.js         54.2 kB
+  └ other shared chunks (total)                 2.04 kB
+
+
+ƒ Middleware                                    34.4 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { AssistantContextEntry } from "@/components/ai-crm/AssistantEntry";
 import { notFound } from "next/navigation";
+import { contactHref, contactListReturn } from "@/lib/contact-navigation";
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
@@ -72,10 +73,13 @@ const activityDotStyles: Record<ActivityType, string> = {
 
 export default async function ContactDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string }>;
 }) {
   const { id } = await params;
+  const returnTo = contactListReturn((await searchParams).returnTo);
   const user = await requireUser();
   const contact = await prisma.contact.findFirst({
     where: { id, ...eigene(user.id).kontakte },
@@ -156,14 +160,14 @@ export default async function ContactDetailPage({
   };
 
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="crm-record" data-contact-id={contact.id} data-contact-name={contact.name}>
+      <div className="crm-record-header">
         <Link
-          href="/heute"
+          href={returnTo}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
         >
           <ArrowLeftIcon className="h-4 w-4" />
-          Zurück zu Heute
+          Zurück zu Kontakten
         </Link>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -179,11 +183,12 @@ export default async function ContactDetailPage({
                 {contact.source ? `${contact.source} · ` : ""}
                 Kontakt seit {dateFormat.format(contact.createdAt)}
               </p>
+              {contact.phone && <a href={`tel:${contact.phone}`} className="inline-flex items-center text-sm text-link">{contact.phone}</a>}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <AssistantContextEntry context={{ contactId: contact.id, label: contact.name }} />
-            <Link href={`/contacts/${contact.id}/edit`} className={btnSecondary}>
+            <Link href={contactHref(contact.id, returnTo, true)} className={btnSecondary}>
               Bearbeiten
             </Link>
             <DeleteContactButton
@@ -196,8 +201,9 @@ export default async function ContactDetailPage({
         </div>
       </div>
 
+      <nav aria-label="Bereiche im Kontakt" className="crm-record-sections"><a href="#naechste-schritte">Nächste Schritte</a><a href="#kontaktdaten">Kontaktdaten und Notiz</a><a href="#verlauf">Verlauf · {contact.activities.length}</a></nav>
       {/* Was als Nächstes zu tun ist, steht ganz oben. */}
-      <section className={`${card} p-5 sm:p-6`}>
+      <section id="naechste-schritte" className={`${card} crm-record-next p-5 sm:p-6`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className={kicker}>Nächster Schritt</p>
@@ -324,7 +330,7 @@ export default async function ContactDetailPage({
 
       {/* Was vor einem Anruf zaehlt - mehr nicht. Alles Weitere stand hier
           frueher, weil es das Feld gab, nicht weil es jemand braucht. */}
-      <div className={`${card} grid gap-x-8 gap-y-5 p-6 sm:grid-cols-2 sm:p-8`}>
+      <div id="kontaktdaten" className={`${card} crm-record-properties grid gap-x-8 gap-y-5 p-6 sm:grid-cols-2 sm:p-8`}>
         <div>
           <p className={kicker}>Telefon</p>
           <p className="mt-1 text-sm text-ink">
@@ -426,7 +432,7 @@ export default async function ContactDetailPage({
 
       {/* Vorgeschichte: entsteht aus den Ergebnis-Knoepfen, nicht aus einem
           Formular. Hier wird nur gelesen. */}
-      <div className="space-y-5">
+      <div id="verlauf" className="crm-record-history space-y-5">
         <h2 className={sectionTitle}>
           Vorgeschichte{" "}
           <span className="font-normal text-ink-soft">

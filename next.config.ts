@@ -5,6 +5,7 @@ import type { NextConfig } from "next";
 // (vercel/next.js#56368). Wer eine hübsche URL braucht, nimmt einen
 // Route-Handler.
 const nextConfig: NextConfig = {
+  devIndicators: process.env.CRM_TEST_DIST_DIR ? false : undefined,
   // Isolated browser/build checks must not overwrite a running developer's cache.
   distDir: process.env.CRM_TEST_DIST_DIR || ".next",
   typescript: { tsconfigPath: process.env.CRM_TEST_TSCONFIG || "tsconfig.json" },

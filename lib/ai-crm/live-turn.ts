@@ -5,7 +5,8 @@ import { reserveAiToolCall } from "@/lib/ai-crm/entitlement";
 import type { MusicProvider, MusicState } from "@/lib/ai-crm/live-music";
 import { requireLiveSession } from "@/lib/ai-crm/live-sessions";
 import { runCrmTool } from "@/lib/ai-crm/tools";
-import { actionReceipts, stageAction } from "@/lib/ai-crm/action-plans";
+import { actionReceipts, stageAction, executeActionPlan } from "@/lib/ai-crm/action-plans";
+import { captureExecutionPolicy } from "@/lib/ai-crm/execution-policy";
 import type { ActionReceipt } from "@/lib/ai-crm/contracts";
 
 export type LiveActionReceipt = ActionReceipt;
@@ -120,7 +121,9 @@ async function createReminder(
     idempotencyKey,
     now: params.now,
   });
-  await stageAction(params.db, {
+  const request = await params.db.aiRequest.findUniqueOrThrow({ where: { id: params.requestId } });
+  const mode = await captureExecutionPolicy(params.db, params.userId, params.requestId, request.conversationId!);
+  const plan = await stageAction(params.db, {
     userId: params.userId,
     requestId: params.requestId,
     key: idempotencyKey,
@@ -132,6 +135,10 @@ async function createReminder(
       note: "Live-Erinnerung",
     },
   });
+  if (mode === "AUTONOMOUS") {
+    const actions = await executeActionPlan(params.db, { userId: params.userId, requestId: params.requestId, actionIds: [plan.id], direct: true });
+    return { answer: actions.every(action => action.status === "COMPLETED") ? "Lokale Demo: Die Wiedervorlage wurde gespeichert." : "Lokale Demo: Die Wiedervorlage konnte nicht gespeichert werden.", actions };
+  }
   return {
     answer: "Lokale Demo: Die Wiedervorlage ist als Vorschau vorbereitet. Bitte bestätige sie sichtbar im CRM; bisher wurde nichts gespeichert.",
     actions: await actionReceipts(params.db, params.userId, params.requestId),

@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useVorfuehren } from "@/components/VorfuehrProvider";
-import type { ActionReceipt, AssistantAccess, AssistantContext, ConversationSummary, Entry, ReadResult } from "@/lib/ai-crm/contracts";
+import type { AiExecutionMode, ActionReceipt, AssistantAccess, AssistantContext, ConversationSummary, Entry, ReadResult } from "@/lib/ai-crm/contracts";
 import { assistantRecoveryFailureMessage } from "@/lib/ai-crm/errors";
 import type { LiveCaption } from "@/lib/ai-crm/live-captions";
 import { mergeLiveSpeech } from "@/lib/ai-crm/live-timeline";
@@ -32,6 +32,7 @@ function useController() {
   const [mode, setMode] = useState<"closed" | "panel" | "workspace">("closed");
   const [section, setSection] = useState<"chat" | "conversations" | "details">("chat");
   const [access, setAccess] = useState<AssistantAccess | null>(null);
+  const [policyBusy, setPolicyBusy] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -59,7 +60,7 @@ function useController() {
   const loadVersion = useRef(0);
   const opener = useRef<HTMLElement | null>(null);
   const active = conversations.find(item => item.id === conversationId) ?? null;
-  const locked = working || Boolean(recovery) || Boolean(actionBusy);
+  const locked = working || policyBusy || Boolean(recovery) || Boolean(actionBusy);
   const visible = mode !== "closed" && !presenting;
 
   const close = useCallback(() => {
@@ -105,10 +106,32 @@ function useController() {
       if (version !== loadVersion.current) return;
       setConversationId(id); setEntries(data.messages); setScrollTop(-1); setNotice("Frühere Antworten beziehen sich auf den Zeitpunkt des Gesprächs.");
       if (data.context) setAttachment(data.context);
-      setConversations(current => [{ id: data.id, title: data.title, expiresAt: data.expiresAt, updatedAt: data.updatedAt, messageCount: data.messageCount }, ...current.filter(item => item.id !== id)]);
+      setConversations(current => [{ id: data.id, executionMode: data.executionMode, executionVersion: data.executionVersion, title: data.title, expiresAt: data.expiresAt, updatedAt: data.updatedAt, messageCount: data.messageCount }, ...current.filter(item => item.id !== id)]);
     } catch (reason) { if (version === loadVersion.current) setError(reason instanceof Error ? reason.message : "Die Unterhaltung konnte nicht geladen werden."); }
     finally { if (version === loadVersion.current) setLoading(false); }
   }, []);
+
+  const changeExecutionMode = useCallback(async (executionMode: AiExecutionMode) => {
+    if (policyBusy || working && !active || !access?.executionModesEnabled) return;
+    const requestedOwner = owner.current;
+    const navigation = loadVersion.current;
+    setPolicyBusy(true); setError(null);
+    try {
+      let target = active;
+      if (!target) {
+        target = await assistantFetch<ConversationSummary>("/api/ai-crm/conversations", post({}));
+        if (requestedOwner !== owner.current || navigation !== loadVersion.current) return;
+        setConversationId(target.id);
+        const created = target;
+        setConversations(current => [created, ...current.filter(item => item.id !== created.id)]);
+      }
+      const updated = await assistantFetch<ConversationSummary>(`/api/ai-crm/conversations/${encodeURIComponent(target.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ executionMode, executionVersion: target.executionVersion ?? 0 }) });
+      if (requestedOwner !== owner.current || navigation !== loadVersion.current) return;
+      setConversations(current => [updated, ...current.filter(item => item.id !== updated.id)]);
+      setNotice("Zugriffe für diesen Chat aktualisiert. Offene Vorschläge werden nicht automatisch ausgeführt.");
+    } catch (reason) { if (requestedOwner === owner.current && navigation === loadVersion.current) { setError(reason instanceof Error ? reason.message : "Zugriffe konnten nicht geändert werden."); await loadList(); } }
+    finally { setPolicyBusy(false); }
+  }, [policyBusy, working, access, active, loadList]);
 
   const initialize = useCallback(async () => {
     if (initialized.current) return;
@@ -193,7 +216,11 @@ function useController() {
       return [...base.filter(entry => entry.id !== responseEntry.id), responseEntry];
     });
     setConversationId(data.conversation.id);
-    setConversations(current => [data.conversation, ...current.filter(item => item.id !== data.conversation.id)]);
+    setConversations(current => {
+      const previous = current.find(item => item.id === data.conversation.id);
+      const policy = previous && (previous.executionVersion ?? 0) > (data.conversation.executionVersion ?? 0) ? previous : data.conversation;
+      return [{ ...data.conversation, executionMode: policy.executionMode, executionVersion: policy.executionVersion }, ...current.filter(item => item.id !== data.conversation.id)];
+    });
     if (data.conversation.restartReason) setNotice(data.conversation.restartReason === "expired" ? "Das vorherige Gespräch ist abgelaufen. Hier beginnt ein neues." : "Hier beginnt eine neue Unterhaltung. Das vorherige Gespräch hat 20 Nachrichten erreicht.");
     setRecovery(null); setError(null); activeRequest.current = null;
     if (data.actions.some(item => item.status === "COMPLETED")) { router.refresh(); window.dispatchEvent(new Event("crm:work-saved")); }
@@ -207,6 +234,8 @@ function useController() {
       const previous = current.find(item => item.id === conversation.id);
       const summary: ConversationSummary = {
         id: conversation.id,
+        executionMode: previous && (previous.executionVersion ?? 0) > (conversation.executionVersion ?? 0) ? previous.executionMode : conversation.executionMode ?? previous?.executionMode ?? "CONFIRM",
+        executionVersion: Math.max(conversation.executionVersion ?? 0, previous?.executionVersion ?? 0),
         title: conversation.title,
         expiresAt: conversation.expiresAt,
         updatedAt: conversation.updatedAt ?? previous?.updatedAt ?? new Date().toISOString(),
@@ -413,7 +442,7 @@ function useController() {
     catch (reason) { setError(reason instanceof Error ? reason.message : "Der Zugang konnte nicht geöffnet werden."); setBilling(false); }
   }, []);
 
-  return { mode, setMode, expand, asPanel, showWorkspace, visible, presenting, section, setSection, access, conversations, nextCursor, conversationId, active, entries, draft, setDraft, source, setSource, attachment, setAttachment, loading, working, locked, recovery, error, setError, notice, actionBusy, actionErrors, deleteTarget, setDeleteTarget, billing, captureEpoch, scrollTop, setScrollTop, register, open, close, initialize, loadList, selectConversation, startNew, send, recover, retryOriginal, stop, changePlan, revisePlan, refreshActions, undo, removeConversation, openBilling, acceptLiveConversation, acceptLiveTranscript, acceptLiveTurn };
+  return { policyBusy, changeExecutionMode, mode, setMode, expand, asPanel, showWorkspace, visible, presenting, section, setSection, access, conversations, nextCursor, conversationId, active, entries, draft, setDraft, source, setSource, attachment, setAttachment, loading, working, locked, recovery, error, setError, notice, actionBusy, actionErrors, deleteTarget, setDeleteTarget, billing, captureEpoch, scrollTop, setScrollTop, register, open, close, initialize, loadList, selectConversation, startNew, send, recover, retryOriginal, stop, changePlan, revisePlan, refreshActions, undo, removeConversation, openBilling, acceptLiveConversation, acceptLiveTranscript, acceptLiveTurn };
 }
 
 type Controller = ReturnType<typeof useController>;

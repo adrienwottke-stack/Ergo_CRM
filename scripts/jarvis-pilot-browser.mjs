@@ -82,6 +82,7 @@ try {
   let activeSessionId = "fixture-blocked", failEnd = true, failStart = false, delayedStart = null, startEntered = null;
   const introBodies = [];
   const selectedVoices = [];
+  const selectedEnergy = [];
   const greetingAcceptances = [];
   let turnDelay = 0;
   await page.route("**/api/ai-crm/live/**", async route => {
@@ -116,6 +117,7 @@ try {
         if (activeSessionId && !body.reconnect) return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ code: "LIVE_SESSION_ALREADY_ACTIVE", error: "Eine Sprachsitzung ist noch geöffnet." }) });
         activeSessionId = "fixture-session";
         selectedVoices.push(body.voice);
+        selectedEnergy.push(body.energy);
         if (!body.reconnect) introState = "WAITING";
         startEntered?.();
         if (delayedStart) await delayedStart;
@@ -132,7 +134,9 @@ try {
   });
   await page.route("**/api/ai-crm/requests/**", route => route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "Controlled not-found fixture" }) }));
   await page.goto(`${origin}/heute`);
-  await page.getByRole("button", { name: "Deinen Tag besprechen" }).click();
+  await page.getByRole("button", { name: /^Mit Jarvis sprechen/ }).click();
+  await page.getByText("Mikrofon aus · bereit zum Start", { exact: true }).waitFor();
+  assert.equal(await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).count(), 0, "opening Jarvis does not claim an active microphone");
 
   await page.getByRole("button", { name: "Vorherige Sitzung beenden", exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.__micRequests), 0, "discovering a stale lock never opens the microphone");
@@ -144,8 +148,10 @@ try {
   assert.equal(await page.evaluate(() => window.__micRequests), 0, "ending another session does not implicitly start audio");
   await page.getByRole("textbox", { name: "Nachricht an den Assistenten" }).fill("Mein Entwurf bleibt erhalten");
   await page.evaluate(() => { window.__redesignComposer = document.getElementById("assistant-message"); });
-  assert.equal(await page.getByLabel("Jarvis-Stimme", { exact: true }).inputValue(), "vesper");
-  await page.getByLabel("Jarvis-Stimme", { exact: true }).selectOption("cinder");
+  assert.equal(await page.getByLabel("Jarvis-Stimme", { exact: true }).inputValue(), "meridian");
+  assert.equal(await page.getByLabel("Jarvis-Gesprächsstil", { exact: true }).inputValue(), "balanced");
+  await page.getByLabel("Jarvis-Gesprächsstil", { exact: true }).selectOption("energetic");
+  await page.getByLabel("Jarvis-Stimme", { exact: true }).selectOption("vesper");
   await page.getByLabel("Jarvis-Stimme", { exact: true }).selectOption("meridian");
   const firstIntroResponse = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/intro"));
   await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
@@ -155,7 +161,9 @@ try {
   assert.equal(await page.locator('.assistant-message[data-kind="speech"]').count(), 1, "a transcript arriving immediately with session.started survives conversation startup");
   const micBeforeLayout = await page.evaluate(() => window.__micRequests);
   assert.equal(selectedVoices.at(-1), "meridian");
+  assert.equal(selectedEnergy.at(-1), "energetic");
   assert.equal(await page.getByLabel("Jarvis-Stimme", { exact: true }).isDisabled(), true, "voice changes require a new session");
+  assert.equal(await page.getByLabel("Jarvis-Gesprächsstil", { exact: true }).isDisabled(), true, "style changes require a new session");
   await page.evaluate(() => {
     const event = { type: "session.output_transcript.delta", delta: "Hallo, Meister Emil.", event_id: "greeting-caption", start_ms: 0, end_ms: 1000 };
     window.__peer.channel.onmessage({ data: JSON.stringify(event) });
@@ -204,6 +212,9 @@ try {
   assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), false, "a new social reply resumes native Live after manual stop");
   await new Promise(resolve => setTimeout(resolve, 1600));
   assert.equal(turnCalls.length, 1, "short social replies do not enter the slower CRM backend");
+  await page.evaluate(() => window.__say("Mehr Energie"));
+  await new Promise(resolve => setTimeout(resolve, 1200));
+  assert.equal(turnCalls.length, 1, "a spoken style change stays in the Live conversation");
   await page.evaluate(() => window.__say("Musik an"));
   await page.waitForFunction(() => window.__audio.some(audio => audio.src.includes("/live/music") && !audio.paused));
   // Raw microphone noise while Jarvis speaks must not mute or revoke his answer.
@@ -337,15 +348,15 @@ try {
   await entered;
   for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-    await page.getByRole("status", { name: "Jarvis startet", exact: true }).waitFor();
+    await page.getByLabel("Jarvis startet", { exact: true }).waitFor();
     assert.equal(await page.getByText("Jarvis macht sich bereit.", { exact: true }).isVisible(), true);
-    assert.equal(await page.getByRole("button", { name: "Sitzung beenden", exact: true }).isVisible(), true);
+    assert.equal(await page.getByRole("button", { name: "Abbrechen", exact: true }).isVisible(), true);
     assert.equal(await page.locator(".assistant-voice-notices .assistant-error:visible").count(), 0);
     assert.equal(await page.getByText(/Sprachverbindung wird hergestellt|Mikrofonfreigabe wird angefragt/).count(), 0);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.screenshot({ path: fileURLToPath(new URL(`redesign-connecting-${width}.png`, output)) });
   }
-  await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
+  await page.getByRole("button", { name: "Abbrechen", exact: true }).click();
   await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).waitFor();
   releaseStart(); delayedStart = null; startEntered = null;
   await page.waitForResponse(response => response.request().method() === "DELETE" && response.url().endsWith("/fixture-session"));
@@ -360,7 +371,7 @@ try {
   await page.getByRole("textbox", { name: "Nachricht an den Assistenten" }).waitFor();
   await page.evaluate(() => { window.__denyMic = false; });
   await page.reload();
-  await page.getByRole("button", { name: "Assistent", exact: true }).click();
+  await page.getByRole("button", { name: "Jarvis", exact: true }).click();
   await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).waitFor();
   await page.getByRole("button", { name: "Groß öffnen", exact: true }).click();
   await page.waitForURL("**/assistent");

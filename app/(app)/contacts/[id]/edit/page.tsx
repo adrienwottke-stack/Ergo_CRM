@@ -8,13 +8,17 @@ import ContactForm from "@/components/ContactForm";
 import DeleteContactButton from "@/components/DeleteContactButton";
 import { card, kicker, pageTitle, columnNarrow } from "@/components/ui";
 import { updateContact } from "../../actions";
+import { contactHref, contactListReturn } from "@/lib/contact-navigation";
 
 export default async function EditContactPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string }>;
 }) {
   const { id } = await params;
+  const returnTo = contactListReturn((await searchParams).returnTo);
   const user = await requireUser();
   const contact = await prisma.contact.findFirst({
     where: { id, ...eigene(user.id).kontakte },
@@ -28,10 +32,10 @@ export default async function EditContactPage({
   }
 
   return (
-    <div className={`${columnNarrow} space-y-6`}>
+    <div className={`${columnNarrow} space-y-6`} data-contact-id={contact.id} data-contact-name={contact.name}>
       <div>
         <Link
-          href={`/contacts/${contact.id}`}
+          href={contactHref(contact.id, returnTo)}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
         >
           <ArrowLeftIcon className="h-4 w-4" />
@@ -42,6 +46,7 @@ export default async function EditContactPage({
       <ContactForm
         action={updateContact}
         contact={contact}
+        returnTo={returnTo}
         submitLabel="Änderungen speichern"
       />
 

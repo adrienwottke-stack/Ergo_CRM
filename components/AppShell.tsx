@@ -13,6 +13,7 @@ import { shell, gutter } from "@/components/ui";
 import type { User } from "@/lib/generated/prisma/client";
 import AssistantEntry from "@/components/ai-crm/AssistantEntry";
 import AssistantSurface from "@/components/ai-crm/AssistantSurface";
+import { istAn } from "@/lib/features";
 
 export function navigationFuer() {
   return HAUPTNAVIGATION;
@@ -25,7 +26,10 @@ export default async function AppShell({
   user: User;
   children: React.ReactNode;
 }) {
-  const coach = await ladeCoach(user.id).catch(() => null);
+  const [coach, calculatorEnabled] = await Promise.all([
+    ladeCoach(user.id).catch(() => null),
+    istAn("zinsrechner"),
+  ]);
   const initialen = user.name
     .trim()
     .split(/\s+/)
@@ -42,9 +46,9 @@ export default async function AppShell({
       </a>
       <header className="crm-header sticky top-0 z-20 border-b border-line bg-canvas pt-[env(safe-area-inset-top)]">
         <div
-          className={`${shell} ${gutter} flex h-16 items-center justify-between gap-3`}
+          className={`${shell} ${gutter} crm-topbar flex h-16 items-center justify-between gap-3`}
         >
-          <Link href="/heute" aria-label="Cockpit · Heute">
+          <Link href="/heute" aria-label="Cockpit · Heute" className="crm-brand">
             <Wordmark />
           </Link>
           <div className="flex items-center gap-2">
@@ -53,7 +57,7 @@ export default async function AppShell({
             <Link
               href="/suche"
               aria-label="Suchen"
-              className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-ink-muted hover:bg-surface hover:text-ink"
+              className="crm-global-search inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-ink-muted hover:bg-surface hover:text-ink"
             >
               <svg
                 aria-hidden
@@ -66,8 +70,9 @@ export default async function AppShell({
                 <circle cx="10.5" cy="10.5" r="6.5" />
                 <path d="m16 16 5 5" />
               </svg>
-              <span className="assistant-search-label">Suchen</span>
+              <span className="assistant-search-label">CRM durchsuchen</span>
             </Link>
+            <Link href="/hilfe" className="crm-help-link" aria-label="Hilfe und Support">?</Link>
             <Link
               href="/profil"
               aria-label="Profil und Einstellungen"
@@ -77,8 +82,8 @@ export default async function AppShell({
             </Link>
           </div>
         </div>
-        <div className={`${shell} md:px-6 lg:px-8`}>
-          <NavLinks links={navigationFuer()} />
+        <div className="crm-navigation-container">
+          <NavLinks links={navigationFuer()} calculatorEnabled={calculatorEnabled} />
         </div>
       </header>
       <main

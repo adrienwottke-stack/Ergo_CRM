@@ -50,13 +50,17 @@ test("Live uses actual SDK session configuration with browser instruction/tool e
   assert.deepEqual(config.delegation, { type: "client" });
   assert.equal(config.store, false);
   assert.deepEqual(config.client.data_channel.allowed_client_events, ["session.close", "session.input_audio.mute", "session.input_audio.unmute"]);
-  assert.match(config.instructions, /sichtbare Bestätigung/);
+  assert.match(config.instructions, /Selbstständig arbeiten/);
+  assert.match(config.instructions, /Vorschau zurückgelieferte Aktionen brauchen einen sichtbaren Klick/);
   assert.match(config.instructions, /Warte dafür nicht auf das Fachresultat/);
   assert.match(config.instructions, /keine erfundenen Fortschritte/);
   assert.match(config.instructions, /Hey, Meister Emil/);
-  assert.match(config.instructions, /Hype-Modus ist standardmäßig an/);
-  assert.match(config.instructions, /abwechslungsreiche Satzmelodie/);
-  assert.match(config.instructions, /trockener, situativer Witz/);
+  assert.match(config.instructions, /souverän, zugewandt und handlungsbereit/);
+  assert.match(config.instructions, /Namen, Zahlen, Termine und Bestätigungen/);
+  assert.doesNotMatch(config.instructions, /Die Person hat vor dem Sprachstart „Mehr Energie“ gewählt/);
+  const energetic = providerSessionConfig(aiCrmConfig(), true, null, "energetic");
+  assert.match(energetic.instructions, /Die Person hat vor dem Sprachstart „Mehr Energie“ gewählt/);
+  assert.match(energetic.instructions, /werde auf Wunsch sofort ruhiger/);
   assert.deepEqual(liveSpeechChunks("Ein Ergebnis. Ein nächster Schritt."), ["Ein Ergebnis. Ein nächster Schritt."]);
   const speech = "Das ist eine längere belegte Vorbereitung. ".repeat(60);
   const chunks = liveSpeechChunks(speech);
@@ -79,7 +83,7 @@ test("native greeting needs no user turn or TTS; claim, manual replay and reconn
   assert.equal(started.status, 200);
   const payload = await started.json();
   assert.equal(payload.mode, "live");
-  assert.equal(payload.config.greetingText, "Hey, Meister Emil! Ich bin da. Los geht's — was packen wir zuerst an?");
+  assert.equal(payload.config.greetingText, "Hey, Meister Emil. Ich bin da. Was steht heute an?");
   assert.equal(payload.session.introState, "WAITING");
   assert.equal(creates, 1);
   assert.equal(globalThis.jarvisVoiceCreated.session.store, false);
@@ -94,8 +98,8 @@ test("native greeting needs no user turn or TTS; claim, manual replay and reconn
   assert.equal(globalThis.jarvisVoiceSent.delegation_id, null);
   assert.match(globalThis.jarvisVoiceSent.content, /Hey, Meister Emil/);
   assert.doesNotMatch(globalThis.jarvisVoiceSent.content, /Musik/);
-  assert.equal(globalThis.jarvisVoiceCreated.session.audio.output.voice, "vesper");
-  assert.match(globalThis.jarvisVoiceCreated.session.instructions, /dezent synthetische/);
+  assert.equal(globalThis.jarvisVoiceCreated.session.audio.output.voice, "meridian");
+  assert.match(globalThis.jarvisVoiceCreated.session.instructions, /natürliches Deutsch mit warmer, mitteltiefer Stimmwirkung/);
   const delivered = globalThis.jarvisVoiceEvents.length;
   assert.deepEqual(await (await intro.POST(req(), session)).json(), { introState: "DONE", accepted: false });
   assert.equal(globalThis.jarvisVoiceEvents.length, delivered);
@@ -172,6 +176,15 @@ test("the new comparison voices reach the provider through the approved session 
     assert.equal(globalThis.jarvisVoiceCreated.session.audio.output.voice, voice);
     await lifecycle.DELETE(req({}, "DELETE"), ctx(session.id));
   }
+});
+
+test("the selected conversation style reaches Live through the validated session route", async () => {
+  assert.equal((await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=energy-check\r\n", energy: "unbounded" }))).status, 400);
+  const response = await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=energy-check\r\n", energy: "energetic" }));
+  assert.equal(response.status, 200);
+  assert.match(globalThis.jarvisVoiceCreated.session.instructions, /Die Person hat vor dem Sprachstart „Mehr Energie“ gewählt/);
+  const { session } = await response.json();
+  await lifecycle.DELETE(req({}, "DELETE"), ctx(session.id));
 });
 
 test("Live delegates to existing backend, persists sourced results, never replays speech or stale revision", async () => {

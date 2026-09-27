@@ -14,7 +14,8 @@ import { liegtSeit } from "@/lib/liegenbleiber";
 import { lostReasonLabels } from "@/lib/pipeline";
 import NameList, { type NameEntry } from "@/components/NameList";
 import GuidePanel from "@/components/GuidePanel";
-import { cn, pageTitle, column, segmentGruppe, segmentKnopf } from "@/components/ui";
+import { btnSecondary } from "@/components/ui";
+import SeitenKopf from "@/components/SeitenKopf";
 
 export const dynamic = "force-dynamic";
 
@@ -30,10 +31,11 @@ const appointmentFormat = new Intl.DateTimeFormat("de-DE", {
 export default async function NamenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ liste?: string; stufe?: string }>;
+  searchParams: Promise<{ liste?: string; stufe?: string; q?: string; status?: string; telefon?: string }>;
 }) {
   const user = await requireUser();
-  const { liste } = await searchParams;
+  const { liste, q: rawQuery, status = "alle", telefon = "alle" } = await searchParams;
+  const q = typeof rawQuery === "string" ? rawQuery.slice(0, 160) : "";
   const kind = listeAus(liste, user.startTrack);
 
   const guideKey = guideKeyForList[kind];
@@ -64,6 +66,8 @@ export default async function NamenPage({
   const entries: NameEntry[] = contacts.map((contact) => ({
     id: contact.id,
     name: contact.name,
+    stage: contact.stage,
+    outcome: contact.outcome,
     phone: contact.phone,
     rating: contact.rating,
     listKinds: contact.listKinds,
@@ -78,31 +82,28 @@ export default async function NamenPage({
   const guide = DEFAULT_GUIDES[guideKey];
 
   return (
-    <div className={`${column} space-y-6`}>
-      <div>
-        <h1 className={pageTitle}>Kontakte</h1>
-        <p className="mt-1 text-sm text-ink-muted">{listKindHints[kind]}</p>
-      </div>
+    <div className="crm-contact-list space-y-6">
+      <SeitenKopf titel="Kontakte" kicker="Arbeitsbereich" unterzeile={listKindHints[kind]} aktion={<Link href={`/contacts/new?liste=${kind}`} className={btnSecondary}>Kontakt anlegen</Link>} />
 
       {/* Reiter: serverseitig gefiltert, damit der Zustand in der Adresse steht
           und ein Neuladen nichts verliert. Dieselbe Segmented-Control wie im
           Rest der App (components/ui.ts), statt einer eigenen Pillengruppe. */}
-      <div className={cn(segmentGruppe, "w-full")}>
+      <nav className="crm-view-tabs" aria-label="Kontaktlisten">
         {LIST_KINDS.map((value) => {
           const active = value === kind;
           return (
             <Link
               key={value}
               href={`/namen?liste=${value}`}
-              className={cn(segmentKnopf(active), "flex-1")}
+              aria-current={active ? "page" : undefined}
             >
               {listKindLabels[value]}
             </Link>
           );
         })}
-      </div>
+      </nav>
 
-      <NameList entries={entries} kind={kind} />
+      <NameList key={`${kind}:${q}:${status}:${telefon}`} entries={entries} kind={kind} query={q.slice(0, 160)} statusFilter={["offen", "geschafft", "raus"].includes(status) ? status : "alle"} phoneFilter={["mit", "ohne"].includes(telefon) ? telefon : "alle"} />
 
       <GuidePanel title={guide.title} body={guide.body} kind={kind} />
     </div>

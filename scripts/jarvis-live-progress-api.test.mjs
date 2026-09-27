@@ -39,7 +39,7 @@ async function waitUntil(check, timeoutMs = 15000) {
     await new Promise(resolve => setTimeout(resolve, 50));
   }
 }
-async function session() { return (await (await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\nprogress-fixture" }))).json()).session.id; }
+async function session() { const response = await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\nprogress-fixture" })); const data = await response.json(); assert.equal(response.status, 200, JSON.stringify(data)); return data.session.id; }
 after(async () => { delete process.env.AI_CRM_ENABLED; delete process.env.AI_LIVE_PROVIDER; delete process.env.AI_PROVIDER_TIMEOUT_MS; await fixture.close(); });
 
 test("reported CM question persists its exact input and direct answer, with zero model/tool calls", async () => {

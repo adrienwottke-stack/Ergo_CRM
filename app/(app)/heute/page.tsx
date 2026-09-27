@@ -48,9 +48,10 @@ import { ladeCoach } from "@/lib/coach/server";
 import NamenSammelnEinstieg from "@/components/NamenSammelnEinstieg";
 import Postfach from "@/components/Postfach";
 import ZinsrechnerEinstieg from "@/components/zinsrechner/Einstieg";
-import { card, column, pageTitle } from "@/components/ui";
+import { card, column } from "@/components/ui";
 import { ArrowRightIcon, TrophyIcon } from "@/components/icons";
 import { AssistantTodayEntry } from "@/components/ai-crm/AssistantEntry";
+import SeitenKopf from "@/components/SeitenKopf";
 import {
   followUpErledigen,
   followUpVerschieben,
@@ -504,18 +505,7 @@ export default async function HeutePage({
   return (
     <VorfuehrProvider>
       <div className={`${column} space-y-6`}>
-        <header>
-          <p className="mb-2 text-sm text-ink-muted">
-            {datum.format(new Date())}
-          </p>
-          <div className="flex items-center justify-between gap-3">
-            <h1 className={pageTitle}>Heute</h1>
-            {fuehrung && <VorfuehrSchalter />}
-          </div>
-          <p className="mt-2 text-sm text-ink-muted">
-            {arbeitslageTitel[arbeitslage]}
-          </p>
-        </header>
+        <SeitenKopf titel="Heute" kicker={datum.format(new Date())} unterzeile={arbeitslageTitel[arbeitslage]} aktion={fuehrung ? <VorfuehrSchalter /> : undefined} />
         <AssistantTodayEntry />
         <NamenSammelnEinstieg fortsetzen={sammlungFortsetzen} />
         {(startVorne || hauptaktion) && (

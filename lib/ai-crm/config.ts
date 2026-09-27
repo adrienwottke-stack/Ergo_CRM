@@ -90,7 +90,7 @@ export function aiCrmConfig(): AiCrmConfig {
       1,
     ),
     monthlyToolCallLimit: integer("AI_MAX_MONTHLY_TOOL_CALLS", 1500, 1),
-    maxToolRounds: integer("AI_MAX_TOOL_ROUNDS", 6, 1),
+    maxToolRounds: integer("AI_MAX_TOOL_ROUNDS", 12, 1),
     maxAudioBytes: integer("AI_MAX_AUDIO_BYTES", 5 * 1024 * 1024, 1024),
     maxAudioSeconds: integer("AI_MAX_AUDIO_SECONDS", 60, 1),
     conversationRetentionDays: integer(

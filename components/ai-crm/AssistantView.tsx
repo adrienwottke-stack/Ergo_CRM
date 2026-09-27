@@ -5,6 +5,7 @@ import AssistantComposer from "@/components/ai-crm/AssistantComposer";
 import AssistantTimeline from "@/components/ai-crm/AssistantTimeline";
 import JarvisLive from "@/components/ai-crm/JarvisLive";
 import AssistantIcon from "./AssistantIcon";
+import AssistantPageReference from "./AssistantPageReference";
 
 export function AssistantConversationList({ disabled = false, onSelect }: { disabled?: boolean; onSelect?: () => void }) {
   const assistant = useAssistant();
@@ -112,6 +113,7 @@ export default function AssistantView() {
       {assistant.section === "details" && <Details />}
       <div className="assistant-chat" hidden={assistant.section !== "chat"} data-empty={empty && !liveOpen}>
         {!assistant.access ? <p className="assistant-loading" role="status">Assistent wird geöffnet …</p> : !assistant.access.enabled ? <div className="assistant-access"><h3>{assistant.access.reason === "NO_ENTITLEMENT" ? "Der Assistent ist für dein Konto noch nicht freigeschaltet." : assistant.access.reason?.startsWith("MONTHLY") ? "Dein Nutzungslimit ist erreicht." : "Der Assistent ist vorübergehend nicht verfügbar."}</h3><p>Du kannst im CRM normal weiterarbeiten.</p><div className="assistant-button-row"><button className="assistant-primary" onClick={assistant.close}>Zurück zum CRM</button><button onClick={() => assistant.setSection("details")}>Zugang ansehen</button></div></div> : <>
+          <AssistantPageReference disabled={assistant.locked || liveOpen} />
           {assistant.attachment && <div className="assistant-context"><span>Bezug: <strong>{assistant.attachment.label}</strong>{assistant.attachment.followUpId && " · Wiedervorlage"}</span><button disabled={assistant.working || liveOpen} onClick={() => assistant.setAttachment(null)} aria-label="Bezug entfernen"><AssistantIcon name="close" /></button></div>}
           <div className="assistant-empty" hidden={!empty || liveOpen}><h2>Was möchtest du heute erledigen?</h2></div>
         <AssistantTimeline liveActive={liveOpen} />

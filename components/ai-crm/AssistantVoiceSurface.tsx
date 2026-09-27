@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import AssistantIcon from "./AssistantIcon";
+import AssistantPermissions from "./AssistantPermissions";
 
 /** Presentation only: the mounted live controller continues to own media and requests. */
-export default function AssistantVoiceSurface({ active, status, starting = false, muted, canMute, onStart, onMute, onInterrupt, onEnd, composer, options, notices, simulation = false }: {
+export default function AssistantVoiceSurface({ active, status, starting = false, startDisabled = false, muted, canMute, onStart, onMute, onInterrupt, onEnd, composer, options, notices, simulation = false }: {
   active: boolean;
   status: string;
   starting?: boolean;
+  startDisabled?: boolean;
   muted: boolean;
   canMute: boolean;
   onStart: () => void;
@@ -52,7 +54,7 @@ export default function AssistantVoiceSurface({ active, status, starting = false
       <p className="assistant-voice-launch-kicker">JARVIS LIVE</p>
       <h3>{starting ? "Jarvis macht sich bereit." : "Sprachchat mit Jarvis"}</h3>
       <p>{status}</p>
-      {starting ? <><small>Bitte einen Moment.</small><button type="button" className="assistant-live-cancel" onClick={onEnd}>Abbrechen</button></> : <button type="button" className="assistant-primary assistant-live-start" onClick={onStart}><AssistantIcon name="voice" />Sprachchat starten</button>}
+      {starting ? <><small>Bitte einen Moment.</small><button type="button" className="assistant-live-cancel" onClick={onEnd}>Abbrechen</button></> : <button type="button" className="assistant-primary assistant-live-start" disabled={startDisabled} onClick={onStart}><AssistantIcon name="voice" />Sprachchat starten</button>}
     </div>}
     {active && !starting && <div className="assistant-voice-bar" aria-label="Jarvis Sprache">
       <div className="assistant-voice-status" role="status"><AssistantIcon name="voice" /><span><span>{status}</span>{simulation && <small>Lokale Simulation · kein Audiostream</small>}</span></div>
@@ -67,5 +69,6 @@ export default function AssistantVoiceSurface({ active, status, starting = false
       </div>
     </div>}
     <div className="assistant-voice-notices">{notices}</div>
+    {active && <AssistantPermissions />}
   </section>;
 }

@@ -1,0 +1,58 @@
+(node:26448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/adrie/Desktop/Business/Ergo_CRM/lib/generated/prisma/client.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\adrie\Desktop\Business\Ergo_CRM\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ one browser instance can retry its active live session, while a second tab is blocked (1029.8974ms)
+✔ a live session expires, never stores audio/transcript columns, and keeps its owner boundary (112.1996ms)
+✔ a live round starts a fresh conversation before its final pair would exceed 20 messages (162.3228ms)
+✔ an active Live session moves to a new conversation at the limit or expiry without ending (187.1517ms)
+(node:25532) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/adrie/Desktop/Business/Ergo_CRM/lib/generated/prisma/client.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\adrie\Desktop\Business\Ergo_CRM\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the local live path makes music status unmistakably simulated and supports pause (350.8731ms)
+(node:25532) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+✔ a live follow-up stays an owner-scoped preview and duplicate events cannot stage twice (548.3087ms)
+(node:32392) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/adrie/Desktop/Business/Ergo_CRM/lib/ai-crm/live-state.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\adrie\Desktop\Business\Ergo_CRM\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ live client state renders a client-only assistant preview before its final text and can be interrupted (2.3775ms)
+✔ the local music mock remains per user/session and never claims real playback (1.0737ms)
+(node:37952) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/adrie/Desktop/Business/Ergo_CRM/lib/generated/prisma/client.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\adrie\Desktop\Business\Ergo_CRM\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ sensitive updates are immutable previews and double confirmation executes once (741.7698ms)
+✔ stale previews do not overwrite changes from the ordinary CRM (182.9223ms)
+✔ confirmation is owner scoped, rejects browser parameters and expired plans (226.7298ms)
+✔ cancel retains completed receipts and prevents remaining actions (270.4741ms)
+✔ undo survives reopen, uses actual expiry and refuses a changed record (204.2633ms)
+✔ a successful undo is reflected in reloaded action state (358.5426ms)
+✔ every business write needs visible confirmation including explicit short commands (0.7143ms)
+✔ contact results never turn a synthesized next step into a follow-up context (93.9707ms)
+(node:37952) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+✔ the model cannot bypass confirmation even when its final text claims success (207.9649ms)
+✔ multi-step commands remain pending as a whole and give individual receipts (595.2716ms)
+✔ conversation presentation restores structured data and current plan status (367.0242ms)
+✔ an owner can retrieve a completed live turn through the ordinary request status route (78.6884ms)
+✔ a failed step remains visible and prevents direct execution of a surviving step (413.0449ms)
+✔ expired conversations with interrupted requests are purged without CRM deletion (159.9082ms)
+✔ all valid conversations are pageable and deletion protects in-flight work (213.229ms)
+(node:36048) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/adrie/Desktop/Business/Ergo_CRM/lib/generated/prisma/client.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\adrie\Desktop\Business\Ergo_CRM\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ contact return paths retain view and filters without accepting redirects or arbitrary query keys (9.1171ms)
+✔ calculator tool uses the existing formula, hands off identical inputs and writes no scenario (89.0339ms)
+✔ calculator rejects invalid assumptions and honors the same feature gate (48.7226ms)
+✔ assistant help uses the manual help source and never turns help entries into contacts (1.6552ms)
+✔ manual proposal editing invalidates the old confirmation; retries of the revised action save once (624.7401ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13718.2603

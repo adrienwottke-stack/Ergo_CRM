@@ -1,3 +1,6 @@
+import { WORK_SCHEMAS, WORK_TOOL_DEFINITIONS, runWorkRead } from "@/lib/ai-crm/work-tools";
+import { WORKSPACE_SCHEMAS, WORKSPACE_TOOL_DEFINITIONS, runWorkspaceRead } from "@/lib/ai-crm/workspace-tools";
+import { executeWorkOperation } from "@/lib/ai-crm/work-registry";
 import { z } from "zod";
 import { Prisma, type PrismaClient } from "@/lib/generated/prisma/client";
 import {
@@ -20,6 +23,8 @@ import { aiUndoState } from "@/lib/ai-crm/undo-guard";
 import { LEADERSHIP_TOOL_DEFINITIONS, LEADERSHIP_SCHEMAS, LEADERSHIP_WRITE_TOOLS, runLeadershipRead, executeLeadershipWrite } from "@/lib/ai-crm/leadership-tools";
 
 export const CRM_TOOL_DEFINITIONS = [
+  ...WORKSPACE_TOOL_DEFINITIONS,
+  ...WORK_TOOL_DEFINITIONS,
   ...LEADERSHIP_TOOL_DEFINITIONS,
   {
     type: "function" as const,
@@ -321,6 +326,8 @@ const staleSchema = z.object({
 const recentSchema = z.object({ limit: z.number().int().min(1).max(30) });
 
 const schemas = {
+  ...WORK_SCHEMAS,
+  ...WORKSPACE_SCHEMAS,
   ...LEADERSHIP_SCHEMAS,
   search_contacts: searchSchema,
   get_contact: contactIdSchema,
@@ -350,9 +357,12 @@ export type CrmToolResult = {
   link?: string;
   undoable?: boolean;
   undoEntryId?: string;
+  /** Server-only result reference; never included in model output or receipts. */
+  privateResult?: { resetId: string };
 };
 
 type ToolContext = {
+  afterCommit?: Array<() => Promise<unknown>>;
   userId: string;
   requestId: string;
   aiRequestId?: string;
@@ -365,6 +375,7 @@ type ToolContext = {
 };
 
 export const WRITE_TOOLS = new Set<CrmToolName>([
+  "execute_crm_operation",
   ...LEADERSHIP_WRITE_TOOLS,
   "create_contact",
   "update_contact",
@@ -583,7 +594,13 @@ export async function runCrmTool(
   }
   const name = parsed.name;
   const args = parsed.args;
+  if (Object.hasOwn(WORKSPACE_SCHEMAS, name)) return runWorkspaceRead(db, context.userId, name, args);
 
+  if (Object.hasOwn(WORK_SCHEMAS, name)) {
+    if (name !== "execute_crm_operation") return runWorkRead(db, context.userId, name, args);
+    if (!context.transaction) throw new AiCrmError("CONFIRMATION_REQUIRED", "Die Aktion benötigt einen autorisierten Ausführungsplan.", 409);
+    return auditedWrite(db, context, tx => executeWorkOperation(tx, context.userId, args, context.afterCommit ?? []));
+  }
   if (Object.hasOwn(LEADERSHIP_SCHEMAS, name)) {
     if (!WRITE_TOOLS.has(name)) return runLeadershipRead(db, context.userId, name, args);
     if (!context.transaction) throw new AiCrmError("CONFIRMATION_REQUIRED", "Bitte bestätige zuerst die konkrete Vorschau.", 409);

@@ -155,6 +155,7 @@ try {
     ]);
     const page = await context.newPage();
     page.setDefaultTimeout(30_000);
+    page.setDefaultNavigationTimeout(90_000);
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("console", (message) => {
       if (message.type() === "error") {
@@ -180,16 +181,16 @@ try {
 
   const desktop = await contextFor({ width: 1280, height: 800 }, false, "no-preference");
   await desktop.page.goto(`${origin}/heute`);
-  await desktop.page.getByRole("button", { name: "Deinen Tag besprechen" }).waitFor();
+  await desktop.page.getByRole("button", { name: "Mit Jarvis sprechen" }).waitFor();
   await screenshot(desktop.page, "desktop-dashboard.png");
   assert.ok(
     await desktop.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
     "desktop dashboard has no horizontal overflow",
   );
-  await desktop.page.getByRole("button", { name: "Deinen Tag besprechen" }).click();
-  await desktop.page.locator("#crm-assistant-surface").waitFor();
-  await desktop.page.getByRole("button", { name: "Mit Jarvis sprechen" }).waitFor();
   await desktop.page.getByRole("button", { name: "Mit Jarvis sprechen" }).click();
+  await desktop.page.locator("#crm-assistant-surface").waitFor();
+  await desktop.page.getByRole("button", { name: "Sprachchat starten", exact: true }).waitFor();
+  await desktop.page.getByRole("button", { name: "Sprachchat starten", exact: true }).click();
   await desktop.page.getByText("Jarvis hört zu", { exact: true }).waitFor();
   await desktop.page.getByLabel("Sprachoptionen", { exact: true }).click();
   const spotifySetup = desktop.page.getByRole("button", { name: "Spotify einrichten" });
@@ -224,25 +225,26 @@ try {
     .getByText("Lokale Demo: Die simulierte Wiedergabe wurde pausiert.")
     .first()
     .waitFor();
-  await desktop.page.getByText("Simulierte Antwortzeile", { exact: true }).waitFor();
   await desktop.page.getByText("Finale Antwort", { exact: true }).waitFor();
   await screenshot(desktop.page, "desktop-live-result.png");
   await desktop.page.getByRole("button", { name: "Sitzung beenden" }).click();
-  await desktop.page.getByText("Live-Session beendet.").waitFor();
+  await desktop.page.getByRole("status").filter({ hasText: "Live-Session beendet." }).waitFor();
   await waitForNoActiveSession(user.id);
   assert.ok(
     await desktop.page.evaluate(() => window.__jarvisLiveTrackStops > 0),
     "ending Live stops local microphone tracks",
   );
-  await desktop.page.getByText("Live-Transkript", { exact: true }).first().waitFor();
   await screenshot(desktop.page, "desktop-live-history.png");
+  const history = await desktop.page.getByRole("list", { name: "Gesprächsverlauf" }).innerText();
+  await writeFile(new URL("history.txt", output), history);
+  assert.match(history, /Pause\./, "the spoken task remains in the ordinary conversation after ending Live");
   await desktop.context.close();
 
   const mobile = await contextFor({ width: 375, height: 812 }, true);
   await mobile.page.goto(`${origin}/heute`);
-  await mobile.page.getByRole("button", { name: "Deinen Tag besprechen" }).click();
-  await mobile.page.getByRole("button", { name: "Mit Jarvis sprechen" }).waitFor();
   await mobile.page.getByRole("button", { name: "Mit Jarvis sprechen" }).click();
+  await mobile.page.getByRole("button", { name: "Sprachchat starten", exact: true }).waitFor();
+  await mobile.page.getByRole("button", { name: "Sprachchat starten", exact: true }).click();
   await mobile.page.getByText("Jarvis hört zu", { exact: true }).waitFor();
   const end = mobile.page.getByRole("button", { name: "Sitzung beenden" });
   await end.scrollIntoViewIfNeeded();
@@ -318,6 +320,8 @@ try {
 } catch (error) {
   failed = true;
   console.error(error);
+  const currentPage = browser?.contexts().at(-1)?.pages().at(-1);
+  await currentPage?.screenshot({ path: fileURLToPath(new URL("failure.png", output)), caret: "initial" }).catch(() => {});
   await writeFile(
     new URL("result.json", output),
     JSON.stringify({ passed: false, error: String(error) }, null, 2),

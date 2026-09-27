@@ -2,6 +2,14 @@
 
 Stand: 19. September 2026. Repository: `C:\Users\adrie\Desktop\Business\Ergo_CRM`.
 
+**Aktualisierte Produktvorgabe vom 27. September 2026:** Für das Gesamtprodukt,
+Navigation und wiederkehrende Seitenmuster gilt die
+[verbindliche HubSpot-Ausrichtung](produkt-design-hubspot.md). Sie ersetzt ältere
+allgemeine ChatGPT-/Claude-Designempfehlungen in diesem historischen Dokument.
+Bestehende fachliche Regeln, Sicherheitsanforderungen und passende einzelne
+Gesprächs-/Sprachinteraktionen bleiben relevant. Die lokale Umsetzung und ihre
+Prüfung stehen im [Abnahmebericht](hubspot-workspace-abnahme-2026-09-27.md).
+
 Dieses Dokument enthält die vollständige im Ursprungstask erarbeitete Konzeption einschließlich Research, Entscheidungsmatrix, aller 18 Wireframes, Nutzerflüssen, deutschen UX-Texten, Komponentenmodell, Umsetzungsetappen und späteren Paketen. Der Originalauftrag ist zusätzlich als Referenz enthalten. Die nächste Session benötigt dafür keinen Zugriff auf den bisherigen Chat oder den ursprünglichen Anhang.
 
 ## A. Einstieg für die nächste Session

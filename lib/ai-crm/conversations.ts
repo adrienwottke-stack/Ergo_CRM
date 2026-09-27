@@ -68,6 +68,8 @@ export async function resolveConversation(
   return {
     conversation: {
       id: current.id,
+      executionMode: current.executionMode,
+      executionVersion: current.executionVersion,
       userId: current.userId,
       title: current.title,
       startedAt: current.startedAt,

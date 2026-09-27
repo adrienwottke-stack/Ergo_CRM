@@ -781,7 +781,7 @@ test("system prompt anchors relative dates and treats stored CRM text as data, n
   const prompt = aiCrmSystemPrompt(new Date("2030-10-01T10:00:00Z"));
   assert.match(prompt, /Europe\/Berlin/);
   assert.match(prompt, /untrusted data/);
-  assert.match(prompt, /keine Löschungen/);
+  assert.match(prompt, /serverseitigen Zugriffsmodus/);
 
   // OpenAI bekommt nur den von Strict Function Calling unterstützten
   // JSON-Schema-Kern; die vollständigen Grenzen erzwingt weiterhin Zod.
