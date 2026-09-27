@@ -10,7 +10,7 @@ export default function AssistantEntry() {
 export function AssistantTodayEntry() {
   const assistant = useAssistant();
   if (assistant.presenting) return null;
-  return <button type="button" className="assistant-today-entry" onClick={() => assistant.open()}><AssistantSymbol /><span><strong>Mit Jarvis sprechen</strong><span>Assistent öffnen und Sprachchat starten.</span></span><span aria-hidden>↗</span></button>;
+  return <button type="button" className="assistant-today-entry crm-assistant-compact" onClick={() => assistant.open()}><AssistantSymbol /><span><strong>Mit Jarvis sprechen</strong></span><span aria-hidden>↗</span></button>;
 }
 export function AssistantContextEntry({ context, prompt, appendPrompt = false, label = "Mit Assistent besprechen" }: { context?: AssistantContext; prompt?: string; appendPrompt?: boolean; label?: string }) {
   const assistant = useAssistant();

@@ -29,6 +29,7 @@ export default function DeleteContactButton({
   activityCount,
   referralCount = 0,
   variant = "button",
+  onOpen,
 }: {
   contactId: string;
   contactName: string;
@@ -36,6 +37,8 @@ export default function DeleteContactButton({
   referralCount?: number;
   /** "button" steht neben "Bearbeiten", "link" passt in eine Tabellenzeile. */
   variant?: "button" | "link";
+  /** Close the surrounding contact disclosure before opening the confirmation. */
+  onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -50,7 +53,7 @@ export default function DeleteContactButton({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => { onOpen?.(); setOpen(true); }}
         aria-label={`${contactName} löschen`}
         className={
           variant === "link"

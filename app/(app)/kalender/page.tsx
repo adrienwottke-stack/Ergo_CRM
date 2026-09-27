@@ -16,8 +16,6 @@ import {
 import { eintraegeImZeitraum } from "@/lib/kalender/laden";
 import { faelligeQuellenAbgleichen } from "@/lib/kalender/abgleich";
 import {
-  kicker,
-  pageTitle,
   shell,
   btnPrimary,
   btnSecondary,
@@ -29,6 +27,8 @@ import { Umschalter, type Ansicht } from "@/components/kalender/Umschalter";
 import { Zeitraster } from "@/components/kalender/Zeitraster";
 import { Monatsraster } from "@/components/kalender/Monatsraster";
 import { Agenda } from "@/components/kalender/Agenda";
+import SeitenKopf from "@/components/SeitenKopf";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
 import { jetztAbgleichen } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -191,7 +191,7 @@ export default async function KalenderPage({
     bis = dayToUtcDate(shiftDay(tag, 60));
     zurueck = shiftDay(tag, -30);
     vor = shiftDay(tag, 30);
-    titel = tag === heute ? "Nächste Wochen" : `Ab ${kurzFormat.format(dayToUtcDate(tag))}`;
+    titel = `Ab ${tagTitelFormat.format(dayToUtcDate(tag))}`;
   }
 
   // Die Zeitzonen-Falle: dayToUtcDate liefert UTC-Mitternacht, der Berliner Tag
@@ -244,29 +244,72 @@ export default async function KalenderPage({
   });
 
   return (
-    <div className={`${shell} space-y-5`}>
-      <div className="crm-page-heading flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className={pageTitle}>Kalender</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            {imFenster.length === 0
-              ? "Nichts in diesem Zeitraum."
-              : `${imFenster.length} ${imFenster.length === 1 ? "Eintrag" : "Einträge"}.`}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href="/kalender/abo" className={btnSecondary}>
-            <CalendarCheckIcon className="h-4 w-4" />
-            Auf dem Handy
-          </Link>
+    <div className={`${shell} crm-calendar space-y-4`}>
+      <SeitenKopf
+        hauptbereich
+        titel="Kalender"
+        unterzeile={`${imFenster.length} ${imFenster.length === 1 ? "Eintrag" : "Einträge"} im Zeitraum`}
+        aktion={
           <Link href={`/kalender/neu?tag=${tag}`} className={btnPrimary}>
             <PlusIcon className="h-4 w-4" />
             Eintrag
           </Link>
-        </div>
+        }
+      />
+
+      <Umschalter
+        ansicht={ansicht}
+        tag={tag}
+        heute={heute}
+        zurueck={zurueck}
+        vor={vor}
+        titel={titel}
+      />
+
+      <div aria-labelledby="kalender-zeitraum" className="crm-calendar-content">
+        {ansicht === "monat" && (
+          <VorfuehrVerdeckt hinweis="Kalendereinträge sind beim Vorführen ausgeblendet.">
+          <Monatsraster tag={tag} eintraege={imFenster} heute={heute} />
+          </VorfuehrVerdeckt>
+        )}
+        {ansicht === "woche" && (
+          <VorfuehrVerdeckt hinweis="Kalendereinträge sind beim Vorführen ausgeblendet.">
+          <Zeitraster tage={wochentage} eintraege={imFenster} heute={heute} />
+          </VorfuehrVerdeckt>
+        )}
+        {ansicht === "tag" && (
+          <>
+            {imFenster.length === 0 && (
+              <div className="crm-calendar-empty-day">
+                <p>Für diesen Tag ist noch nichts eingetragen.</p>
+                <Link href={`/kalender/neu?tag=${tag}`} className={btnSecondary}>Eintrag anlegen</Link>
+              </div>
+            )}
+            <VorfuehrVerdeckt hinweis="Kalendereinträge sind beim Vorführen ausgeblendet.">
+              <Zeitraster tage={[tag]} eintraege={imFenster} heute={heute} />
+            </VorfuehrVerdeckt>
+          </>
+        )}
+        {ansicht === "liste" && <Agenda eintraege={imFenster} heute={heute} tag={tag} />}
       </div>
 
+      <details className="crm-calendar-connections crm-work-section">
+        <summary>
+          <CalendarCheckIcon className="h-4 w-4" />
+          Kalender verbinden
+          {syncZustand && syncZustand.gestoerte.length > 0 && (
+            <span className="text-red-700"> · {syncZustand.gestoerte.length} {syncZustand.gestoerte.length === 1 ? "Quelle gestört" : "Quellen gestört"}</span>
+          )}
+        </summary>
+        <div className="space-y-3">
+          <p className="text-sm text-ink-muted">Übernimm deine Termine in den Handy-Kalender oder zeige Termine aus verbundenen Kalendern hier an.</p>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/kalender/abo" className={btnSecondary}>Auf dem Handy</Link>
+            <Link href="/kalender/quellen" className={btnSecondary}>TimeTree und Kalenderquellen</Link>
+          </div>
+
       {syncZustand && (
+        <VorfuehrVerdeckt hinweis="Verbindungsdetails sind beim Vorführen ausgeblendet.">
         <div
           className={
             syncZustand.gestoerte.length > 0
@@ -314,39 +357,10 @@ export default async function KalenderPage({
             </form>
           )}
         </div>
+        </VorfuehrVerdeckt>
       )}
-
-      <Umschalter
-        ansicht={ansicht}
-        tag={tag}
-        heute={heute}
-        zurueck={zurueck}
-        vor={vor}
-        titel={titel}
-      />
-
-      {ansicht === "monat" && (
-        <Monatsraster tag={tag} eintraege={imFenster} heute={heute} />
-      )}
-      {ansicht === "woche" && (
-        <Zeitraster tage={wochentage} eintraege={imFenster} heute={heute} />
-      )}
-      {ansicht === "tag" && (
-        <Zeitraster tage={[tag]} eintraege={imFenster} heute={heute} />
-      )}
-      {ansicht === "liste" && <Agenda eintraege={imFenster} heute={heute} />}
-
-      <p className={kicker}>
-        „Auf dem Handy“ legt den Kalender in dein Telefon — dann weckt dich dein
-        Telefon, auch wenn die App zu ist. Umgekehrt holt{" "}
-        <Link
-          href="/kalender/quellen"
-          className="font-medium text-navy-600 hover:underline"
-        >
-          TimeTree hereinholen
-        </Link>{" "}
-        deine dortigen Termine hierher, damit niemand in belegte Zeit plant.
-      </p>
+        </div>
+      </details>
     </div>
   );
 }

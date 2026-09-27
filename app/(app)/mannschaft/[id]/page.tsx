@@ -32,6 +32,9 @@ import PersonenVerlauf from "@/components/PersonenVerlauf";
 import { ladeStrukturperson } from "@/lib/struktur-verwaltung";
 import { ladePersonenverlauf } from "@/lib/personen-verlauf";
 import { KARRIERESTUFE_MIN, KARRIERESTUFE_MAX } from "@/lib/einheiten";
+import GpName from "@/components/GpName";
+import VorfuehrSchalter from "@/components/VorfuehrSchalter";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
 
 export const dynamic = "force-dynamic";
 
@@ -104,7 +107,7 @@ function SchrittZeile({
 }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-      <span className="w-28 shrink-0 text-11 font-semibold uppercase tracking-wider text-ink-soft">
+      <span className="crm-partner-step-label w-28 shrink-0 text-11 font-semibold uppercase tracking-wider text-ink-soft">
         {marke}
       </span>
       <span
@@ -190,7 +193,7 @@ function AstZeile({ person }: { person: Mannschaftsperson }) {
     <li>
       <PersonLink
         href={`/mannschaft/${person.id}`}
-        className="-mx-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg px-2 py-2 transition hover:bg-sunken"
+        className="-mx-2 flex min-h-11 flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg px-2 py-2 transition hover:bg-sunken"
       >
         <Ampel
           ampel={person.ampel}
@@ -198,7 +201,7 @@ function AstZeile({ person }: { person: Mannschaftsperson }) {
           groesse="klein"
           className="self-center"
         />
-        <span className="text-sm font-medium text-ink">{person.name}</span>
+        <span className="text-sm font-medium text-ink"><GpName name={person.name} /></span>
         {person.fuehrt > 0 && (
           <span className="rounded-full bg-navy-50 px-2 py-0.5 text-11 text-navy-700">
             führt {person.fuehrt}
@@ -234,10 +237,12 @@ export default async function PersonPage({
   ]);
   const stufen = Array.from({ length: KARRIERESTUFE_MAX - KARRIERESTUFE_MIN + 1 }, (_, i) => i + KARRIERESTUFE_MIN);
   if (verwaltung?.ausgetragen) return (
-    <div className="space-y-6">
+    <div className="crm-team-detail space-y-6">
       <PersonLink href="/mannschaft/verwalten" className="inline-flex min-h-11 items-center text-sm font-medium text-navy-700">← Struktur verwalten</PersonLink>
-      <div><p className={kicker}>Ausgetragen</p><h1 className={pageTitle}>{verwaltung.name}</h1></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><p className={kicker}>Ausgetragen</p><h1 className={pageTitle}><GpName name={verwaltung.name} /></h1></div><VorfuehrSchalter /></div>
+      <VorfuehrVerdeckt hinweis="Persönliche Verwaltung ist beim Vorführen ausgeblendet.">
       <PersonVerwalten person={verwaltung} stufen={stufen} />
+      </VorfuehrVerdeckt>
       {meldung && <p role="status" className="text-sm text-emerald-700">{meldung}</p>}
       <section className={`${card} p-5`}><p className="text-sm text-ink-muted">Der Zugang ist gesperrt. Die Daten bleiben erhalten, die Person zählt in laufenden Auswertungen nicht mit. Du kannst sie hier bearbeiten, zurückholen oder endgültig löschen.</p></section>
     </div>
@@ -280,23 +285,24 @@ export default async function PersonPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="crm-team-detail space-y-6">
       <div>
         <PersonLink
           href="/mannschaft"
-          className="text-13 font-medium text-navy-700 hover:underline"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-navy-700 hover:underline"
         >
-          ← Mannschaft
+          ← Team
         </PersonLink>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <Ampel ampel={person.ampel} variante="punkt" groesse="gross" />
-          <h1 className={pageTitle}>{person.name}</h1>
+          <h1 className={pageTitle}><GpName name={person.name} /></h1>
+          <VorfuehrSchalter />
           {/* Der Zustand als Wort direkt hinter dem Namen - das ist die
               Antwort auf die Frage, mit der man diese Seite oeffnet. */}
           <Ampel ampel={person.ampel} variante="text" />
           {person.ueber && (
             <span className="rounded-full bg-sunken px-2.5 py-0.5 text-xs font-medium text-ink-muted">
-              über {person.ueber}
+              über <GpName name={person.ueber} />
             </span>
           )}
           {person.ausgetreten && (
@@ -314,6 +320,7 @@ export default async function PersonPage({
         </p>
       </div>
 
+      <VorfuehrVerdeckt hinweis="Persönliche Begleitung, Absprachen und Kontaktaktionen sind beim Vorführen ausgeblendet. Die Leistungszahlen bleiben sichtbar.">
       {verwaltung && <PersonVerwalten person={verwaltung} stufen={stufen} />}
       {meldung && <p role="status" className="text-sm text-emerald-700">{meldung}</p>}
       {kurven && (kurven.hatEigen || kurven.teamKoepfe > 0) && <PersonenVerlauf daten={kurven} name={person.vorname} />}
@@ -449,6 +456,8 @@ export default async function PersonPage({
         </section>
       )}
 
+      </VorfuehrVerdeckt>
+
       {/* --- Zahlen ----------------------------------------------------------
           Bei einer Fuehrungskraft zwei Bloecke nebeneinander: was SIE selbst
           geschafft hat und was ihr Ast geschafft hat. Zusammengerechnet waere
@@ -459,7 +468,7 @@ export default async function PersonPage({
           falls schon jemand unter ihm haengt. */}
       {!person.platzhalter && (
         <section className={`${card} p-4 sm:p-5`}>
-          <h2 className={kicker}>{person.vorname} selbst</h2>
+          <h2 className={kicker}><GpName name={person.vorname} /> selbst</h2>
           <div className="mt-3 flex flex-wrap gap-x-6 gap-y-3">
             <Kennzahl
               wert={person.werte.anrufeWoche}
@@ -541,7 +550,7 @@ export default async function PersonPage({
       {person.platzhalter && fuehrt && (
         <section className={`${card} p-4 sm:p-5`}>
           <h2 className={kicker}>
-            Ast unter {person.vorname} — {koepfe}{" "}
+            Ast unter <GpName name={person.vorname} /> — {koepfe}{" "}
             {koepfe === 1 ? "Kopf" : "Köpfe"}
             {wartende > 0 && `, ${wartende} noch nicht dabei`}
           </h2>
@@ -562,6 +571,7 @@ export default async function PersonPage({
       )}
 
       {/* --- Der Verlauf mit Namen ------------------------------------------ */}
+      <VorfuehrVerdeckt hinweis="Persönliche Verläufe und Kontaktaufgaben sind beim Vorführen ausgeblendet.">
       {!(person.platzhalter && !fuehrt) && (
         <section className={`${card} p-4 sm:p-5`}>
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -675,13 +685,15 @@ export default async function PersonPage({
           </div>
         )}
 
+      </VorfuehrVerdeckt>
+
       {/* --- Weiter nach unten ----------------------------------------------
           Direkte prominent, der Rest des Astes darunter. Jede Zeile fuehrt
           eine Ebene tiefer - genau derselbe Bildschirm, eine Stufe weiter. */}
       {fuehrt && (
         <section className={`${card} p-4 sm:p-5`}>
           <h2 className={kicker}>
-            {person.vorname}s Direkte ({direkte.length})
+            Direkte Partner von <GpName name={person.vorname} /> ({direkte.length})
           </h2>
           <ul className="mt-1.5 divide-y divide-line">
             {direkte.map((eintrag) => (

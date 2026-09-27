@@ -11,7 +11,6 @@
 // `children` laeuft als bereits gerenderter Server-Baum unveraendert durch,
 // solange der Schalter aus ist. Kostet dann nichts.
 
-import { useVorfuehren } from "@/components/VorfuehrProvider";
 import type { ReactNode } from "react";
 
 export default function VorfuehrVerdeckt({
@@ -21,9 +20,5 @@ export default function VorfuehrVerdeckt({
   children: ReactNode;
   hinweis: string;
 }) {
-  const { aktiv } = useVorfuehren();
-  if (aktiv) {
-    return <p className="text-xs text-ink-soft">{hinweis}</p>;
-  }
-  return <>{children}</>;
+  return <><div data-private-content="" style={{ display: "contents" }}>{children}</div><p data-private-placeholder="" className="text-xs text-ink-muted">{hinweis}</p></>;
 }

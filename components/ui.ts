@@ -9,7 +9,7 @@ export function cn(...teile: Array<string | false | null | undefined>) {
   return teile.filter(Boolean).join(" ");
 }
 
-export const card = "rounded-2xl border border-line bg-surface";
+export const card = "rounded-[10px] border border-line bg-surface";
 
 /** Karte, die auf einen Klick wartet: hebt sich unter dem Zeiger leicht an. */
 export const cardInteractive = `${card} transition duration-200 hover:-translate-y-px hover:border-line-strong hover:schatten-hoch`;
@@ -44,16 +44,16 @@ export const shell = "mx-auto w-full max-w-6xl 2xl:max-w-7xl";
 export const gutter = "px-4 sm:px-6 lg:px-8";
 
 export const btnPrimary =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-akzent px-5 py-3 text-base font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600 disabled:opacity-60";
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-akzent px-4 py-2 text-base font-semibold text-white transition hover:bg-akzent-stark active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600 disabled:opacity-60";
 
 export const btnSecondary =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink transition hover:border-line-strong hover:bg-sunken hover:text-ink active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm font-medium text-ink transition hover:border-line-strong hover:bg-sunken hover:text-ink active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-akzent";
 
 export const btnGhost =
   "text-sm font-medium text-link transition hover:text-link-stark";
 
 const inputBasis =
-  "min-h-12 w-full rounded-xl border border-line-strong bg-surface px-3.5 py-3 text-base text-ink transition placeholder:text-ink-soft focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/25";
+  "min-h-12 w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-base text-ink transition placeholder:text-ink-soft focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/25";
 
 /** Eingabefeld unter einem <label> - der Abstand nach oben steckt schon drin. */
 export const input = `mt-1.5 ${inputBasis}`;
@@ -84,7 +84,7 @@ export const kicker =
 export const td = "px-4 py-3.5 first:pl-5 last:pr-5";
 
 export const filterPill = (active: boolean) =>
-  `inline-flex min-h-9 items-center rounded-full px-3.5 text-sm font-medium transition ${
+  `inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition ${
     active
       ? "bg-akzent text-white schatten-karte"
       : "border border-line-strong bg-surface text-ink-muted hover:text-ink"
@@ -94,10 +94,10 @@ export const filterPill = (active: boolean) =>
 // Ansichten nebeneinander, in einer eingesenkten Kapsel. Umschalter.tsx und
 // WettbewerbNav.tsx bauen ihre Umschalter bisher noch selbst - die stellen
 // erst eine spaetere Welle auf diesen Baustein um.
-export const segmentGruppe = "inline-flex items-center gap-0.5 rounded-full bg-sunken p-1";
+export const segmentGruppe = "inline-flex items-center gap-0.5 rounded-lg bg-sunken p-1";
 
 export const segmentKnopf = (aktiv: boolean) =>
-  `inline-flex min-h-11 items-center justify-center rounded-full px-3.5 text-sm font-medium transition${
+  `inline-flex min-h-11 items-center justify-center rounded-md px-3 text-sm font-medium transition${
     aktiv ? " bg-surface text-ink schatten-karte" : " text-ink-muted hover:text-ink"
   }`;
 

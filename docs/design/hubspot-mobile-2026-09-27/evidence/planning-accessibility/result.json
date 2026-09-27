@@ -1,0 +1,31 @@
+{
+  "success": true,
+  "phase": "planning-accessibility",
+  "date": "2026-09-27T16:03:22.484Z",
+  "commit": "57548123c1edeb2a45320d1fe2f05cb60f229506",
+  "seed": {
+    "date": "2026-09-27",
+    "roles": [
+      "ready",
+      "leader",
+      "empty"
+    ],
+    "contactsPerActiveRole": 16,
+    "partners": 4,
+    "agreements": 3,
+    "personalGoals": 2,
+    "teamGoals": 1
+  },
+  "checks": [
+    "Own goal/partner keyboard details, preserved calendar view, external read-only row and consecutive short appointments passed; 18 views with 200% text and 16 rendered text contrast samples passed. Details in planning-accessibility.json.",
+    "Empty calendar, progress and team captured at 390px."
+  ],
+  "measurements": [],
+  "errors": [],
+  "findings": [],
+  "limitations": [
+    "Local Chromium emulation; no physical devices",
+    "No real provider or microphone acceptance",
+    "Disposable in-memory database; no deployment"
+  ]
+}

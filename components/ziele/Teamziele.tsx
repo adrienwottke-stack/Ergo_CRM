@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ladeTeamziele } from "@/lib/teamziele";
 import { teamzielBeenden } from "@/app/(app)/mannschaft/ziele/actions";
 import Fortschritt from "@/components/Fortschritt";
+import GpName from "@/components/GpName";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
 
 const datum = new Intl.DateTimeFormat("de-DE", {
   day: "numeric",
@@ -16,12 +18,14 @@ export default async function Teamziele({
   tag,
   kompakt = false,
   verwalten = false,
+  alsAbschnitt = false,
 }: {
   userId: string;
   wurzelId?: string;
   tag?: string;
   kompakt?: boolean;
   verwalten?: boolean;
+  alsAbschnitt?: boolean;
 }) {
   const ziele = await ladeTeamziele(userId, {
     wurzelId,
@@ -43,16 +47,19 @@ export default async function Teamziele({
     );
   return (
     <div className="space-y-3" aria-label="Gemeinsame Teamziele">
+      {alsAbschnitt && <div className="crm-section-heading"><h2>Gemeinsame Teamziele</h2></div>}
       {(kompakt ? ziele.slice(0, 1) : ziele).map((ziel) => (
         <section
           key={ziel.id}
-          className="rounded-2xl border border-line bg-surface p-5"
+          className="crm-team-goal rounded-[10px] border border-line bg-surface p-4"
         >
           <p className="text-sm text-ink-muted">
-            {ziel.eigenes ? "Dein Team" : `Team ${ziel.teamName}`} ·{" "}
+            {ziel.eigenes ? "Dein Team" : <>Team <GpName name={ziel.teamName} /></>} ·{" "}
             {ziel.mitglieder} aktive Partner
           </p>
-          <h3 className="mt-1 text-lg font-semibold">{ziel.titel}</h3>
+          <VorfuehrVerdeckt hinweis="Persönlicher Teamzieltitel ausgeblendet.">
+            <h3 className="mt-1 text-lg font-semibold">{ziel.titel}</h3>
+          </VorfuehrVerdeckt>
           <p className="mt-1 text-xs text-ink-muted">
             {datum.format(ziel.start)} bis{" "}
             {datum.format(new Date(ziel.ende.getTime() - 86400000))}
@@ -68,7 +75,9 @@ export default async function Teamziele({
             />
           </div>
           {ziel.wunsch && (
+            <VorfuehrVerdeckt hinweis="Persönlicher Wunsch ausgeblendet.">
             <p className="mt-2 text-sm text-ink-muted">Dafür: {ziel.wunsch}</p>
+            </VorfuehrVerdeckt>
           )}
           {ziel.geschafft && (
             <p className="mt-2 font-medium text-link">Gemeinsam geschafft!</p>

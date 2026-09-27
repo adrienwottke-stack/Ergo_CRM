@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ergo Cockpit · Vorher und nachher</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eef2f8;color:#0b1220;font:16px/1.5 system-ui,sans-serif}main{max-width:1500px;margin:auto;padding:28px}h1{font-size:28px;letter-spacing:-.03em;margin:0 0 6px}p{margin:0;color:#46536a}.top{padding-bottom:24px;border-bottom:1px solid #cbd4e1}nav{display:flex;flex-wrap:wrap;align-items:end;gap:16px;margin:20px 0}label{display:grid;gap:5px;font-size:13px;font-weight:600}select{font:inherit;color:#0b1220;background:white;border:1px solid #b9c5d5;padding:12px;border-radius:8px;min-height:44px}select:focus{outline:2px solid #2465d1;outline-offset:2px}.comparison{display:grid;grid-template-columns:1fr 1fr;gap:24px}.comparison.mobile{max-width:850px;margin:auto}figure{margin:0;min-width:0}figcaption{display:flex;justify-content:space-between;margin-bottom:8px;font-weight:650}figcaption span{font-size:13px;font-weight:400;color:#46536a}img{width:100%;height:auto;display:block;border:1px solid #cbd4e1;border-radius:8px;background:white}footer{margin-top:24px;padding-top:16px;border-top:1px solid #cbd4e1;font-size:13px;color:#46536a}a{color:#1d55b4}#note{max-width:75ch;margin-top:16px}@media(max-width:700px){main{padding:16px}.comparison{gap:10px}h1{font-size:23px}figcaption{display:block}figcaption span{display:block;font-size:11px}}@media print{nav{display:none}main{padding:0}footer{page-break-inside:avoid}}
+</style>
+<main>
+<div class="top"><h1>Die Arbeit rückt nach vorn.</h1><p>Ergo Cockpit · Umsetzung des HubSpot- und Mobile-Masterplans · 27. September 2026</p></div>
+<nav aria-label="Vergleich auswählen">
+<label>Bereich<select id="area"><option value="today">Heute</option><option value="contacts" selected>Kontakte</option><option value="record">Kontaktdetail</option><option value="edit">Kontakt bearbeiten</option><option value="calendar">Kalender</option><option value="progress">Fortschritt</option><option value="team">Team</option></select></label>
+<label>Bildschirm<select id="size"><option value="390">Mobile · 390 × 844</option><option value="1440">Desktop · 1440 × 900</option></select></label>
+<label>Darstellung<select id="theme"><option value="light">Hell</option><option value="dark">Dunkel</option></select></label>
+</nav>
+<div class="comparison mobile" id="comparison">
+<figure><figcaption>Vorher <span>Ausgangsstand 5754812</span></figcaption><a id="beforeLink" href="before-ready-contacts-390-light.png"><img id="before" src="before-ready-contacts-390-light.png" alt="Kontaktliste vor dem Umbau"></a></figure>
+<figure><figcaption>Nachher <span>Geprüfter UI-Stand</span></figcaption><a id="afterLink" href="after-ready-contacts-390-light.png"><img id="after" src="after-ready-contacts-390-light.png" alt="Kontaktliste nach dem Umbau"></a></figure>
+</div>
+<p id="note"></p>
+<footer>Gleiche synthetische Testdaten, Bildschirmgrößen und Rollen. Die Ansichten enthalten keine realen Kundendaten. Mobile wird im Browser emuliert. Providerantworten und Sprachzustände wurden separat lokal simuliert; physische Mobilgeräte und echte Sprachhardware sind damit nicht abgenommen. Auf ein Bild klicken, um die Originalaufnahme zu öffnen.</footer>
+</main>
+<script>
+const notes={today:'Die bestehende nächste Handlung und Aufgaben erscheinen vor Fortschritt und Coaching. Termine nutzen dieselben Daten wie der Kalender.',contacts:'Suche und Filter sind kompakt. Mobile zeigt Personenzeilen; Desktop eine echte Tabelle. Such- und Filterzustände bleiben beim Detail- und Bearbeitungsweg erhalten.',record:'Name und direkte Aktionen kommen zuerst. Übersicht, Aktivitäten und Details ordnen den bestehenden Inhalt; Löschen bleibt unter Mehr erreichbar.',edit:'Das vollständige bestehende Formular bleibt erhalten. Der Rückweg führt in denselben Such- und Filterzustand.',calendar:'Ausgewähltes Datum, Ansichtswechsel und Eintrag führen direkt zur Terminfläche. Kalenderanbindung und Hilfe sind nachgeordnet.',progress:'Eigene Ziele mit realem Ist, Ziel und Zeitraum stehen vor Werkzeugen. Persönliche Leistung und Teamwerte bleiben getrennt.',team:'Die Führungsrolle sieht zunächst die relevanten direkten Partner und deren nächste Absprache. Alle berechtigten Partner und die Verwaltung bleiben erreichbar.'};
+function render(){const area=document.getElementById('area').value,size=document.getElementById('size').value,theme=document.getElementById('theme').value,role=area==='team'?'leader':'ready';document.getElementById('comparison').classList.toggle('mobile',size==='390');for(const phase of ['before','after']){const src=`${phase}-${role}-${area}-${size}-${theme}.png`;document.getElementById(phase).src=src;document.getElementById(phase).alt=`${document.getElementById('area').selectedOptions[0].textContent} ${phase==='before'?'vor':'nach'} dem Umbau, ${size} Pixel, ${theme==='dark'?'dunkel':'hell'}`;document.getElementById(phase+'Link').href=src;}document.getElementById('note').textContent=notes[area];}
+for(const id of ['area','size','theme'])document.getElementById(id).addEventListener('change',render);render();
+</script>
+</html>

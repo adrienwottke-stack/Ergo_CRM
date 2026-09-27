@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { cn, card } from "@/components/ui";
+import { cn, btnSecondary } from "@/components/ui";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
 import { berlinDayOf, dayToUtcDate, shiftDay } from "@/lib/dates";
 import type { KalenderEintrag } from "@/lib/kalender/laden";
 import { CalendarCheckIcon, PhoneIcon } from "@/components/icons";
@@ -28,9 +29,11 @@ const zeitFormat = new Intl.DateTimeFormat("de-DE", {
 export function Agenda({
   eintraege,
   heute,
+  tag = heute,
 }: {
   eintraege: KalenderEintrag[];
   heute: string;
+  tag?: string;
 }) {
   const tage = new Map<string, KalenderEintrag[]>();
   for (const eintrag of eintraege) {
@@ -42,16 +45,12 @@ export function Agenda({
 
   if (tage.size === 0) {
     return (
-      <div className={`${card} px-6 py-12 text-center`}>
-        <p className="text-sm font-medium text-ink">Nichts eingetragen</p>
+      <div className="crm-work-section crm-calendar-empty">
+        <p className="font-semibold text-ink">Noch keine Termine im Zeitraum</p>
         <p className="mt-1 text-sm text-ink-muted">
-          Termine entstehen im Gespräch — der Knopf „Termin“ im{" "}
-          <Link href="/namen" className="font-medium text-navy-600 hover:underline">
-            Durchlauf
-          </Link>{" "}
-          legt sie an. Alles andere — Schulung, Begleitung, ein privater Blocker —
-          trägst du hier selbst ein.
+          Trage einen Termin, eine Schulung oder eine freie Zeit ein.
         </p>
+        <Link href={`/kalender/neu?tag=${tag}`} className={`${btnSecondary} mt-3`}>Eintrag anlegen</Link>
       </div>
     );
   }
@@ -66,19 +65,19 @@ export function Agenda({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="crm-calendar-agenda">
       {[...tage.entries()].map(([tag, liste]) => (
-        <section key={tag} className="space-y-2">
+        <section key={tag} className="crm-agenda-day">
           <h2
             className={cn(
-              "text-base font-semibold",
-              tag < heute ? "text-ink-soft" : "text-ink"
+              "crm-agenda-day-heading",
+              tag < heute ? "text-ink-muted" : "text-ink"
             )}
           >
             {tagName(tag)}
-            <span className="ml-2 text-sm font-normal text-ink-soft">{liste.length}</span>
+            <span className="ml-2 text-sm font-normal text-ink-muted">{liste.length}</span>
           </h2>
-          <ul className="space-y-2">
+          <ul className="crm-agenda-list">
             {liste.map((eintrag) => {
               const stil = stilFuer(eintrag);
               return (
@@ -86,42 +85,40 @@ export function Agenda({
                   key={eintrag.id}
                   id={`termin-${eintrag.id}`}
                   className={cn(
-                    `${card} flex items-center gap-3 p-4`,
-                    // Vergangenes bleibt sichtbar, tritt aber zurueck. Dass es
-                    // ueberhaupt sichtbar ist, ist neu: vorher verschwand ein
-                    // gehaltener Termin am naechsten Tag spurlos.
-                    tag < heute && "opacity-60"
+                    "crm-agenda-row",
+                    tag < heute && "crm-agenda-past"
                   )}
                 >
-                  <span className="flex w-14 shrink-0 items-center gap-1.5">
+                  <span className="crm-agenda-time">
                     <span className={cn("h-2 w-2 shrink-0 rounded-full", stil.punkt)} />
                     <span className="text-sm font-semibold tabular-nums text-navy-800">
-                      {eintrag.ganztags ? "—" : zeitFormat.format(eintrag.von)}
+                      {eintrag.ganztags ? "Ganztags" : zeitFormat.format(eintrag.von)}
                     </span>
                   </span>
 
+                  <VorfuehrVerdeckt hinweis="Eintrag beim Vorführen ausgeblendet.">
+                  <div className="crm-agenda-row-content">
                   <div className="min-w-0 flex-1">
                     {eintrag.kontaktId || eintrag.href ? (
                       <Link
                         href={eintrag.href ?? `/contacts/${eintrag.kontaktId}`}
-                        className="block truncate text-sm font-semibold text-ink hover:text-link"
+                        className="crm-agenda-title"
                       >
-                        {eintrag.titel}
+                        {beschriftung(eintrag)}
                       </Link>
                     ) : (
-                      <p className="truncate text-sm font-semibold text-ink">
+                      <p className="crm-agenda-title">
                         {beschriftung(eintrag)}
                       </p>
                     )}
-                    {(eintrag.zusatz || eintrag.quelleName) && (
-                      <p className="truncate text-xs text-ink-muted">
-                        {[eintrag.quelleName && `aus ${eintrag.quelleName}`, eintrag.zusatz]
+                    {(eintrag.zusatz || eintrag.quelleName || eintrag.herkunft === "FREMD") && (
+                      <p className="crm-agenda-meta">
+                        {[eintrag.quelleName && `aus ${eintrag.quelleName}`, eintrag.zusatz, eintrag.herkunft === "FREMD" && "extern · nur ansehen"]
                           .filter(Boolean)
                           .join(" · ")}
                       </p>
                     )}
                   </div>
-
                   <div className="flex shrink-0 items-center gap-1">
                     {eintrag.telefon && (
                       <a
@@ -143,6 +140,8 @@ export function Agenda({
                       </a>
                     )}
                   </div>
+                  </div>
+                  </VorfuehrVerdeckt>
                 </li>
               );
             })}

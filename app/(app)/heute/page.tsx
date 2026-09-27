@@ -11,7 +11,10 @@ import {
   dueState,
   utcToBerlinLocalInput,
   startOfWeek,
+  berlinLocalToUtc,
+  shiftDay,
 } from "@/lib/dates";
+import { eintraegeImZeitraum } from "@/lib/kalender/laden";
 import { arbeitslageFuer, arbeitslageTitel } from "@/lib/arbeitslage";
 import { faelligeAufgaben, mannschaftsLage } from "@/lib/fuehrung";
 import { ladeHeuteVereinbarungen } from "@/lib/vereinbarungen";
@@ -47,8 +50,7 @@ import StartHinweis from "@/components/StartHinweis";
 import { ladeCoach } from "@/lib/coach/server";
 import NamenSammelnEinstieg from "@/components/NamenSammelnEinstieg";
 import Postfach from "@/components/Postfach";
-import ZinsrechnerEinstieg from "@/components/zinsrechner/Einstieg";
-import { card, column } from "@/components/ui";
+import { card } from "@/components/ui";
 import { ArrowRightIcon, TrophyIcon } from "@/components/icons";
 import { AssistantTodayEntry } from "@/components/ai-crm/AssistantEntry";
 import SeitenKopf from "@/components/SeitenKopf";
@@ -123,6 +125,7 @@ export default async function HeutePage({
     einheitenMonat,
     einheitenGesamt,
     einheitenSchwelle,
+    termine,
   ] = await Promise.all([
     prisma.contactFollowUp.findMany({
       where: {
@@ -208,6 +211,7 @@ export default async function HeutePage({
     eigenerMonatsstand(user.id),
     eigenerGesamtstand(user.id, user.einheitenStart),
     schwelleFuer(user.karrierestufe),
+    eintraegeImZeitraum(user.id, new Date(), berlinLocalToUtc(`${shiftDay(heute, 8)}T00:00`)!),
   ]);
   const kontakte = followUps.map((followUp) => ({
     ...followUp.contact,
@@ -337,11 +341,11 @@ export default async function HeutePage({
   const arbeitsliste = (liste: Arbeitskontakt[]) => (
     <ul className="crm-list">
       {liste.map((k) => (
-        <li key={k.followUpId ?? k.id} className="p-4">
+        <li key={k.followUpId ?? k.id} className="crm-today-task p-4">
           <div className="flex items-start justify-between gap-3">
             <Link
               href={`/contacts/${k.id}`}
-              className="min-h-11 text-lg font-semibold"
+              className="inline-flex min-h-11 items-center text-base font-semibold"
             >
               {k.name}
             </Link>
@@ -351,11 +355,10 @@ export default async function HeutePage({
               </span>
             )}
           </div>
-          {k.activities[0]?.text && (
-            <p className="mb-3 line-clamp-2 text-sm text-ink-muted">
-              Zuletzt: {k.activities[0].text}
-            </p>
-          )}
+          <p className="mb-2 text-sm text-ink-muted">
+            {k.nextStepNote || (k.nextStepType === "ANRUF" ? "Anrufen" : k.nextStepType === "TERMIN" ? "Termin" : "Nächsten Schritt festlegen")}
+            {k.nextStepAt && ` · ${dueState(k.nextStepAt, heute) === "overdue" ? "Überfällig" : dueState(k.nextStepAt, heute) === "today" ? "Heute" : "Später"}`}
+          </p>
           {k.followUpId && !k.isPrimaryFollowUp ? (
             <div className="flex flex-wrap items-center gap-1.5">
               {k.phone && k.nextStepType === "ANRUF" && (
@@ -410,16 +413,16 @@ export default async function HeutePage({
       k.appointmentAt < new Date(),
   );
   const tagesarbeit = (
-    <section className="space-y-3" id="tagesarbeit">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-xl font-semibold">
-          {fuehrung ? "Dein eigenes Geschäft" : "Anrufe und Termine"}
+    <section className="space-y-2" id="tagesarbeit">
+      <div className="crm-section-heading">
+        <h2>
+          {fuehrung ? "Dein eigenes Geschäft" : "Deine Aufgaben"}
         </h2>
         <Link
-          href="/kalender"
+          href={alle ? "/heute" : "/heute?alle=1#tagesarbeit"}
           className="inline-flex min-h-11 items-center text-sm text-link"
         >
-          Kalender →
+          {alle ? "Übersicht" : `Alle ${jetzt.length}`} →
         </Link>
       </div>
       <TerminFrageKarte
@@ -453,9 +456,9 @@ export default async function HeutePage({
     </section>
   );
   const betreuung = (
-    <section className="space-y-5" aria-label="Partner begleiten">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-xl font-semibold">Deine Partner</h2>
+    <section className="space-y-3" aria-label="Partner begleiten">
+      <div className="crm-section-heading">
+        <h2>Deine Partner</h2>
         <Link
           href="/mannschaft"
           className="inline-flex min-h-11 items-center text-sm text-link"
@@ -469,6 +472,7 @@ export default async function HeutePage({
           personen={partner}
           struktur={lage?.leute}
           limit={3}
+          kompakt
         />
       ) : (
         <Link
@@ -504,36 +508,60 @@ export default async function HeutePage({
 
   return (
     <VorfuehrProvider>
-      <div className={`${column} space-y-6`}>
-        <SeitenKopf titel="Heute" kicker={datum.format(new Date())} unterzeile={arbeitslageTitel[arbeitslage]} aktion={fuehrung ? <VorfuehrSchalter /> : undefined} />
+      <div className="crm-today">
+        <SeitenKopf titel="Heute" hauptbereich unterzeile={`${datum.format(new Date())} · ${arbeitslageTitel[arbeitslage]}`} aktion={fuehrung ? <VorfuehrSchalter /> : undefined} />
         <AssistantTodayEntry />
-        <NamenSammelnEinstieg fortsetzen={sammlungFortsetzen} />
+        {sammlungFortsetzen && <NamenSammelnEinstieg fortsetzen />}
         {(startVorne || hauptaktion) && (
           <VorfuehrVerdeckt hinweis="Deine persönliche nächste Handlung wird beim Vorführen ausgeblendet.">
             {startVorne ? (
               <StartHinweis phase={startHinweis.phase} coach={coach} />
             ) : hauptaktion && (
-              <section className="space-y-3" aria-labelledby="naechste-handlung">
-                <p className="text-sm text-ink-muted">{hauptaktion.titel}</p>
+              <section className="crm-today-next" aria-labelledby="naechste-handlung">
+                <div>
+                <p className="text-xs font-semibold text-link">ALS NÄCHSTES · {hauptaktion.titel}</p>
                 <h2
                   id="naechste-handlung"
-                  className="text-3xl font-semibold leading-tight tracking-tight"
+                  className="mt-1 text-xl font-semibold leading-tight tracking-tight"
                 >
                   {hauptaktion.text}
                 </h2>
+                {naechster && !absprache && !fuehrung && <p className="mt-1 text-sm text-ink-muted">{zeit.format(naechster.nextStepAt!)}{naechster.nextStepNote ? ` · ${naechster.nextStepNote}` : ""}</p>}
+                </div>
                 <Link href={hauptaktion.href} className="crm-primary-action">
-                  {hauptaktion.label}
+                  <span>{hauptaktion.label}</span>
                   <ArrowRightIcon className="h-5 w-5" />
                 </Link>
               </section>
             )}
           </VorfuehrVerdeckt>
         )}
-        <ZinsrechnerEinstieg />
+        <div className="crm-today-grid">
+        <div className="crm-today-work">
+        {fuehrung ? betreuung : (
+          <>
+            <VorfuehrVerdeckt hinweis="Eigene Kontakte werden beim Vorführen ausgeblendet.">{tagesarbeit}</VorfuehrVerdeckt>
+            {arbeitslage === "AUFBAU" ? betreuung : <VorfuehrVerdeckt hinweis="Persönliche Absprachen werden beim Vorführen ausgeblendet."><VereinbarungenHeute userId={user.id} /></VorfuehrVerdeckt>}
+          </>
+        )}
+        </div>
+        <aside className="crm-today-aside">
+        <VorfuehrVerdeckt hinweis="Deine Termine werden beim Vorführen ausgeblendet.">
+          <section className="crm-work-section" aria-labelledby="naechste-termine">
+            <div className="crm-section-heading"><h2 id="naechste-termine">Nächste Termine</h2><Link href="/kalender?ansicht=liste">Kalender →</Link></div>
+            {termine.length ? <ul>{termine.slice(0, 2).map(termin => (
+              <li key={termin.id} className="crm-work-row crm-today-appointment">
+                <span className="text-sm font-semibold tabular-nums text-link">{termin.ganztags ? "Ganztägig" : zeit.format(termin.von)}</span>
+                <Link href={termin.kontaktId ? `/contacts/${termin.kontaktId}` : termin.href ?? `/kalender?ansicht=tag&tag=${utcToBerlinLocalInput(termin.von).slice(0, 10)}`} className="block min-h-11 content-center font-semibold">{termin.titel}</Link>
+                {termin.zusatz && <p className="text-sm text-ink-muted">{termin.zusatz}</p>}
+              </li>
+            ))}</ul> : <div className="crm-work-row"><p className="text-sm text-ink-muted">In den nächsten sieben Tagen stehen keine Termine an.</p><Link href="/kalender/neu" className="inline-flex min-h-11 items-center text-sm text-link">Termin eintragen →</Link></div>}
+          </section>
+        </VorfuehrVerdeckt>
         <section className="space-y-3" aria-label="Dein Fortschritt">
-          <h2 className="text-xl font-semibold">
+          <div className="crm-section-heading"><h2>
             {fuehrung ? "Euer Fortschritt" : "Dein Fortschritt"}
-          </h2>
+          </h2><Link href="/fortschritt">Ziele →</Link></div>
           {fuehrung ? (
             <Teamziele userId={user.id} wurzelId={user.id} kompakt />
           ) : (
@@ -567,20 +595,8 @@ export default async function HeutePage({
             </Link>
           )}
         </section>
-        {fuehrung ? (
-          betreuung
-        ) : (
-          <>
-            <VorfuehrVerdeckt hinweis="Eigene Kontakte werden beim Vorführen ausgeblendet.">
-              {tagesarbeit}
-            </VorfuehrVerdeckt>
-            {arbeitslage === "AUFBAU" ? (
-              betreuung
-            ) : (
-              <VereinbarungenHeute userId={user.id} />
-            )}
-          </>
-        )}
+        </aside>
+        </div>
         <VorfuehrVerdeckt hinweis="Persönliche Erfolge und Nachrichten werden beim Vorführen ausgeblendet.">
           {!fuehrung && <ErfolgeHeute userId={user.id} />}
           {aktiveDirekte > 0 && <ErfolgeHeute userId={user.id} team />}

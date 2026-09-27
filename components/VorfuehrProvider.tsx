@@ -34,17 +34,21 @@ export default function VorfuehrProvider({ children }: { children: ReactNode }) 
   const [aktiv, setAktiv] = useState(false);
 
   useEffect(() => {
+    if (inherited) return;
     try {
-      if (sessionStorage.getItem(SPEICHER_SCHLUESSEL) === "1") setAktiv(true);
+      const stored = sessionStorage.getItem(SPEICHER_SCHLUESSEL) === "1";
+      document.documentElement.dataset.presenting = String(stored);
+      setAktiv(stored);
     } catch {
       // Kein Storage (privater Modus, Browser-Einstellung) - der Schalter
       // startet dann einfach aus, wie ohne gespeicherten Zustand.
     }
-  }, []);
+  }, [inherited]);
 
   const umschalten = () => {
     setAktiv((vorher) => {
       const naechster = !vorher;
+      document.documentElement.dataset.presenting = String(naechster);
       try {
         sessionStorage.setItem(SPEICHER_SCHLUESSEL, naechster ? "1" : "0");
       } catch {

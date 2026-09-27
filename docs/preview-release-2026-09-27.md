@@ -1,5 +1,7 @@
 # Gemeinsames Preview-Release: HubSpot, Jarvis und globale Suche
 
+> Nachfolgend bleibt der ursprüngliche Integrationsbericht erhalten. Die ausdrücklich freigegebene vollständige Umsetzung des HubSpot-UI-/Mobile-Masterplans folgt separat in [Umsetzung und Übergabe](hubspot-ui-mobile-umsetzung-2026-09-27.md), einschließlich aktueller Tests, Vergleichsbilder und eindeutig geprüftem Preview-Ziel. Für diesen nachfolgenden UI-Auftrag gelten keine Migrationen und keine Änderung von Production.
+
 ## Umfang
 
 Branch: `codex/hubspot-jarvis-preview`, Ausgangsstand `435b3f92fd43b57cc447a45d3e344b43fd264103`.

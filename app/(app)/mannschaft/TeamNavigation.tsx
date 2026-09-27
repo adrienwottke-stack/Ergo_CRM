@@ -8,7 +8,7 @@ export default function TeamNavigation({
   return (
     <nav
       aria-label="Teamansichten"
-      className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1"
+      className="crm-view-tabs crm-team-views"
     >
       {[
         { key: "begleiten", titel: "Begleiten", href: "/mannschaft" },
@@ -27,7 +27,6 @@ export default function TeamNavigation({
           key={eintrag.key}
           href={eintrag.href}
           aria-current={aktiv === eintrag.key ? "page" : undefined}
-          className={`flex min-h-12 items-center justify-center rounded-xl px-2 py-3 text-sm font-semibold sm:text-base ${aktiv === eintrag.key ? "bg-surface text-ink" : "text-slate-700"}`}
         >
           {eintrag.titel}
         </Link>

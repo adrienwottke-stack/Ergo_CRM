@@ -1,0 +1,18 @@
+{
+  "findings": [],
+  "checks": [
+    {
+      "name": "record",
+      "width": 320,
+      "theme": "light",
+      "metrics": {
+        "documentWidth": 305,
+        "width": 320,
+        "top": 160.1875,
+        "bottom": 361.21875,
+        "over": []
+      }
+    }
+  ],
+  "errors": []
+}

@@ -4,6 +4,8 @@ import "./globals.css";
 import "./emil.css";
 import "./assistant.css";
 import "./workspace.css";
+import "./planning-workspace.css";
+import "./contacts-workspace.css";
 import AssistantProvider from "@/components/ai-crm/AssistantProvider";
 import VorfuehrProvider from "@/components/VorfuehrProvider";
 import ServiceWorkerRegistrierung from "@/components/ServiceWorkerRegistrierung";
@@ -22,6 +24,7 @@ const INSTALL_MITSCHNITT = `window.addEventListener('beforeinstallprompt',functi
 // Der try/catch ist noetig, weil localStorage in manchen Browsern (privater
 // Modus, gesperrte Cookies) beim blossen Zugriff wirft.
 const THEMA_VORLAUF = `(function(){try{var t=localStorage.getItem('ergo-thema')||'dunkel';var d=t==='dunkel'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}})();`;
+const VORFUEHR_VORLAUF = `(function(){try{document.documentElement.dataset.presenting=sessionStorage.getItem('cockpit-vorfuehren')==='1'?'true':'false'}catch(e){}})();`;
 
 const inter = Inter({
   variable: "--font-inter",
@@ -69,6 +72,7 @@ export default function RootLayout({
     <html lang="de" className="dark" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEMA_VORLAUF }} />
+        <script dangerouslySetInnerHTML={{ __html: VORFUEHR_VORLAUF }} />
         <script dangerouslySetInnerHTML={{ __html: INSTALL_MITSCHNITT }} />
       </head>
       <body

@@ -21,9 +21,12 @@ import NextStepBadge, { formatDue } from "@/components/NextStepBadge";
 import ContactActions from "@/components/ContactActions";
 import ZinsrechnerEinstieg from "@/components/zinsrechner/Einstieg";
 import QuickRowActions from "@/components/QuickRowActions";
-import DeleteContactButton from "@/components/DeleteContactButton";
 import KandidaturKarte from "@/components/KandidaturKarte";
 import QrCode from "@/components/schleuse/QrCode";
+import GpName from "@/components/GpName";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
+import KontaktBereiche from "@/components/contacts/KontaktBereiche";
+import KontaktMehr from "@/components/contacts/KontaktMehr";
 import type { ContactLite } from "@/components/ContactActionDialog";
 import { contactStageHints, lostReasonLabels } from "@/lib/pipeline";
 import { activityTypeLabels } from "@/lib/labels";
@@ -33,7 +36,7 @@ import {
   ClipboardIcon,
   PhoneIcon,
 } from "@/components/icons";
-import { btnSecondary, card, kicker, pageTitle, sectionTitle } from "@/components/ui";
+import { pageTitle } from "@/components/ui";
 import {
   followUpErledigen,
   followUpVerschieben,
@@ -159,327 +162,70 @@ export default async function ContactDetailPage({
     referralsAsked: contact.referralsAskedAt !== null,
   };
 
-  return (
-    <div className="crm-record" data-contact-id={contact.id} data-contact-name={contact.name}>
-      <div className="crm-record-header">
-        <Link
-          href={returnTo}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
-          Zurück zu Kontakten
-        </Link>
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-navy-100 text-lg font-semibold text-navy-700">
-              {initials(contact.name)}
-            </span>
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className={pageTitle}>{contact.name}</h1>
-                <StageBadge stage={contact.stage} outcome={contact.outcome} />
-              </div>
-              <p className="mt-0.5 text-sm text-ink-muted">
-                {contact.source ? `${contact.source} · ` : ""}
-                Kontakt seit {dateFormat.format(contact.createdAt)}
-              </p>
-              {contact.phone && <a href={`tel:${contact.phone}`} className="inline-flex items-center text-sm text-link">{contact.phone}</a>}
-            </div>
+  const editHref = contactHref(contact.id, returnTo, true);
+  const phoneTarget = contact.phone && contact.phone.replace(/\D/g, "").length >= 3
+    ? `tel:${contact.phone.replace(/[^\d+*#;,]/g, "")}` : null;
+
+  const overview = <>
+    <section id="naechste-schritte" className="crm-work-section crm-record-next">
+      <div className="crm-section-heading"><h2>Nächste Schritte</h2><span className="text-xs text-ink-muted">{contact.followUps.length > 0 ? `${contact.followUps.length} offen` : ""}</span></div>
+      {contact.followUps.length > 0 ? <ol className="crm-record-followups">
+        {contact.followUps.map(followUp => <li key={followUp.id}>
+          <div className="crm-record-followup-title"><NextStepBadge type={followUp.type} at={followUp.at} state={dueState(followUp.at, today)} withTime={hasTimeOfDay(followUp.at)} />{followUp.id === primaryFollowUp?.id && <strong>Als Nächstes</strong>}</div>
+          {followUp.note && <p className="crm-record-followup-note" data-sensitive>{followUp.note}</p>}
+          <div className="crm-record-followup-actions" data-private-content>
+            <AssistantContextEntry context={{ contactId: contact.id, label: contact.name, followUpId: followUp.id }} />
+            <form action={followUpVerschieben}><input type="hidden" name="followUpId" value={followUp.id} /><input type="hidden" name="contactId" value={contact.id} /><input type="hidden" name="days" value="1" /><button type="submit">Morgen</button></form>
+            <form action={followUpErledigen}><input type="hidden" name="followUpId" value={followUp.id} /><input type="hidden" name="contactId" value={contact.id} /><button type="submit">Erledigt</button></form>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <AssistantContextEntry context={{ contactId: contact.id, label: contact.name }} />
-            <Link href={contactHref(contact.id, returnTo, true)} className={btnSecondary}>
-              Bearbeiten
-            </Link>
-            <DeleteContactButton
-              contactId={contact.id}
-              contactName={contact.name}
-              activityCount={contact.activities.length}
-              referralCount={contact.referrals.length}
-            />
-          </div>
-        </div>
+        </li>)}
+      </ol> : <p className="text-sm text-ink-muted">{contact.outcome === "VERLOREN" ? `Verloren${contact.lostReason ? ` · ${lostReasonLabels[contact.lostReason]}` : ""}${contact.lostAt ? ` am ${dateFormat.format(contact.lostAt)}` : ""}` : contact.stage === "ABSCHLUSS" ? "Schleife durchlaufen – abgeschlossen." : "Noch kein nächster Schritt. Über „Mehr“ kannst du die passende Phase mit Wiedervorlage festlegen."}</p>}
+      {(istTermin || istAnruf) && <div className="crm-record-results"><h3>{istTermin ? "Wie ist der Termin gelaufen?" : "Anrufergebnis festhalten"}</h3><VorfuehrVerdeckt hinweis="Kontaktaktionen sind im Vorführmodus ausgeblendet."><QuickRowActions contact={lite} istAnruf={istAnruf} istTermin={istTermin} zeigeWeitere={false} /></VorfuehrVerdeckt></div>}
+      <p className="mt-3 text-xs text-ink-muted">{contactStageHints[contact.stage]}</p>
+    </section>
+    {contact.appointmentAt && !contact.followUps.some(followUp => followUp.type === "TERMIN" && followUp.at.getTime() === contact.appointmentAt?.getTime()) && <section className="crm-work-section"><div className="crm-section-heading"><h2>Vereinbarter Termin</h2><Link href={`/kalender?tag=${utcToBerlinLocalInput(contact.appointmentAt).slice(0, 10)}&ansicht=tag`}>Im Kalender</Link></div><p className="text-sm">{formatDue(contact.appointmentAt, hasTimeOfDay(contact.appointmentAt))}</p></section>}
+    {zeigtAufbau && <section id="kandidatur" className="scroll-mt-24"><VorfuehrVerdeckt hinweis="Die Kandidatur ist im Vorführmodus ausgeblendet."><KandidaturKarte contactId={contact.id} contactName={contact.name} kandidatur={kandidatur} herkunft={herkunft} qrCode={qrCode} /></VorfuehrVerdeckt></section>}
+    {contact.stage !== "NEU" && contact.stage !== "KONTAKTIERT" && contact.referralsAskedAt === null && <p className="rounded-lg bg-sunken px-4 py-3 text-sm text-ink-muted">Nach diesem Termin wurde noch nicht nach Empfehlungen gefragt. Unter „Mehr“ kannst du sie festhalten.</p>}
+    <VorfuehrVerdeckt hinweis="Gespeicherte Rechenszenarien sind im Vorführmodus ausgeblendet."><ZinsrechnerEinstieg contactId={contact.id} userId={user.id} /></VorfuehrVerdeckt>
+  </>;
+
+  const activities = <>
+    <section className="crm-work-section" id="notiz"><div className="crm-section-heading"><h2>Notiz</h2><Link href={`${editHref}#note`}>{contact.note ? "Notiz bearbeiten" : "Notiz ergänzen"}</Link></div><VorfuehrVerdeckt hinweis="Die Notiz ist im Vorführmodus ausgeblendet."><p className="crm-record-note">{contact.note ?? "Noch keine Notiz zu diesem Kontakt."}</p></VorfuehrVerdeckt></section>
+    <section id="verlauf" className="crm-work-section crm-record-history"><div className="crm-section-heading"><h2>Aktivitäten <span className="font-normal text-ink-muted">· {contact.activities.length}</span></h2></div>
+      {contact.activities.length === 0 ? <p className="text-sm text-ink-muted">Noch keine Aktivitäten. Festgehaltene Anruf- und Terminergebnisse erscheinen hier automatisch.</p> : <ol className="crm-record-timeline">{contact.activities.map(activity => <li key={activity.id}>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${activityDotStyles[activity.type]}`}><ActivityIcon type={activity.type} /></span>
+        <div><div className="crm-record-activity-meta"><strong>{activityTypeLabels[activity.type]}</strong><time dateTime={activity.date.toISOString()}>{dateTimeFormat.format(activity.date)}</time></div><p className="crm-record-note mt-2" data-sensitive>{activity.text}</p></div>
+      </li>)}</ol>}
+    </section>
+  </>;
+
+  const details = <>
+    <section id="kontaktdaten" className="crm-work-section crm-record-properties"><div className="crm-section-heading"><h2>Kontaktdaten</h2><Link href={editHref}>Daten bearbeiten</Link></div>
+      <dl className="crm-record-properties-list">
+        <div><dt>Telefon</dt><dd>{contact.phone ? <a href={phoneTarget ?? undefined} data-sensitive>{contact.phone}</a> : "Nicht hinterlegt"}</dd></div>
+        <div><dt>Beruf</dt><dd data-sensitive>{contact.job ?? "Nicht hinterlegt"}</dd></div>
+        {contact.email && <div><dt>E-Mail</dt><dd><a href={`mailto:${contact.email}`} data-sensitive>{contact.email}</a></dd></div>}
+        {contact.source && <div><dt>Herkunft</dt><dd data-sensitive>{contact.source}</dd></div>}
+        <div><dt>Kontakt seit</dt><dd>{dateFormat.format(contact.createdAt)}</dd></div>
+      </dl>
+    </section>
+    {(contact.referredBy || contact.referrals.length > 0) && <section className="crm-work-section"><div className="crm-section-heading"><h2>Empfehlungen</h2></div>
+      {contact.referredBy && <p className="text-sm text-ink-muted">Empfohlen von <Link href={contactHref(contact.referredBy.id, returnTo)} className="inline-flex min-h-11 items-center text-link"><GpName name={contact.referredBy.name} /></Link></p>}
+      {contact.referrals.length > 0 && <><p className="mb-2 text-xs text-ink-muted">Hat empfohlen · {contact.referrals.length}</p><ul className="divide-y divide-line">{contact.referrals.map(referral => <li key={referral.id}><Link href={contactHref(referral.id, returnTo)} className="flex min-h-11 flex-wrap items-center justify-between gap-2 py-2 text-sm text-link"><GpName name={referral.name} /><StageBadge stage={referral.stage} outcome={referral.outcome} /></Link></li>)}</ul></>}
+    </section>}
+  </>;
+
+  return <div className="crm-record crm-contact-record" data-contact-id={contact.id} data-contact-name={contact.name}>
+    <header className="crm-record-header">
+      <Link href={returnTo} className="crm-record-return"><ArrowLeftIcon className="h-4 w-4" />Zurück zu Kontakten</Link>
+      <div className="crm-record-identity"><span className="crm-record-avatar" aria-hidden="true">{initials(contact.name)}</span><div className="crm-record-identity-main"><h1 className={pageTitle}><GpName name={contact.name} /></h1><StageBadge stage={contact.stage} outcome={contact.outcome} /><div className="crm-record-meta">{contact.phone ? <a href={phoneTarget ?? undefined} data-sensitive>{contact.phone}</a> : <span>Telefonnummer fehlt</span>}</div></div></div>
+      <div className="crm-record-primary-actions">
+        {phoneTarget ? <a href={phoneTarget} className="crm-record-call" data-private-content><PhoneIcon className="h-4 w-4" />Anrufen</a> : <Link href={`${editHref}#phone`}>Nummer ergänzen</Link>}
+        <Link href={`${editHref}#note`}>Notiz</Link>
+        <Link href={editHref}>Bearbeiten</Link>
+        <KontaktMehr contactId={contact.id} contactName={contact.name} activityCount={contact.activities.length} referralCount={contact.referrals.length}><ContactActions contact={lite} /><AssistantContextEntry context={{ contactId: contact.id, label: contact.name }} /></KontaktMehr>
       </div>
-
-      <nav aria-label="Bereiche im Kontakt" className="crm-record-sections"><a href="#naechste-schritte">Nächste Schritte</a><a href="#kontaktdaten">Kontaktdaten und Notiz</a><a href="#verlauf">Verlauf · {contact.activities.length}</a></nav>
-      {/* Was als Nächstes zu tun ist, steht ganz oben. */}
-      <section id="naechste-schritte" className={`${card} crm-record-next p-5 sm:p-6`}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className={kicker}>Nächster Schritt</p>
-            {primaryFollowUp ? (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <NextStepBadge
-                  type={primaryFollowUp.type}
-                  at={primaryFollowUp.at}
-                  state={dueState(primaryFollowUp.at, today)}
-                  withTime={hasTimeOfDay(primaryFollowUp.at)}
-                />
-                {primaryFollowUp.note && (
-                  <span className="text-sm text-ink-muted">{primaryFollowUp.note}</span>
-                )}
-              </div>
-            ) : contact.outcome === "VERLOREN" ? (
-              <p className="mt-2 text-sm text-ink-muted">
-                Verloren
-                {contact.lostReason ? ` · ${lostReasonLabels[contact.lostReason]}` : ""}
-                {contact.lostAt ? ` am ${dateFormat.format(contact.lostAt)}` : ""}
-              </p>
-            ) : contact.stage === "ABSCHLUSS" ? (
-              <p className="mt-2 text-sm text-ink-muted">
-                Schleife durchlaufen – abgeschlossen.
-              </p>
-            ) : (
-              <p className="mt-2 text-sm font-medium text-red-700">
-                Kein nächster Schritt gesetzt.
-              </p>
-            )}
-            <p className="mt-2 text-xs text-ink-muted">
-              {contactStageHints[contact.stage]}
-            </p>
-          </div>
-        </div>
-        {contact.followUps.length > 0 && (
-          <div className="mt-5 border-t border-line pt-4">
-            <h3 className="text-sm font-semibold text-ink">
-              Offene Wiedervorlagen · {contact.followUps.length}
-            </h3>
-            <ol className="mt-3 space-y-2">
-              {contact.followUps.map((followUp, index) => (
-                <li
-                  key={followUp.id}
-                  className="rounded-xl border border-line bg-surface px-3 py-3"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <NextStepBadge
-                          type={followUp.type}
-                          at={followUp.at}
-                          state={dueState(followUp.at, today)}
-                          withTime={hasTimeOfDay(followUp.at)}
-                        />
-                        {index === 0 && (
-                          <span className="rounded-full bg-navy-50 px-2 py-1 text-[11px] font-semibold text-navy-700">
-                            Nächster Schritt
-                          </span>
-                        )}
-                      </div>
-                      {followUp.note && (
-                        <p className="mt-1 text-sm text-ink-muted">{followUp.note}</p>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      <details><summary className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center" aria-label="Weitere Aktionen zur Wiedervorlage">⋯</summary><AssistantContextEntry context={{ contactId: contact.id, label: contact.name, followUpId: followUp.id }} /></details>
-                      <form action={followUpVerschieben}>
-                        <input type="hidden" name="followUpId" value={followUp.id} />
-                        <input type="hidden" name="contactId" value={contact.id} />
-                        <input type="hidden" name="days" value="1" />
-                        <button
-                          type="submit"
-                          className="min-h-11 rounded-lg px-3 text-sm font-medium text-ink-muted hover:bg-sunken"
-                        >
-                          Morgen
-                        </button>
-                      </form>
-                      <form action={followUpErledigen}>
-                        <input type="hidden" name="followUpId" value={followUp.id} />
-                        <input type="hidden" name="contactId" value={contact.id} />
-                        <button
-                          type="submit"
-                          className="min-h-11 rounded-lg px-3 text-sm font-medium text-link hover:bg-navy-50"
-                        >
-                          Erledigt
-                        </button>
-                      </form>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-        <div className="mt-4 border-t border-line pt-4">
-          {(istTermin || istAnruf) && <div className="space-y-3">
-            <p className="text-base font-semibold text-ink">{istTermin ? "Wie ist der Termin gelaufen?" : "Anrufergebnis festhalten"}</p>
-            <QuickRowActions contact={lite} istAnruf={istAnruf} istTermin={istTermin} zeigeWeitere={false} />
-          </div>}
-          <details className={istTermin || istAnruf ? "mt-4 border-t border-line pt-2" : ""}>
-            <summary className="flex min-h-12 cursor-pointer list-item items-center py-3 text-base font-medium text-ink-muted">Weitere Kontaktaktionen</summary>
-            <div className="pb-2 pt-2"><ContactActions contact={lite} /></div>
-          </details>
-        </div>
-      </section>
-
-      <ZinsrechnerEinstieg contactId={contact.id} userId={user.id} />
-
-      {/* Aufbau-Trichter: nur fuer Kontakte auf der Recruiting-Liste, gut
-          sichtbar direkt unter dem Verkaufs-Schritt, aber ohne ihn zu
-          verdraengen - Verkauf bleibt fuer jeden Kontakt der erste Block. */}
-      {zeigtAufbau && (
-        <section id="kandidatur" className="scroll-mt-24">
-          <KandidaturKarte
-            contactId={contact.id}
-            contactName={contact.name}
-            kandidatur={kandidatur}
-            herkunft={herkunft}
-            qrCode={qrCode}
-          />
-        </section>
-      )}
-
-      {/* Was vor einem Anruf zaehlt - mehr nicht. Alles Weitere stand hier
-          frueher, weil es das Feld gab, nicht weil es jemand braucht. */}
-      <div id="kontaktdaten" className={`${card} crm-record-properties grid gap-x-8 gap-y-5 p-6 sm:grid-cols-2 sm:p-8`}>
-        <div>
-          <p className={kicker}>Telefon</p>
-          <p className="mt-1 text-sm text-ink">
-            {contact.phone ? (
-              <a
-                href={`tel:${contact.phone}`}
-                className="font-medium text-navy-600 hover:underline"
-              >
-                {contact.phone}
-              </a>
-            ) : (
-              "–"
-            )}
-          </p>
-        </div>
-        <div>
-          <p className={kicker}>Beruf</p>
-          <p className="mt-1 text-sm text-ink">{contact.job ?? "–"}</p>
-        </div>
-        {contact.appointmentAt && (
-          <div>
-            <p className={kicker}>Termin</p>
-            <p className="mt-1 text-sm text-ink">
-              {formatDue(contact.appointmentAt, hasTimeOfDay(contact.appointmentAt))}
-            </p>
-          </div>
-        )}
-        {/* Nur noch Bestand: neu erfasst wird keine E-Mail mehr. */}
-        {contact.email && (
-          <div>
-            <p className={kicker}>E-Mail</p>
-            <p className="mt-1 text-sm text-ink">
-              <a
-                href={`mailto:${contact.email}`}
-                className="font-medium text-navy-600 hover:underline"
-              >
-                {contact.email}
-              </a>
-            </p>
-          </div>
-        )}
-        {contact.note && (
-          <div className="sm:col-span-2">
-            <p className={kicker}>Notiz</p>
-            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">
-              {contact.note}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Die Empfehlungsfrage ist der Motor - fehlt sie nach einem gehaltenen
-          Termin, steht das hier und nicht in einer Auswertung. */}
-      {contact.stage !== "NEU" &&
-        contact.stage !== "KONTAKTIERT" &&
-        contact.referralsAskedAt === null && (
-          <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Nach diesem Termin wurde noch nicht nach Empfehlungen gefragt.
-          </p>
-        )}
-
-      {/* Empfehlungsbaum */}
-      {(contact.referredBy || contact.referrals.length > 0) && (
-        <section className={`${card} space-y-4 p-6 sm:p-8`}>
-          <h2 className={sectionTitle}>Empfehlungen</h2>
-          {contact.referredBy && (
-            <p className="text-sm text-ink-muted">
-              Empfohlen von{" "}
-              <Link
-                href={`/contacts/${contact.referredBy.id}`}
-                className="font-medium text-navy-600 hover:underline"
-              >
-                {contact.referredBy.name}
-              </Link>
-            </p>
-          )}
-          {contact.referrals.length > 0 && (
-            <div>
-              <p className={kicker}>Hat empfohlen ({contact.referrals.length})</p>
-              <ul className="mt-2 divide-y divide-line">
-                {contact.referrals.map((referral) => (
-                  <li key={referral.id}>
-                    <Link
-                      href={`/contacts/${referral.id}`}
-                      className="flex min-h-11 items-center justify-between gap-3"
-                    >
-                      <span className="text-sm font-medium text-ink">
-                        {referral.name}
-                      </span>
-                      <StageBadge stage={referral.stage} outcome={referral.outcome} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Vorgeschichte: entsteht aus den Ergebnis-Knoepfen, nicht aus einem
-          Formular. Hier wird nur gelesen. */}
-      <div id="verlauf" className="crm-record-history space-y-5">
-        <h2 className={sectionTitle}>
-          Vorgeschichte{" "}
-          <span className="font-normal text-ink-soft">
-            ({contact.activities.length})
-          </span>
-        </h2>
-
-        {contact.activities.length === 0 ? (
-          <div className={`${card} px-6 py-12 text-center`}>
-            <p className="text-sm font-medium text-ink">Noch nichts passiert</p>
-            <p className="mt-1 text-sm text-ink-muted">
-              Jeder Anruf und jeder Termin landet hier automatisch.
-            </p>
-          </div>
-        ) : (
-          <ol className="relative space-y-0 pl-2">
-            {contact.activities.map((activity, index) => (
-              <li key={activity.id} className="relative flex gap-4 pb-6">
-                {index < contact.activities.length - 1 && (
-                  <span
-                    aria-hidden
-                    className="absolute left-[calc(1rem-1px)] top-9 h-[calc(100%-1.5rem)] w-px bg-line"
-                  />
-                )}
-                <span
-                  className={`relative z-10 mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${activityDotStyles[activity.type]}`}
-                >
-                  <ActivityIcon type={activity.type} />
-                </span>
-                <div className={`${card} flex-1 px-5 py-4`}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-13 font-semibold text-ink">
-                      {activityTypeLabels[activity.type]}
-                    </span>
-                    <span className="text-xs text-ink-soft">
-                      {dateTimeFormat.format(activity.date)}
-                    </span>
-                  </div>
-                  <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink-muted">
-                    {activity.text}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-    </div>
-  );
+    </header>
+    <KontaktBereiche contactId={contact.id} overview={overview} activities={activities} details={details} />
+  </div>;
 }

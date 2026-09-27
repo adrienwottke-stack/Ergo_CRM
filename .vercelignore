@@ -1,0 +1,12 @@
+# Local credentials, browser fixtures and handoff evidence never enter a deployment.
+.env*
+.cache
+test-results
+.codex-remote-attachments
+.agents
+.claude
+.vs
+docs
+scripts/_audit
+*.tsbuildinfo
+*.pem

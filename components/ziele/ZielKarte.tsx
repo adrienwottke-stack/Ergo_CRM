@@ -9,6 +9,8 @@ import {
 } from "@/app/(app)/fortschritt/actions";
 import { btnSecondary, btnPrimary, card } from "@/components/ui";
 import Fortschritt from "@/components/Fortschritt";
+import GpName from "@/components/GpName";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
 
 const datum = new Intl.DateTimeFormat("de-DE", {
   day: "numeric",
@@ -21,29 +23,34 @@ export default function ZielKarte({
   ziel,
   userId,
   hauptzielId,
+  kompakt = false,
 }: {
   ziel: ZielStand;
   userId: string;
   hauptzielId: string | null;
+  kompakt?: boolean;
 }) {
   const eigen = ziel.inhaberId === userId;
   const vorgeschlagen = ziel.zusage === "OFFEN" && !ziel.archiviertAt;
   const ende = new Date(ziel.ende.getTime() - 1);
+  const Titel = kompakt ? "h3" : "h2";
   return (
-    <article className={`${card} space-y-4 p-5`}>
+    <article className={`${card} crm-goal-card ${kompakt ? "crm-goal-card-compact" : "space-y-4 p-5"}`}>
       <div>
-        <p className="text-sm text-slate-600">
-          {eigen ? "Dein Ziel" : `Für ${ziel.inhaber.name}`}
+        <p className="text-sm text-ink-muted">
+          {eigen ? "Dein Ziel" : <>Für <GpName name={ziel.inhaber.name} /></>}
           {ziel.id === hauptzielId ? " · Auf Heute" : ""}
         </p>
-        <h2 className="mt-1 text-xl font-semibold">{ziel.titel}</h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <VorfuehrVerdeckt hinweis="Persönlicher Zieltitel ausgeblendet.">
+          <Titel className="mt-1 text-lg font-semibold">{ziel.titel}</Titel>
+        </VorfuehrVerdeckt>
+        <p className="mt-1 text-sm text-ink-muted">
           {datum.format(ziel.start)} – {datum.format(ende)}
         </p>
       </div>
       {vorgeschlagen ? (
         <p>
-          Vorschlag von {ziel.erstelltVon.name}.{" "}
+          Vorschlag von <GpName name={ziel.erstelltVon.name} />.{" "}
           {eigen ? "Passt dieses Ziel für dich?" : "Wartet auf Bestätigung."}
         </p>
       ) : (
@@ -66,7 +73,7 @@ export default function ZielKarte({
           {ziel.kennzahlText}
         </p>
       )}
-      {ziel.wunsch && <p className="text-base text-slate-600">{ziel.wunsch}</p>}
+      {!kompakt && ziel.wunsch && <VorfuehrVerdeckt hinweis="Persönlicher Wunsch ausgeblendet."><p className="text-base text-ink-muted">{ziel.wunsch}</p></VorfuehrVerdeckt>}
       {ziel.zusage === "ABGELEHNT" && (
         <p className="text-sm">Vorschlag abgelehnt.</p>
       )}
@@ -83,6 +90,10 @@ export default function ZielKarte({
         </form>
       )}
       {eigen && ziel.zusage === "BESTAETIGT" && (
+        <details className="crm-goal-actions" open={kompakt ? undefined : true}>
+          <summary>Ziel verwalten</summary>
+          <VorfuehrVerdeckt hinweis="Zielbearbeitung ist beim Vorführen ausgeblendet.">
+          {kompakt && ziel.wunsch && <p className="mb-3 text-sm text-ink-muted">{ziel.wunsch}</p>}
         <div className="flex flex-wrap gap-3">
           {ziel.aktiv && ziel.id !== hauptzielId && (
             <form action={hauptzielWaehlen}>
@@ -102,6 +113,8 @@ export default function ZielKarte({
             </form>
           )}
         </div>
+          </VorfuehrVerdeckt>
+        </details>
       )}
       {eigen && ziel.zusage === "BESTAETIGT" && ziel.geschafft && (
         <div className="space-y-2 border-t border-line pt-4">
@@ -112,7 +125,7 @@ export default function ZielKarte({
             <input type="hidden" name="zielId" value={ziel.id} />
             <button className={btnSecondary}>Erfolg ans Netzwerk melden</button>
           </form>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-ink-muted">
             Du teilst nur den erreichten Stand. Dein persönlicher Wunsch bleibt
             hier.
           </p>

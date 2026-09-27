@@ -50,7 +50,8 @@ export function Monatsraster({
   }
 
   return (
-    <div className={cn(card, "overflow-hidden")}>
+    <div className={cn(card, "overflow-x-auto")}>
+      <div className="min-w-[21rem]">
       <div className="grid grid-cols-7 border-b border-line">
         {wochentage.map((name) => (
           <div
@@ -85,7 +86,7 @@ export function Monatsraster({
               <Link
                 href={`/kalender?ansicht=tag&tag=${kandidat}`}
                 className={cn(
-                  "mb-1 flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums transition",
+                  "mb-1 flex min-h-11 min-w-11 items-center justify-center rounded-lg text-sm font-semibold tabular-nums transition",
                   istHeute
                     ? "bg-akzent text-white"
                     : imMonat
@@ -110,7 +111,7 @@ export function Monatsraster({
                     </>
                   );
                   const klassen = cn(
-                    "block truncate rounded px-1 py-0.5 text-11 leading-tight",
+                    "flex min-h-11 items-center overflow-hidden rounded px-1 py-1 text-xs leading-tight",
                     stil.streifen
                   );
                   return eintrag.kontaktId || eintrag.href ? (
@@ -131,7 +132,7 @@ export function Monatsraster({
                 {rest > 0 && (
                   <Link
                     href={`/kalender?ansicht=tag&tag=${kandidat}`}
-                    className="block px-1 text-11 font-medium text-ink-muted hover:text-ink"
+                    className="flex min-h-11 items-center px-1 text-xs font-medium text-ink-muted hover:text-ink"
                   >
                     +{rest} weitere
                   </Link>
@@ -140,6 +141,7 @@ export function Monatsraster({
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

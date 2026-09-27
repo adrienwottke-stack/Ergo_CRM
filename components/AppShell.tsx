@@ -15,6 +15,7 @@ import type { User } from "@/lib/generated/prisma/client";
 import AssistantEntry from "@/components/ai-crm/AssistantEntry";
 import AssistantSurface from "@/components/ai-crm/AssistantSurface";
 import { istAn } from "@/lib/features";
+import { WorkspaceTitle, WorkspaceTools } from "@/components/WorkspaceHeader";
 
 export function navigationFuer() {
   return HAUPTNAVIGATION;
@@ -31,12 +32,6 @@ export default async function AppShell({
     ladeCoach(user.id).catch(() => null),
     istAn("zinsrechner"),
   ]);
-  const initialen = user.name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((teil) => teil[0])
-    .join("");
   return (
     <div className="crm-shell flex min-h-dvh flex-col">
       <a
@@ -52,7 +47,8 @@ export default async function AppShell({
           <Link href="/heute" aria-label="Cockpit · Heute" className="crm-brand">
             <Wordmark />
           </Link>
-          <div className="flex items-center gap-2">
+          <Suspense fallback={<span className="crm-mobile-title">Cockpit</span>}><WorkspaceTitle /></Suspense>
+          <div className="crm-global-actions flex items-center gap-2">
             <NamenSammelnLink className="crm-collection-header" />
             <AssistantEntry />
             <Link
@@ -73,14 +69,7 @@ export default async function AppShell({
               </svg>
               <span className="assistant-search-label">CRM durchsuchen</span>
             </Link>
-            <Link href="/hilfe" className="crm-help-link" aria-label="Hilfe und Support">?</Link>
-            <Link
-              href="/profil"
-              aria-label="Profil und Einstellungen"
-              className="inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-line-strong bg-surface px-2 text-sm font-semibold text-ink"
-            >
-              {initialen}
-            </Link>
+            <WorkspaceTools calculatorEnabled={calculatorEnabled} />
           </div>
         </div>
         <div className="crm-navigation-container">

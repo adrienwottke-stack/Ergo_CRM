@@ -64,6 +64,7 @@ try {
   await page.getByRole("heading", { name: "Kontakte", exact: true }).waitFor();
   assert.equal(requests, 0);
   await page.getByRole("searchbox", { name: "Kontakte suchen" }).fill("Jonas");
+  await page.getByRole("button", { name: /^Filter/ }).click();
   await page.getByRole("combobox", { name: "Status", exact: true }).selectOption("offen");
   await page.getByRole("button", { name: "Anwenden", exact: true }).click();
   await page.getByText("1 von 3 Kontakten in dieser Ansicht", { exact: true }).waitFor();
@@ -83,9 +84,15 @@ try {
   checks.push("Manual search/filter → contact → edit/save → same filtered list, database result verified, no Jarvis request");
   await page.getByRole("searchbox", { name: "Kontakte suchen" }).focus();
   await page.keyboard.press("Tab");
+  assert.equal(await page.getByRole("button", { name: "Kontakte suchen", exact: true }).evaluate(element => element === document.activeElement), true);
+  await page.keyboard.press("Tab");
+  assert.equal(await page.getByRole("button", { name: /^Filter/ }).evaluate(element => element === document.activeElement), true);
+  await page.keyboard.press("Enter");
+  await page.getByRole("combobox", { name: "Status", exact: true }).focus();
   assert.equal(await page.getByRole("combobox", { name: "Status", exact: true }).evaluate(element => element === document.activeElement && getComputedStyle(element).outlineStyle !== "none"), true);
   await page.keyboard.press("Tab");
   assert.equal(await page.getByRole("combobox", { name: "Telefon", exact: true }).evaluate(element => element === document.activeElement), true);
+  await page.getByRole("button", { name: "Abbrechen", exact: true }).click();
   await page.getByRole("link", { name: "Kontakt anlegen", exact: true }).click();
   await page.getByRole("textbox", { name: "Name *", exact: true }).fill("Manuell angelegt");
   await page.getByRole("button", { name: "Kontakt anlegen", exact: true }).click();
@@ -95,18 +102,18 @@ try {
   assert.equal(requests, 0);
   checks.push("Keyboard filter order and visible focus; manual contact creation persists in the chosen list without Jarvis");
 
-  for (const width of [320, 390, 768, 1440]) {
+  for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     for (const [name, path, heading] of [["contacts", "/namen?liste=VERKAUF", "Kontakte"], ["record", `/contacts/${contact.id}`, "Jonas Müller"], ["edit", `/contacts/${contact.id}/edit`, "Kontakt bearbeiten"], ["today", "/heute", "Heute"], ["calendar", "/kalender?ansicht=liste", "Kalender"], ["help", "/hilfe", "Hilfe und Support"], ["calculator", "/zinsrechner?start=1000&monatlich=100&jahre=10&rendite=5", /Was aus deinem Geld/]]) {
       await page.goto(origin + path); await page.getByRole("heading", { name: heading, exact: typeof heading === "string" }).waitFor(); await noOverflow(); await shot(`${name}-${width}-dark`);
       if (width === 1440 || width === 390) { await page.evaluate(() => document.documentElement.classList.remove("dark")); await noOverflow(); await shot(`${name}-${width}-light`); await page.evaluate(() => document.documentElement.classList.add("dark")); }
     }
     assert.deepEqual(await page.getByRole("navigation", { name: "Hauptnavigation", exact: true }).getByRole("link").allTextContents(), ["Heute", "Kontakte", "Kalender", "Fortschritt", "Team"]);
-    for (const target of [page.getByRole("button", { name: "Jarvis", exact: true }), page.locator(".crm-help-link"), page.getByRole("link", { name: "Suchen", exact: true })]) {
+    for (const target of [page.getByRole("button", { name: "Jarvis", exact: true }), page.getByRole("button", { name: "Werkzeuge und Profil", exact: true }), page.getByRole("link", { name: "Suchen", exact: true })]) {
       const rect = await target.boundingBox(); assert.ok(rect.width >= 43 && rect.height >= 43);
     }
   }
-  checks.push("Seven real pages at 320/390/768/1440, light/dark captures, no document overflow, original five navigation items, global touch targets at least 44px");
+  checks.push("Seven real pages at 320/390/768/1024/1440, light/dark captures, no document overflow, original five navigation items, global touch targets at least 44px");
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${origin}/contacts/${contact.id}`);
   await page.getByRole("heading", { name: "Jonas Müller", exact: true }).waitFor();
@@ -146,7 +153,7 @@ try {
   assert.ok(await calculator.count() > 0);
   const expected = berechne({ ...standardWerte(), start: 1000, monthly: 100, years: 10, scenario: "custom", customRate: 5 }).main.end;
   assert.ok(expected > 0); await shot("jarvis-calculator-result");
-  for (const width of [320, 390, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); await noOverflow(); await shot(`jarvis-${width}`); }
+  for (const width of [320, 390, 768, 1024, 1440]) { await page.setViewportSize({ width, height: 1000 }); await noOverflow(); await shot(`jarvis-${width}`); }
   checks.push("Help source links and calculator handoff use actual shared helpers; assistant panel responsive; opening does not request microphone");
   assert.deepEqual(errors, []);
   await writeFile(new URL("result.json", output), JSON.stringify({ success: true, checks, errors, limitations: ["Local simulated text provider", "No real microphone, OpenAI or physical device acceptance", "No deployment"] }, null, 2));

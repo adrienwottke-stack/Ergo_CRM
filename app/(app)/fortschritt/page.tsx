@@ -5,7 +5,9 @@ import { zielPruefzeit } from "@/lib/ziele-modell";
 import { ladeEinheitenErinnerungen } from "@/lib/einheiten-erinnerung";
 import ZielKarte from "@/components/ziele/ZielKarte";
 import Teamziele from "@/components/ziele/Teamziele";
-import { column, pageTitle, btnPrimary } from "@/components/ui";
+import { shell, btnPrimary } from "@/components/ui";
+import SeitenKopf from "@/components/SeitenKopf";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
 
 export const dynamic = "force-dynamic";
 
@@ -16,90 +18,89 @@ export default async function FortschrittPage() {
     ladeHauptziel(user.id),
     ladeEinheitenErinnerungen(user.id, true),
   ]);
-  const laufend = ziele.filter(
+  const eigene = ziele.filter((ziel) => ziel.inhaberId === user.id);
+  const partnerZiele = ziele.filter((ziel) => ziel.inhaberId !== user.id);
+  const laufend = eigene.filter(
     (ziel) =>
       !ziel.archiviertAt &&
       ziel.ende > zielPruefzeit(ziel.zeitraum) &&
       ziel.zusage !== "ABGELEHNT",
-  );
-  const vergangen = ziele.filter((ziel) => !laufend.includes(ziel));
+  ).sort((a, b) => Number(b.aktiv) - Number(a.aktiv));
+  const vergangen = eigene.filter((ziel) => !laufend.includes(ziel));
   return (
-    <div className={`${column} space-y-8`}>
-      <header className="space-y-3">
-        <h1 className={pageTitle}>Fortschritt</h1>
-        <p className="text-base text-slate-600">
-          Deine Ziele und das, was du dafür geschafft hast.
-        </p>
-      </header>
-      <Teamziele userId={user.id} kompakt />
-      <nav
-        aria-label="Fortschritt entdecken"
-        className="divide-y divide-line rounded-xl border border-line bg-surface"
-      >
-        {[
-          ["#ziele", "Deine Ziele", "Woche, Monat und dein nächster Schritt"],
-          ["/einheiten", "Einheiten", "Eintragen und Entwicklung überblicken"],
-          ["/arena", "Wettbewerb", "Gemeinsam dranbleiben"],
-          ["/trichter", "Trichter", "Erkennen, wo es hakt"],
-          ["/fortschritt/warum", "Mein Warum", "Wofür du das machst"],
-        ].map(([href, titel, text]) => (
-          <Link
-            key={href}
-            href={href!}
-            className="flex min-h-20 items-center justify-between gap-4 p-5"
-          >
-            <div>
-              <p className="text-lg font-medium">{titel}</p>
-              <p className="mt-1 text-sm text-slate-600">{text}</p>
-            </div>
-            <span aria-hidden>→</span>
-          </Link>
-        ))}
-      </nav>
-      {erinnerungen.length > 0 && (
-        <Link
-          href="/fortschritt/einheiten-offen"
-          className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-line p-4"
-        >
-          <span>Offene Einheiten · {erinnerungen.length}</span>
-          <span aria-hidden>→</span>
-        </Link>
-      )}
+    <div className={`${shell} crm-progress space-y-6`}>
+      <SeitenKopf
+        hauptbereich
+        titel="Fortschritt"
+        unterzeile="Deine eigene Leistung und deine Ziele."
+        aktion={<Link className={btnPrimary} href="/fortschritt/neu">Ziel setzen</Link>}
+      />
       <section id="ziele" className="scroll-mt-8 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-2xl font-semibold">Deine Ziele</h2>
-          <Link className={btnPrimary} href="/fortschritt/neu">
-            Ziel setzen
-          </Link>
+        <div className="crm-section-heading">
+          <h2>Deine Ziele</h2>
+          <span className="text-sm text-ink-muted">{laufend.length} laufend</span>
         </div>
         {laufend.length === 0 ? (
-          <p className="py-4 text-base text-slate-600">
-            Ein klares Ziel für diese Woche genügt. Deinen Fortschritt zählen
-            wir aus deiner Arbeit.
-          </p>
+          <div className="crm-work-section p-4">
+            <p className="font-semibold">Setze dir ein neues Ziel.</p>
+            <p className="mt-1 text-sm text-ink-muted">Ein Wochenziel genügt. Deinen Stand zählen wir aus deiner eingetragenen Arbeit.</p>
+            <Link className="crm-planning-inline-link mt-2" href="/fortschritt/neu">Ziel setzen →</Link>
+          </div>
         ) : (
-          laufend.map((ziel) => (
+          <div className="crm-goals-grid">
+          {laufend.map((ziel) => (
             <ZielKarte
               key={ziel.id}
               ziel={ziel}
               userId={user.id}
               hauptzielId={hauptziel?.id ?? null}
+              kompakt
             />
-          ))
+          ))}
+          </div>
         )}
       </section>
+      {erinnerungen.length > 0 ? (
+        <Link href="/fortschritt/einheiten-offen" className="crm-planning-action-row">
+          <span><strong>{erinnerungen.length} offene {erinnerungen.length === 1 ? "Einheitenmeldung" : "Einheitenmeldungen"}</strong><span className="block text-sm text-ink-muted">Abschlüsse vervollständigen</span></span>
+          <span aria-hidden>→</span>
+        </Link>
+      ) : laufend.length > 0 ? (
+        <Link href="/heute" className="crm-planning-action-row"><span>Zu deinen nächsten Schritten auf Heute</span><span aria-hidden>→</span></Link>
+      ) : null}
+      <section className="space-y-2">
+        <div className="crm-section-heading"><h2>Deine Arbeit auswerten</h2></div>
+        <nav aria-label="Fortschritt entdecken" className="crm-planning-tool-list">
+          <Link href="/einheiten"><span>Einheiten</span><span className="text-sm text-ink-muted">Eintragen und Entwicklung ansehen</span><span aria-hidden>→</span></Link>
+          <Link href="/trichter"><span>Trichter</span><span className="text-sm text-ink-muted">Vom Anruf bis zum Ergebnis</span><span aria-hidden>→</span></Link>
+        </nav>
+      </section>
+      <Teamziele userId={user.id} kompakt alsAbschnitt />
+      {partnerZiele.length > 0 && (
+        <details className="crm-planning-details">
+          <summary>Partnerziele · {partnerZiele.length}</summary>
+          <VorfuehrVerdeckt hinweis="Persönliche Partnerziele sind beim Vorführen ausgeblendet.">
+            <div className="crm-goals-grid mt-3">{partnerZiele.map((ziel) => <ZielKarte key={ziel.id} ziel={ziel} userId={user.id} hauptzielId={null} kompakt />)}</div>
+          </VorfuehrVerdeckt>
+        </details>
+      )}
+      <nav aria-label="Weitere Fortschrittsbereiche" className="crm-planning-tool-list">
+        <Link href="/arena"><span>Wettbewerb</span><span className="text-sm text-ink-muted">Gemeinsam dranbleiben</span><span aria-hidden>→</span></Link>
+        <Link href="/fortschritt/warum"><span>Mein Warum</span><span className="text-sm text-ink-muted">Wofür du das machst</span><span aria-hidden>→</span></Link>
+      </nav>
       {vergangen.length > 0 && (
-        <details className="space-y-4">
-          <summary className="min-h-12 cursor-pointer text-lg font-medium">
+        <details className="crm-planning-details">
+          <summary>
             Frühere Ziele · {vergangen.length}
           </summary>
-          <div className="space-y-4">
+          <div className="crm-goals-grid mt-3">
             {vergangen.map((ziel) => (
               <ZielKarte
                 key={ziel.id}
                 ziel={ziel}
                 userId={user.id}
                 hauptzielId={null}
+                kompakt
               />
             ))}
           </div>

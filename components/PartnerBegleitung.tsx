@@ -20,11 +20,15 @@ export default async function PartnerBegleitung({
   personen,
   struktur = personen,
   limit,
+  kompakt = false,
+  alleHref = "/mannschaft",
 }: {
   userId: string;
   personen: Mannschaftsperson[];
   struktur?: Mannschaftsperson[];
   limit?: number;
+  kompakt?: boolean;
+  alleHref?: string;
 }) {
   const aktive = personen.filter((p) => !p.platzhalter && !p.ausgetreten);
   const auswahl = limit ? aktive.slice(0, limit) : aktive;
@@ -43,7 +47,8 @@ export default async function PartnerBegleitung({
     ),
   );
   return (
-    <div className="space-y-3">
+    <div className={kompakt ? "space-y-2" : "space-y-3"}>
+      <div className={kompakt ? "crm-team-partner-list" : "space-y-3"}>
       {auswahl.map((person) => {
         const letzter = zuletzt.get(person.id);
         const naechster = naechstes.get(person.id);
@@ -76,16 +81,41 @@ export default async function PartnerBegleitung({
         return (
           <article
             key={person.id}
-            className="rounded-2xl border border-line bg-surface p-5"
+            className={kompakt ? "crm-team-partner-row" : "rounded-[10px] border border-line bg-surface p-5"}
           >
+            <div className="crm-team-partner-heading">
             <PersonLink
               href={`/mannschaft/${person.id}`}
-              className="inline-flex min-h-11 items-center text-xl font-semibold"
+              className={kompakt ? "crm-team-partner-name" : "inline-flex min-h-11 items-center text-xl font-semibold"}
             >
               <GpName name={person.name} />{" "}
               <span className="ml-3 text-link">→</span>
             </PersonLink>
+            {kompakt && person.fuehrt > 0 && <span className="crm-team-partner-status">Führt {person.fuehrt}</span>}
+            </div>
+            {kompakt && (
+              <VorfuehrVerdeckt hinweis="Persönliche Begleitung wird beim Vorführen ausgeblendet.">
+                <p className="crm-team-partner-next">
+                  {absprache ? (
+                    <Link href={`/mannschaft/vereinbarungen?partner=${person.id}`}>
+                      {absprache.titel} · {datum.format(absprache.faelligAm)}{absprache.status === "VORGESCHLAGEN" ? " · Bestätigung offen" : ""}
+                    </Link>
+                  ) : person.betreuung ? (
+                    <>Nachfassen am {datum.format(person.betreuung.faelligAm)} · {person.signale[0]?.titel ?? "Gemeinsamer Schritt"}</>
+                  ) : !person.angekommen ? (
+                    "Einstieg gemeinsam fortsetzen"
+                  ) : naechster ? (
+                    `${naechster.istTermin ? "Termin" : naechster.art === "ANRUF" ? "Anruf" : "Kontaktschritt"} · ${datum.format(naechster.wann)}`
+                  ) : (
+                    person.signale[0]?.titel ?? "Nächsten gemeinsamen Schritt besprechen"
+                  )}
+                </p>
+              </VorfuehrVerdeckt>
+            )}
+            <details className={kompakt ? "crm-team-partner-details" : "crm-team-partner-details-full"} open={kompakt ? undefined : true}>
+              <summary hidden={!kompakt} aria-label="Begleitung und Aktionen anzeigen">Details</summary>
             <VorfuehrVerdeckt hinweis="Persönliche Begleitung wird beim Vorführen ausgeblendet.">
+              <div className={kompakt ? "crm-team-partner-detail-body" : undefined}>
               <dl className="mt-2 space-y-2 text-sm">
                 <div>
                   <dt className="text-ink-muted">Zuletzt passiert</dt>
@@ -200,13 +230,16 @@ export default async function PartnerBegleitung({
                   variante="knopf"
                 />
               </div>
+              </div>
             </VorfuehrVerdeckt>
+            </details>
           </article>
         );
       })}
+      </div>
       {limit && aktive.length > limit && (
         <Link
-          href="/mannschaft"
+          href={alleHref}
           className="inline-flex min-h-11 items-center font-medium text-link"
         >
           Alle {aktive.length} Partner ansehen →

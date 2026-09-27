@@ -13,7 +13,6 @@
 // einfache Initialen ohne Kollisionsaufloesung - zwei "M. W." nebeneinander
 // sind beim Vorfuehren verschmerzbar, ein echter Name waere es nicht.
 
-import { useVorfuehren } from "@/components/VorfuehrProvider";
 
 /** "Marc Weber" -> "M. W." - der Fallback ohne Kollisionsaufloesung. */
 function einfacheInitialen(name: string): string {
@@ -23,7 +22,5 @@ function einfacheInitialen(name: string): string {
 }
 
 export default function GpName({ name, kurz }: { name: string; kurz?: string }) {
-  const { aktiv } = useVorfuehren();
-  if (!aktiv) return <>{name}</>;
-  return <>{kurz ?? einfacheInitialen(name)}</>;
+  return <><span data-private-name="">{name}</span><span data-private-mask="">{kurz ?? einfacheInitialen(name)}</span></>;
 }

@@ -101,8 +101,8 @@
      weisse Schrift (gemessen: 5,3 bis 6,0 zu 1).
      Die Variante "-stark" ist der Zustand unter dem Zeiger: hell wird sie
      dunkler, dunkel wird sie heller - in beiden Faellen also deutlicher. */
-  --color-fest-erfolg: #059669;
-  --color-fest-erfolg-stark: #047857;
+  --color-fest-erfolg: #047857;
+  --color-fest-erfolg-stark: #065f46;
   --color-fest-gefahr: #dc2626;
   --color-fest-gefahr-stark: #b91c1c;
   --color-fest-warnung: #78350f;
@@ -283,7 +283,7 @@
   /* Gefuellte Ton-Knoepfe: satt und dunkel genug fuer weisse Schrift, aber
      heller als die Karte dahinter - sonst verschwaende der Knopf im Grund. */
   --color-fest-erfolg: #0e7a53;
-  --color-fest-erfolg-stark: #12915f;
+  --color-fest-erfolg-stark: #107852;
   --color-fest-gefahr: #b33636;
   --color-fest-gefahr-stark: #c94444;
   --color-fest-warnung: #8a5a12;

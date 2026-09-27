@@ -12,6 +12,7 @@ export default function SeitenKopf({
   unterzeile,
   aktion,
   className,
+  hauptbereich = false,
 }: {
   /** Kleine Zeile darueber - nennt den Bereich, nicht die Seite. */
   kicker?: string;
@@ -20,11 +21,13 @@ export default function SeitenKopf({
   /** Rechts aussen, z. B. "Beenden" oder ein Filter. */
   aktion?: React.ReactNode;
   className?: string;
+  /** Main sections already have a mobile title in the global header. */
+  hauptbereich?: boolean;
 }) {
   return (
-    <div className={cn("crm-page-heading flex flex-wrap items-start justify-between gap-4", className)}>
-      <div className="min-w-0">
-        {kicker && <p className={cn(kickerStil, "mb-1")}>{kicker}</p>}
+    <div className={cn("crm-page-heading flex flex-wrap items-start justify-between gap-4", hauptbereich && "crm-main-heading", className)}>
+      <div className="crm-page-title-block min-w-0">
+        {kicker && <p className={cn(kickerStil, "crm-page-kicker mb-1")}>{kicker}</p>}
         <h1 className={pageTitle}>{titel}</h1>
         {unterzeile && (
           <p className="mt-1.5 text-sm text-ink-muted">{unterzeile}</p>

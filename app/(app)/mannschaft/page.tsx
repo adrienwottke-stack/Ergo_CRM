@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import TeamNavigation from "./TeamNavigation";
+import SeitenKopf from "@/components/SeitenKopf";
 import Teamziele from "@/components/ziele/Teamziele";
 import PartnerBegleitung from "@/components/PartnerBegleitung";
 import ErfolgeHeute from "@/components/ErfolgeHeute";
@@ -60,7 +61,6 @@ import {
   filterPill,
   flaeche,
   kicker,
-  pageTitle,
   sectionTitle,
   td,
   th,
@@ -250,9 +250,10 @@ function kopfzeile(person: Mannschaftsperson): string {
 export default async function MannschaftPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ansicht?: string; bereich?: string }>;
+  searchParams: Promise<{ ansicht?: string; bereich?: string; partner?: string }>;
 }) {
-  const { ansicht, bereich } = await searchParams;
+  const { ansicht, bereich, partner } = await searchParams;
+  const allePartner = partner === "alle";
   const begleiten = bereich !== "ueberblick" && ansicht !== "liste";
   // Das Bild ist die Vorgabe. Die Liste bleibt einen Tipp entfernt - sie
   // traegt die Signale und die Knoepfe, fuer die im Kasten kein Platz ist.
@@ -497,23 +498,20 @@ export default async function MannschaftPage({
 
   return (
     <VorfuehrProvider>
-      <div className="space-y-6">
+      <div className="crm-team space-y-5">
         <div>
-          <div className="flex items-center justify-between gap-3">
-            <h1 className={pageTitle}>Team</h1>
-            <VorfuehrSchalter />
-          </div>
+          <SeitenKopf
+            hauptbereich
+            titel="Team"
+            unterzeile={begleiten
+              ? eigenePartner.length > 0 ? `${eigenePartner.length} direkte Partner · eure nächsten Schritte` : "Dein Führungskontakt und gemeinsame Schritte"
+              : "Direkte Partner und weitere Ebenen"}
+            aktion={<VorfuehrSchalter />}
+          />
           <VorfuehrHinweis />
-          <p className="mt-2 text-base text-ink-muted">
-            {begleiten
-              ? "Deine Partner, eure Absprachen und der nächste gemeinsame Schritt."
-              : "Wer zu deinem Team gehört und wie die einzelnen Bereiche zusammenarbeiten."}
-          </p>
         </div>
 
         <TeamNavigation aktiv={begleiten ? "begleiten" : "ueberblick"} />
-
-        {begleiten && <Teamziele userId={user.id} kompakt />}
 
         {!begleiten && (
           <MannschaftsMatrix
@@ -538,30 +536,9 @@ export default async function MannschaftPage({
             </div>
           </details>
         )}
-        <div className="flex flex-wrap gap-x-5 gap-y-2">
-          <PersonLink className="inline-flex min-h-11 items-center font-medium text-navy-700" href="/mannschaft/verwalten">Struktur verwalten →</PersonLink>
-          <Link
-            className="inline-flex min-h-11 items-center font-medium text-navy-700"
-            href="/teamabend"
-          >
-            Netzwerkabend · Wettbewerb und Erfolge →
-          </Link>
-          <Link
-            className="inline-flex min-h-11 items-center font-medium text-navy-700"
-            href="/mannschaft/bericht"
-          >
-            Berichts-Link erstellen →
-          </Link>
-        </div>
-        {begleiten && (
-          <VorfuehrVerdeckt hinweis="Gemeinsame Absprachen werden beim Vorführen ausgeblendet.">
-            <VereinbarungenHeute userId={user.id} />
-          </VorfuehrVerdeckt>
-        )}
-
         {eigenePartner.length === 0 && (
-          <section className="space-y-4 rounded-2xl border border-line bg-surface p-5">
-            <h2 className="text-2xl font-semibold text-ink">
+          <section className="crm-work-section crm-team-empty space-y-3">
+            <h2 className="text-ink">
               {eigeneFuehrung ? "Dein Führungskontakt" : "Gemeinsam starten"}
             </h2>
             {eigeneFuehrung ? (
@@ -576,17 +553,18 @@ export default async function MannschaftPage({
                   Besprecht deinen nächsten Schritt oder vereinbart eine
                   gemeinsame Vorbereitung.
                 </p>
+                <VorfuehrVerdeckt hinweis="Persönliche Kontaktaktionen sind beim Vorführen ausgeblendet.">
                 <div className="flex flex-wrap gap-3">
                   <Link
                     href={`/mannschaft/vereinbarungen?partner=${eigeneFuehrung.id}`}
-                    className="min-h-12 rounded-xl bg-akzent px-4 py-3 text-base font-semibold text-white"
+                    className="min-h-11 rounded-lg bg-akzent px-4 py-3 text-sm font-semibold text-white"
                   >
                     Unsere Absprachen
                   </Link>
                   {eigeneFuehrung.phone && (
                     <a
                       href={`tel:${eigeneFuehrung.phone.replace(/[^+\d]/g, "")}`}
-                      className="min-h-12 rounded-xl border border-line-strong px-4 py-3 text-base font-semibold text-ink-muted"
+                      className="min-h-11 rounded-lg border border-line-strong px-4 py-3 text-sm font-semibold text-ink-muted"
                     >
                       Anrufen
                     </a>
@@ -597,6 +575,7 @@ export default async function MannschaftPage({
                     variante="knopf"
                   />
                 </div>
+                </VorfuehrVerdeckt>
               </>
             ) : (
               <p className="text-base text-ink-muted">
@@ -614,9 +593,9 @@ export default async function MannschaftPage({
         )}
 
         {begleiten && eigenePartner.length > 0 && (
-          <section className="space-y-3">
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-2xl font-semibold">Deine Partner</h2>
+          <section id="partner" className="scroll-mt-24 space-y-3">
+            <div className="crm-section-heading">
+              <h2>Deine direkten Partner</h2>
               <Link
                 href="/einladen"
                 className="inline-flex min-h-11 items-center text-link"
@@ -628,11 +607,25 @@ export default async function MannschaftPage({
               userId={user.id}
               personen={eigenePartner}
               struktur={lage.leute}
+              kompakt
+              limit={allePartner ? undefined : 3}
+              alleHref="/mannschaft?partner=alle#partner"
             />
+            {allePartner && eigenePartner.length > 3 && <Link className="crm-planning-inline-link" href="/mannschaft#partner">Weniger anzeigen →</Link>}
             <VorfuehrVerdeckt hinweis="Persönliche Erfolge werden beim Vorführen ausgeblendet.">
               <ErfolgeHeute userId={user.id} team />
             </VorfuehrVerdeckt>
           </section>
+        )}
+
+        {begleiten && (
+          <VorfuehrVerdeckt hinweis="Gemeinsame Absprachen werden beim Vorführen ausgeblendet.">
+            <VereinbarungenHeute userId={user.id} />
+          </VorfuehrVerdeckt>
+        )}
+
+        {begleiten && (
+          <Teamziele userId={user.id} kompakt alsAbschnitt />
         )}
 
         {lage.fuehrtNiemanden && lage.gesamtstruktur && (
@@ -740,6 +733,7 @@ export default async function MannschaftPage({
           heute an, und was sage ich ihm. Die Liste bleibt kurz, weil nur rot
           und gelb hier landen. */}
         {begleiten && rot.length > 0 && (
+          <VorfuehrVerdeckt hinweis="Persönliche Unterstützung in weiteren Ebenen ist beim Vorführen ausgeblendet.">
           <section className="space-y-3">
             <h2 className={kicker}>Unterstützung in weiteren Ebenen</h2>
             <ul className="space-y-3">
@@ -857,6 +851,7 @@ export default async function MannschaftPage({
               })}
             </ul>
           </section>
+          </VorfuehrVerdeckt>
         )}
 
         {/* --- Wo du schon dran bist -------------------------------------------
@@ -1307,7 +1302,7 @@ export default async function MannschaftPage({
                                 }
                                 hoehe="normal"
                                 className="w-16"
-                                beschriftung={`${person.name}: ${Math.round(anteil * 100)} Prozent der Struktur-Summe`}
+                                beschriftung={`${Math.round(anteil * 100)} Prozent der Struktur-Summe`}
                               />
                               <span className="w-10 shrink-0 tabular-nums text-ink-muted">
                                 {Math.round(anteil * 100)} %
@@ -1385,7 +1380,13 @@ export default async function MannschaftPage({
           </section>
         )}
 
-        <p className={kicker}>
+        <nav aria-label="Teamwerkzeuge" className="crm-team-utilities">
+          <PersonLink href="/mannschaft/verwalten">Struktur verwalten →</PersonLink>
+          <Link href="/teamabend">Netzwerkabend · Wettbewerb und Erfolge →</Link>
+          <Link href="/mannschaft/bericht">Berichts-Link erstellen →</Link>
+          <Link href="/mannschaft/vereinbarungen">Alle Absprachen →</Link>
+        </nav>
+        <p className="crm-team-footnote">
           Woche ab Montag, Monat ab dem Ersten, beides nach Berliner Kalender.
           Signale werden bei jedem Aufruf neu berechnet und nirgends
           gespeichert. Von den Kontakten siehst du die ersten{" "}

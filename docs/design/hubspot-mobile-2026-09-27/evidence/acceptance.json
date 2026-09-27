@@ -1,0 +1,738 @@
+{
+  "success": true,
+  "generatedAt": "2026-09-27T16:13:42.077Z",
+  "baseCommit": "57548123c1edeb2a45320d1fe2f05cb60f229506",
+  "workingTreeModified": true,
+  "methodology": "Historical findings are retained in source reports. A named finding closes only when a subsequent source has passed that exact scenario. Final geometry uses only the latest matrix.",
+  "scope": {
+    "areas": 7,
+    "roles": 2,
+    "widths": [
+      320,
+      390,
+      768,
+      1024,
+      1440
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "measuredViews": 140,
+    "functionalScenarios": 17
+  },
+  "sourceReports": [
+    "first-combined-run.json",
+    "after-flows/result.json",
+    "after/result.json"
+  ],
+  "checks": [
+    {
+      "name": "All five primary pages expose tools within two activations and preserve navigation/focus",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": false
+        },
+        {
+          "path": "after-flows/result.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Mobile filters: cancel discards edits; apply, edit/save and return preserve list/search/filter state",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Contact states: no matches, missing phone, long name, record tabs and safe More actions",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Today → existing contact result → persisted follow-up and updated Today",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": false
+        },
+        {
+          "path": "after-flows/result.json",
+          "passed": false
+        },
+        {
+          "path": "after/result.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Calendar: create real entry in Berlin time, find it after navigation and reach all existing views",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": false
+        },
+        {
+          "path": "after-flows/result.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Contact appointment: dialog traps and restores focus; the saved appointment keeps the contact association",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "after-flows/result.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Goals and partners: personal numbers are separate from team; permitted agreements/tools remain reachable",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Jarvis and mixed editing: no microphone on open; manual proposal revision saves the verified value",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Provider failure leaves manual contact work usable",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Voice start remains deliberate; cancelling a delayed microphone request cleans up the late stream",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Presentation mode masks the first rendered view, subsequent routes and partner detail",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Filter keyboard focus and short viewport: focus stays inside, Escape closes and returns focus",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": false
+        },
+        {
+          "path": "after-flows/result.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Simulated visual viewport keyboard hides and restores the dock and limits dialog height",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "after-flows/result.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "200 percent text scaling preserves access to primary actions and navigation",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": false
+        },
+        {
+          "path": "after-flows/result.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Mixed leadership view and real collection onboarding use the same shell with the relevant next work",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "first-combined-run.json",
+          "passed": false
+        },
+        {
+          "path": "after-flows/result.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Today shows at most three tasks and opens the actual full task list",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "after-flows/result.json",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "Contact loading and failed save retain usable context and input, then allow retry",
+      "passed": true,
+      "evidence": [
+        {
+          "path": "after-flows/result.json",
+          "passed": true
+        }
+      ]
+    }
+  ],
+  "unresolved": [],
+  "unexpectedBrowserErrors": [],
+  "metricFindings": [],
+  "measurements": [
+    {
+      "page": "today",
+      "width": 320,
+      "firstAction": {
+        "x": 16,
+        "y": 156.5625,
+        "width": 273,
+        "height": 183,
+        "bottom": 339.5625
+      },
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 305,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 451,
+        "width": 305,
+        "height": 117,
+        "bottom": 568
+      },
+      "documentWidth": 305
+    },
+    {
+      "page": "contacts",
+      "width": 320,
+      "firstAction": null,
+      "firstContact": {
+        "x": 17,
+        "y": 274,
+        "width": 271,
+        "height": 92,
+        "bottom": 366
+      },
+      "completeRows": 1,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 305,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 451,
+        "width": 305,
+        "height": 117,
+        "bottom": 568
+      },
+      "documentWidth": 305
+    },
+    {
+      "page": "edit",
+      "width": 320,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 305,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 451,
+        "width": 305,
+        "height": 117,
+        "bottom": 568
+      },
+      "documentWidth": 305
+    },
+    {
+      "page": "calendar",
+      "width": 320,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 305,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 451,
+        "width": 305,
+        "height": 117,
+        "bottom": 568
+      },
+      "documentWidth": 305
+    },
+    {
+      "page": "progress",
+      "width": 320,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 305,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 451,
+        "width": 305,
+        "height": 117,
+        "bottom": 568
+      },
+      "documentWidth": 305
+    },
+    {
+      "page": "team",
+      "width": 320,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 305,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 451,
+        "width": 305,
+        "height": 117,
+        "bottom": 568
+      },
+      "documentWidth": 305
+    },
+    {
+      "page": "today",
+      "width": 390,
+      "firstAction": {
+        "x": 16,
+        "y": 156.5625,
+        "width": 343,
+        "height": 163,
+        "bottom": 319.5625
+      },
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 727,
+        "width": 375,
+        "height": 117,
+        "bottom": 844
+      },
+      "documentWidth": 375
+    },
+    {
+      "page": "contacts",
+      "width": 390,
+      "firstAction": null,
+      "firstContact": {
+        "x": 17,
+        "y": 274,
+        "width": 341,
+        "height": 92,
+        "bottom": 366
+      },
+      "completeRows": 4,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 727,
+        "width": 375,
+        "height": 117,
+        "bottom": 844
+      },
+      "documentWidth": 375
+    },
+    {
+      "page": "edit",
+      "width": 390,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 727,
+        "width": 375,
+        "height": 117,
+        "bottom": 844
+      },
+      "documentWidth": 375
+    },
+    {
+      "page": "calendar",
+      "width": 390,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 727,
+        "width": 375,
+        "height": 117,
+        "bottom": 844
+      },
+      "documentWidth": 375
+    },
+    {
+      "page": "progress",
+      "width": 390,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 727,
+        "width": 375,
+        "height": 117,
+        "bottom": 844
+      },
+      "documentWidth": 375
+    },
+    {
+      "page": "team",
+      "width": 390,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 727,
+        "width": 375,
+        "height": 117,
+        "bottom": 844
+      },
+      "documentWidth": 375
+    },
+    {
+      "page": "today",
+      "width": 1440,
+      "firstAction": {
+        "x": 244,
+        "y": 222.796875,
+        "width": 1157,
+        "height": 105.140625,
+        "bottom": 327.9375
+      },
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 1425,
+        "height": 67,
+        "bottom": 67
+      },
+      "dock": {
+        "x": 0,
+        "y": 67,
+        "width": 220,
+        "height": 833,
+        "bottom": 900
+      },
+      "documentWidth": 1425
+    },
+    {
+      "page": "contacts",
+      "width": 1440,
+      "firstAction": null,
+      "firstContact": {
+        "x": 245,
+        "y": 273.625,
+        "width": 1155,
+        "height": 58,
+        "bottom": 331.625
+      },
+      "completeRows": 10,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 1425,
+        "height": 67,
+        "bottom": 67
+      },
+      "dock": {
+        "x": 0,
+        "y": 67,
+        "width": 220,
+        "height": 833,
+        "bottom": 900
+      },
+      "documentWidth": 1425
+    },
+    {
+      "page": "edit",
+      "width": 1440,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 1425,
+        "height": 67,
+        "bottom": 67
+      },
+      "dock": {
+        "x": 0,
+        "y": 67,
+        "width": 220,
+        "height": 833,
+        "bottom": 900
+      },
+      "documentWidth": 1425
+    },
+    {
+      "page": "calendar",
+      "width": 1440,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 1425,
+        "height": 67,
+        "bottom": 67
+      },
+      "dock": {
+        "x": 0,
+        "y": 67,
+        "width": 220,
+        "height": 833,
+        "bottom": 900
+      },
+      "documentWidth": 1425
+    },
+    {
+      "page": "progress",
+      "width": 1440,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 1425,
+        "height": 67,
+        "bottom": 67
+      },
+      "dock": {
+        "x": 0,
+        "y": 67,
+        "width": 220,
+        "height": 833,
+        "bottom": 900
+      },
+      "documentWidth": 1425
+    },
+    {
+      "page": "team",
+      "width": 1440,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 1425,
+        "height": 67,
+        "bottom": 67
+      },
+      "dock": {
+        "x": 0,
+        "y": 67,
+        "width": 220,
+        "height": 833,
+        "bottom": 900
+      },
+      "documentWidth": 1425
+    },
+    {
+      "page": "record",
+      "width": 320,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 305,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 451,
+        "width": 305,
+        "height": 117,
+        "bottom": 568
+      },
+      "documentWidth": 305
+    },
+    {
+      "page": "record",
+      "width": 390,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 57,
+        "bottom": 57
+      },
+      "dock": {
+        "x": 0,
+        "y": 727,
+        "width": 375,
+        "height": 117,
+        "bottom": 844
+      },
+      "documentWidth": 375
+    },
+    {
+      "page": "record",
+      "width": 1440,
+      "firstAction": null,
+      "firstContact": null,
+      "completeRows": 0,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 1425,
+        "height": 67,
+        "bottom": 67
+      },
+      "dock": {
+        "x": 0,
+        "y": 67,
+        "width": 220,
+        "height": 833,
+        "bottom": 900
+      },
+      "documentWidth": 1425
+    }
+  ],
+  "limitations": [
+    "Chromium emulation; no physical device, iOS/Safari or Android/Chrome acceptance",
+    "Visual viewport height was simulated; no physical onscreen keyboard",
+    "Local provider fixture and synthetic delayed microphone; no real provider or microphone",
+    "Independent QA did not publish a deployment; the integration owner records commit/preview separately"
+  ]
+}

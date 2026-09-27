@@ -4,14 +4,15 @@ import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
 import {
   LIST_KINDS,
-  listKindHints,
   listKindLabels,
   listeAus,
   sectionOf,
 } from "@/lib/namelist";
 import { DEFAULT_GUIDES, guideKeyForList } from "@/lib/guides";
 import { liegtSeit } from "@/lib/liegenbleiber";
-import { lostReasonLabels } from "@/lib/pipeline";
+import { lostReasonLabels, nextStepLabels } from "@/lib/pipeline";
+import { berlinToday, dueState, hasTimeOfDay } from "@/lib/dates";
+import { formatDue } from "@/components/NextStepBadge";
 import NameList, { type NameEntry } from "@/components/NameList";
 import GuidePanel from "@/components/GuidePanel";
 import { btnSecondary } from "@/components/ui";
@@ -56,6 +57,12 @@ export default async function NamenPage({
       // seit Wochen nichts gehoert hat.
       lastProgressAt: true,
       nextStepAt: true,
+      nextStepType: true,
+      followUps: {
+        where: { ownerId: user.id, status: "OPEN" },
+        select: { at: true, type: true, isPrimary: true },
+        orderBy: [{ at: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -63,27 +70,36 @@ export default async function NamenPage({
   // Bewusst in Eingabe-Reihenfolge, nicht nach Naehe: beim Einstufen wuerden
   // sonst die Zeilen unter dem Finger wegspringen. Sortiert wird im Durchlauf,
   // wo die Reihenfolge zaehlt.
-  const entries: NameEntry[] = contacts.map((contact) => ({
-    id: contact.id,
-    name: contact.name,
-    stage: contact.stage,
-    outcome: contact.outcome,
-    phone: contact.phone,
-    rating: contact.rating,
-    listKinds: contact.listKinds,
-    section: sectionOf(contact),
-    lostLabel: contact.lostReason ? lostReasonLabels[contact.lostReason] : null,
-    liegtTage: liegtSeit(contact),
-    appointmentLabel: contact.appointmentAt
-      ? appointmentFormat.format(contact.appointmentAt)
-      : null,
-  }));
+  const today = berlinToday();
+  const entries: NameEntry[] = contacts.map((contact) => {
+    const followUp = contact.followUps.find((item) => item.isPrimary) ?? contact.followUps[0];
+    const nextAt = followUp?.at ?? contact.nextStepAt;
+    const nextType = followUp?.type ?? contact.nextStepType;
+    return {
+      id: contact.id,
+      name: contact.name,
+      stage: contact.stage,
+      outcome: contact.outcome,
+      phone: contact.phone,
+      rating: contact.rating,
+      listKinds: contact.listKinds,
+      section: sectionOf(contact),
+      lostLabel: contact.lostReason ? lostReasonLabels[contact.lostReason] : null,
+      liegtTage: liegtSeit(contact),
+      appointmentLabel: contact.appointmentAt
+        ? appointmentFormat.format(contact.appointmentAt)
+        : null,
+      nextStepLabel: nextAt && nextType
+        ? `${nextStepLabels[nextType]} · ${dueState(nextAt, today) === "overdue" ? "überfällig · " : dueState(nextAt, today) === "today" ? "heute · " : ""}${formatDue(nextAt, hasTimeOfDay(nextAt))}`
+        : null,
+    };
+  });
 
   const guide = DEFAULT_GUIDES[guideKey];
 
   return (
-    <div className="crm-contact-list space-y-6">
-      <SeitenKopf titel="Kontakte" kicker="Arbeitsbereich" unterzeile={listKindHints[kind]} aktion={<Link href={`/contacts/new?liste=${kind}`} className={btnSecondary}>Kontakt anlegen</Link>} />
+    <div className="crm-contact-list crm-contacts-workspace">
+      <SeitenKopf titel="Kontakte" hauptbereich aktion={<Link href={`/contacts/new?liste=${kind}`} className={btnSecondary}>Kontakt anlegen</Link>} />
 
       {/* Reiter: serverseitig gefiltert, damit der Zustand in der Adresse steht
           und ein Neuladen nichts verliert. Dieselbe Segmented-Control wie im
@@ -105,7 +121,7 @@ export default async function NamenPage({
 
       <NameList key={`${kind}:${q}:${status}:${telefon}`} entries={entries} kind={kind} query={q.slice(0, 160)} statusFilter={["offen", "geschafft", "raus"].includes(status) ? status : "alle"} phoneFilter={["mit", "ohne"].includes(telefon) ? telefon : "alle"} />
 
-      <GuidePanel title={guide.title} body={guide.body} kind={kind} />
+      <div className="crm-contacts-guide"><GuidePanel title={guide.title} body={guide.body} kind={kind} /></div>
     </div>
   );
 }

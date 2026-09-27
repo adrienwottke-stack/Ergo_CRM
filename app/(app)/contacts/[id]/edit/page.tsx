@@ -5,8 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { eigene } from "@/lib/scope";
 import ContactForm from "@/components/ContactForm";
-import DeleteContactButton from "@/components/DeleteContactButton";
-import { card, kicker, pageTitle, columnNarrow } from "@/components/ui";
+import { pageTitle, columnNarrow } from "@/components/ui";
+import VorfuehrVerdeckt from "@/components/VorfuehrVerdeckt";
+import GpName from "@/components/GpName";
+import KontaktMehr from "@/components/contacts/KontaktMehr";
 import { updateContact } from "../../actions";
 import { contactHref, contactListReturn } from "@/lib/contact-navigation";
 
@@ -32,39 +34,24 @@ export default async function EditContactPage({
   }
 
   return (
-    <div className={`${columnNarrow} space-y-6`} data-contact-id={contact.id} data-contact-name={contact.name}>
+    <div className={`${columnNarrow} crm-record-edit`} data-contact-id={contact.id} data-contact-name={contact.name}>
       <div>
         <Link
           href={contactHref(contact.id, returnTo)}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted transition hover:text-ink"
+          className="crm-record-return"
         >
           <ArrowLeftIcon className="h-4 w-4" />
-          Zurück zu {contact.name}
+          <span>Zurück zu <GpName name={contact.name} /></span>
         </Link>
         <h1 className={`${pageTitle} mt-2`}>Kontakt bearbeiten</h1>
       </div>
-      <ContactForm
+      <VorfuehrVerdeckt hinweis="Die Kontaktdaten sind im Vorführmodus ausgeblendet."><ContactForm
         action={updateContact}
         contact={contact}
         returnTo={returnTo}
         submitLabel="Änderungen speichern"
-      />
-
-      <section className={`${card} border-red-200/70 p-6`}>
-        <p className={kicker}>Gefahrenzone</p>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
-          <p className="max-w-sm text-sm text-ink-muted">
-            Kontakt mitsamt Aktivitäten entfernen. Nicht rückgängig zu
-            machen.
-          </p>
-          <DeleteContactButton
-            contactId={contact.id}
-            contactName={contact.name}
-            activityCount={contact._count.activities}
-            referralCount={contact._count.referrals}
-          />
-        </div>
-      </section>
+      /></VorfuehrVerdeckt>
+      <div className="crm-record-primary-actions"><KontaktMehr contactId={contact.id} contactName={contact.name} activityCount={contact._count.activities} referralCount={contact._count.referrals}><Link href={contactHref(contact.id, returnTo)} className="inline-flex min-h-11 items-center text-sm text-link">Zum Kontakt</Link></KontaktMehr></div>
     </div>
   );
 }

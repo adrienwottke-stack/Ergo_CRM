@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { segmentGruppe, segmentKnopf } from "@/components/ui";
 import { ArrowLeftIcon, ArrowRightIcon } from "@/components/icons";
 
 // Ansicht waehlen und blaettern.
@@ -14,7 +13,7 @@ export const ANSICHTEN: { wert: Ansicht; label: string }[] = [
   { wert: "monat", label: "Monat" },
   { wert: "woche", label: "Woche" },
   { wert: "tag", label: "Tag" },
-  { wert: "liste", label: "Liste" },
+  { wert: "liste", label: "Agenda" },
 ];
 
 function href(ansicht: Ansicht, tag: string) {
@@ -37,43 +36,40 @@ export function Umschalter({
   titel: string;
 }) {
   const springKnopf =
-    "flex h-11 w-11 items-center justify-center rounded-lg border border-line-strong bg-surface text-ink-muted transition hover:border-line-strong hover:text-ink";
+    "crm-calendar-step";
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <Link href={href(ansicht, zurueck)} aria-label="Zurück" className={springKnopf}>
+    <div className="crm-calendar-toolbar">
+      <div className="crm-calendar-date">
+        <h2 id="kalender-zeitraum">{titel}</h2>
+        <nav aria-label="Zeitraum wechseln" className="crm-calendar-date-actions">
+        <Link href={href(ansicht, zurueck)} aria-label="Vorheriger Zeitraum" className={springKnopf}>
           <ArrowLeftIcon className="h-4 w-4" />
         </Link>
-        <Link href={href(ansicht, vor)} aria-label="Vor" className={springKnopf}>
+        <Link href={href(ansicht, vor)} aria-label="Nächster Zeitraum" className={springKnopf}>
           <ArrowRightIcon className="h-4 w-4" />
         </Link>
-        <h2 className="ml-1 text-base font-semibold tracking-tight text-ink">
-          {titel}
-        </h2>
-        {tag !== heute && (
           <Link
             href={href(ansicht, heute)}
-            className="ml-1 text-sm font-medium text-navy-600 hover:underline"
+            className="crm-calendar-today"
+            aria-current={tag === heute ? "date" : undefined}
           >
             Heute
           </Link>
-        )}
+        </nav>
       </div>
 
-      {/* Segmentgruppe. Am Handy scrollt sie lieber, als umzubrechen. */}
-      <div className={segmentGruppe}>
+      <nav className="crm-view-tabs crm-calendar-views" aria-label="Kalenderansichten">
         {ANSICHTEN.map(({ wert, label }) => (
           <Link
             key={wert}
             href={href(wert, tag)}
             aria-current={wert === ansicht ? "page" : undefined}
-            className={segmentKnopf(wert === ansicht)}
           >
             {label}
           </Link>
         ))}
-      </div>
+      </nav>
     </div>
   );
 }

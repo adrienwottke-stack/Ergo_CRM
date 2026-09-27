@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { XIcon } from "@/components/icons";
 
@@ -20,12 +20,28 @@ export default function Modal({
   children: React.ReactNode;
 }) {
   const [mounted, setMounted] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !mounted) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    const shell = document.querySelector<HTMLElement>(".crm-shell");
+    const wasInert = shell?.inert ?? false;
+    if (shell) shell.inert = true;
+    const controls = () => Array.from(dialog?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]') ?? []).filter(element => element.getClientRects().length > 0);
+    const frame = requestAnimationFrame(() => (controls()[0] ?? dialog)?.focus());
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") { event.preventDefault(); closeRef.current(); }
+      if (event.key !== "Tab") return;
+      const targets = controls();
+      const first = targets[0], last = targets.at(-1);
+      if (!first) { event.preventDefault(); dialog?.focus(); return; }
+      if (!dialog?.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) { event.preventDefault(); (event.shiftKey ? last : first)?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     };
     window.addEventListener("keydown", onKey);
 
@@ -40,10 +56,13 @@ export default function Modal({
 
     return () => {
       window.removeEventListener("keydown", onKey);
+      cancelAnimationFrame(frame);
+      if (shell) shell.inert = wasInert;
       document.body.style.overflow = prevOverflow;
       document.body.style.paddingRight = prevPadding;
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open, mounted]);
 
   if (!open || !mounted) return null;
 
@@ -56,16 +75,14 @@ export default function Modal({
       role="presentation"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(event) => event.stopPropagation()}
         className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl sm:max-w-lg sm:rounded-xl"
       >
-        {/* Grabber: signalisiert am Handy "das hier ist ein Sheet, zieh mich
-            runter". Rein optisch - gezogen wird noch nicht, das Schliessen
-            laeuft weiter ueber Backdrop, X oder Escape. */}
-        <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-line-strong" aria-hidden />
         <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div>
             <h2 className="text-base font-semibold text-ink">{title}</h2>

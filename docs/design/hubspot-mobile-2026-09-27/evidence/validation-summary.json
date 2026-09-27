@@ -1,0 +1,32 @@
+{
+  "checkedAt": "2026-09-27T16:14:33.873Z",
+  "baseCommit": "57548123c1edeb2a45320d1fe2f05cb60f229506",
+  "workingTreeModified": true,
+  "domainTests": 264,
+  "domainSupplement": 16,
+  "domainTotal": 280,
+  "domainFailed": 0,
+  "isolatedBuild": "passed including typecheck and19static pages",
+  "changedFileLint": "passed",
+  "workspaceRegression": {
+    "success": true,
+    "checks": [
+      "Manual search/filter → contact → edit/save → same filtered list, database result verified, no Jarvis request",
+      "Keyboard filter order and visible focus; manual contact creation persists in the chosen list without Jarvis",
+      "Seven real pages at 320/390/768/1440, light/dark captures, no document overflow, original five navigation items, global touch targets at least 44px",
+      "Jarvis text task via simulated provider → confirmed server action → same CRM record refreshed",
+      "Mixed task: Jarvis proposal → manual field edit → new preview → confirmation → correct persisted value",
+      "F6 transfers focus between the usable CRM and Jarvis panel",
+      "Help source links and calculator handoff use actual shared helpers; assistant panel responsive; opening does not request microphone"
+    ],
+    "errors": [],
+    "limitations": [
+      "Local simulated text provider",
+      "No real microphone, OpenAI or physical device acceptance",
+      "No deployment"
+    ]
+  },
+  "simulatedVoiceBrowser": "passed",
+  "uiAcceptance": true,
+  "images": 56
+}
