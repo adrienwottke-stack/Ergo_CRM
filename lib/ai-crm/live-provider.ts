@@ -107,15 +107,32 @@ export async function sendProviderUpdate(providerSessionRef: string, content: st
       if (error) reject(error); else resolve();
     };
     const abort = () => finish(new AiCrmError("REQUEST_ABORTED", "Diese Sprachausgabe wurde beendet.", 409));
-    const timeout = setTimeout(() => finish(new AiCrmError("LIVE_AUDIO_DELIVERY_UNKNOWN", "Das Fachresultat liegt vor. Die Sprachausgabe konnte nicht bestätigt werden.", 504)), options.timeoutMs ?? 10_000);
+    const timeout = setTimeout(() => {
+      console.error("Jarvis sideband failed", { reason: "ack_timeout", event: expectedAcknowledgment });
+      finish(new AiCrmError("LIVE_AUDIO_DELIVERY_UNKNOWN", "Das Fachresultat liegt vor. Die Sprachausgabe konnte nicht bestätigt werden.", 504));
+    }, options.timeoutMs ?? 10_000);
     options.signal?.addEventListener("abort", abort, { once: true });
     if (options.signal?.aborted) { abort(); return; }
-    connection.on("error", () => finish(new AiCrmError("LIVE_AUDIO_DELIVERY_FAILED", "Die Sprachverbindung konnte das Ergebnis nicht übernehmen. Das Ergebnis bleibt im CRM sichtbar.", 502)));
-    connection.on("close", () => { if (!settled) finish(new AiCrmError("LIVE_CONNECTION_CLOSED", "Die Sprachverbindung wurde beendet.", 502)); });
+    connection.on("error", error => {
+      if (settled) return;
+      // Never log credentials, session IDs or message content from provider errors.
+      const status = error instanceof Error ? error.message.match(/\b(?:400|401|403|404|409|429|5\d\d)\b/)?.[0] : undefined;
+      console.error("Jarvis sideband failed", { reason: "socket_error", status, event: expectedAcknowledgment });
+      finish(new AiCrmError("LIVE_AUDIO_DELIVERY_FAILED", "Die Sprachverbindung konnte das Ergebnis nicht übernehmen. Das Ergebnis bleibt im CRM sichtbar.", 502));
+    });
+    connection.on("close", code => { if (!settled) {
+      console.error("Jarvis sideband failed", { reason: "socket_closed", code, event: expectedAcknowledgment });
+      finish(new AiCrmError("LIVE_CONNECTION_CLOSED", "Die Sprachverbindung wurde beendet.", 502));
+    } });
     connection.on("event", event => {
       // The SDK emits its generic event before the typed error callback.
       // An error can carry our client_event_id and must never acknowledge it.
-      if (event.type === "error") { finish(new AiCrmError("LIVE_AUDIO_DELIVERY_FAILED", "Die Sprachverbindung konnte das Ergebnis nicht übernehmen. Das Ergebnis bleibt im CRM sichtbar.", 502)); return; }
+      if (event.type === "error") {
+        if (settled) return;
+        const code = "error" in event && typeof event.error === "object" && event.error && "code" in event.error && typeof event.error.code === "string" ? event.error.code : undefined;
+        console.error("Jarvis sideband failed", { reason: "provider_error", code, event: expectedAcknowledgment });
+        finish(new AiCrmError("LIVE_AUDIO_DELIVERY_FAILED", "Die Sprachverbindung konnte das Ergebnis nicht übernehmen. Das Ergebnis bleibt im CRM sichtbar.", 502)); return;
+      }
       if (event.type !== expectedAcknowledgment) return;
       if ("client_event_id" in event && event.client_event_id && pending.has(event.client_event_id)) {
         pending.delete(event.client_event_id);

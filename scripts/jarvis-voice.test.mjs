@@ -13,7 +13,7 @@ let creates = 0, speeches = 0, backendCalls = 0;
 globalThis.jarvisVoiceEvents = [];
 globalThis.jarvisVoiceClient = {
   live: { create: async body => { creates++; globalThis.jarvisVoiceCreated = body; return { session: { id: `live_test_${creates}` }, transport: { type: "webrtc", sdp: "test-answer" } }; } },
-  audio: { speech: { create: async body => { speeches++; globalThis.jarvisVoiceSpeechRequest = body; globalThis.jarvisVoiceSpoken = body.input; return new Response(new Uint8Array([1, 2, 3]), { headers: { "Content-Type": "audio/mpeg" } }); } } },
+  audio: { speech: { create: async body => { if (globalThis.jarvisVoiceRejectTts) throw new Error("TTS unavailable"); speeches++; globalThis.jarvisVoiceSpeechRequest = body; globalThis.jarvisVoiceSpoken = body.input; return new Response(new Uint8Array([1, 2, 3]), { headers: { "Content-Type": "audio/mpeg" } }); } } },
 };
 globalThis.jarvisVoiceAgent = async params => { backendCalls++; globalThis.jarvisVoiceAgentParams = params; return { answer: "Zugängliche Daten wurden geprüft.", actions: [], results: [{ id: "fact", summary: "Quelle", readAt: new Date().toISOString(), items: [] }], usage: { inputTokens: 3, outputTokens: 4, toolCalls: 0, estimatedCostMicros: 0 } }; };
 const modules = {
@@ -112,22 +112,37 @@ test("native greeting needs no user turn or TTS; claim, manual replay and reconn
   await lifecycle.DELETE(req({}, "DELETE"), session);
 });
 
-test("uncertain greeting delivery stays claimed across reconnect and only an explicit retry can send again", async () => {
+test("a failed Live greeting produces an authenticated one-time spoken fallback", async () => {
   const clientSessionId = randomUUID();
   const { session } = await (await start.POST(req({ clientSessionId, sdp: "v=0\r\na=uncertain-intro\r\n" }))).json();
   const context = ctx(session.id);
   globalThis.jarvisVoiceRejectSideband = true;
-  try { assert.equal((await intro.POST(req(), context)).status, 502); }
+  let fallback;
+  try { fallback = await intro.POST(req(), context); }
   finally { globalThis.jarvisVoiceRejectSideband = false; }
-  assert.equal((await db.aiLiveSession.findUniqueOrThrow({ where: { id: session.id } })).introState, "PLAYING");
+  assert.equal(fallback.status, 200);
+  assert.equal(fallback.headers.get("X-Jarvis-Voice-Fallback"), "1");
+  assert.deepEqual(new Uint8Array(await fallback.arrayBuffer()), new Uint8Array([1, 2, 3]));
+  assert.match(globalThis.jarvisVoiceSpoken, /Hey, Meister Emil/);
+  assert.equal(globalThis.jarvisVoiceSpeechRequest.voice, "cedar");
+  assert.equal((await db.aiLiveSession.findUniqueOrThrow({ where: { id: session.id } })).introState, "DONE");
   const sent = globalThis.jarvisVoiceEvents.length;
-  assert.equal((await intro.POST(req(), context)).status, 409);
+  assert.deepEqual(await (await intro.POST(req(), context)).json(), { introState: "DONE", accepted: false });
   assert.equal(globalThis.jarvisVoiceEvents.length, sent);
   const reconnect = await start.POST(req({ clientSessionId, sdp: "v=0\r\na=reconnect-intro\r\n", reconnect: true }));
-  assert.equal((await reconnect.json()).session.introState, "PLAYING");
+  assert.equal((await reconnect.json()).session.introState, "DONE");
   assert.match(globalThis.jarvisVoiceCreated.session.instructions, /Begrüße nicht erneut/);
   assert.equal((await intro.POST(req({ replay: true }), context)).status, 200);
   await lifecycle.DELETE(req({}, "DELETE"), context);
+});
+
+test("uncertain greeting stays claimed if both voice paths fail", async () => {
+  const { session } = await (await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=both-unavailable\r\n" }))).json();
+  globalThis.jarvisVoiceRejectSideband = true; globalThis.jarvisVoiceRejectTts = true;
+  try { assert.equal((await intro.POST(req(), ctx(session.id))).status, 502); }
+  finally { globalThis.jarvisVoiceRejectSideband = false; globalThis.jarvisVoiceRejectTts = false; }
+  assert.equal((await db.aiLiveSession.findUniqueOrThrow({ where: { id: session.id } })).introState, "PLAYING");
+  await lifecycle.DELETE(req({}, "DELETE"), ctx(session.id));
 });
 
 test("skip and concurrent startup requests cannot produce an automatic duplicate greeting", async () => {
@@ -182,6 +197,30 @@ test("Live delegates to existing backend, persists sourced results, never replay
   const stored = await db.aiConversationMessage.findFirst({ where: { conversationId: data.conversation.id, role: "assistant" } });
   assert.ok(stored);
   assert.equal(stored.actions.kind, "live-result", "saved backend prose is labelled as a summary, never a spoken transcript");
+  await lifecycle.DELETE(req({}, "DELETE"), context);
+});
+
+test("a completed CRM answer is spoken through TTS when Live sideband rejects it", async () => {
+  const { session } = await (await start.POST(req({ clientSessionId: randomUUID(), sdp: "v=0\r\na=fallback-turn\r\n" }))).json();
+  const context = ctx(session.id);
+  const before = backendCalls;
+  const body = { clientTurnId: randomUUID(), transcript: "Was steht heute an?", revision: 1 };
+  globalThis.jarvisVoiceRejectSideband = true;
+  let response;
+  try { response = await turn.POST(req(body), context); }
+  finally { globalThis.jarvisVoiceRejectSideband = false; }
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.audioDelivered, false);
+  assert.equal(Buffer.from(data.fallbackAudio, "base64").toString("hex"), "010203");
+  assert.equal(globalThis.jarvisVoiceSpoken, data.answer);
+  assert.equal(backendCalls, before + 1);
+  const saved = await db.aiRequest.findUniqueOrThrow({ where: { id: data.requestId }, select: { response: true } });
+  assert.equal("fallbackAudio" in saved.response, false, "temporary audio must not enter the stored request");
+  const replay = await (await turn.POST(req(body), context)).json();
+  assert.equal(replay.audioDelivered, false);
+  assert.equal(replay.fallbackAudio, undefined);
+  assert.equal(backendCalls, before + 1);
   await lifecycle.DELETE(req({}, "DELETE"), context);
 });
 

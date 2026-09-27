@@ -25,6 +25,7 @@ import { assistantContextSchema } from "@/lib/ai-crm/context-schema";
 import { withinAiDeadline } from "@/lib/ai-crm/deadline";
 import { LIVE_STREAM_TYPE, liveTurnStream, type LiveProgress } from "@/lib/ai-crm/live-progress";
 import { startLiveBackchannel } from "@/lib/ai-crm/live-backchannel";
+import { renderSpeechFallback } from "@/lib/ai-crm/speech-fallback";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -187,7 +188,20 @@ async function runTurn(request: Request, context: RouteContext, progress: (phase
     const messageCount = await prisma.aiConversationMessage.count({
       where: { conversationId: conversation.id },
     });
-    const response = {
+    const response: {
+      mode: "live" | "simulation";
+      revision: number;
+      results: ReadResult[];
+      scopeFingerprint: string | undefined;
+      context: AssistantContext | undefined;
+      audioDelivered: boolean;
+      requestId: string;
+      answer: string;
+      actions: typeof actions;
+      music: typeof result.music;
+      conversation: { id: string; title: string; expiresAt: string; updatedAt: string; messageCount: number; restarted: boolean; restartReason: "expired" | "limit" | null };
+      fallbackAudio?: string;
+    } = {
       mode: currentSession.provider === "live" ? "live" as const : "simulation" as const,
       revision,
       results,
@@ -226,7 +240,15 @@ async function runTurn(request: Request, context: RouteContext, progress: (phase
       if (audioCurrent) {
         progress("speaking");
         try { await sendProviderUpdate(currentSession.providerSessionRef, result.answer, { delegationId: parsed.data.delegationId, signal: request.signal }); response.audioDelivered = true; }
-        catch { /* The durable result remains visible; never repeat a write. */ }
+        catch {
+          // The durable result is already committed. Do not rerun its CRM work.
+          try {
+            const audio = await renderSpeechFallback(result.answer, config);
+            const stillCurrent = await prisma.aiLiveSession.findFirst({ where: { id: routeSessionId, userId: user.id, revision, activeKey: user.id }, select: { id: true } });
+            if (stillCurrent && audio.byteLength <= 500_000) response.fallbackAudio = Buffer.from(audio).toString("base64");
+          }
+          catch { progress("voiceUnavailable"); }
+        }
       }
     }
     if (result.actions.length > 0) {

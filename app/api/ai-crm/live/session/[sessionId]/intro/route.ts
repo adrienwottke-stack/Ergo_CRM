@@ -7,6 +7,7 @@ import { aiErrorResponse, sameOrigin } from "@/lib/ai-crm/http";
 import { requireLiveSession } from "@/lib/ai-crm/live-sessions";
 import { livePublicConfig, liveGreetingInstruction, sendProviderUpdate } from "@/lib/ai-crm/live-provider";
 import { aiCrmConfig } from "@/lib/ai-crm/config";
+import { renderSpeechFallback } from "@/lib/ai-crm/speech-fallback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,8 +41,16 @@ export async function POST(request: Request, context: Context) {
       await sendProviderUpdate(session.providerSessionRef, liveGreetingInstruction(livePublicConfig(user.name, config).greetingText), { instruction: true });
       await prisma.aiLiveSession.updateMany({ where: { id: session.id, userId: user.id, activeKey: user.id, providerSessionRef: session.providerSessionRef, introState: "PLAYING" }, data: { introState: "DONE" } });
       return Response.json({ introState: "DONE", accepted: true }, { headers });
-    } catch {
-      throw new AiCrmError("LIVE_INTRO_DELIVERY_UNKNOWN", "Die Begrüßung konnte noch nicht bestätigt werden. Du kannst weitersprechen oder sie bewusst erneut anfordern.", 502);
+    } catch (error) {
+      console.error("Jarvis intro delivery failed", { code: error instanceof AiCrmError ? error.code : "UNEXPECTED" });
+      try {
+        const audio = await renderSpeechFallback(livePublicConfig(user.name, config).greetingText, config);
+        const stillActive = await prisma.aiLiveSession.updateMany({ where: { id: session.id, userId: user.id, activeKey: user.id, providerSessionRef: session.providerSessionRef, introState: "PLAYING" }, data: { introState: "DONE" } });
+        if (!stillActive.count) return Response.json({ introState: "DONE", accepted: false }, { headers });
+        return new Response(audio, { headers: { ...headers, "Content-Type": "audio/mpeg", "X-Jarvis-Voice-Fallback": "1" } });
+      } catch {
+        throw new AiCrmError("LIVE_INTRO_DELIVERY_UNKNOWN", "Die Begrüßung konnte noch nicht bestätigt werden. Du kannst weitersprechen oder sie bewusst erneut anfordern.", 502);
+      }
     }
   } catch (error) { return aiErrorResponse(error); }
 }

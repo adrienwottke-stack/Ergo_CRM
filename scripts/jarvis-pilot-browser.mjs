@@ -78,7 +78,7 @@ try {
   const errors = []; page.on("pageerror", error => errors.push(error.message));
   const settings = { demoEnabled: true, greetingText: "Hallo, Meister Emil.", inactivitySeconds: 180, warningSeconds: 30, maxSessionSeconds: 600, reconnectLimit: 1 };
   const conversation = { id: "fixture-conversation", title: "Jarvis UI Test", expiresAt: new Date(Date.now() + 86_400_000).toISOString(), updatedAt: new Date().toISOString(), messageCount: 0 };
-  let introState = "WAITING", introCalls = 0, turnCalls = [], revision = 0, ends = 0, failNextTurn = false, lastTurn = null, introDelay = 0, failIntro = false;
+  let introState = "WAITING", introCalls = 0, turnCalls = [], revision = 0, ends = 0, failNextTurn = false, fallbackNextTurn = false, lastTurn = null, introDelay = 0, failIntro = false, fallbackIntro = false;
   let activeSessionId = "fixture-blocked", failEnd = true, failStart = false, delayedStart = null, startEntered = null;
   const introBodies = [];
   const selectedVoices = [];
@@ -94,6 +94,7 @@ try {
         introCalls++; introBodies.push(body); introState = "PLAYING";
         assert.equal(await page.evaluate(() => window.__providerStarted), true, "greeting waits for session.started");
         if (failIntro) { failIntro = false; return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "Controlled uncertain greeting delivery" }) }); }
+        if (fallbackIntro) { fallbackIntro = false; introState = "DONE"; return route.fulfill({ status: 200, contentType: "audio/mpeg", headers: { "X-Jarvis-Voice-Fallback": "1" }, body: Buffer.from([1, 2, 3]) }); }
         if (introDelay) await new Promise(resolve => setTimeout(resolve, introDelay));
         const accepted = introState !== "DONE";
         if (accepted) greetingAcceptances.push(Date.now());
@@ -108,6 +109,7 @@ try {
       if (turnDelay) await new Promise(resolve => setTimeout(resolve, turnDelay));
       if (failNextTurn) { failNextTurn = false; return route.abort("failed"); }
       response = { answer: "Dies ist eine gekennzeichnete kontrollierte UI-Testantwort.", requestId: body.clientTurnId, actions: [], results: [{ id: "fixture-read", readAt: new Date().toISOString(), summary: "Kontrolliertes Testresultat", items: [] }], conversation, revision, stale: false, audioDelivered: true };
+      if (fallbackNextTurn) { fallbackNextTurn = false; response.audioDelivered = false; response.fallbackAudio = Buffer.from([1, 2, 3]).toString("base64"); }
     } else if (url.pathname.endsWith("/session")) {
       if (request.method() === "GET") response = { mode: "live", config: settings, activeSession: activeSessionId ? { id: activeSessionId } : null };
       else {
@@ -236,12 +238,16 @@ try {
   await page.getByText("Mikrofon stumm · Verbindung aktiv", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Mikrofon einschalten", exact: true }).click();
   // A lost response is recovered by operation id; explicit retry uses the original id/body.
-  failNextTurn = true; await page.evaluate(() => window.__say("Welche Aufgaben stehen diese Woche an?"));
+  failNextTurn = true; fallbackNextTurn = true; await page.evaluate(() => window.__say("Welche Aufgaben stehen diese Woche an?"));
   await page.getByRole("button", { name: "Ergebnis anhand der Operationskennung prüfen" }).click();
   await page.getByRole("button", { name: "Dieselbe Anfrage erneut senden" }).click();
   await page.waitForFunction(() => document.querySelectorAll(".assistant-read-result").length >= 3);
   assert.equal(turnCalls.at(-1).clientTurnId, turnCalls.at(-2).clientTurnId);
   assert.deepEqual(turnCalls.at(-1), turnCalls.at(-2));
+  await page.waitForFunction(() => window.__audio.some(audio => audio.createdSrc.startsWith("blob:")));
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), true, "the Live output is muted while verified fallback audio plays");
+  await page.evaluate(() => window.__say("Danke."));
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), false, "the next spoken turn restores Live output");
   await page.getByRole("button", { name: "Groß öffnen", exact: true }).click();
   await page.waitForURL("**/assistent");
   for (const dark of [true, false]) {
@@ -303,6 +309,14 @@ try {
   await page.getByRole("button", { name: "Begrüßung erneut anfordern", exact: true }).click();
   await retryResponse;
   assert.deepEqual(introBodies.at(-1), { replay: true });
+  await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
+  // The same voice surface plays the server-approved greeting clip if sideband delivery fails.
+  fallbackIntro = true;
+  const beforeFallbackIntro = await page.evaluate(() => window.__audio.filter(audio => audio.createdSrc.startsWith("blob:")).length);
+  await page.getByRole("button", { name: "Mit Jarvis sprechen", exact: true }).click();
+  await page.getByText("Mikrofon aktiv · Jarvis hört zu", { exact: true }).waitFor();
+  await page.waitForFunction(count => window.__audio.filter(audio => audio.createdSrc.startsWith("blob:")).length > count, beforeFallbackIntro);
+  assert.equal(await page.evaluate(() => window.__audio.find(audio => audio.srcObject?.kind === "output")?.muted), true);
   await page.getByRole("button", { name: "Sitzung beenden", exact: true }).click();
   // An accepted start with a lost HTTP response exposes owner-scoped recovery.
   failStart = true;

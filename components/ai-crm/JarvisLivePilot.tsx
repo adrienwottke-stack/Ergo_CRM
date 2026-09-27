@@ -59,6 +59,8 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const peer = useRef<RTCPeerConnection | null>(null);
   const channel = useRef<RTCDataChannel | null>(null);
   const voice = useRef<HTMLAudioElement | null>(null);
+  const fallbackVoice = useRef<HTMLAudioElement | null>(null);
+  const fallbackUrl = useRef<string | null>(null);
   const inputMeter = useRef<ReturnType<typeof monitorAudio> | null>(null);
   const outputMeter = useRef<ReturnType<typeof monitorAudio> | null>(null);
   const player = useRef<LocalAudioController | null>(null);
@@ -85,6 +87,34 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
   const activity = useCallback(() => { lastActivity.current = Date.now(); setIdleWarning(null); }, []);
   const changeIntro = useCallback((value: Intro) => { introState.current = value; setIntro(value); }, []);
   const duck = useCallback(() => player.current?.setDucked(userSpeaking.current || jarvisSpeaking.current), []);
+  const stopFallback = useCallback(() => {
+    if (fallbackVoice.current) {
+      fallbackVoice.current.onended = null;
+      fallbackVoice.current.onerror = null;
+      fallbackVoice.current.pause();
+      fallbackVoice.current.src = "";
+      fallbackVoice.current = null;
+    }
+    if (fallbackUrl.current) { URL.revokeObjectURL(fallbackUrl.current); fallbackUrl.current = null; }
+    jarvisSpeaking.current = false; setOutputActive(false); duck();
+  }, [duck]);
+  const playFallback = useCallback(async (blob: Blob) => {
+    stopFallback();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    fallbackVoice.current = audio; fallbackUrl.current = url;
+    audio.volume = JARVIS_VOICE_VOLUME;
+    if (voice.current) voice.current.muted = true;
+    audio.onended = () => { if (fallbackVoice.current === audio) stopFallback(); };
+    audio.onerror = () => { if (fallbackVoice.current === audio) { stopFallback(); setAudioBlocked(true); setNotice("Die Ersatz-Sprachausgabe konnte nicht abgespielt werden. Prüfe die Audiofreigabe."); } };
+    try {
+      await audio.play();
+      if (fallbackVoice.current !== audio) return;
+      jarvisSpeaking.current = true; setOutputActive(true); setAudioBlocked(false); duck(); activity();
+    } catch {
+      if (fallbackVoice.current === audio) { setAudioBlocked(true); setNotice("Die Audioausgabe braucht deine Freigabe. Tippe auf „Audioausgabe freigeben“."); }
+    }
+  }, [activity, duck, stopFallback]);
   const sendControl = useCallback((type: "session.close" | "session.input_audio.mute" | "session.input_audio.unmute") => {
     if (channel.current?.readyState === "open") channel.current.send(JSON.stringify({ type }));
   }, []);
@@ -95,9 +125,10 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     inputMeter.current?.close(); inputMeter.current = null;
     outputMeter.current?.close(); outputMeter.current = null;
     if (voice.current) { voice.current.pause(); voice.current.srcObject = null; voice.current = null; }
+    stopFallback();
     userSpeaking.current = false; jarvisSpeaking.current = false;
     setInputActive(false); setOutputActive(false);
-  }, []);
+  }, [stopFallback]);
   const releaseIntro = useCallback(() => {
     introEpoch.current++; introRequest.current?.abort(); introRequest.current = null; introInFlight.current = false;
   }, []);
@@ -143,10 +174,11 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     const active = session.current;
     if (!active) return 0;
     active.revision++;
+    stopFallback();
     operation.current?.abort(); operation.current = null;
     if (revoke) void fetch(`/api/ai-crm/live/session/${active.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ revision: active.revision, interruptAudio }) }).catch(() => undefined);
     return active.revision;
-  }, []);
+  }, [stopFallback]);
 
   useEffect(() => {
     if (previousContext.current === selectedContext) return;
@@ -171,9 +203,14 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     pending.current = null; setRecovery(false); setRetryAvailable(false); setWorking(false);
     setNotice("");
     if (voice.current && data.audioDelivered === true) voice.current.muted = false;
-    if (data.audioDelivered === false) setNotice("Die Sprachausgabe konnte gerade nicht bestätigt werden. Die CRM-Zusammenfassung kannst du im Gespräch öffnen.");
+    if (data.audioDelivered === false && typeof data.fallbackAudio === "string") {
+      try {
+        const bytes = Uint8Array.from(atob(data.fallbackAudio), character => character.charCodeAt(0));
+        void playFallback(new Blob([bytes], { type: "audio/mpeg" }));
+      } catch { setNotice("Die Sprachausgabe konnte nicht geladen werden. Die CRM-Zusammenfassung steht im Gespräch."); }
+    } else if (data.audioDelivered === false) setNotice("Die Sprachausgabe konnte gerade nicht bestätigt werden. Die CRM-Zusammenfassung kannst du im Gespräch öffnen.");
     activity();
-  }, [activity]);
+  }, [activity, playFallback]);
 
   const submit = useCallback(async (text: string, inputInTranscript: boolean) => {
     const active = session.current;
@@ -246,9 +283,16 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     changeIntro("PLAYING");
     try {
       const response = await fetch(`/api/ai-crm/live/session/${active.id}/intro`, { method: "POST", headers: jsonHeaders, signal: controller.signal, body: JSON.stringify(replay ? { replay: true } : {}) });
-      const data = await readJson(response);
+      const fallback = response.ok && response.headers.get("X-Jarvis-Voice-Fallback") === "1";
+      const data = fallback ? {} : await readJson(response);
       if (token !== lifecycle.current || epoch !== introEpoch.current || session.current?.id !== active.id) return;
       if (!response.ok) throw new Error(errorMessage(data, "Die Begrüßung konnte nicht bestätigt werden."));
+      if (fallback) {
+        const audio = await response.blob();
+        if (token !== lifecycle.current || epoch !== introEpoch.current || session.current?.id !== active.id) return;
+        await playFallback(audio);
+        if (token !== lifecycle.current || epoch !== introEpoch.current || session.current?.id !== active.id) return;
+      }
       changeIntro("DONE"); // Instruction acknowledged; no claim of finished audio playback.
       setIntroIssue("");
     } catch (reason) {
@@ -258,7 +302,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       if (token === lifecycle.current && epoch === introEpoch.current) introInFlight.current = false;
       if (introRequest.current === controller) introRequest.current = null;
     }
-  }, [changeIntro]);
+  }, [changeIntro, playFallback]);
 
   const musicAction = useCallback(async (command: MusicCommand) => { activity(); await player.current?.command(command); }, [activity]);
 
@@ -307,7 +351,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
       pc.ontrack = event => {
         if (peer.current !== pc) return;
         const remote = event.streams[0] ?? new MediaStream([event.track]); speaker.srcObject = remote;
-        outputMeter.current?.close(); outputMeter.current = monitorAudio(remote, active => { jarvisSpeaking.current = active && !speaker.muted; setOutputActive(jarvisSpeaking.current); duck(); if (active) activity(); });
+        outputMeter.current?.close(); outputMeter.current = monitorAudio(remote, active => { jarvisSpeaking.current = (active && !speaker.muted) || Boolean(fallbackVoice.current && !fallbackVoice.current.paused); setOutputActive(jarvisSpeaking.current); duck(); if (active) activity(); });
         void outputMeter.current.resume().catch(() => setAudioBlocked(true));
         void speaker.play().then(() => setAudioBlocked(inputMeter.current?.state() !== "running" || outputMeter.current?.state() !== "running")).catch(() => setAudioBlocked(true));
       };
@@ -337,10 +381,12 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
             else setHeard(utterance.current.preview());
             // A new spoken turn resumes Live even when it is just a greeting
             // and will not produce a backend response to unmute the speaker.
-            if (accepted === "added" && /[\p{L}\p{N}]/u.test(delta.content)) speaker.muted = false;
+            const newSpeech = accepted === "added" && /[\p{L}\p{N}]/u.test(delta.content);
+            const wasSpeaking = jarvisSpeaking.current;
+            if (newSpeech) { stopFallback(); speaker.muted = false; }
             // Microphone levels include clicks, breathing and residual speaker echo.
             // Only new recognized speech may cancel an answer, once per utterance.
-            if (accepted === "added" && session.current && (jarvisSpeaking.current || operation.current || introState.current === "PLAYING") && utterance.current.claimInterruption()) {
+            if (accepted === "added" && session.current && (wasSpeaking || operation.current || introState.current === "PLAYING") && utterance.current.claimInterruption()) {
               // GPT-Live handles audible interruption; do not mute its next acknowledgment.
               // Live yields the microphone immediately. Do not cancel backend
               // work on a partial "Mir geht ..." before knowing the full reply.
@@ -417,7 +463,7 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
         if (token === lifecycle.current && typeof blocked?.id === "string") setBlockedSessionId(blocked.id);
       }
     } finally { if (startRequest.current === controller) startRequest.current = null; if (token === lifecycle.current) starting.current = false; }
-  }, [activity, changeIntro, close, duck, markIntro, nextRevision, playIntro, releaseIntro, releaseTransport, selectedVoice, settings]);
+  }, [activity, changeIntro, close, duck, markIntro, nextRevision, playIntro, releaseIntro, releaseTransport, selectedVoice, settings, stopFallback]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -450,11 +496,17 @@ export default function JarvisLivePilot(props: JarvisLiveProps & { settings: Jar
     pending.current = null; delegation.current = undefined; setRecovery(false); setRetryAvailable(false);
     if (introState.current === "PLAYING") void markIntro().catch(reason => setError(reason instanceof Error ? reason.message : "Der Begrüßungsstatus konnte nicht beendet werden."));
     if (voice.current) voice.current.muted = true;
+    stopFallback();
     setWorking(false); jarvisSpeaking.current = false; setOutputActive(false); duck();
     setNotice("Sprachausgabe unterbrochen. Neue Frage oder Auswahl verwenden; bereits gespeicherte Änderungen bleiben bestehen.");
   };
   const enableAudio = async () => {
-    try { await inputMeter.current?.resume(); await outputMeter.current?.resume(); if (voice.current) { voice.current.muted = false; await voice.current.play(); } setAudioBlocked(false); }
+    try {
+      await inputMeter.current?.resume(); await outputMeter.current?.resume();
+      if (fallbackVoice.current) { await fallbackVoice.current.play(); jarvisSpeaking.current = true; setOutputActive(true); duck(); }
+      else if (voice.current) { voice.current.muted = false; await voice.current.play(); }
+      setAudioBlocked(false);
+    }
     catch { setError("Der Browser blockiert die Audioausgabe weiterhin. Prüfe die Audiofreigabe dieser Seite."); }
   };
   const active = !["IDLE", "ENDED"].includes(connection);
