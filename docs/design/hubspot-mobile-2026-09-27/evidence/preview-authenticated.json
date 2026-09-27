@@ -1,0 +1,104 @@
+{
+  "success": true,
+  "checkedAt": "2026-09-27T16:21:57.555Z",
+  "deploymentId": "dpl_HNQeHzFuDcu3Ce4XvtjETPNRptpv",
+  "url": "https://ergo-exgfu4k49-adrienwottke-7137s-projects.vercel.app",
+  "target": "preview",
+  "apiTarget": null,
+  "commit": "aff9233192d0d903fb2bbe05b450cefe162d2765",
+  "checks": [
+    {
+      "check": "Normal login with existing owner credentials",
+      "success": true
+    },
+    {
+      "path": "/heute",
+      "width": 390,
+      "status": 200,
+      "authenticatedApp": true,
+      "noOverflow": true
+    },
+    {
+      "path": "/namen?liste=VERKAUF",
+      "width": 390,
+      "status": 200,
+      "authenticatedApp": true,
+      "noOverflow": true
+    },
+    {
+      "check": "Published contact filter opens and cancels",
+      "width": 390,
+      "success": true
+    },
+    {
+      "path": "/fortschritt",
+      "width": 390,
+      "status": 200,
+      "authenticatedApp": true,
+      "noOverflow": true
+    },
+    {
+      "path": "/mannschaft",
+      "width": 390,
+      "status": 200,
+      "authenticatedApp": true,
+      "noOverflow": true
+    },
+    {
+      "path": "/kalender?ansicht=liste",
+      "width": 390,
+      "status": 200,
+      "authenticatedApp": true,
+      "noOverflow": true
+    },
+    {
+      "path": "/heute",
+      "width": 1440,
+      "status": 200,
+      "authenticatedApp": true,
+      "noOverflow": true
+    },
+    {
+      "path": "/namen?liste=VERKAUF",
+      "width": 1440,
+      "status": 200,
+      "authenticatedApp": true,
+      "noOverflow": true
+    },
+    {
+      "check": "Published contact filter opens and cancels",
+      "width": 1440,
+      "success": true
+    },
+    {
+      "path": "/fortschritt",
+      "width": 1440,
+      "status": 200,
+      "authenticatedApp": true,
+      "noOverflow": true
+    },
+    {
+      "path": "/mannschaft",
+      "width": 1440,
+      "status": 200,
+      "authenticatedApp": true,
+      "noOverflow": true
+    },
+    {
+      "path": "/kalender?ansicht=liste",
+      "width": 1440,
+      "status": 200,
+      "authenticatedApp": true,
+      "noOverflow": true
+    }
+  ],
+  "errors": [],
+  "blockedWrites": [],
+  "calendarRemoteCheck": "Authenticated rendered agenda verified",
+  "limits": [
+    "Remote probe uses existing owner login and view-only business actions",
+    "Writes and provider/voice flows tested only with isolated local data",
+    "Normal server-side presence metadata may update when visiting Today",
+    "No physical-device or real-voice/provider acceptance"
+  ]
+}

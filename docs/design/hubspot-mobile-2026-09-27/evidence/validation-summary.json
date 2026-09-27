@@ -6,7 +6,7 @@
   "domainSupplement": 16,
   "domainTotal": 280,
   "domainFailed": 0,
-  "isolatedBuild": "passed including typecheck and19static pages",
+  "isolatedBuild": "passed including typecheck and 19 static pages",
   "changedFileLint": "passed",
   "workspaceRegression": {
     "success": true,
@@ -28,5 +28,15 @@
   },
   "simulatedVoiceBrowser": "passed",
   "uiAcceptance": true,
-  "images": 56
+  "images": 56,
+  "release": {
+    "appCommit": "aff9233192d0d903fb2bbe05b450cefe162d2765",
+    "branch": "codex/hubspot-jarvis-preview",
+    "deploymentId": "dpl_HNQeHzFuDcu3Ce4XvtjETPNRptpv",
+    "url": "https://ergo-exgfu4k49-adrienwottke-7137s-projects.vercel.app",
+    "readyState": "READY",
+    "authenticatedPreview": true,
+    "productionUnchanged": true,
+    "proof": "deployment-proof.json"
+  }
 }

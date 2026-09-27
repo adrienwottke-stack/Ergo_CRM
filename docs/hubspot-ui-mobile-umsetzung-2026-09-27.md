@@ -39,7 +39,7 @@ Preview und Production verwenden weiterhin gemeinsam konfigurierte Datenbankvari
 
 Die Veröffentlichung schließt lokale Umgebungsdateien, Caches, Prüfaufnahmen, Anhänge und Arbeitsunterlagen explizit über `.vercelignore` aus. Das Uploadmanifest wurde vor dem Upload mit Vercels Dry Run kontrolliert; damit gelangen ausschließlich die vorgesehenen Projektdateien in das Deployment. [Vercel: Uploadausschlüsse](https://vercel.com/docs/deployments/vercel-ignore).
 
-Die schreibgeschützte Prüfung der lokal konfigurierten Projektdatenbank am 27. September ergab keine ausstehenden oder fehlgeschlagenen Migrationen. Es wurden keine Migrationen ausgeführt. Die normale vorhandene Anmeldung für einen geschützten, lesenden Preview-Browsercheck wurde vorbereitet; personenbezogene Remote-Aufnahmen werden nicht Bestandteil der Galerie.
+Die schreibgeschützte Prüfung der lokal konfigurierten Projektdatenbank am 27. September ergab keine ausstehenden oder fehlgeschlagenen Migrationen. Es wurden keine Migrationen ausgeführt. Der geschützte Preview-Browsercheck verwendete eine normale vorhandene Anmeldung und lesende Fachaktionen. Personenbezogene Remote-Aufnahmen sind nicht Bestandteil der Galerie.
 
 ## Prüfstand
 
@@ -56,6 +56,7 @@ Die Umsetzung wurde mit wegwerfbaren lokalen Testdaten geprüft. Die schreibende
 | Bildschirmtastatur | `visualViewport` mit 430px sichtbarer Höhe simuliert: feste Navigation wird bei Texteingabe ausgeblendet, Dialog passt in die sichtbare Höhe, Navigation kehrt nach Schließen zurück. |
 | Kalender-Randfall | Drei aufeinanderfolgende 15-Minuten-Termine sind in Tag/Woche getrennt bedienbar; Mindestziele und Rasterende geprüft. |
 | Build/Typen/Lint | Isolierter optimierter Next-Build einschließlich Typprüfung und 19 statischen Seiten bestanden. Alle geänderten TypeScript-/TSX-Dateien ohne ESLint-Befund. Kein Migrations-Build. |
+| Veröffentlichte Preview | Normale Anmeldung und alle fünf Hauptbereiche bei 390/1440px erfolgreich gerendert: zehn angemeldete Seitenprüfungen mit HTTP 200, richtiger Navigation und ohne horizontalen Überlauf. Kontaktfilter und Werkzeugdialog bedienbar; keine Browserfehler oder blockierten Schreibversuche. |
 
 Die vollständige Abnahmemethode, Befunde und korrigierten Testannahmen stehen im [unabhängigen Prüfbericht](hubspot-masterplan-qa-2026-09-27.md). Die [versionierte Vorher-/Nachher-Galerie](design/hubspot-mobile-2026-09-27/index.html) enthält 56 Originalbilder für alle fünf Bereiche und den vollständigen Kontaktweg.
 
@@ -67,4 +68,16 @@ Die vollständige Abnahmemethode, Befunde und korrigierten Testannahmen stehen i
 
 ## Veröffentlichung
 
-Der genaue veröffentlichte Commit, Deploymentstatus, Alias und angemeldete Browsernachweis werden nach der autorisierten Preview-Veröffentlichung hier ergänzt. Ein Login-/Schutzseitenaufruf allein gilt ausdrücklich nicht als Funktionsabnahme. Production-Ausgangsdeployment und Projektkonfiguration werden anschließend erneut verglichen.
+Die gemeinsame Preview ist veröffentlicht und nach normaler Anmeldung geprüft:
+
+- **Preview:** [Ergo_CRM HubSpot-Mobile-Preview öffnen](https://ergo-exgfu4k49-adrienwottke-7137s-projects.vercel.app).
+- **Anwendungscommit:** `aff9233192d0d903fb2bbe05b450cefe162d2765`, auf `origin/codex/hubspot-jarvis-preview` gepusht.
+- **Deployment:** `dpl_HNQeHzFuDcu3Ce4XvtjETPNRptpv`, Status **READY**, Ziel **Preview**, Buildkommando **`next build`**. Commit und Branch wurden aus dem veröffentlichten Deployment gelesen, das Ziel zusätzlich mit Vercel Inspect bestätigt. Die API bildet dieses Preview-Ziel als `target: null` ab.
+- **Angemeldete Prüfung:** 27. September 2026, 18:21 Uhr Europe/Berlin. Heute, Kontakte, Kalender/Agenda, Fortschritt und Team jeweils bei 390 und 1440px; tatsächliche Anwendungsinhalte statt nur Login-/Schutzseite. Filter öffnen/abbrechen, Werkzeuge öffnen/Escape sowie feste Navigationsreihenfolge erfolgreich. [Bereinigter Browsernachweis](design/hubspot-mobile-2026-09-27/evidence/preview-authenticated.json).
+- **Production unverändert:** weiterhin `dpl_F7GRPW8PjJcNyammhRTSxxH5yxXT`. Production-URL, Branch, Buildkommando, Installkommando, Framework und Schutzkonfiguration stimmen mit dem Ausgangssnapshot überein. Es wurden keine Production-Variablen geändert. [Deployment- und Vergleichsnachweis](design/hubspot-mobile-2026-09-27/evidence/deployment-proof.json).
+
+Für die Übergabe gilt bewusst die eindeutige Deployment-Adresse oben. Der ältere Branch-Alias `ergo-crm-git-codex-hubspot-j-40b920-adrienwottke-7137s-projects.vercel.app` verweist derzeit auf das bestehende Production-Deployment. Er wurde weder verändert noch als Preview-Nachweis verwendet.
+
+Der Remotecheck legte keine Fachdatensätze an und rief keine Modellanbieter auf. Die gewöhnliche serverseitige Anwesenheitsmetadatenpflege beim Aufruf von Heute kann stattfinden. Schreibende Funktionsprüfungen, künstliche Fehler und Sprachsimulationen stammen ausschließlich aus der isolierten lokalen Umgebung.
+
+Der nachfolgende reine Dokumentationscommit ergänzt diese Releasezuordnung und die bereinigten Nachweise. Er enthält keine weiteren Anwendungsänderungen; der veröffentlichte Anwendungsstand bleibt exakt `aff9233192d0d903fb2bbe05b450cefe162d2765`.

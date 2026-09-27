@@ -2,6 +2,8 @@
 
 > Nachfolgend bleibt der ursprüngliche Integrationsbericht erhalten. Die ausdrücklich freigegebene vollständige Umsetzung des HubSpot-UI-/Mobile-Masterplans folgt separat in [Umsetzung und Übergabe](hubspot-ui-mobile-umsetzung-2026-09-27.md), einschließlich aktueller Tests, Vergleichsbilder und eindeutig geprüftem Preview-Ziel. Für diesen nachfolgenden UI-Auftrag gelten keine Migrationen und keine Änderung von Production.
 
+> Aktueller UI-Anwendungsstand: `aff9233192d0d903fb2bbe05b450cefe162d2765`, [verifizierte Preview](https://ergo-exgfu4k49-adrienwottke-7137s-projects.vercel.app), Deployment `dpl_HNQeHzFuDcu3Ce4XvtjETPNRptpv` **Ready / Preview**. Alle fünf Hauptbereiche wurden dort nach normaler Anmeldung bei 390/1440px geprüft; Production blieb auf `dpl_F7GRPW8PjJcNyammhRTSxxH5yxXT`.
+
 ## Umfang
 
 Branch: `codex/hubspot-jarvis-preview`, Ausgangsstand `435b3f92fd43b57cc447a45d3e344b43fd264103`.

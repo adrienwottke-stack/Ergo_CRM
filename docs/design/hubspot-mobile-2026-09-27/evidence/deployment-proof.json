@@ -1,0 +1,56 @@
+{
+  "checkedAt": "2026-09-27T16:23:11.526Z",
+  "appCommit": "aff9233192d0d903fb2bbe05b450cefe162d2765",
+  "branch": "codex/hubspot-jarvis-preview",
+  "deploymentId": "dpl_HNQeHzFuDcu3Ce4XvtjETPNRptpv",
+  "url": "https://ergo-exgfu4k49-adrienwottke-7137s-projects.vercel.app",
+  "readyState": "READY",
+  "target": "preview",
+  "targetEvidence": "Vercel CLI inspect reports preview; Vercel API target is null for this Preview",
+  "buildCommand": "next build",
+  "migrationsExecuted": false,
+  "authenticatedPreview": {
+    "success": true,
+    "report": "preview-authenticated.json",
+    "renderedViews": 10,
+    "areas": 5,
+    "widths": [
+      390,
+      1440
+    ],
+    "errors": 0,
+    "blockedWrites": 0
+  },
+  "production": {
+    "unchanged": true,
+    "before": {
+      "productionDeployment": "dpl_F7GRPW8PjJcNyammhRTSxxH5yxXT",
+      "productionUrl": "ergo-51u5z94co-adrienwottke-7137s-projects.vercel.app",
+      "productionBranch": "main",
+      "buildCommand": null,
+      "installCommand": null,
+      "framework": "nextjs",
+      "ssoProtection": {
+        "deploymentType": "all_except_custom_domains"
+      }
+    },
+    "after": {
+      "productionDeployment": "dpl_F7GRPW8PjJcNyammhRTSxxH5yxXT",
+      "productionUrl": "ergo-51u5z94co-adrienwottke-7137s-projects.vercel.app",
+      "productionBranch": "main",
+      "buildCommand": null,
+      "installCommand": null,
+      "framework": "nextjs",
+      "ssoProtection": {
+        "deploymentType": "all_except_custom_domains"
+      }
+    }
+  },
+  "alias": {
+    "releasedAs": "Immutable deployment URL above",
+    "legacyBranchAlias": "ergo-crm-git-codex-hubspot-j-40b920-adrienwottke-7137s-projects.vercel.app",
+    "legacyAliasDeployment": "dpl_F7GRPW8PjJcNyammhRTSxxH5yxXT",
+    "note": "Legacy branch alias currently resolves to Production; it was not changed and is not the released Preview link"
+  },
+  "documentation": "Subsequent documentation-only commit records release proof. The deployed application remains the appCommit above."
+}
