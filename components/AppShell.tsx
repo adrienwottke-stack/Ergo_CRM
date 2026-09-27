@@ -8,6 +8,7 @@ import NamenSammelnLink from "@/components/NamenSammelnLink";
 import UndoBar from "@/components/UndoBar";
 import EinheitenNachAbschluss from "@/components/EinheitenNachAbschluss";
 import InstallationMelder from "@/components/InstallationMelder";
+import SuchTastatur from "@/components/suche/SuchTastatur";
 import { HAUPTNAVIGATION } from "@/lib/navigation";
 import { shell, gutter } from "@/components/ui";
 import type { User } from "@/lib/generated/prisma/client";
@@ -94,6 +95,7 @@ export default async function AppShell({
       </main>
       <UndoBar />
       <AssistantSurface userId={user.id} />
+      <SuchTastatur />
       <EinheitenNachAbschluss />
       <InstallationMelder melden={user.installedAt === null} />
       <Suspense fallback={null}><MiniEmil initial={coach} /></Suspense>
